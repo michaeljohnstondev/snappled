@@ -1,0 +1,343 @@
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Pressable,
+} from "react-native";
+import { useState, useRef } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import VibeButton from "../components/ui/VibeButton";
+import VibeInput from "../components/ui/VibeInput";
+import theme from "../theme/themes";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../services/firebase";
+
+export default function LoginScreen({ navigation }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const passwordInputRef = useRef(null);
+
+  function validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  function validateInputs() {
+    let isValid = true;
+
+    setEmailError("");
+    setPasswordError("");
+
+    if (!email.trim()) {
+      setEmailError("Email is required");
+      isValid = false;
+    } else if (!validateEmail(email)) {
+      setEmailError("Please enter a valid email address");
+      isValid = false;
+    }
+
+    if (!password.trim()) {
+      setPasswordError("Password is required");
+      isValid = false;
+    } else if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      isValid = false;
+    }
+
+    return isValid;
+  }
+
+  async function handleLogin() {
+    if (!validateInputs()) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      
+      Alert.alert("Login Successful! 🎉", "Welcome back to Snapple Park!", [
+        { 
+          text: "Continue", 
+          onPress: () => {
+            // Navigate to main app
+            navigation.navigate("Landing");
+          }
+        },
+      ]);
+    } catch (error) {
+      console.log("[Screen:Login] Login error:", error.code);
+      
+      let errorMessage = "Please check your credentials and try again.";
+      
+      // Handle specific Firebase auth errors
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = "No account found with this email address.";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = "Incorrect password.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email address.";
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = "This account has been disabled.";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many failed attempts. Please try again later.";
+      }
+      
+      setPasswordError(errorMessage);
+      Alert.alert("Login Failed", errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function handleForgotPassword() {
+    Alert.alert("Reset Password", "Password reset functionality coming soon!");
+  }
+
+  function handleGoToSignup() {
+    navigation.navigate("Signup");
+  }
+
+  function handleGoBack() {
+    navigation.goBack();
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <LinearGradient
+        colors={theme.colors.backgroundGradient}
+        style={styles.container}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Pressable onPress={handleGoBack} style={styles.backIcon}>
+            <Ionicons
+              name="chevron-back"
+              size={28}
+              color={theme.colors.textPrimary}
+            />
+          </Pressable>
+
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome Back! 👋</Text>
+            <Text style={styles.subtitle}>
+              Sign in to continue your Snapple Park adventure
+            </Text>
+          </View>
+
+          <View style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <VibeInput
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (emailError) setEmailError("");
+                }}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+                style={emailError ? styles.errorInput : null}
+              />
+              {emailError ? (
+                <Text style={styles.errorText}>{emailError}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordContainer}>
+                <VibeInput
+                  ref={passwordInputRef}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (passwordError) setPasswordError("");
+                  }}
+                  placeholder="Enter your password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  style={[
+                    styles.passwordInput,
+                    passwordError ? styles.errorInput : null,
+                  ]}
+                />
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+              </View>
+              {passwordError ? (
+                <Text style={styles.errorText}>{passwordError}</Text>
+              ) : null}
+            </View>
+
+            <Pressable
+              onPress={handleForgotPassword}
+              style={styles.forgotPasswordLink}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.buttonGroup}>
+            <VibeButton
+              label={isLoading ? "Signing In..." : "Sign In"}
+              onPress={handleLogin}
+              style={[styles.button, isLoading && styles.disabledButton]}
+              disabled={isLoading}
+            />
+
+            <View style={styles.signupPrompt}>
+              <Text style={styles.signupText}>
+                Don&apos;t have an account?{" "}
+              </Text>
+              <Pressable onPress={handleGoToSignup}>
+                <Text style={styles.signupLink}>Sign Up</Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: theme.sizes.spacing?.lg || 24,
+    paddingTop: 60,
+  },
+  backIcon: {
+    alignSelf: "flex-start",
+    marginBottom: 20,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: theme.colors.textPrimary,
+    marginBottom: theme.sizes.spacing?.md || 16,
+    textAlign: "center",
+    ...theme.shadows?.textGlow,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
+  formContainer: {
+    marginBottom: 40,
+  },
+  inputGroup: {
+    marginBottom: theme.sizes.spacing?.lg || 24,
+  },
+  label: {
+    fontSize: 16,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.sizes.spacing?.sm || 8,
+    fontWeight: "600",
+  },
+  passwordContainer: {
+    position: "relative",
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  passwordToggle: {
+    position: "absolute",
+    right: 15,
+    top: "50%",
+    transform: [{ translateY: -10 }],
+    padding: 5,
+  },
+  errorInput: {
+    borderColor: theme.colors.error || "#FF4136",
+    borderWidth: 1.5,
+  },
+  errorText: {
+    color: theme.colors.error || "#FF4136",
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  forgotPasswordLink: {
+    alignSelf: "flex-end",
+    marginTop: 8,
+    padding: 8,
+  },
+  forgotPasswordText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  buttonGroup: {
+    gap: theme.sizes.spacing?.lg || 24,
+    marginBottom: 40,
+  },
+  button: {
+    width: "100%",
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  signupPrompt: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  signupText: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+  },
+  signupLink: {
+    color: theme.colors.vibeBlue,
+    fontSize: 16,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+});
