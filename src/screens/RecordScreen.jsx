@@ -18,6 +18,8 @@ export default function RecordScreen() {
   const [recordedVideo, setRecordedVideo] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  
+  const maxDuration = 10; // 10 second max for Snapples
 
   function handleCameraReady(camera) {
     console.log('[RecordScreen] Camera ready');
@@ -46,9 +48,18 @@ export default function RecordScreen() {
 
   function handleRecordingComplete(video, finalTime) {
     console.log('[RecordScreen] Recording completed:', video, 'Time:', finalTime);
+    console.log('[RecordScreen] Video URI:', video?.uri);
     setIsRecording(false);
     setRecordedVideo(video);
     setRecordingTime(finalTime || 0);
+    
+    // Navigate to preview screen immediately
+    if (video && video.uri) {
+      console.log('[RecordScreen] Navigating to VideoPreview...');
+      navigation.navigate('VideoPreview', { recordedVideo: video });
+    } else {
+      console.log('[RecordScreen] No video or URI to navigate with');
+    }
   }
 
   function handleRecordingTimeUpdate(time) {
@@ -62,16 +73,8 @@ export default function RecordScreen() {
   }
 
   function handlePreviewVideo(video) {
-    // TODO: Navigate to video preview screen
-    console.log('Preview video:', video);
-    Alert.alert(
-      'Preview Video',
-      'Video preview will be implemented soon!',
-      [
-        { text: 'OK' },
-        { text: 'Submit Video', onPress: () => handleContinueWithVideo(video) }
-      ]
-    );
+    // Navigate to video preview screen
+    navigation.navigate('VideoPreview', { recordedVideo: video });
   }
 
   function toggleCamera() {
@@ -124,7 +127,7 @@ export default function RecordScreen() {
               colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
               style={styles.controlButton}
             >
-              <Ionicons name="close" size={24} color="white" />
+              <Text style={styles.closeText}>✕</Text>
             </LinearGradient>
           </Pressable>
 
@@ -142,7 +145,7 @@ export default function RecordScreen() {
               colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
               style={[styles.controlButton, isRecording && styles.disabledButton]}
             >
-              <Ionicons name="camera-reverse" size={24} color={isRecording ? '#666' : 'white'} />
+              <Text style={[styles.flipText, isRecording && styles.disabledText]}>⟲</Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -162,7 +165,7 @@ export default function RecordScreen() {
               colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.6)']}
               style={styles.successContent}
             >
-              <Ionicons name="checkmark-circle" size={64} color={theme.colors.vibeGreen} />
+              <Text style={styles.successIcon}>✓</Text>
               <Text style={styles.successTitle}>Video Recorded!</Text>
               <Text style={styles.successSubtitle}>
                 {recordingTime >= maxDuration 
@@ -349,5 +352,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
+  },
+  closeText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  flipText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  disabledText: {
+    color: '#666',
+  },
+  successIcon: {
+    color: theme.colors.vibeGreen,
+    fontSize: 48,
+    fontWeight: 'bold',
   },
 });

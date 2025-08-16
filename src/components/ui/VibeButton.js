@@ -46,6 +46,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
     alignItems: "center",
+    justifyContent: "center",
     marginVertical: 10,
     position: "relative",
     shadowColor: "#00ffff",
@@ -61,5 +62,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     fontFamily: theme.fonts.main,
+    textAlign: "center",
   },
 });

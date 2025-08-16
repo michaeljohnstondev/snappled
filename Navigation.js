@@ -8,6 +8,7 @@ import SignupScreen from './src/screens/SignupScreen';
 import PromptScreen from './src/screens/PromptScreen.jsx';
 import HomeScreen from './src/screens/HomeScreen.jsx';
 import RecordScreen from './src/screens/RecordScreen.jsx';
+import VideoPreviewScreen from './src/screens/VideoPreviewScreen.jsx';
 
 const Stack = createStackNavigator();
 
@@ -26,6 +27,7 @@ function MainStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Prompts" component={PromptScreen} />
       <Stack.Screen name="Record" component={RecordScreen} />
+      <Stack.Screen name="VideoPreview" component={VideoPreviewScreen} />
     </Stack.Navigator>
   );
 }
