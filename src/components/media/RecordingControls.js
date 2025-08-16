@@ -183,13 +183,6 @@ export default function RecordingControls({
 
   return (
     <View style={styles.container}>
-      {/* Timer Display */}
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerText}>
-          {recordingTime.toFixed(1)}s / {maxDuration}.0s
-        </Text>
-      </View>
-
       {/* Record Button */}
       <TouchableOpacity
         style={[
@@ -208,11 +201,6 @@ export default function RecordingControls({
           ]}
         />
       </TouchableOpacity>
-
-      {/* Status Text */}
-      <Text style={styles.statusText}>
-        {isRecording ? "Tap to stop recording" : "Tap to start recording"}
-      </Text>
     </View>
   );
 }
@@ -220,7 +208,9 @@ export default function RecordingControls({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    gap: 16,
+    justifyContent: "center",
+    height: 120, // Fixed height to maintain consistent space
+    position: "relative",
   },
   timerContainer: {
     paddingHorizontal: 16,

@@ -13,6 +13,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const player = useVideoPlayer(recordedVideo?.uri || null, (player) => {
     player.loop = true;
     player.muted = false;
+    player.play(); // Start playing immediately
   });
 
   const handleScreenTap = () => {
@@ -43,17 +44,15 @@ export default function VideoPreviewScreen({ route, navigation }) {
     <View style={styles.container}>
       {/* Full Screen Video Player */}
       {recordedVideo?.uri ? (
-        <View style={styles.videoContainer}>
-          <VideoView
-            player={player}
-            style={styles.video}
-            contentFit="cover"
-            allowsFullscreen={false}
-            allowsPictureInPicture={false}
-            showsPlaybackControls={false}
-            nativeControls={false}
-          />
-        </View>
+        <VideoView
+          player={player}
+          style={styles.video}
+          contentFit="cover"
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
+          showsPlaybackControls={false}
+          nativeControls={false}
+        />
       ) : (
         <View style={styles.errorContainer}>
           <Ionicons name="videocam-off" size={64} color={theme.colors.textSecondary} />
@@ -110,17 +109,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  videoContainer: {
+  video: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    overflow: 'hidden',
-  },
-  video: {
-    width: '100%',
-    height: '100%',
   },
   errorContainer: {
     flex: 1,

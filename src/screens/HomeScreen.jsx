@@ -163,7 +163,7 @@ export default function HomeScreen({ navigation }) {
           onRefresh={handleRefresh}
         /> */}
         
-        <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record')} />
+        <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record', { prompt: selectedPrompt })} />
 
         {/* Snapple Overlay */}
         <SnappleOverlay

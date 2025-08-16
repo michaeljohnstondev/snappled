@@ -10,7 +10,7 @@ import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-export default function RecordScreen() {
+export default function RecordScreen({ route }) {
   const navigation = useNavigation();
   const [cameraRef, setCameraRef] = useState(null);
   const [facing, setFacing] = useState('front');
@@ -18,8 +18,26 @@ export default function RecordScreen() {
   const [recordedVideo, setRecordedVideo] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [showPrompt, setShowPrompt] = useState(true);
+  const [cameraKey, setCameraKey] = useState(0); // Force camera remount
   
   const maxDuration = 10; // 10 second max for Snapples
+  const { prompt } = route.params || {};
+  const promptText = prompt?.text || "Record your response to today's Snapple prompt!";
+
+  // Auto-hide prompt after 5 seconds
+  useEffect(() => {
+    if (showPrompt) {
+      const timer = setTimeout(() => {
+        setShowPrompt(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showPrompt]);
+
+  function handleOverlayTouch() {
+    setShowPrompt(false); // Any touch on overlay dismisses prompt
+  }
 
   function handleCameraReady(camera) {
     console.log('[RecordScreen] Camera ready');
@@ -36,6 +54,8 @@ export default function RecordScreen() {
     console.log('[RecordScreen] Recording started');
     setIsRecording(true);
     setRecordingTime(0);
+    setShowPrompt(false); // Hide prompt when recording starts
+    // Keep overlay visible during recording so stop button works
   }
 
   function handleRecordingStop(error) {
@@ -109,10 +129,27 @@ export default function RecordScreen() {
     setRecordingTime(0);
   }
 
+  function handleRecordAgain() {
+    console.log('[RecordScreen] Record again - resetting all states');
+    // Reset all states to initial values - clean slate
+    setIsRecording(false);
+    setRecordedVideo(null); // This should hide the success overlay
+    setRecordingTime(0);
+    setShowPrompt(true); // Show prompt again
+    
+    // Force camera component to remount by changing its key
+    setCameraKey(prev => prev + 1);
+    setCameraReady(false);
+    setCameraRef(null);
+    
+    console.log('[RecordScreen] States reset - camera will remount');
+  }
+
   return (
     <View style={styles.container}>
       {/* Camera View - Full Screen */}
       <BasicCameraView
+        key={cameraKey}
         onCameraReady={handleCameraReady}
         onError={handleCameraError}
         facing={facing}
@@ -120,35 +157,7 @@ export default function RecordScreen() {
         style={styles.camera}
       />
 
-        {/* Top Controls */}
-        <View style={styles.topControls}>
-          <Pressable onPress={handleClose} style={styles.closeButton}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
-              style={styles.controlButton}
-            >
-              <Text style={styles.closeText}>✕</Text>
-            </LinearGradient>
-          </Pressable>
-
-          <View style={styles.titleContainer}>
-            <Text style={styles.screenTitle}>Record Snapple</Text>
-            <Text style={styles.screenSubtitle}>Create your video response</Text>
-          </View>
-
-          <Pressable 
-            onPress={toggleCamera} 
-            style={styles.flipButton}
-            disabled={isRecording}
-          >
-            <LinearGradient
-              colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
-              style={[styles.controlButton, isRecording && styles.disabledButton]}
-            >
-              <Text style={[styles.flipText, isRecording && styles.disabledText]}>⟲</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
+        {/* Top Controls - removed, now on overlay */}
 
         {/* Recording Indicator */}
         {isRecording && (
@@ -170,14 +179,14 @@ export default function RecordScreen() {
               <Text style={styles.successSubtitle}>
                 {recordingTime >= maxDuration 
                   ? "Maximum time reached" 
-                  : `${(maxDuration - recordingTime).toFixed(1)}s remaining`}
+                  : "Recording complete"}
               </Text>
               
               <View style={styles.successButtons}>
                 {recordingTime < maxDuration && (
                   <VibeButton
-                    label={`Record More (${(maxDuration - recordingTime).toFixed(1)}s left)`}
-                    onPress={() => setRecordedVideo(null)}
+                    label="Record Again"
+                    onPress={handleRecordAgain}
                     style={styles.recordMoreButton}
                   />
                 )}
@@ -186,29 +195,74 @@ export default function RecordScreen() {
                   onPress={() => handlePreviewVideo(recordedVideo)}
                   style={styles.previewButton}
                 />
+                <VibeButton
+                  label="Go Home"
+                  onPress={() => navigation.navigate('Home')}
+                  style={styles.homeButton}
+                />
               </View>
             </LinearGradient>
           </View>
         )}
 
-      {/* Bottom Controls */}
-      <View style={styles.bottomControls}>
-        <RecordingControls
-          cameraRef={cameraRef}
-          isRecording={isRecording}
-          recordingTime={recordingTime}
-          onRecordingStart={handleRecordingStart}
-          onRecordingStop={handleRecordingStop}
-          onRecordingComplete={handleRecordingComplete}
-          onRecordingTimeUpdate={handleRecordingTimeUpdate}
-          onCameraReset={handleCameraReset}
-          maxDuration={10} // 10 second max for Snapples
-        />
-        
-        {!cameraReady && (
-          <Text style={styles.cameraStatus}>Initializing camera...</Text>
+      {/* Overlay with All Controls */}
+      <Pressable style={styles.overlayContainer} onPress={handleOverlayTouch}>
+        {/* Top Controls */}
+        <View style={styles.topControls}>
+          <Pressable onPress={handleClose} style={styles.closeButton}>
+            <LinearGradient
+              colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
+              style={styles.controlButton}
+            >
+              <Text style={styles.closeText}>✕</Text>
+            </LinearGradient>
+          </Pressable>
+
+          <View style={styles.titleContainer}>
+            {/* Spacer */}
+          </View>
+
+          <Pressable 
+            onPress={toggleCamera} 
+            style={styles.flipButton}
+            disabled={isRecording}
+          >
+            <LinearGradient
+              colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
+              style={[styles.controlButton, isRecording && styles.disabledButton]}
+            >
+              <Text style={[styles.flipText, isRecording && styles.disabledText]}>⟲</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+
+        {/* Prompt Section - Only show when showPrompt is true */}
+        {showPrompt && (
+          <View style={styles.promptContainer}>
+            <LinearGradient
+              colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.6)']}
+              style={styles.promptContent}
+            >
+              <Text style={styles.promptText}>{promptText}</Text>
+            </LinearGradient>
+          </View>
         )}
-      </View>
+
+        {/* Record Controls - Always visible */}
+        <View style={styles.overlayControls}>
+          <RecordingControls
+            cameraRef={cameraRef}
+            isRecording={isRecording}
+            recordingTime={recordingTime}
+            onRecordingStart={handleRecordingStart}
+            onRecordingStop={handleRecordingStop}
+            onRecordingComplete={handleRecordingComplete}
+            onRecordingTimeUpdate={handleRecordingTimeUpdate}
+            onCameraReset={handleCameraReset}
+            maxDuration={10} // 10 second max for Snapples
+          />
+        </View>
+      </Pressable>
 
     </View>
   );
@@ -338,6 +392,10 @@ const styles = StyleSheet.create({
   previewButton: {
     backgroundColor: 'rgba(0, 255, 255, 0.08)',
   },
+  homeButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 12,
+  },
   bottomControls: {
     position: 'absolute',
     bottom: 0,
@@ -346,12 +404,6 @@ const styles = StyleSheet.create({
     padding: 32,
     paddingBottom: 48,
     alignItems: 'center',
-  },
-  cameraStatus: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 16,
   },
   closeText: {
     color: 'white',
@@ -370,5 +422,54 @@ const styles = StyleSheet.create({
     color: theme.colors.vibeGreen,
     fontSize: 48,
     fontWeight: 'bold',
+  },
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 15,
+    backgroundColor: 'transparent',
+  },
+  topControls: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  promptContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 32,
+    right: 32,
+    transform: [{ translateY: -50 }],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promptContent: {
+    paddingHorizontal: 32,
+    paddingVertical: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    maxWidth: '100%',
+  },
+  promptText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: theme.fontWeights.bold,
+    textAlign: 'center',
+    ...theme.shadows?.textGlow,
+  },
+  overlayControls: {
+    position: 'absolute',
+    bottom: 48,
+    left: 0,
+    right: 0,
+    padding: 32,
+    alignItems: 'center',
   },
 });
