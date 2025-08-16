@@ -16,6 +16,11 @@
     },
     "android": {
       "edgeToEdgeEnabled": true,
+      "navigationBarColor": "#080B1E",
+      "statusBarHidden": true,
+      "navigationBarStyle": "dark-content",
+      "navigationBarVisible": false,
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#080B1E"
       },

@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
-import theme from '../../theme/themes';
+import React, { useMemo } from "react";
+import { Pressable, Text, StyleSheet } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import theme from "../../theme/themes";
 
 /**
  * VibeButton: Clean button with subtle border accent
@@ -9,9 +10,9 @@ import theme from '../../theme/themes';
 export default function VibeButton({ label, onPress, style, textStyle }) {
   const accentColor = useMemo(() => {
     const accents = [
-      theme.colors.vibeBlue,    // Cyan
-      theme.colors.vibePurple,  // Purple  
-      theme.colors.shadowGlow,  // Teal
+      theme.colors.vibeBlue, // Cyan
+      theme.colors.vibePurple, // Purple
+      theme.colors.shadowGlow, // Teal
     ];
     return accents[Math.floor(Math.random() * accents.length)];
   }, []);
@@ -21,15 +22,19 @@ export default function VibeButton({ label, onPress, style, textStyle }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { 
+        {
           borderColor: accentColor,
-          backgroundColor: pressed ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
-          opacity: pressed ? 0.8 : 1 
+          backgroundColor: pressed
+            ? "rgba(255,255,255,0.1)"
+            : "rgba(255,255,255,0.05)",
+          opacity: pressed ? 0.8 : 1,
         },
-        style
+        style,
       ]}
     >
-      <Text style={[styles.text, { color: accentColor }, textStyle]}>{label}</Text>
+      <Text style={[styles.text, { color: accentColor }, textStyle]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -37,15 +42,24 @@ export default function VibeButton({ label, onPress, style, textStyle }) {
 const styles = StyleSheet.create({
   button: {
     borderRadius: theme.sizes.buttonRadius,
-    borderWidth: 2,
+    borderWidth: 1,
     paddingVertical: 14,
     paddingHorizontal: 24,
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 10,
+    position: "relative",
+    shadowColor: "#00ffff",
+    shadowOffset: {
+      width: 1,
+      height: 1,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 0,
   },
   text: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: theme.fonts.main,
   },
 });

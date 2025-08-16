@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../components/ui/VibeButton';
 import VibeInput from '../components/ui/VibeInput';
+import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import theme from '../theme/themes';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -159,7 +160,7 @@ export default function LandingScreen({ navigation }) {
             </View>
           </View>
 
-          <View style={styles.buttonContainer}>
+          <ButtonContainer>
             <VibeButton
               label={isLoading ? 'Signing In...' : 'Login'}
               onPress={handleLogin}
@@ -173,7 +174,7 @@ export default function LandingScreen({ navigation }) {
                 <Text style={styles.signupLink}>Sign Up</Text>
               </Pressable>
             </View>
-          </View>
+          </ButtonContainer>
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
@@ -237,10 +238,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.main,
     marginTop: 4,
     marginLeft: 4,
-  },
-  buttonContainer: {
-    gap: theme.sizes.spacing?.lg || 24,
-    alignItems: 'center',
   },
   loginButton: {
     width: '100%',

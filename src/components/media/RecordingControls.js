@@ -1,22 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import VibeAlert from '../ui/VibeAlert';
 import theme from '../../theme/themes';
 
 export default function RecordingControls({ 
-  cameraRef, 
+  cameraRef,
+  isRecording,
+  recordingTime,
   onRecordingComplete,
   onRecordingStart,
   onRecordingStop,
+  onRecordingTimeUpdate,
   onCameraReset,
   maxDuration = 10 
 }) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
   const [canStopManually, setCanStopManually] = useState(false);
   
   const timerRef = useRef(null);
   const recordingPromiseRef = useRef(null);
   const isRecordingRef = useRef(false);
+  const recordingTimeRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -26,18 +29,26 @@ export default function RecordingControls({
     };
   }, []);
 
-  function startTimer() {
+  function startTimer(resetTime = true) {
+    if (resetTime) {
+      recordingTimeRef.current = 0;
+    }
     timerRef.current = setInterval(() => {
-      setRecordingTime(prev => {
-        const newTime = prev + 0.1;
-        
-        // Allow manual stop after 1 second
-        if (newTime >= 1 && !canStopManually) {
-          setCanStopManually(true);
-        }
-        
-        return Math.min(newTime, maxDuration);
-      });
+      recordingTimeRef.current += 0.1;
+      const newTime = Math.min(recordingTimeRef.current, maxDuration);
+      onRecordingTimeUpdate?.(newTime);
+      
+      // Allow manual stop after 0.5 seconds
+      if (newTime >= 0.5 && !canStopManually) {
+        setCanStopManually(true);
+      }
+      
+      // Auto-stop at max duration - let camera complete naturally
+      if (newTime >= maxDuration) {
+        // Don't manually stop - let the camera recording complete naturally
+        // The camera should auto-complete when maxDuration is reached
+        stopTimer();
+      }
     }, 100);
   }
 
@@ -49,8 +60,6 @@ export default function RecordingControls({
   }
 
   function resetState() {
-    setIsRecording(false);
-    setRecordingTime(0);
     setCanStopManually(false);
     isRecordingRef.current = false;
     stopTimer();
@@ -82,9 +91,7 @@ export default function RecordingControls({
       }
 
       // Update state
-      setIsRecording(true);
       isRecordingRef.current = true;
-      setRecordingTime(0);
       setCanStopManually(false);
       
       // Start timer
@@ -110,7 +117,7 @@ export default function RecordingControls({
       // Only process if we're still in recording state
       if (isRecordingRef.current) {
         resetState();
-        onRecordingComplete?.(video);
+        onRecordingComplete?.(video, recordingTimeRef.current);
       }
       
     } catch (error) {
@@ -139,7 +146,7 @@ export default function RecordingControls({
       return;
     }
 
-    console.log(`Manually stopping recording at ${recordingTime.toFixed(1)}s`);
+    console.log(`Manually stopping recording at ${recordingTimeRef.current.toFixed(1)}s`);
     
     try {
       // Stop the camera recording
@@ -147,7 +154,6 @@ export default function RecordingControls({
       console.log('Stop recording called on camera');
       
       // Update UI immediately
-      setIsRecording(false);
       isRecordingRef.current = false;
       stopTimer();
       
@@ -160,6 +166,11 @@ export default function RecordingControls({
     }
   }
 
+  function handleStopRecording() {
+    // Stop recording and go directly to preview
+    stopRecording();
+  }
+
   function forceResetCamera() {
     console.log('Force resetting camera state...');
     resetState();
@@ -168,14 +179,7 @@ export default function RecordingControls({
 
   function handleRecordButtonPress() {
     if (isRecording) {
-      if (canStopManually) {
-        stopRecording();
-      } else {
-        Alert.alert(
-          'Recording...', 
-          'Please wait at least 1 second before stopping the recording.'
-        );
-      }
+      handleStopRecording();
     } else {
       startRecording();
     }
@@ -202,6 +206,7 @@ export default function RecordingControls({
         ]}
         onPress={handleRecordButtonPress}
         activeOpacity={0.8}
+        disabled={isRecording && !canStopManually}
       >
         <View
           style={[
@@ -214,10 +219,11 @@ export default function RecordingControls({
       {/* Status Text */}
       <Text style={styles.statusText}>
         {isRecording 
-          ? (canStopManually ? 'Tap to stop recording' : 'Recording started...') 
+          ? 'Tap to stop recording' 
           : 'Tap to start recording'
         }
       </Text>
+
     </View>
   );
 }
@@ -228,7 +234,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   timerContainer: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -248,14 +253,12 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
     borderColor: 'white',
   },
   recordingActive: {
-    backgroundColor: 'rgba(255,0,0,0.3)',
     borderColor: '#ff0000',
   },
   recordingDisabled: {
@@ -277,7 +280,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     textAlign: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,

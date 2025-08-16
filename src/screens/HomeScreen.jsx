@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, RefreshControl } from 'react-native';
+import { StyleSheet, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import PromptCarousel from '../../components/ui/PromptCarousel';
-import SnappleGrid from '../../components/ui/SnappleGrid';
-import SnappleOverlay from '../../components/ui/SnappleOverlay';
-import { useAuth } from '../../store/AuthContext';
-import { promptService } from '../../services/promptService';
-import { snappleService } from '../../services/snappleService';
-import theme from '../../theme/themes';
+import PromptCarousel from '../components/ui/PromptCarousel';
+// import SnappleGrid from '../components/ui/snapples/SnappleGrid';
+import EmptySnappleList from '../components/ui/snapples/EmptySnappleList';
+import SnappleOverlay from '../components/ui/SnappleOverlay';
+import ButtonContainer from '../components/ui/navigation/ButtonContainer';
+import NavButton from '../components/ui/navigation/NavButton';
+import HomeHeader from '../components/ui/headers/HomeHeader';
+import { useAuth } from '../store/AuthContext';
+import { promptService } from '../services/promptService';
+import { snappleService } from '../services/snappleService';
+import theme from '../theme/themes';
 
 export default function HomeScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
@@ -143,30 +146,7 @@ export default function HomeScreen({ navigation }) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.userInfo}>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.usernameText}>{userStats.username}!</Text>
-          </View>
-          
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Ionicons name="diamond" size={16} color={theme.colors.vibeYellow} />
-              <Text style={styles.statText}>{userStats.coins.toLocaleString()}</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <Ionicons name="trophy" size={16} color={theme.colors.vibeOrange} />
-              <Text style={styles.statText}>{userStats.trophies}</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <Ionicons name="star" size={16} color={theme.colors.vibeBlue} />
-              <Text style={styles.statText}>Lvl {userStats.level}</Text>
-            </View>
-          </View>
-        </View>
+        <HomeHeader userStats={userStats} />
 
         {/* Prompt Carousel */}
         <PromptCarousel
@@ -176,12 +156,14 @@ export default function HomeScreen({ navigation }) {
         />
 
         {/* Snapples Grid */}
-        <SnappleGrid
+        {/* <SnappleGrid
           snapples={snapples}
           onSnapplePress={handleSnapplePress}
           refreshing={refreshing}
           onRefresh={handleRefresh}
-        />
+        /> */}
+        
+        <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record')} />
 
         {/* Snapple Overlay */}
         <SnappleOverlay
@@ -194,6 +176,13 @@ export default function HomeScreen({ navigation }) {
           onReport={handleReport}
         />
       </SafeAreaView>
+      
+      <ButtonContainer>
+        <NavButton title="Home" onPress={() => navigation.navigate('Home')} />
+        <NavButton title="Play" />
+        <NavButton title="Deck" />
+        <NavButton title="Test" />
+      </ButtonContainer>
     </LinearGradient>
   );
 }
@@ -204,46 +193,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  welcomeText: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    fontWeight: theme.fontWeights.medium,
-  },
-  usernameText: {
-    fontSize: 20,
-    color: theme.colors.textPrimary,
-    fontWeight: theme.fontWeights.bold,
-    ...theme.shadows?.textGlow,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statText: {
-    color: theme.colors.textPrimary,
-    fontSize: 12,
-    fontWeight: theme.fontWeights.semiBold,
+    paddingBottom: 80,
   },
 });

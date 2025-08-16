@@ -34,6 +34,9 @@ const theme = {
     vibeBackgroundPurple: "rgba(139, 0, 255, 0.1)",
     vibeBackgroundYellow: "rgba(255, 255, 0, 0.1)",
     vibeBackgroundPink: "rgba(255, 16, 240, 0.1)",
+    
+    // Button gradient
+    buttonGradientCyan: ["rgba(0, 255, 255, 0.1)", "rgba(0, 255, 255, 0.05)", "rgba(255, 255, 255, 0.05)"],
   },
   fonts: {
     main: Platform.select({

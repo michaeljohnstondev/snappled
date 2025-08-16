@@ -3,10 +3,10 @@ import { View, Text, StyleSheet, Alert, Pressable, Dimensions } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import BasicCameraView from '../../components/media/BasicCameraView';
-import RecordingControls from '../../components/media/RecordingControls';
-import VibeButton from '../../components/ui/VibeButton';
-import theme from '../../theme/themes';
+import BasicCameraView from '../components/media/BasicCameraView';
+import RecordingControls from '../components/media/RecordingControls';
+import VibeButton from '../components/ui/VibeButton';
+import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -17,6 +17,7 @@ export default function RecordScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
 
   function handleCameraReady(camera) {
     console.log('[RecordScreen] Camera ready');
@@ -32,6 +33,7 @@ export default function RecordScreen() {
   function handleRecordingStart() {
     console.log('[RecordScreen] Recording started');
     setIsRecording(true);
+    setRecordingTime(0);
   }
 
   function handleRecordingStop(error) {
@@ -42,32 +44,34 @@ export default function RecordScreen() {
     }
   }
 
-  function handleRecordingComplete(video) {
-    console.log('[RecordScreen] Recording completed:', video);
+  function handleRecordingComplete(video, finalTime) {
+    console.log('[RecordScreen] Recording completed:', video, 'Time:', finalTime);
     setIsRecording(false);
     setRecordedVideo(video);
-    
-    // Show success message and navigation options
-    Alert.alert(
-      'Video Recorded! 🎬',
-      'Your Snapple video is ready!',
-      [
-        { 
-          text: 'Record Another', 
-          style: 'cancel',
-          onPress: () => setRecordedVideo(null)
-        },
-        { 
-          text: 'Continue', 
-          onPress: () => handleContinueWithVideo(video)
-        }
-      ]
-    );
+    setRecordingTime(finalTime || 0);
+  }
+
+  function handleRecordingTimeUpdate(time) {
+    setRecordingTime(time);
   }
 
   function handleContinueWithVideo(video) {
-    // Navigate to prompt screen or submission flow with the recorded video
-    navigation.navigate('Prompt', { recordedVideo: video });
+    // For now, just go back to home screen
+    // TODO: Navigate to proper submission flow
+    navigation.navigate('Home');
+  }
+
+  function handlePreviewVideo(video) {
+    // TODO: Navigate to video preview screen
+    console.log('Preview video:', video);
+    Alert.alert(
+      'Preview Video',
+      'Video preview will be implemented soon!',
+      [
+        { text: 'OK' },
+        { text: 'Submit Video', onPress: () => handleContinueWithVideo(video) }
+      ]
+    );
   }
 
   function toggleCamera() {
@@ -99,19 +103,19 @@ export default function RecordScreen() {
     setCameraReady(false);
     setIsRecording(false);
     setRecordedVideo(null);
+    setRecordingTime(0);
   }
 
   return (
     <View style={styles.container}>
-      {/* Camera View */}
-      <View style={styles.cameraContainer}>
-        <BasicCameraView
-          onCameraReady={handleCameraReady}
-          onError={handleCameraError}
-          facing={facing}
-          mode="video"
-          style={styles.camera}
-        />
+      {/* Camera View - Full Screen */}
+      <BasicCameraView
+        onCameraReady={handleCameraReady}
+        onError={handleCameraError}
+        facing={facing}
+        mode="video"
+        style={styles.camera}
+      />
 
         {/* Top Controls */}
         <View style={styles.topControls}>
@@ -160,32 +164,40 @@ export default function RecordScreen() {
             >
               <Ionicons name="checkmark-circle" size={64} color={theme.colors.vibeGreen} />
               <Text style={styles.successTitle}>Video Recorded!</Text>
-              <Text style={styles.successSubtitle}>Ready to continue with your Snapple</Text>
+              <Text style={styles.successSubtitle}>
+                {recordingTime >= maxDuration 
+                  ? "Maximum time reached" 
+                  : `${(maxDuration - recordingTime).toFixed(1)}s remaining`}
+              </Text>
               
               <View style={styles.successButtons}>
+                {recordingTime < maxDuration && (
+                  <VibeButton
+                    label={`Record More (${(maxDuration - recordingTime).toFixed(1)}s left)`}
+                    onPress={() => setRecordedVideo(null)}
+                    style={styles.recordMoreButton}
+                  />
+                )}
                 <VibeButton
-                  label="Record Another"
-                  onPress={() => setRecordedVideo(null)}
-                  style={styles.recordAnotherButton}
-                />
-                <VibeButton
-                  label="Continue"
-                  onPress={() => handleContinueWithVideo(recordedVideo)}
-                  style={styles.continueButton}
+                  label="Preview Video"
+                  onPress={() => handlePreviewVideo(recordedVideo)}
+                  style={styles.previewButton}
                 />
               </View>
             </LinearGradient>
           </View>
         )}
-      </View>
 
       {/* Bottom Controls */}
       <View style={styles.bottomControls}>
         <RecordingControls
           cameraRef={cameraRef}
+          isRecording={isRecording}
+          recordingTime={recordingTime}
           onRecordingStart={handleRecordingStart}
           onRecordingStop={handleRecordingStop}
           onRecordingComplete={handleRecordingComplete}
+          onRecordingTimeUpdate={handleRecordingTimeUpdate}
           onCameraReset={handleCameraReset}
           maxDuration={10} // 10 second max for Snapples
         />
@@ -195,15 +207,6 @@ export default function RecordScreen() {
         )}
       </View>
 
-      {/* Tips */}
-      {!isRecording && !recordedVideo && cameraReady && (
-        <View style={styles.tipsContainer}>
-          <Text style={styles.tipsTitle}>📱 Recording Tips</Text>
-          <Text style={styles.tipsText}>• Keep it short and fun (max 10s)</Text>
-          <Text style={styles.tipsText}>• Make sure you're well lit</Text>
-          <Text style={styles.tipsText}>• Speak clearly for audio</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -211,14 +214,17 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   cameraContainer: {
     flex: 1,
     position: 'relative',
   },
   camera: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   topControls: {
     position: 'absolute',
@@ -319,48 +325,29 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   successButtons: {
-    flexDirection: 'row',
-    gap: 16,
+    flexDirection: 'column',
     width: '100%',
   },
-  recordAnotherButton: {
-    flex: 1,
-    opacity: 0.8,
+  recordMoreButton: {
+    marginBottom: 12,
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
   },
-  continueButton: {
-    flex: 1,
+  previewButton: {
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
   },
   bottomControls: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 32,
     paddingBottom: 48,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   cameraStatus: {
     color: theme.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
-  },
-  tipsContainer: {
-    position: 'absolute',
-    bottom: 200,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 16,
-    borderRadius: 12,
-    zIndex: 5,
-  },
-  tipsTitle: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: theme.fontWeights.semiBold,
-    marginBottom: 8,
-  },
-  tipsText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginBottom: 4,
   },
 });

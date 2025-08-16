@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../theme/themes';
+import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 2; // 2 columns with padding
@@ -120,14 +120,7 @@ export default function SnappleGrid({ snapples, onSnapplePress, refreshing, onRe
     </View>
   );
 
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      <Text style={styles.headerTitle}>Latest Snapples</Text>
-      <Text style={styles.headerSubtitle}>
-        {snapples?.length || 0} responses to this prompt
-      </Text>
-    </View>
-  );
+  const renderHeader = () => null;
 
   return (
     <View style={styles.container}>
@@ -173,7 +166,7 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 100, // Space for tab bar
+    paddingBottom: 80, // Reduced space since nav bar is hidden
   },
   row: {
     justifyContent: 'space-between',

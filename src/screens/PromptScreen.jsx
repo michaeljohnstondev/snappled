@@ -2,8 +2,8 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import VibeButton from '../../components/ui/VibeButton';
-import theme from '../../theme/themes';
+import VibeButton from '../components/ui/VibeButton';
+import theme from '../theme/themes';
 
 // Time-based prompts that change every hour
 const hourlyPrompts = [

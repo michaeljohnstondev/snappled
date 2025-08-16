@@ -100,22 +100,26 @@ export const snappleService = {
 
   async getActiveSnapples(limitCount = 20) {
     try {
+      // Simplified query to avoid composite index requirement
       const q = query(
         collection(db, SNAPPLES_COLLECTION),
-        where('isActive', '==', true),
-        where('isBanned', '==', false),
         orderBy('createdAt', 'desc'),
-        limit(limitCount)
+        limit(limitCount * 2) // Get more to filter client-side
       );
       
       const querySnapshot = await getDocs(q);
       const snapples = [];
       
       querySnapshot.forEach((doc) => {
-        snapples.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Filter client-side to avoid index requirement
+        if (data.isActive === true && data.isBanned !== true) {
+          snapples.push({ id: doc.id, ...data });
+        }
       });
       
-      return { success: true, snapples };
+      // Limit results after filtering
+      return { success: true, snapples: snapples.slice(0, limitCount) };
     } catch (error) {
       console.error('Error fetching active snapples:', error);
       return { success: false, error: 'Failed to fetch snapples' };
@@ -124,23 +128,32 @@ export const snappleService = {
 
   async getTrendingSnapples(limitCount = 10) {
     try {
+      // Simplified query to avoid composite index requirement
       const q = query(
         collection(db, SNAPPLES_COLLECTION),
-        where('isActive', '==', true),
-        where('isBanned', '==', false),
         orderBy('totalVotes', 'desc'),
-        orderBy('buyCount', 'desc'),
-        limit(limitCount)
+        limit(limitCount * 2) // Get more to filter client-side
       );
       
       const querySnapshot = await getDocs(q);
       const snapples = [];
       
       querySnapshot.forEach((doc) => {
-        snapples.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Filter client-side to avoid index requirement
+        if (data.isActive === true && data.isBanned !== true) {
+          snapples.push({ id: doc.id, ...data });
+        }
       });
       
-      return { success: true, snapples };
+      // Sort by engagement metrics and limit results
+      snapples.sort((a, b) => {
+        const aScore = (a.totalVotes || 0) + (a.buyCount || 0) * 2;
+        const bScore = (b.totalVotes || 0) + (b.buyCount || 0) * 2;
+        return bScore - aScore;
+      });
+      
+      return { success: true, snapples: snapples.slice(0, limitCount) };
     } catch (error) {
       console.error('Error fetching trending snapples:', error);
       return { success: false, error: 'Failed to fetch trending snapples' };
