@@ -6,9 +6,11 @@ import { useAuth } from './src/store/AuthContext';
 import LandingScreen from './src/screens/LandingScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import PromptScreen from './src/screens/PromptScreen.jsx';
+import PromptsScreen from './src/screens/PromptsScreen.jsx';
 import HomeScreen from './src/screens/HomeScreen.jsx';
 import RecordScreen from './src/screens/RecordScreen.jsx';
 import VideoPreviewScreen from './src/screens/VideoPreviewScreen.jsx';
+import CreatePromptScreen from './src/screens/CreatePromptScreen.jsx';
 
 const Stack = createStackNavigator();
 
@@ -25,9 +27,10 @@ function MainStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Prompts" component={PromptScreen} />
+      <Stack.Screen name="Prompts" component={PromptsScreen} />
       <Stack.Screen name="Record" component={RecordScreen} />
       <Stack.Screen name="VideoPreview" component={VideoPreviewScreen} />
+      <Stack.Screen name="CreatePrompt" component={CreatePromptScreen} />
     </Stack.Navigator>
   );
 }

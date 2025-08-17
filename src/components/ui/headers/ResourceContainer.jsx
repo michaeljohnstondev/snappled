@@ -1,23 +1,31 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import theme from '../../../theme/themes';
+import React from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import theme from "../../../theme/themes";
 
-export default function ResourceContainer({ userStats }) {
+export default function ResourceContainer({ userStats, onTokenPress }) {
   return (
     <View style={styles.statsRow}>
+      <Pressable
+        style={[styles.statItem, styles.tokenButton]}
+        onPress={onTokenPress}
+        disabled={!userStats.tokens || userStats.tokens <= 0}
+      >
+        <Text style={styles.iconText}>🎫</Text>
+        <Text style={styles.statText}>{userStats.tokens || 0}</Text>
+      </Pressable>
+
       <View style={styles.statItem}>
-        <Ionicons name="diamond" size={16} color={theme.colors.vibeYellow} />
+        <Text style={styles.iconText}>💰</Text>
         <Text style={styles.statText}>{userStats.coins.toLocaleString()}</Text>
       </View>
-      
+
       <View style={styles.statItem}>
-        <Ionicons name="trophy" size={16} color={theme.colors.vibeOrange} />
+        <Text style={styles.iconText}>🏆</Text>
         <Text style={styles.statText}>{userStats.trophies}</Text>
       </View>
-      
+
       <View style={styles.statItem}>
-        <Ionicons name="star" size={16} color={theme.colors.vibeBlue} />
+        <Text style={styles.iconText}>⭐</Text>
         <Text style={styles.statText}>Lvl {userStats.level}</Text>
       </View>
     </View>
@@ -26,14 +34,16 @@ export default function ResourceContainer({ userStats }) {
 
 const styles = StyleSheet.create({
   statsRow: {
-    flexDirection: 'row',
-    gap: 16,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
   },
   statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -42,5 +52,15 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: 12,
     fontWeight: theme.fontWeights.semiBold,
+    textAlign: "center",
+  },
+  iconText: {
+    fontSize: 14,
+  },
+  tokenButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    transform: [{ scale: 1.05 }],
   },
 });

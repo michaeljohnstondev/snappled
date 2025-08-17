@@ -3,17 +3,29 @@ import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import VibeButton from '../components/ui/VibeButton';
 import theme from '../theme/themes';
 
 export default function VideoPreviewScreen({ route, navigation }) {
-  const { recordedVideo } = route.params || {};
+  const { recordedVideo, cameraFacing } = route.params || {};
   const [isPlaying, setIsPlaying] = useState(true);
+  
+  console.log('[VideoPreview] Camera facing:', cameraFacing);
   
   const player = useVideoPlayer(recordedVideo?.uri || null, (player) => {
     player.loop = true;
     player.muted = false;
     player.play(); // Start playing immediately
+  });
+
+  // Animated style for horizontal flip - only for front camera
+  const animatedStyle = useAnimatedStyle(() => {
+    const scaleValue = cameraFacing === 'front' ? -1 : 1;
+    console.log('[VideoPreview] ScaleX value:', scaleValue, 'for camera:', cameraFacing);
+    return {
+      transform: [{ scaleX: scaleValue }],
+    };
   });
 
   const handleScreenTap = () => {
@@ -44,15 +56,17 @@ export default function VideoPreviewScreen({ route, navigation }) {
     <View style={styles.container}>
       {/* Full Screen Video Player */}
       {recordedVideo?.uri ? (
-        <VideoView
-          player={player}
-          style={styles.video}
-          contentFit="cover"
-          allowsFullscreen={false}
-          allowsPictureInPicture={false}
-          showsPlaybackControls={false}
-          nativeControls={false}
-        />
+        <View style={[styles.video, { transform: [{ scaleX: cameraFacing === 'front' ? -1 : 1 }] }]}>
+          <VideoView
+            player={player}
+            style={styles.videoInner}
+            contentFit="cover"
+            allowsFullscreen={false}
+            allowsPictureInPicture={false}
+            showsPlaybackControls={false}
+            nativeControls={false}
+          />
+        </View>
       ) : (
         <View style={styles.errorContainer}>
           <Ionicons name="videocam-off" size={64} color={theme.colors.textSecondary} />
@@ -115,6 +129,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  videoInner: {
+    width: '100%',
+    height: '100%',
   },
   errorContainer: {
     flex: 1,

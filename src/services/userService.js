@@ -11,6 +11,8 @@ import {
   getDocs,
   runTransaction,
   orderBy,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "./firebase";
@@ -26,32 +28,59 @@ export const userService = {
     try {
       const { email, password, username } = userData;
 
+      console.log('[UserService] Starting user creation for:', { email, username });
+
       if (!email || !password || !username) {
         throw new Error("Email, password, and username are required");
       }
 
-      await this.validateUsername(username);
+      // Basic username validation (without database check)
+      if (!username || username.length < 3) {
+        throw new Error("Username must be at least 3 characters long");
+      }
+      if (username.length > 20) {
+        throw new Error("Username must be 20 characters or less");
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        throw new Error("Username can only contain letters, numbers, and underscores");
+      }
 
+      console.log('[UserService] Creating Firebase Auth user...');
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
       const user = userCredential.user;
+      console.log('[UserService] Firebase Auth user created successfully:', user.uid);
 
+      console.log('[UserService] Validating username availability...');
+      try {
+        await this.validateUsername(username);
+      } catch (usernameError) {
+        // If username validation fails, delete the Firebase Auth user we just created
+        console.log('[UserService] Username validation failed, cleaning up auth user...');
+        await user.delete();
+        throw usernameError;
+      }
+
+      console.log('[UserService] Updating user profile...');
       await updateProfile(user, {
         displayName: username,
       });
+      console.log('[UserService] User profile updated successfully');
 
       const userDoc = {
         uid: user.uid,
         username: username.toLowerCase(),
         displayName: username,
         email: email.toLowerCase(),
-        coins: STARTING_COINS,
-        receivedCoins: 0, // Gifted/earned coins separate from purchased
-        topicTokens: STARTING_TOPIC_TOKENS, // New system
-        tickets: STARTING_TROPHIES, // Player rating system (trophies)
+        resources: {
+          coins: STARTING_COINS,
+          tokens: STARTING_TOPIC_TOKENS,
+          trophies: STARTING_TROPHIES,
+          receivedCoins: 0, // Gifted/earned coins separate from purchased
+        },
         ownedSnapples: [],
         wishlistedSnapples: [],
         activeDeck: null,
@@ -62,7 +91,6 @@ export const userService = {
           level: 1,
           xp: 0, // Legacy experience points
           experience: 0, // New experience system
-          trophies: 0, // Legacy trophy count
           achievements: [],
         },
         stats: {
@@ -100,7 +128,17 @@ export const userService = {
         lastLoginAt: serverTimestamp(),
       };
 
+      console.log('[UserService] Creating user document with data:', {
+        uid: userDoc.uid,
+        username: userDoc.username,
+        email: userDoc.email,
+        hasResources: !!userDoc.resources,
+        resourcesKeys: userDoc.resources ? Object.keys(userDoc.resources) : []
+      });
+      
+      console.log('[UserService] Writing to Firestore...');
       await setDoc(doc(db, USERS_COLLECTION, user.uid), userDoc);
+      console.log('[UserService] Firestore document created successfully');
 
       return {
         success: true,
@@ -111,6 +149,8 @@ export const userService = {
       };
     } catch (error) {
       console.error("Error creating user:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
 
       let errorMessage = "Failed to create account";
       if (error.code === "auth/email-already-in-use") {
@@ -121,6 +161,9 @@ export const userService = {
         errorMessage = "Invalid email address";
       } else if (error.message.includes("Username")) {
         errorMessage = error.message;
+      } else if (error.code === "permission-denied" || error.message.includes("permissions")) {
+        errorMessage = "Database permission error - please contact support";
+        console.error("Firestore permission error details:", error);
       }
 
       return {
@@ -224,7 +267,7 @@ export const userService = {
     try {
       const userRef = doc(db, USERS_COLLECTION, userId);
       await updateDoc(userRef, {
-        coins: increment(amount),
+        "resources.coins": increment(amount),
         updatedAt: serverTimestamp(),
       });
 
@@ -239,7 +282,7 @@ export const userService = {
     try {
       const userRef = doc(db, USERS_COLLECTION, userId);
       await updateDoc(userRef, {
-        topicTokens: increment(amount),
+        "resources.tokens": increment(amount),
         updatedAt: serverTimestamp(),
       });
 
@@ -250,28 +293,33 @@ export const userService = {
     }
   },
 
-  async updateTickets(userId, amount) {
+  async updateTrophies(userId, amount) {
     try {
       const userRef = doc(db, USERS_COLLECTION, userId);
       await updateDoc(userRef, {
-        tickets: increment(amount),
-        "stats.totalTicketsSpent":
+        "resources.trophies": increment(amount),
+        "stats.totalTrophiesSpent":
           amount < 0 ? increment(Math.abs(amount)) : increment(0),
         updatedAt: serverTimestamp(),
       });
 
       return { success: true };
     } catch (error) {
-      console.error("Error updating tickets:", error);
-      return { success: false, error: "Failed to update tickets" };
+      console.error("Error updating trophies:", error);
+      return { success: false, error: "Failed to update trophies" };
     }
+  },
+
+  // Legacy method for backwards compatibility
+  async updateTickets(userId, amount) {
+    return this.updateTrophies(userId, amount);
   },
 
   async updateReceivedCoins(userId, amount) {
     try {
       const userRef = doc(db, USERS_COLLECTION, userId);
       await updateDoc(userRef, {
-        receivedCoins: increment(amount),
+        "resources.receivedCoins": increment(amount),
         updatedAt: serverTimestamp(),
       });
 
@@ -739,7 +787,7 @@ export const userService = {
         }
         
         const userData = userDoc.data();
-        const currentTokens = userData.topicTokens || 0;
+        const currentTokens = userData.resources?.tokens || userData.topicTokens || 0;
         
         if (currentTokens < 1) {
           throw new Error('Insufficient topic tokens');
@@ -747,7 +795,7 @@ export const userService = {
         
         // Update user: spend 1 token
         transaction.update(userRef, {
-          topicTokens: increment(-1),
+          "resources.tokens": increment(-1),
           updatedAt: serverTimestamp()
         });
         
@@ -813,6 +861,172 @@ export const userService = {
     } catch (error) {
       console.error('Error getting user prompts:', error);
       return { success: false, error: 'Failed to get user prompts' };
+    }
+  },
+
+  async updateUserResources(userId, updates) {
+    try {
+      const userRef = doc(db, USERS_COLLECTION, userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) {
+        return { success: false, error: "User not found" };
+      }
+
+      // Build the update object for the resources field
+      const resourceUpdates = {};
+      if (updates.coins !== undefined) {
+        resourceUpdates['resources.coins'] = updates.coins;
+      }
+      if (updates.tokens !== undefined) {
+        resourceUpdates['resources.tokens'] = updates.tokens;
+      }
+      if (updates.trophies !== undefined) {
+        resourceUpdates['resources.trophies'] = updates.trophies;
+      }
+
+      await updateDoc(userRef, resourceUpdates);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user resources:', error);
+      return { success: false, error: 'Failed to update user resources' };
+    }
+  },
+
+  // Follow/Unfollow functionality
+  async followUser(followerId, followeeId) {
+    try {
+      if (followerId === followeeId) {
+        return {
+          success: false,
+          error: 'Cannot follow yourself'
+        };
+      }
+
+      // Update follower's following list
+      const followerRef = doc(db, USERS_COLLECTION, followerId);
+      await updateDoc(followerRef, {
+        'social.following': arrayUnion(followeeId),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update followee's followers list
+      const followeeRef = doc(db, USERS_COLLECTION, followeeId);
+      await updateDoc(followeeRef, {
+        'social.followers': arrayUnion(followerId),
+        updatedAt: serverTimestamp(),
+      });
+
+      console.log(`[UserService] User ${followerId} followed ${followeeId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('[UserService] Error following user:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async unfollowUser(followerId, followeeId) {
+    try {
+      if (followerId === followeeId) {
+        return {
+          success: false,
+          error: 'Cannot unfollow yourself'
+        };
+      }
+
+      // Update follower's following list
+      const followerRef = doc(db, USERS_COLLECTION, followerId);
+      await updateDoc(followerRef, {
+        'social.following': arrayRemove(followeeId),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update followee's followers list
+      const followeeRef = doc(db, USERS_COLLECTION, followeeId);
+      await updateDoc(followeeRef, {
+        'social.followers': arrayRemove(followerId),
+        updatedAt: serverTimestamp(),
+      });
+
+      console.log(`[UserService] User ${followerId} unfollowed ${followeeId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('[UserService] Error unfollowing user:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async toggleFollow(followerId, followeeId) {
+    try {
+      // Check current follow status
+      const isFollowing = await this.isFollowing(followerId, followeeId);
+      
+      if (isFollowing) {
+        const result = await this.unfollowUser(followerId, followeeId);
+        return {
+          ...result,
+          isFollowing: false
+        };
+      } else {
+        const result = await this.followUser(followerId, followeeId);
+        return {
+          ...result,
+          isFollowing: true
+        };
+      }
+    } catch (error) {
+      console.error('[UserService] Error toggling follow:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async isFollowing(followerId, followeeId) {
+    try {
+      const followerDoc = await getDoc(doc(db, USERS_COLLECTION, followerId));
+      if (followerDoc.exists()) {
+        const following = followerDoc.data().social?.following || [];
+        return following.includes(followeeId);
+      }
+      return false;
+    } catch (error) {
+      console.error('[UserService] Error checking follow status:', error);
+      return false;
+    }
+  },
+
+  async getFollowData(userId) {
+    try {
+      const userDoc = await getDoc(doc(db, USERS_COLLECTION, userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const social = userData.social || {};
+        return {
+          success: true,
+          followers: social.followers || [],
+          following: social.following || [],
+          followerCount: (social.followers || []).length,
+          followingCount: (social.following || []).length
+        };
+      }
+      return {
+        success: false,
+        error: 'User not found'
+      };
+    } catch (error) {
+      console.error('[UserService] Error getting follow data:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   },
 };

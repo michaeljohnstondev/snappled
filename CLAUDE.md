@@ -22,28 +22,7 @@ React Native (Expo), JavaScript (.js / .jsx).
 
 Firebase v9 modular SDK (Auth / Firestore / Storage).
 
-2. Repository Structure
-   root
-   ├─ App.js
-   ├─ Navigation.js
-   ├─ src/
-   │ ├─ screens/
-   │ │ ├─ FeedScreen/index.jsx
-   │ │ └─ UploadScreen/index.jsx
-   │ ├─ components/
-   │ │ ├─ ui/
-   │ │ │ └─ PrimaryButton.jsx
-   │ │ └─ media/
-   │ ├─ hooks/
-   │ ├─ services/
-   │ ├─ lib/
-   │ ├─ store/
-   │ ├─ theme/
-   │ └─ config/
-   ├─ CLAUDE.md
-   └─ package.json
-
-Rule: app/ = navigation shells only. All UI + logic in src/.
+2. All UI + logic in src/.
 
 3. Naming & Size Limits
 
@@ -99,15 +78,15 @@ Logs for errors/warnings are tagged [Screen:<Name>].
 
 6. Code Organization Rules
 
-src/components = dumb UI only (no network or state beyond props).
+components = dumb UI only (no network or state beyond props).
 
-src/screens = screen containers (may use hooks, services).
+sscreens = screen containers (may use hooks, services).
 
-src/services = all Firebase/API logic.
+services = all Firebase/API logic.
 
-src/hooks = reusable hooks (no UI).
+hooks = reusable hooks (no UI).
 
-src/lib = pure helpers/utilities.
+lib = pure helpers/utilities.
 
 7. State & Data
 

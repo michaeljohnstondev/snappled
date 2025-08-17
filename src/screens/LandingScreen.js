@@ -13,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../components/ui/VibeButton';
 import VibeInput from '../components/ui/VibeInput';
-import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import theme from '../theme/themes';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -61,10 +60,13 @@ export default function LandingScreen({ navigation }) {
     
     setIsLoading(true);
     try {
+      console.log('[Screen:Landing] Attempting login for:', email);
       await signInWithEmailAndPassword(auth, email, password);
+      console.log('[Screen:Landing] Login successful');
       // Navigation will happen automatically via AuthContext
     } catch (error) {
       console.log('[Screen:Landing] Login error:', error.code);
+      console.log('[Screen:Landing] Login error message:', error.message);
       
       let errorMessage = 'Please check your credentials and try again.';
       if (error.code === 'auth/user-not-found') {
@@ -160,7 +162,7 @@ export default function LandingScreen({ navigation }) {
             </View>
           </View>
 
-          <ButtonContainer>
+          <View style={styles.buttonContainer}>
             <VibeButton
               label={isLoading ? 'Signing In...' : 'Login'}
               onPress={handleLogin}
@@ -174,7 +176,7 @@ export default function LandingScreen({ navigation }) {
                 <Text style={styles.signupLink}>Sign Up</Text>
               </Pressable>
             </View>
-          </ButtonContainer>
+          </View>
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
@@ -244,6 +246,10 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  buttonContainer: {
+    gap: 20,
+    alignItems: 'center',
   },
   signupContainer: {
     flexDirection: 'row',

@@ -1,29 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, SafeAreaView } from 'react-native';
+import { StyleSheet, SafeAreaView, ScrollView, View, Text, Pressable, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import PromptCarousel from '../components/ui/PromptCarousel';
-// import SnappleGrid from '../components/ui/snapples/SnappleGrid';
-import EmptySnappleList from '../components/ui/snapples/EmptySnappleList';
-import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
-import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
-import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
-import HomeHeader from '../components/ui/headers/HomeHeader';
+import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
+import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import { useAuth } from '../store/AuthContext';
 import { promptService } from '../services/promptService';
-import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
 
-export default function HomeScreen({ navigation }) {
+export default function PromptsScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
   
   // State
   const [prompts, setPrompts] = useState([]);
-  const [selectedPrompt, setSelectedPrompt] = useState(null);
-  const [snapples, setSnapples] = useState([]);
-  const [selectedSnapple, setSelectedSnapple] = useState(null);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,31 +25,22 @@ export default function HomeScreen({ navigation }) {
     loadData();
   }, []);
 
-  // Refresh data when screen comes into focus (e.g., returning from CreatePrompt)
+  // Refresh data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      // Reload prompts when user navigates back to Home
       loadData();
     });
 
     return unsubscribe;
   }, [navigation]);
 
-  // Load snapples when prompt changes
-  useEffect(() => {
-    if (selectedPrompt) {
-      loadSnapplesForPrompt(selectedPrompt.id);
-    }
-  }, [selectedPrompt]);
-
   const loadData = async () => {
     setIsLoading(true);
     try {
       // Load recent snapple prompts (user-generated)
-      const promptsResult = await promptService.getRecentSnapplePrompts(10);
+      const promptsResult = await promptService.getRecentSnapplePrompts(20);
       if (promptsResult.success && promptsResult.prompts?.length > 0) {
         setPrompts(promptsResult.prompts);
-        setSelectedPrompt(promptsResult.prompts[0]); // Select first prompt by default
       } else {
         // Fallback prompts if none exist
         const fallbackPrompts = [
@@ -85,41 +67,12 @@ export default function HomeScreen({ navigation }) {
           }
         ];
         setPrompts(fallbackPrompts);
-        setSelectedPrompt(fallbackPrompts[0]);
       }
     } catch (error) {
-      console.error('[HomeScreen] Error loading data:', error);
+      console.error('[PromptsScreen] Error loading data:', error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const loadSnapplesForPrompt = async (promptId) => {
-    try {
-      // For now, load all active snapples and filter by prompt later
-      // You might want to add a method to snappleService to filter by promptId
-      const result = await snappleService.getActiveSnapples(20);
-      if (result.success) {
-        // Filter snapples for this prompt or show all if none match
-        const filteredSnapples = result.snapples.filter(s => s.promptId === promptId);
-        setSnapples(filteredSnapples.length > 0 ? filteredSnapples : result.snapples.slice(0, 6));
-      }
-    } catch (error) {
-      console.error('[HomeScreen] Error loading snapples:', error);
-      setSnapples([]);
-    }
-  };
-
-  const handlePromptSelect = (prompt) => {
-    setSelectedPrompt(prompt);
-  };
-
-  const handleSnapplePress = (snapple) => {
-    setSelectedSnapple(snapple);
-  };
-
-  const handleSnappleOverlayClose = () => {
-    setSelectedSnapple(null);
   };
 
   const handlePromptPress = (prompt) => {
@@ -128,26 +81,6 @@ export default function HomeScreen({ navigation }) {
 
   const handlePromptInfoClose = () => {
     setSelectedPromptForInfo(null);
-  };
-
-  const handleLike = async (snappleId) => {
-    if (!user?.uid) return;
-    return await snappleService.likeSnapple(snappleId, user.uid);
-  };
-
-  const handleDislike = async (snappleId) => {
-    if (!user?.uid) return;
-    return await snappleService.dislikeSnapple(snappleId, user.uid);
-  };
-
-  const handleBuy = async (snappleId) => {
-    if (!user?.uid) return;
-    return await snappleService.purchaseSnapple(snappleId, user.uid);
-  };
-
-  const handleReport = async (snappleId, reason) => {
-    if (!user?.uid) return;
-    return await snappleService.reportSnapple(snappleId, user.uid, reason);
   };
 
   const handlePromptLike = async (promptId) => {
@@ -242,13 +175,8 @@ export default function HomeScreen({ navigation }) {
         })
       );
     } catch (error) {
-      console.error('[HomeScreen] Error tracking view:', error);
+      console.error('[PromptsScreen] Error tracking view:', error);
     }
-  };
-
-  const handleProfilePress = () => {
-    // TODO: Navigate to profile screen
-    console.log('Profile pressed - TODO: Navigate to profile screen');
   };
 
   const handleVisitProfile = (userId) => {
@@ -257,14 +185,14 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleFollowUser = async (userId) => {
-    console.log('[HomeScreen] handleFollowUser called', {
+    console.log('[PromptsScreen] handleFollowUser called', {
       currentUser: user?.uid,
       targetUser: userId,
       userAuthenticated: !!user?.uid
     });
 
     if (!user?.uid) {
-      console.error('[HomeScreen] User not authenticated');
+      console.error('[PromptsScreen] User not authenticated');
       return {
         success: false,
         error: 'User not authenticated'
@@ -272,27 +200,23 @@ export default function HomeScreen({ navigation }) {
     }
 
     try {
-      console.log('[HomeScreen] Calling userService.toggleFollow');
+      console.log('[PromptsScreen] Calling userService.toggleFollow');
       const result = await userService.toggleFollow(user.uid, userId);
-      console.log('[HomeScreen] toggleFollow result:', result);
+      console.log('[PromptsScreen] toggleFollow result:', result);
       
       if (result.success) {
-        console.log(`[HomeScreen] ${result.isFollowing ? 'Followed' : 'Unfollowed'} user:`, userId);
+        console.log(`[PromptsScreen] ${result.isFollowing ? 'Followed' : 'Unfollowed'} user:`, userId);
       } else {
-        console.error('[HomeScreen] Follow operation failed:', result.error);
+        console.error('[PromptsScreen] Follow operation failed:', result.error);
       }
       return result;
     } catch (error) {
-      console.error('[HomeScreen] Error in follow operation:', error);
+      console.error('[PromptsScreen] Error in follow operation:', error);
       return {
         success: false,
         error: 'Failed to update follow status'
       };
     }
-  };
-
-  const handleTokenPress = () => {
-    setShowTokenModal(true);
   };
 
   const handleCreatePrompt = () => {
@@ -309,6 +233,17 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(false);
   };
 
+  const getPromptGradient = (index) => {
+    const gradients = [
+      [theme.colors.vibeBlue, theme.colors.vibeGreen],
+      [theme.colors.vibePurple, theme.colors.vibePink],
+      [theme.colors.vibeOrange, theme.colors.vibeYellow],
+      [theme.colors.vibePink, theme.colors.vibeBlue],
+      [theme.colors.vibeGreen, theme.colors.vibeOrange]
+    ];
+    return gradients[index % gradients.length];
+  };
+
   const userStats = {
     tokens: userCurrency.tokens || 0,
     coins: userCurrency.coins || 0,
@@ -323,36 +258,60 @@ export default function HomeScreen({ navigation }) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        <HomeHeader userStats={userStats} onProfilePress={handleProfilePress} onTokenPress={handleTokenPress} />
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Prompts</Text>
+          <Text style={styles.headerSubtitle}>
+            {prompts.length} prompts available
+          </Text>
+        </View>
 
-        {/* Prompt Carousel */}
-        <PromptCarousel
-          prompts={prompts}
-          selectedPrompt={selectedPrompt}
-          onPromptSelect={handlePromptSelect}
-          onPromptPress={handlePromptPress}
-        />
-
-        {/* Snapples Grid */}
-        {/* <SnappleGrid
-          snapples={snapples}
-          onSnapplePress={handleSnapplePress}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-        /> */}
-        
-        <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record', { prompt: selectedPrompt })} />
-
-        {/* Snapple Overlay */}
-        <SnappleOverlay
-          visible={!!selectedSnapple}
-          snapple={selectedSnapple}
-          onClose={handleSnappleOverlayClose}
-          onLike={handleLike}
-          onDislike={handleDislike}
-          onBuy={handleBuy}
-          onReport={handleReport}
-        />
+        {/* Prompt Cards List */}
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.vibeBlue}
+            />
+          }
+        >
+          <View style={styles.promptsList}>
+            {prompts.map((prompt, index) => (
+              <Pressable
+                key={prompt.id || index}
+                style={styles.promptCard}
+                onPress={() => handlePromptPress(prompt)}
+              >
+                <LinearGradient
+                  colors={getPromptGradient(index)}
+                  style={styles.cardGradient}
+                >
+                  <View style={styles.cardContent}>
+                    <Text style={styles.promptText} numberOfLines={3}>
+                      {prompt.text || prompt.prompt || 'Create something amazing!'}
+                    </Text>
+                    
+                    {/* Stats */}
+                    <View style={styles.statsRow}>
+                      <Text style={styles.statText}>
+                        👁 {prompt.totalViews || 0}
+                      </Text>
+                      <Text style={styles.statText}>
+                        👍 {prompt.likeCount || 0}
+                      </Text>
+                      <Text style={styles.statText}>
+                        📹 {prompt.participantCount || 0}
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
 
         {/* Prompt Info Overlay */}
         <PromptInfoOverlay
@@ -397,5 +356,63 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingBottom: 80,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  headerTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 28,
+    fontWeight: theme.fontWeights.bold,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    fontWeight: theme.fontWeights.medium,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  promptsList: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 16,
+  },
+  promptCard: {
+    height: 140,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  cardGradient: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  cardContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promptText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: theme.fontWeights.medium,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  statText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: theme.fontWeights.medium,
   },
 });

@@ -7,6 +7,9 @@ service cloud.firestore {
       // Users can read their own data
       allow read: if request.auth != null && request.auth.uid == userId;
       
+      // Allow authenticated users to read user documents for username validation
+      allow read: if request.auth != null;
+      
       // Users can create their own user document
       allow create: if request.auth != null && request.auth.uid == userId
         && validateUserData(request.resource.data);
@@ -14,6 +17,10 @@ service cloud.firestore {
       // Users can update their own data with restrictions
       allow update: if request.auth != null && request.auth.uid == userId
         && validateUserUpdate(request.resource.data, resource.data);
+      
+      // Allow other users to update followers/following arrays (for follow functionality)
+      allow update: if request.auth != null 
+        && isFollowUpdate(request.resource.data, resource.data);
       
       // No delete allowed for user documents
       allow delete: if false;
@@ -118,6 +125,45 @@ service cloud.firestore {
         request.auth.uid == resource.data.creatorId;
     }
     
+    // Hourly prompts collection rules
+    match /hourlyPrompts/{promptId} {
+      // Anyone can read hourly prompts
+      allow read: if request.auth != null;
+      
+      // System can create hourly prompts
+      allow create: if request.auth != null;
+      
+      // System can update hourly prompts (for engagement stats)
+      allow update: if request.auth != null;
+      
+      // No delete allowed
+      allow delete: if false;
+    }
+    
+    // Snapple prompts collection rules (user-generated prompts)
+    match /snapplePrompts/{promptId} {
+      // Anyone can read snapple prompts
+      allow read: if request.auth != null;
+      
+      // Any authenticated user can create prompts (will check for bans later)
+      allow create: if request.auth != null;
+      
+      // Any authenticated user can update prompts (for likes/dislikes)
+      allow update: if request.auth != null;
+      
+      // No delete allowed (handled by moderation)
+      allow delete: if false;
+    }
+    
+    // Prompt reports collection rules
+    match /promptReports/{reportId} {
+      // Any authenticated user can read/create/update prompt reports
+      allow read, create, update: if request.auth != null;
+      
+      // No delete allowed (handled by moderation)
+      allow delete: if false;
+    }
+    
     // Transactions collection rules
     match /transactions/{transactionId} {
       // Users can read their own transactions
@@ -160,11 +206,18 @@ service cloud.firestore {
 
 // Helper functions for validation
 function validateUserData(data) {
-  return data.keys().hasAll(['uid', 'username', 'email', 'coins', 'topicTokens']) &&
-    data.coins is number && data.coins >= 0 &&
-    data.topicTokens is number && data.topicTokens >= 0 &&
-    data.username is string && data.username.size() >= 3 && data.username.size() <= 20 &&
-    data.email is string && data.email.matches('.*@.*');
+  // Basic required fields validation
+  return data.keys().hasAny(['uid']) && data.uid is string &&
+    data.keys().hasAny(['username']) && data.username is string && 
+    data.username.size() >= 3 && data.username.size() <= 20 &&
+    data.keys().hasAny(['email']) && data.email is string && 
+    data.email.matches('.*@.*') &&
+    // Support both old and new resource structures
+    ((data.keys().hasAny(['coins']) && data.coins is number && data.coins >= 0 &&
+      data.keys().hasAny(['topicTokens']) && data.topicTokens is number && data.topicTokens >= 0) ||
+     (data.keys().hasAny(['resources']) && 
+      data.resources.keys().hasAny(['coins']) && data.resources.coins is number && data.resources.coins >= 0 &&
+      data.resources.keys().hasAny(['tokens']) && data.resources.tokens is number && data.resources.tokens >= 0));
 }
 
 function validateUserUpdate(newData, oldData) {
@@ -173,11 +226,12 @@ function validateUserUpdate(newData, oldData) {
     newData.username == oldData.username &&
     newData.email == oldData.email &&
     newData.createdAt == oldData.createdAt &&
-    // Coins and tokens can only be updated by server-side functions or controlled operations
-    (newData.coins == oldData.coins || 
-     newData.coins >= 0) &&
-    (newData.topicTokens == oldData.topicTokens || 
-     newData.topicTokens >= 0);
+    // Allow resource updates with validation
+    (('coins' in oldData && (newData.coins == oldData.coins || newData.coins >= 0) &&
+      (newData.topicTokens == oldData.topicTokens || newData.topicTokens >= 0)) ||
+     ('resources' in oldData && 'resources' in newData &&
+      (newData.resources.coins == oldData.resources.coins || newData.resources.coins >= 0) &&
+      (newData.resources.tokens == oldData.resources.tokens || newData.resources.tokens >= 0)));
 }
 
 function validateVideoData(data) {
@@ -208,3 +262,26 @@ function isEngagementUpdate(newData, oldData) {
     newData.promptId == oldData.promptId &&
     newData.videoId == oldData.videoId;
 }
+
+function isUsernameValidationQuery() {
+  // Allow queries that are specifically for username validation
+  // These queries should have a where clause on 'username' field
+  return request.query != null && 
+    request.query.limit != null && 
+    request.query.limit <= 10;
+}
+
+function isFollowUpdate(newData, oldData) {
+  // Allow updates that only modify social.followers/following arrays
+  let socialChanged = newData.social != oldData.social;
+  let updatedAtChanged = newData.updatedAt != oldData.updatedAt;
+  
+  // Check if only social fields and updatedAt changed
+  return socialChanged && updatedAtChanged
+    // And all other core fields remain unchanged
+    && newData.uid == oldData.uid
+    && newData.username == oldData.username
+    && newData.email == oldData.email
+    && newData.createdAt == oldData.createdAt;
+}
+

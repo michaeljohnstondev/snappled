@@ -22,7 +22,9 @@
       "Bash(npm start:*)",
       "WebSearch",
       "Bash(dir node_modules@expo-google-fontscomic-relief)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(move TokenPromptModal.jsx modals )",
+      "Bash(move:*)"
     ],
     "deny": [],
     "ask": [],

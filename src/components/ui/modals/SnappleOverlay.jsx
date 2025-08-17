@@ -12,11 +12,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import SnappleVideoPlayer from '../media/SnappleVideoPlayer';
-import VibeButton from './VibeButton';
-import CommentSection from '../comments/CommentSection';
-import { useAuth } from '../../store/AuthContext';
-import theme from '../../theme/themes';
+import SnappleVideoPlayer from '../../media/SnappleVideoPlayer';
+import VibeButton from '../VibeButton';
+import CommentSection from '../../comments/CommentSection';
+import { useAuth } from '../../../store/AuthContext';
+import theme from '../../../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 

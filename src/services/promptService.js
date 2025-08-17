@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, doc, getDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, updateDoc, arrayUnion, arrayRemove, increment, addDoc, setDoc } from 'firebase/firestore';
 import { hourlyPromptService } from './hourlyPromptService';
 import { promptDatabaseService } from './promptDatabaseService';
 
@@ -83,6 +83,227 @@ class PromptService {
       return result;
     } catch (error) {
       console.error('Error getting current prompt:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Like a prompt (works for both hourly and snapple prompts)
+  async likePrompt(promptId, userId, collection = 'hourlyPrompts') {
+    try {
+      const promptRef = doc(db, collection, promptId);
+      
+      // First check if the document exists and get current data
+      const promptDoc = await getDoc(promptRef);
+      
+      if (!promptDoc.exists()) {
+        console.error('[PromptService] Prompt document does not exist:', promptId);
+        return {
+          success: false,
+          error: 'Prompt not found'
+        };
+      }
+
+      const currentData = promptDoc.data();
+      const currentLikes = currentData.likes || [];
+      const currentDislikes = currentData.dislikes || [];
+      
+      // Check if user already liked this prompt
+      if (currentLikes.includes(userId)) {
+        return { success: true, message: 'Already liked' };
+      }
+
+      // Check if user previously disliked (need to decrement dislike count)
+      const wasDisliked = currentDislikes.includes(userId);
+
+      // Update the document
+      const updates = {
+        likes: arrayUnion(userId),
+        dislikes: arrayRemove(userId),
+        likeCount: increment(1),
+        // Initialize arrays if they don't exist
+        ...(currentData.likes === undefined && { likes: [userId] }),
+        ...(currentData.dislikes === undefined && { dislikes: [] })
+      };
+
+      // If user was previously disliking, decrement dislike count
+      if (wasDisliked) {
+        updates.dislikeCount = increment(-1);
+      }
+
+      await updateDoc(promptRef, updates);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[PromptService] Error liking prompt:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Dislike a prompt (works for both hourly and snapple prompts)
+  async dislikePrompt(promptId, userId, collection = 'hourlyPrompts') {
+    try {
+      const promptRef = doc(db, collection, promptId);
+      
+      // First check if the document exists and get current data
+      const promptDoc = await getDoc(promptRef);
+      
+      if (!promptDoc.exists()) {
+        console.error('[PromptService] Prompt document does not exist:', promptId);
+        return {
+          success: false,
+          error: 'Prompt not found'
+        };
+      }
+
+      const currentData = promptDoc.data();
+      const currentLikes = currentData.likes || [];
+      const currentDislikes = currentData.dislikes || [];
+      
+      // Check if user already disliked this prompt
+      if (currentDislikes.includes(userId)) {
+        return { success: true, message: 'Already disliked' };
+      }
+
+      // Check if user previously liked (need to decrement like count)
+      const wasLiked = currentLikes.includes(userId);
+
+      // Update the document
+      const updates = {
+        dislikes: arrayUnion(userId),
+        likes: arrayRemove(userId),
+        dislikeCount: increment(1),
+        // Initialize arrays if they don't exist
+        ...(currentData.likes === undefined && { likes: [] }),
+        ...(currentData.dislikes === undefined && { dislikes: [userId] })
+      };
+
+      // If user was previously liking, decrement like count
+      if (wasLiked) {
+        updates.likeCount = increment(-1);
+      }
+
+      await updateDoc(promptRef, updates);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[PromptService] Error disliking prompt:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Report a prompt (works for both hourly and snapple prompts)
+  async reportPrompt(promptId, userId, reason, collection = 'hourlyPrompts') {
+    try {
+      const reportData = {
+        promptId,
+        userId,
+        reason,
+        timestamp: new Date(),
+        status: 'pending'
+      };
+
+      const reportsRef = collection(db, 'promptReports');
+      await addDoc(reportsRef, reportData);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[PromptService] Error reporting prompt:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Create a new user-generated prompt
+  async createPrompt(promptData) {
+    try {
+      const promptToCreate = {
+        text: promptData.text,
+        createdBy: promptData.createdBy,
+        creatorUsername: promptData.creatorUsername,
+        timestamp: new Date(),
+        type: 'user-generated',
+        likeCount: 0,
+        dislikeCount: 0,
+        likes: [],
+        dislikes: [],
+        reports: [],
+        reportCount: 0,
+        participantCount: 0,
+        totalViews: 0
+      };
+
+      const promptsRef = collection(db, 'snapplePrompts');
+      const docRef = await addDoc(promptsRef, promptToCreate);
+
+      return {
+        success: true,
+        promptId: docRef.id
+      };
+    } catch (error) {
+      console.error('[PromptService] Error creating prompt:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Get recent snapple prompts (user-generated prompts)
+  async getRecentSnapplePrompts(limitCount = 10) {
+    try {
+      const promptsRef = collection(db, 'snapplePrompts');
+      const q = query(
+        promptsRef,
+        orderBy('timestamp', 'desc'),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const prompts = [];
+      
+      querySnapshot.forEach((doc) => {
+        prompts.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      return {
+        success: true,
+        prompts
+      };
+    } catch (error) {
+      console.error('[PromptService] Error getting snapple prompts:', error);
+      return {
+        success: false,
+        error: error.message,
+        prompts: []
+      };
+    }
+  }
+
+  // Increment view count for a prompt
+  async incrementViews(promptId, collection = 'hourlyPrompts') {
+    try {
+      const promptRef = doc(db, collection, promptId);
+      await updateDoc(promptRef, {
+        totalViews: increment(1)
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[PromptService] Error incrementing views:', error);
       return {
         success: false,
         error: error.message

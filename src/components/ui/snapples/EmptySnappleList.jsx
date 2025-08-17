@@ -30,6 +30,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
     paddingHorizontal: 40,
+    paddingBottom: 120, // Account for nav bar space to center properly
   },
   title: {
     color: theme.colors.textPrimary,

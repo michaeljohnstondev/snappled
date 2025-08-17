@@ -25,8 +25,18 @@ export function AuthProvider({ children }) {
 
       if (firebaseUser) {
         try {
-          // Load user data from our service
-          const userData = await userService.getUserData(firebaseUser.uid);
+          // Load user data from our service with retry for new users
+          console.log('[AuthContext] Loading user data for:', firebaseUser.uid);
+          let userData = await userService.getUserData(firebaseUser.uid);
+          
+          // If user data not found, retry once after a short delay (for new users)
+          if (!userData) {
+            console.log('[AuthContext] User data not found, retrying in 1 second...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            userData = await userService.getUserData(firebaseUser.uid);
+          }
+          
+          console.log('[AuthContext] User data loaded:', !!userData);
           if (userData) {
             setUser({
               uid: firebaseUser.uid,
@@ -35,9 +45,10 @@ export function AuthProvider({ children }) {
             });
             setUserCurrency({
               userId: firebaseUser.uid,
-              coins: userData.coins || 0,
-              trophies: userData.tickets || 0, // Convert tickets to trophies
-              topicTokens: userData.topicTokens || 0,
+              coins: userData.resources?.coins || userData.coins || 0,
+              tokens: userData.resources?.tokens || userData.topicTokens || 0,
+              trophies: userData.resources?.trophies || userData.tickets || 0,
+              level: userData.profile?.level || 1,
               ownedSnapples: userData.ownedSnapples || [],
               wishlistedSnapples: userData.wishlistedSnapples || [],
               ownedCards: userData.ownedCards || [],
@@ -45,6 +56,7 @@ export function AuthProvider({ children }) {
             setIsAuthenticated(true);
           } else {
             // User exists in Firebase Auth but not in our database
+            console.log('[AuthContext] User data not found in database for:', firebaseUser.uid);
             setUser(null);
             setUserCurrency({});
             setIsAuthenticated(false);
@@ -78,9 +90,10 @@ export function AuthProvider({ children }) {
       if (userData) {
         setUserCurrency({
           userId: user.uid,
-          coins: userData.coins || 0,
-          trophies: userData.tickets || 0, // Convert tickets to trophies
-          topicTokens: userData.topicTokens || 0,
+          coins: userData.resources?.coins || userData.coins || 0,
+          tokens: userData.resources?.tokens || userData.topicTokens || 0,
+          trophies: userData.resources?.trophies || userData.tickets || 0,
+          level: userData.profile?.level || 1,
           ownedSnapples: userData.ownedSnapples || [],
           wishlistedSnapples: userData.wishlistedSnapples || [],
           ownedCards: userData.ownedCards || [],
@@ -91,9 +104,21 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Function to update user currency locally (for immediate UI updates)
-  const updateUserCurrency = (updates) => {
+  // Function to update user currency locally and persist to database
+  const updateUserCurrency = async (updates) => {
+    if (!user?.uid) return;
+
+    // Update local state immediately for responsive UI
     setUserCurrency((prev) => ({ ...prev, ...updates }));
+
+    try {
+      // Persist changes to database
+      await userService.updateUserResources(user.uid, updates);
+    } catch (error) {
+      console.error("Error updating user currency in database:", error);
+      // Optionally refresh from database to ensure consistency
+      await refreshUserCurrency();
+    }
   };
 
   const value = {

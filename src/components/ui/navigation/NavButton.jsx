@@ -12,12 +12,13 @@ export default function NavButton({ title = "test", onPress, style }) {
 
 const styles = StyleSheet.create({
   button: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 55,
   },
   buttonText: {
     color: theme.colors.textPrimary,

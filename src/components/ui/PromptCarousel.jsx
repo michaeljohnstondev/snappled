@@ -8,7 +8,7 @@ const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth - 40;
 const CARD_SPACING = 20;
 
-export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect }) {
+export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect, onPromptPress }) {
   const scrollViewRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -85,52 +85,23 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
             key={prompt.id || index}
             style={styles.promptCard}
             onPress={() => {
-              setCurrentIndex(index);
-              onPromptSelect?.(prompt);
-              scrollToIndex(index);
+              if (onPromptPress) {
+                onPromptPress(prompt);
+              } else {
+                setCurrentIndex(index);
+                onPromptSelect?.(prompt);
+                scrollToIndex(index);
+              }
             }}
           >
             <LinearGradient
               colors={getPromptGradient(index)}
               style={styles.cardGradient}
             >
-              <View style={styles.cardHeader}>
-                <View style={styles.promptInfo}>
-                  <Text style={styles.promptTheme}>{prompt.theme || 'Creative'}</Text>
-                  <Text style={styles.timeRemaining}>
-                    {formatTimeRemaining(prompt.expiresAt)}
-                  </Text>
-                </View>
-                
-                {currentIndex === index && (
-                  <View style={styles.activeIndicator}>
-                    <Ionicons name="radio-button-on" size={16} color="#fff" />
-                  </View>
-                )}
-              </View>
-
               <View style={styles.cardContent}>
                 <Text style={styles.promptText} numberOfLines={3}>
                   {prompt.text || prompt.prompt || 'Create something amazing!'}
                 </Text>
-                
-                <View style={styles.cardFooter}>
-                  <View style={styles.statsContainer}>
-                    <View style={styles.stat}>
-                      <Ionicons name="people" size={14} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.statText}>
-                        {prompt.participantCount || 0} responses
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.stat}>
-                      <Ionicons name="trending-up" size={14} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.statText}>
-                        {prompt.totalViews || 0} views
-                      </Text>
-                    </View>
-                  </View>
-                </View>
               </View>
             </LinearGradient>
           </Pressable>
@@ -200,14 +171,15 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   promptText: {
     color: 'white',
     fontSize: 16,
     fontWeight: theme.fontWeights.medium,
     lineHeight: 20,
-    marginBottom: 12,
+    textAlign: 'center',
   },
   cardFooter: {
     marginTop: 'auto',

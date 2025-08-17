@@ -76,7 +76,10 @@ export default function RecordScreen({ route }) {
     // Navigate to preview screen immediately
     if (video && video.uri) {
       console.log('[RecordScreen] Navigating to VideoPreview...');
-      navigation.navigate('VideoPreview', { recordedVideo: video });
+      navigation.navigate('VideoPreview', { 
+        recordedVideo: video,
+        cameraFacing: facing // Pass camera facing to preview
+      });
     } else {
       console.log('[RecordScreen] No video or URI to navigate with');
     }
@@ -94,7 +97,10 @@ export default function RecordScreen({ route }) {
 
   function handlePreviewVideo(video) {
     // Navigate to video preview screen
-    navigation.navigate('VideoPreview', { recordedVideo: video });
+    navigation.navigate('VideoPreview', { 
+      recordedVideo: video,
+      cameraFacing: facing // Pass camera facing to preview
+    });
   }
 
   function toggleCamera() {
