@@ -6,7 +6,9 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import theme from '../../theme/themes';
 
-export default function UserMenu({ visible, onClose, onProfilePress }) {
+const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
+
+export default function UserMenu({ visible, onClose, onProfilePress, onAdminPress, userId }) {
   const handleLogout = () => {
     Alert.alert(
       'Sign Out',
@@ -56,6 +58,20 @@ export default function UserMenu({ visible, onClose, onProfilePress }) {
             <Text style={styles.menuText}>Profile</Text>
             <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
           </Pressable>
+
+          {/* Admin Button — only for admins */}
+          {ADMIN_UIDS.includes(userId) && (
+            <>
+              <View style={styles.divider} />
+              <Pressable style={styles.menuItem} onPress={() => { onAdminPress?.(); onClose(); }}>
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name="shield-outline" size={20} color={theme.colors.vibeGreen} />
+                </View>
+                <Text style={styles.menuText}>Admin</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+              </Pressable>
+            </>
+          )}
 
           {/* Divider */}
           <View style={styles.divider} />

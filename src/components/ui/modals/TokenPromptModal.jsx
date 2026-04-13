@@ -46,21 +46,21 @@ export default function TokenPromptModal({
                 </View>
                 <Text style={styles.title}>Create Custom Prompt</Text>
                 <Text style={styles.subtitle}>
-                  Spend 1 token to create your own prompt for the community
+                  Spend 1 topic ticket to create your own prompt for the community
                 </Text>
               </View>
 
               {/* Token Info */}
               <View style={styles.tokenInfo}>
                 <Text style={styles.tokenText}>
-                  You have {userTokens} token{userTokens !== 1 ? 's' : ''} available
+                  You have {userTokens} ticket{userTokens !== 1 ? 's' : ''} available
                 </Text>
               </View>
 
               {/* Buttons */}
               <View style={styles.buttonContainer}>
                 <VibeButton
-                  label="Create Prompt (1 Token)"
+                  label="Create Prompt (1 Ticket)"
                   onPress={handleCreatePrompt}
                   style={styles.createButton}
                   textStyle={styles.createButtonText}

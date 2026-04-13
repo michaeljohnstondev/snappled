@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import VibeButton from "../components/ui/VibeButton";
 import VibeInput from "../components/ui/VibeInput";
 import theme from "../theme/themes";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../services/firebase";
 
 export default function LoginScreen({ navigation }) {
@@ -56,6 +56,19 @@ export default function LoginScreen({ navigation }) {
     return isValid;
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert("Reset Password", "Enter your email address first, then tap Forgot Password.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      Alert.alert("Email Sent", "Check your inbox for a password reset link.");
+    } catch (error) {
+      Alert.alert("Error", "Could not send reset email. Check your email address.");
+    }
+  }
+
   async function handleLogin() {
     if (!validateInputs()) {
       return;
@@ -70,7 +83,7 @@ export default function LoginScreen({ navigation }) {
         password
       );
       
-      Alert.alert("Login Successful! 🎉", "Welcome back to Snapple Park!", [
+      Alert.alert("Login Successful! 🎉", "Welcome back to Snappled!", [
         { 
           text: "Continue", 
           onPress: () => {
@@ -141,7 +154,7 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.header}>
             <Text style={styles.title}>Welcome Back! 👋</Text>
             <Text style={styles.subtitle}>
-              Sign in to continue your Snapple Park adventure
+              Sign in to continue your Snappled adventure
             </Text>
           </View>
 
@@ -220,6 +233,10 @@ export default function LoginScreen({ navigation }) {
               disabled={isLoading}
             />
 
+            <Pressable onPress={handleForgotPassword}>
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </Pressable>
+
             <View style={styles.signupPrompt}>
               <Text style={styles.signupText}>
                 Don&apos;t have an account?{" "}
@@ -261,7 +278,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.md || 16,
     textAlign: "center",
-    ...theme.shadows?.textGlow,
   },
   subtitle: {
     fontSize: 16,
@@ -339,5 +355,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textDecorationLine: "underline",
+  },
+  forgotText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 12,
   },
 });

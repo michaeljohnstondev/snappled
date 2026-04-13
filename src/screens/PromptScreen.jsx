@@ -108,7 +108,7 @@ export default function PromptScreen({ navigation }) {
       style={styles.container}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>🍏 Today&apos;s Snapple Prompt</Text>
+        <Text style={styles.title}>Today&apos;s Prompt</Text>
         <View style={styles.promptMeta}>
           <Text style={styles.promptNumber}>Prompt #{promptNumber}</Text>
           <View style={styles.timerContainer}>
@@ -175,7 +175,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     marginBottom: 16,
     textAlign: 'center',
-    ...theme.shadows?.textGlow,
   },
   promptMeta: {
     flexDirection: 'row',

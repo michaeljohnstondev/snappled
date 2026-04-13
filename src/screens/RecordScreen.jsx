@@ -76,9 +76,10 @@ export default function RecordScreen({ route }) {
     // Navigate to preview screen immediately
     if (video && video.uri) {
       console.log('[RecordScreen] Navigating to VideoPreview...');
-      navigation.navigate('VideoPreview', { 
+      navigation.navigate('VideoPreview', {
         recordedVideo: video,
-        cameraFacing: facing // Pass camera facing to preview
+        cameraFacing: facing,
+        prompt,
       });
     } else {
       console.log('[RecordScreen] No video or URI to navigate with');
@@ -97,9 +98,10 @@ export default function RecordScreen({ route }) {
 
   function handlePreviewVideo(video) {
     // Navigate to video preview screen
-    navigation.navigate('VideoPreview', { 
+    navigation.navigate('VideoPreview', {
       recordedVideo: video,
-      cameraFacing: facing // Pass camera facing to preview
+      cameraFacing: facing,
+      prompt,
     });
   }
 
@@ -327,7 +329,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-    ...theme.shadows?.textGlow,
   },
   screenSubtitle: {
     color: 'rgba(255,255,255,0.8)',
@@ -468,7 +469,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-    ...theme.shadows?.textGlow,
   },
   overlayControls: {
     position: 'absolute',

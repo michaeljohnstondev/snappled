@@ -1,14 +1,59 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Dimensions, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, FlatList, Pressable, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SnappleThumbnail from '../SnappleThumbnail';
+import SortModal from '../modals/SortModal';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
-const ITEM_SIZE = (screenWidth - 60) / 2; // 2 columns with padding
+const ITEM_SIZE = (screenWidth - 60) / 2;
 
-export default function SnappleGrid({ snapples, onSnapplePress, refreshing, onRefresh }) {
+function getHotScore(item) {
+  const likes = item.likes || 0;
+  const views = item.views || 0;
+  const createdAt = item.createdAt?.toDate ? item.createdAt.toDate() : new Date(item.createdAt || 0);
+  const hoursAge = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+  // Recency boost decays over 24 hours
+  const recencyBonus = Math.max(0, 100 - (hoursAge * 4));
+  return likes * 10 + views + recencyBonus;
+}
+
+function sortSnapples(items, sortBy, ascending) {
+  const sorted = [...items].sort((a, b) => {
+    switch (sortBy) {
+      case 'hot': return getHotScore(b) - getHotScore(a);
+      case 'likes': return (b.likes || 0) - (a.likes || 0);
+      case 'views': return (b.views || 0) - (a.views || 0);
+      case 'price': return (b.currentPrice || 10) - (a.currentPrice || 10);
+      case 'time':
+      default:
+        const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return bTime - aTime;
+    }
+  });
+  return ascending ? sorted.reverse() : sorted;
+}
+
+export default function SnappleGrid({
+  snapples,
+  onSnapplePress,
+  refreshing,
+  onRefresh,
+  sortBy: externalSortBy,
+  ascending: externalAscending,
+  hideSort = false,
+}) {
   const [selectedSnapple, setSelectedSnapple] = useState(null);
+  const [sortBy, setSortBy] = useState(externalSortBy || 'time');
+  const [ascending, setAscending] = useState(externalAscending || false);
+  const [showSortModal, setShowSortModal] = useState(false);
+
+  // Sync with external sort props
+  React.useEffect(() => {
+    if (externalSortBy !== undefined) setSortBy(externalSortBy);
+    if (externalAscending !== undefined) setAscending(externalAscending);
+  }, [externalSortBy, externalAscending]);
 
   const handleSnapplePress = (snapple) => {
     setSelectedSnapple(snapple);
@@ -60,51 +105,28 @@ export default function SnappleGrid({ snapples, onSnapplePress, refreshing, onRe
         onPress={() => handleSnapplePress(item)}
       >
         <View style={styles.videoContainer}>
-          {/* Video Thumbnail - You might want to generate/store thumbnails */}
-          <View style={styles.thumbnailPlaceholder}>
-            <LinearGradient
-              colors={[theme.colors.vibeBackgroundPurple, theme.colors.vibeBackgroundBlue]}
-              style={styles.thumbnailGradient}
-            >
+          {item.videoUrl ? (
+            <SnappleThumbnail videoUrl={item.videoUrl} />
+          ) : (
+            <View style={styles.thumbnailPlaceholder}>
               <Ionicons name="play-circle" size={32} color="white" />
-            </LinearGradient>
-          </View>
+            </View>
+          )}
 
-          {/* Video Duration Badge */}
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>0:{Math.floor(Math.random() * 60).toString().padStart(2, '0')}</Text>
+          {/* Overlay info on thumbnail */}
+          <View style={styles.overlayInfo}>
+            <Text style={styles.creatorText} numberOfLines={1}>
+              @{item.creatorUsername || 'anonymous'}
+            </Text>
+            <View style={styles.statsRow}>
+              <Text style={styles.statText}>{formatCount(item.likes || 0)} ♥</Text>
+              <Text style={styles.statText}>{formatCount(item.views || 0)} 👁</Text>
+              <Text style={styles.statText}>{item.currentPrice || 10} 💎</Text>
+            </View>
           </View>
 
           {/* Engagement Indicator */}
           <View style={[styles.engagementIndicator, { backgroundColor: engagementColor }]} />
-        </View>
-
-        <View style={styles.snappleInfo}>
-          {/* Creator */}
-          <Text style={styles.creatorText} numberOfLines={1}>
-            @{item.creatorUsername || 'anonymous'}
-          </Text>
-
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Ionicons name="heart" size={12} color={theme.colors.vibePink} />
-              <Text style={styles.statText}>{formatCount(item.likes || 0)}</Text>
-            </View>
-
-            <View style={styles.stat}>
-              <Ionicons name="eye" size={12} color={theme.colors.vibeBlue} />
-              <Text style={styles.statText}>{formatCount(item.views || 0)}</Text>
-            </View>
-
-            <View style={styles.stat}>
-              <Ionicons name="diamond" size={12} color={theme.colors.vibeYellow} />
-              <Text style={styles.statText}>{item.currentPrice || 10}</Text>
-            </View>
-          </View>
-
-          {/* Time */}
-          <Text style={styles.timeText}>{formatTimeAgo(item.createdAt)}</Text>
         </View>
       </Pressable>
     );
@@ -120,13 +142,25 @@ export default function SnappleGrid({ snapples, onSnapplePress, refreshing, onRe
     </View>
   );
 
-  const renderHeader = () => null;
+  const sortedSnapples = sortSnapples(snapples, sortBy, ascending);
+
+  const sortLabel = { time: 'Newest', likes: 'Likes', views: 'Views', price: 'Price' }[sortBy];
+
+  const renderHeader = () => hideSort ? null : (
+    <View style={styles.sortRow}>
+      <Pressable style={styles.sortButton} onPress={() => setShowSortModal(true)}>
+        <Ionicons name="swap-vertical" size={14} color={theme.colors.vibeBlue} />
+        <Text style={styles.sortButtonText}>{sortLabel}</Text>
+        <Ionicons name={ascending ? 'arrow-up' : 'arrow-down'} size={12} color={theme.colors.vibeBlue} />
+      </Pressable>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={snapples}
-        keyExtractor={(item) => item.id || item.videoId}
+        data={sortedSnapples}
+        keyExtractor={(item, index) => item?.id || item?.videoId || `snapple-${index}`}
         renderItem={renderSnappleItem}
         numColumns={2}
         contentContainerStyle={styles.gridContainer}
@@ -137,6 +171,16 @@ export default function SnappleGrid({ snapples, onSnapplePress, refreshing, onRe
         refreshing={refreshing}
         onRefresh={onRefresh}
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+      />
+      <SortModal
+        visible={showSortModal}
+        onClose={() => setShowSortModal(false)}
+        sortBy={sortBy}
+        ascending={ascending}
+        onSelect={(value, asc) => {
+          setSortBy(value);
+          setAscending(asc);
+        }}
       />
     </View>
   );
@@ -164,6 +208,27 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontWeight: theme.fontWeights.medium,
   },
+  sortRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    flexDirection: 'row',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderWidth: 1,
+    borderColor: theme.colors.vibeBlue,
+  },
+  sortButtonText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: theme.fontWeights.semiBold,
+  },
   gridContainer: {
     paddingHorizontal: 20,
     paddingBottom: 80, // Reduced space since nav bar is hidden
@@ -173,15 +238,14 @@ const styles = StyleSheet.create({
   },
   snappleItem: {
     width: ITEM_SIZE,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 3,
+    borderColor: theme.colors.vibeBlue,
   },
   selectedItem: {
-    borderColor: theme.colors.vibeBlue,
-    borderWidth: 2,
+    borderColor: theme.colors.vibeCyan,
     transform: [{ scale: 1.02 }],
   },
   videoContainer: {
@@ -192,26 +256,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  thumbnailGradient: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  durationBadge: {
+  overlayInfo: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  durationText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: theme.fontWeights.semiBold,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    gap: 2,
   },
   engagementIndicator: {
     position: 'absolute',
@@ -221,33 +275,22 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  snappleInfo: {
-    padding: 12,
-    gap: 6,
-  },
   creatorText: {
-    color: theme.colors.textPrimary,
-    fontSize: 12,
+    color: 'white',
+    fontSize: 11,
     fontWeight: theme.fontWeights.semiBold,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    gap: 10,
   },
   statText: {
-    color: theme.colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 10,
     fontWeight: theme.fontWeights.medium,
-  },
-  timeText: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
-    fontWeight: theme.fontWeights.regular,
   },
   emptyContainer: {
     flex: 1,

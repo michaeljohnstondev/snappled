@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "snapple-park",
+    "name": "Snappled",
     "slug": "snapple-park",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "snapplepark",
+    "scheme": "snappled",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
@@ -15,13 +15,18 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
+      "navigationBar": {
+        "visible": "immersive",
+        "backgroundColor": "#00000000"
+      },
       "adaptiveIcon": {
-        "backgroundColor": "#080B1E"
+        "backgroundColor": "#001020"
       },
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.bigvibestudiosadmin.snapplepark"
     },
     "web": {
       "bundler": "metro"
@@ -30,20 +35,20 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Snapple Park to access your camera to record videos for prompts.",
-          "microphonePermission": "Allow Snapple Park to access your microphone to record audio with videos."
-        }
-      ],
-      [
-        "expo-splash-screen",
-        {
-          "resizeMode": "contain",
-          "backgroundColor": "#080B1E"
+          "cameraPermission": "Allow Snappled to access your camera to record videos for prompts.",
+          "microphonePermission": "Allow Snappled to access your microphone to record audio with videos."
         }
       ],
       "expo-video",
       "expo-font",
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-image"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a9e37a08-f738-46fc-b005-13392ce18692"
+      }
+    },
+    "owner": "bigvibestudiosadmin"
   }
 }

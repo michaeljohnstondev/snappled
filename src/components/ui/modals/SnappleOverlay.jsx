@@ -1,21 +1,18 @@
 import React, { useState, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Modal, 
-  Pressable, 
-  Dimensions, 
-  ScrollView,
-  Alert
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  Pressable,
+  Dimensions,
+  Share
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import SnappleVideoPlayer from '../../media/SnappleVideoPlayer';
-import VibeButton from '../VibeButton';
-import CommentSection from '../../comments/CommentSection';
 import { useAuth } from '../../../store/AuthContext';
+import { useModal } from '../../../store/ModalContext';
+import { snappleService } from '../../../services/snappleService';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -23,97 +20,172 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 export default function SnappleOverlay({ 
   visible, 
   snapple, 
-  onClose, 
-  onLike, 
-  onDislike, 
-  onBuy, 
-  onReport 
+  onClose,
+  onLike,
+  onDislike,
+  onBuy,
+  onReport,
+  navigation
 }) {
-  const { user } = useAuth();
-  const [isPlaying, setIsPlaying] = useState(false);
+  const { user, userCurrency, updateUserCurrency } = useAuth();
+  const { showConfirm, showError } = useModal();
+  const playerRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [showComments, setShowComments] = useState(false);
+  const [metrics, setMetrics] = useState({
+    likes: snapple?.likes || 0,
+    dislikes: snapple?.dislikes || 0,
+    buyCount: snapple?.buyCount || 0,
+    currentPrice: snapple?.currentPrice || 10,
+  });
   const [userInteraction, setUserInteraction] = useState({
     hasLiked: false,
     hasDisliked: false,
     hasPurchased: false
   });
 
+  // Reset metrics, load interactions, and track view when snapple changes
+  React.useEffect(() => {
+    if (snapple && visible) {
+      setMetrics({
+        likes: snapple.likes || 0,
+        dislikes: snapple.dislikes || 0,
+        buyCount: snapple.buyCount || 0,
+        currentPrice: snapple.currentPrice || 10,
+        views: (snapple.views || 0) + 1,
+      });
+      snappleService.incrementViews(snapple.id);
+
+      // Load existing interaction state
+      if (user?.uid) {
+        snappleService.getUserInteraction(snapple.id, user.uid).then((interaction) => {
+          setUserInteraction({
+            hasLiked: interaction.hasLiked,
+            hasDisliked: interaction.hasDisliked,
+            hasPurchased: false,
+          });
+        });
+      }
+    }
+  }, [snapple?.id, visible]);
+
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
+    if (isPlaying) {
+      playerRef.current?.pause();
+      setIsPlaying(false);
+    } else {
+      playerRef.current?.play();
+      setIsPlaying(true);
+    }
   };
 
   const handleLike = async () => {
-    if (userInteraction.hasLiked) return;
-    
-    try {
-      await onLike?.(snapple.id);
-      setUserInteraction(prev => ({
+    const wasLiked = userInteraction.hasLiked;
+    const wasDisliked = userInteraction.hasDisliked;
+
+    if (wasLiked) {
+      // Unlike
+      setMetrics(prev => ({ ...prev, likes: prev.likes - 1 }));
+      setUserInteraction(prev => ({ ...prev, hasLiked: false }));
+      try {
+        await snappleService.unlikeSnapple(snapple.id, user.uid);
+      } catch (error) {
+        setMetrics(prev => ({ ...prev, likes: prev.likes + 1 }));
+        setUserInteraction(prev => ({ ...prev, hasLiked: true }));
+      }
+    } else {
+      // Like
+      setMetrics(prev => ({
         ...prev,
-        hasLiked: true,
-        hasDisliked: false
+        likes: prev.likes + 1,
+        dislikes: wasDisliked ? prev.dislikes - 1 : prev.dislikes,
       }));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to like Snapple');
+      setUserInteraction(prev => ({ ...prev, hasLiked: true, hasDisliked: false }));
+      try {
+        await onLike?.(snapple.id);
+      } catch (error) {
+        setMetrics(prev => ({
+          ...prev,
+          likes: prev.likes - 1,
+          dislikes: wasDisliked ? prev.dislikes + 1 : prev.dislikes,
+        }));
+        setUserInteraction(prev => ({ ...prev, hasLiked: false, hasDisliked: wasDisliked }));
+      }
     }
   };
 
   const handleDislike = async () => {
-    if (userInteraction.hasDisliked) return;
-    
-    try {
-      await onDislike?.(snapple.id);
-      setUserInteraction(prev => ({
+    const wasDisliked = userInteraction.hasDisliked;
+    const wasLiked = userInteraction.hasLiked;
+
+    if (wasDisliked) {
+      // Undislike
+      setMetrics(prev => ({ ...prev, dislikes: prev.dislikes - 1 }));
+      setUserInteraction(prev => ({ ...prev, hasDisliked: false }));
+      try {
+        await snappleService.unlikeSnapple(snapple.id, user.uid);
+      } catch (error) {
+        setMetrics(prev => ({ ...prev, dislikes: prev.dislikes + 1 }));
+        setUserInteraction(prev => ({ ...prev, hasDisliked: true }));
+      }
+    } else {
+      // Dislike
+      setMetrics(prev => ({
         ...prev,
-        hasDisliked: true,
-        hasLiked: false
+        dislikes: prev.dislikes + 1,
+        likes: wasLiked ? prev.likes - 1 : prev.likes,
       }));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to dislike Snapple');
+      setUserInteraction(prev => ({ ...prev, hasDisliked: true, hasLiked: false }));
+      try {
+        await onDislike?.(snapple.id);
+      } catch (error) {
+        setMetrics(prev => ({
+          ...prev,
+          dislikes: prev.dislikes - 1,
+          likes: wasLiked ? prev.likes + 1 : prev.likes,
+        }));
+        setUserInteraction(prev => ({ ...prev, hasDisliked: false, hasLiked: wasLiked }));
+      }
     }
   };
 
   const handleBuy = () => {
-    Alert.alert(
+    showConfirm(
       'Purchase Snapple',
-      `Buy this Snapple for ${snapple?.currentPrice || 10} coins?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Buy', 
-          onPress: async () => {
-            try {
-              await onBuy?.(snapple.id);
-              setUserInteraction(prev => ({ ...prev, hasPurchased: true }));
-              Alert.alert('Success!', 'Snapple purchased and added to your deck!');
-            } catch (error) {
-              Alert.alert('Error', 'Purchase failed. Please try again.');
-            }
+      `Buy this Snapple for ${metrics.currentPrice} coins?`,
+      async () => {
+        try {
+          const result = await onBuy?.(snapple.id);
+          if (result?.success) {
+            setMetrics(prev => ({
+              ...prev,
+              buyCount: prev.buyCount + 1,
+              currentPrice: result.newPrice || prev.currentPrice,
+            }));
+            setUserInteraction(prev => ({ ...prev, hasPurchased: true }));
+          } else if (result?.error) {
+            showError('Purchase Failed', result.error);
           }
+        } catch (error) {
+          showError('Purchase Failed', error.message || 'Something went wrong');
         }
-      ]
+      }
     );
   };
 
   const handleReport = () => {
-    Alert.alert(
+    showConfirm(
       'Report Snapple',
-      'Why are you reporting this content?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Inappropriate', onPress: () => submitReport('inappropriate') },
-        { text: 'Spam', onPress: () => submitReport('spam') },
-        { text: 'Copyright', onPress: () => submitReport('copyright') },
-        { text: 'Other', onPress: () => submitReport('other') }
-      ]
+      'Report this content as inappropriate?',
+      () => submitReport('inappropriate')
     );
   };
 
   const submitReport = async (reason) => {
     try {
       await onReport?.(snapple.id, reason);
-      Alert.alert('Reported', 'Thank you for your report. We\'ll review this content.');
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit report');
+      // silently fail
     }
   };
 
@@ -129,173 +201,155 @@ export default function SnappleOverlay({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="overFullScreen"
+      transparent
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        {/* Video Section */}
-        <View style={styles.videoSection}>
-          <SnappleVideoPlayer
-            videoUrl={snapple.videoUrl}
-            isPlaying={isPlaying}
-            onPlayPause={handlePlayPause}
-            style={styles.videoPlayer}
-          />
+        {/* Full Screen Video */}
+        <SnappleVideoPlayer
+          ref={playerRef}
+          snapple={snapple}
+          style={StyleSheet.absoluteFill}
+        />
 
-          {/* Video Controls */}
-          <View style={styles.videoControls}>
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <BlurView intensity={20} style={styles.controlBlur}>
-                <Ionicons name="close" size={24} color="white" />
-              </BlurView>
-            </Pressable>
+        {/* Tap to pause/play - covers entire screen behind buttons */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handlePlayPause}>
+          {!isPlaying && (
+            <View style={styles.pauseIndicator}>
+              <View style={styles.playIconBg}>
+                <Ionicons name="play" size={40} color="white" />
+              </View>
+            </View>
+          )}
+        </Pressable>
 
-            <Pressable style={styles.playButton} onPress={handlePlayPause}>
-              <BlurView intensity={20} style={styles.playBlur}>
-                <Ionicons 
-                  name={isPlaying ? "pause" : "play"} 
-                  size={32} 
-                  color="white" 
-                />
-              </BlurView>
+        {/* Close Button - top left */}
+        <Pressable style={styles.closeButton} onPress={onClose}>
+          <View style={styles.buttonBg}>
+            <Ionicons name="close" size={24} color="white" />
+          </View>
+        </Pressable>
+
+        {/* Action Buttons - right side */}
+        <View style={styles.actionsColumn}>
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={handleLike}>
+              <View style={[styles.buttonBg, userInteraction.hasLiked && styles.activeBg]}>
+                <Ionicons name="heart" size={20} color={userInteraction.hasLiked ? theme.colors.vibeRed : 'white'} />
+              </View>
             </Pressable>
+            <Text style={styles.actionCount}>{formatCount(metrics.likes)}</Text>
           </View>
 
-          {/* Video Info Overlay */}
-          <View style={styles.videoInfo}>
-            <BlurView intensity={40} style={styles.infoBlur}>
-              <Text style={styles.creatorName}>
-                @{snapple.creatorUsername || 'anonymous'}
-              </Text>
-              <Text style={styles.promptText} numberOfLines={2}>
-                {snapple.prompt}
-              </Text>
-            </BlurView>
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={handleDislike}>
+              <View style={[styles.buttonBg, userInteraction.hasDisliked && styles.activeBg]}>
+                <Ionicons name="thumbs-down" size={19} style={{ marginTop: 3 }} color={userInteraction.hasDisliked ? theme.colors.vibeOrange : 'white'} />
+              </View>
+            </Pressable>
+            <Text style={styles.actionCount}>{formatCount(metrics.dislikes)}</Text>
           </View>
-        </View>
 
-        {/* Actions Section */}
-        <View style={styles.actionsSection}>
-          <ScrollView style={styles.actionsScroll} showsVerticalScrollIndicator={false}>
-            {/* Like/Dislike */}
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
+              <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
+                <Ionicons name={userInteraction.hasPurchased ? "checkmark" : "diamond"} size={20} style={{ marginTop: 2 }} color={userInteraction.hasPurchased ? theme.colors.vibeGreen : theme.colors.vibeBlue} />
+              </View>
+            </Pressable>
+            <Text style={styles.actionCount}>{userInteraction.hasPurchased ? 'Owned' : `${metrics.currentPrice}`}</Text>
+          </View>
+
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={async () => {
+              try {
+                await Share.share({
+                  message: `Check out this Snapple by @${snapple.creatorUsername || 'anonymous'}: "${snapple.prompt}"`,
+                });
+              } catch (e) {}
+            }}>
+              <View style={styles.buttonBg}>
+                <Ionicons name="share-social" size={20} style={{ marginTop: 2, marginLeft: -2 }} color="white" />
+              </View>
+            </Pressable>
+            <Text style={styles.actionCount}>Share</Text>
+          </View>
+
+          {(snapple.creatorId === user?.uid || (userCurrency.ownedSnapples || []).includes(snapple.id)) ? (
             <View style={styles.actionGroup}>
-              <Pressable 
-                style={[styles.actionButton, userInteraction.hasLiked && styles.activeAction]}
-                onPress={handleLike}
-              >
-                <LinearGradient
-                  colors={userInteraction.hasLiked ? 
-                    [theme.colors.vibePink, theme.colors.vibeOrange] : 
-                    ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
+              <Pressable style={styles.actionButton} onPress={() => {
+                showConfirm(
+                  'Discard Snapple',
+                  'Remove this snapple from your collection?',
+                  async () => {
+                    // Remove from user's owned lists
+                    const updated = (userCurrency.ownedSnapples || []).filter(id => id !== snapple.id);
+                    const updatedCards = (userCurrency.ownedCards || []).filter(id => id !== snapple.id);
+                    const discarded = [...(userCurrency.discardedSnapples || []), snapple.id];
+                    await updateUserCurrency({ ownedSnapples: updated, ownedCards: updatedCards, discardedSnapples: discarded });
+                    // Remove from snapple's owners array
+                    try {
+                      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+                      const { db } = await import('../../../services/firebase');
+                      await updateDoc(doc(db, 'snapples', snapple.id), {
+                        owners: arrayRemove(user.uid),
+                      });
+                    } catch (e) {}
+                    onClose();
                   }
-                  style={styles.actionGradient}
-                >
-                  <Ionicons 
-                    name="heart" 
-                    size={24} 
-                    color={userInteraction.hasLiked ? "white" : theme.colors.textSecondary} 
-                  />
-                </LinearGradient>
+                );
+              }}>
+                <View style={styles.buttonBg}>
+                  <Ionicons name="ban" size={20} color="white" />
+                </View>
               </Pressable>
-              <Text style={styles.actionCount}>{formatCount(snapple.likes)}</Text>
+              <Text style={styles.actionCount}>Discard</Text>
             </View>
-
-            <View style={styles.actionGroup}>
-              <Pressable 
-                style={[styles.actionButton, userInteraction.hasDisliked && styles.activeAction]}
-                onPress={handleDislike}
-              >
-                <LinearGradient
-                  colors={userInteraction.hasDisliked ? 
-                    [theme.colors.vibeOrange, theme.colors.vibePink] : 
-                    ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
-                  }
-                  style={styles.actionGradient}
-                >
-                  <Ionicons 
-                    name="thumbs-down" 
-                    size={24} 
-                    color={userInteraction.hasDisliked ? "white" : theme.colors.textSecondary} 
-                  />
-                </LinearGradient>
-              </Pressable>
-              <Text style={styles.actionCount}>{formatCount(snapple.dislikes)}</Text>
-            </View>
-
-            {/* Buy */}
-            <View style={styles.actionGroup}>
-              <Pressable 
-                style={[styles.actionButton, userInteraction.hasPurchased && styles.purchasedAction]}
-                onPress={handleBuy}
-                disabled={userInteraction.hasPurchased}
-              >
-                <LinearGradient
-                  colors={userInteraction.hasPurchased ? 
-                    [theme.colors.vibeGreen, theme.colors.vibeBlue] :
-                    [theme.colors.vibeYellow, theme.colors.vibeOrange]
-                  }
-                  style={styles.actionGradient}
-                >
-                  <Ionicons 
-                    name={userInteraction.hasPurchased ? "checkmark" : "diamond"} 
-                    size={24} 
-                    color="white" 
-                  />
-                </LinearGradient>
-              </Pressable>
-              <Text style={styles.actionCount}>
-                {userInteraction.hasPurchased ? 'Owned' : `${snapple.currentPrice || 10}`}
-              </Text>
-            </View>
-
-            {/* Comments */}
-            <View style={styles.actionGroup}>
-              <Pressable 
-                style={[styles.actionButton, showComments && styles.activeAction]}
-                onPress={() => setShowComments(!showComments)}
-              >
-                <LinearGradient
-                  colors={showComments ? 
-                    [theme.colors.vibeBlue, theme.colors.vibeGreen] : 
-                    ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
-                  }
-                  style={styles.actionGradient}
-                >
-                  <Ionicons 
-                    name="chatbubble" 
-                    size={24} 
-                    color={showComments ? "white" : theme.colors.textSecondary} 
-                  />
-                </LinearGradient>
-              </Pressable>
-              <Text style={styles.actionCount}>
-                {formatCount(snapple.commentCount || 0)}
-              </Text>
-            </View>
-
-            {/* Report */}
+          ) : (
             <View style={styles.actionGroup}>
               <Pressable style={styles.actionButton} onPress={handleReport}>
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-                  style={styles.actionGradient}
-                >
-                  <Ionicons name="flag" size={20} color={theme.colors.textSecondary} />
-                </LinearGradient>
+                <View style={styles.buttonBg}>
+                  <Ionicons name="flag" size={20} color="white" />
+                </View>
               </Pressable>
               <Text style={styles.actionCount}>Report</Text>
             </View>
+          )}
 
-            {/* Comments Section */}
-            {showComments && (
-              <View style={styles.commentsContainer}>
-                <CommentSection
-                  snappleId={snapple.id}
-                  currentUserId={user?.uid}
-                />
-              </View>
-            )}
-          </ScrollView>
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable style={styles.actionButton} onPress={() => {
+                showConfirm(
+                  'Delete Snapple',
+                  'This removes it for everyone. Are you sure?',
+                  async () => {
+                    const result = await snappleService.deleteSnapple(snapple.id, user.uid);
+                    if (result.success) {
+                      onClose();
+                    }
+                  }
+                );
+              }}>
+                <View style={styles.buttonBg}>
+                  <Ionicons name="trash" size={20} color="white" />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>Delete</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Creator Info - bottom left */}
+        <View style={styles.videoInfo}>
+          <Pressable onPress={() => {
+            onClose();
+            if (snapple.creatorId && navigation) {
+              navigation.navigate('UserProfile', { userId: snapple.creatorId });
+            }
+          }}>
+            <Text style={styles.creatorName}>@{snapple.creatorUsername || 'anonymous'}</Text>
+          </Pressable>
+          <Text style={styles.promptText} numberOfLines={2}>{snapple.prompt}</Text>
+          <Text style={styles.viewCount}>{formatCount(metrics.views || 0)} views</Text>
         </View>
       </View>
     </Modal>
@@ -305,112 +359,95 @@ export default function SnappleOverlay({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    flexDirection: 'row',
-    backgroundColor: 'black',
+    backgroundColor: '#000',
   },
-  videoSection: {
+  pauseIndicator: {
     flex: 1,
-    position: 'relative',
-  },
-  videoPlayer: {
-    flex: 1,
-  },
-  videoControls: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  playIconBg: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 4,
   },
   closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
     position: 'absolute',
-    left: '50%',
-    marginLeft: -32,
+    top: 20,
+    left: 16,
+    zIndex: 10,
   },
-  controlBlur: {
-    flex: 1,
+  buttonBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playBlur: {
-    flex: 1,
-    justifyContent: 'center',
+  activeBg: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  purchasedBg: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  actionsColumn: {
+    position: 'absolute',
+    right: 12,
+    bottom: 120,
     alignItems: 'center',
+    gap: 16,
+    zIndex: 10,
+  },
+  actionGroup: {
+    alignItems: 'center',
+  },
+  actionButton: {
+    marginBottom: 2,
+  },
+  actionCount: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: theme.fontWeights.semiBold,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   videoInfo: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 100,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  infoBlur: {
-    padding: 16,
+    bottom: 40,
+    left: 16,
+    right: 80,
+    zIndex: 10,
   },
   creatorName: {
     color: 'white',
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
     marginBottom: 4,
   },
   promptText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 14,
     lineHeight: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginBottom: 4,
   },
-  actionsSection: {
-    width: 80,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingTop: 60,
-  },
-  actionsScroll: {
-    flex: 1,
-  },
-  actionGroup: {
-    alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 12,
-  },
-  actionButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  activeAction: {
-    transform: [{ scale: 1.1 }],
-  },
-  purchasedAction: {
-    opacity: 0.7,
-  },
-  actionGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionCount: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: theme.fontWeights.medium,
-    textAlign: 'center',
-  },
-  commentsContainer: {
-    marginTop: 16,
-    paddingHorizontal: 12,
-    maxHeight: 200,
+  viewCount: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });

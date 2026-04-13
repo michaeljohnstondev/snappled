@@ -2,34 +2,42 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Pressable,
   StyleSheet,
-  SafeAreaView,
-  TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import VibeButton from '../components/ui/VibeButton';
+import VibeInput from '../components/ui/VibeInput';
 import { useAuth } from '../store/AuthContext';
+import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
 import theme from '../theme/themes';
 
 export default function CreatePromptScreen({ navigation }) {
   const { user, userCurrency, updateUserCurrency } = useAuth();
+  const { showAlert, showSuccess, showError } = useModal();
   const [promptText, setPromptText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const showGuidelines = () => {
+    showAlert(
+      'Prompt Guidelines',
+      '• Keep it creative and engaging\n• Make it clear and easy to understand\n• Avoid inappropriate or offensive content\n• Reported prompts may be removed by moderation'
+    );
+  };
+
   const handleCreatePrompt = async () => {
     if (!promptText.trim()) {
-      Alert.alert('Error', 'Please enter a prompt');
+      showError('Error', 'Please enter a prompt');
       return;
     }
 
-
     if (userCurrency.tokens < 1) {
-      Alert.alert('Insufficient Tokens', 'You need at least 1 token to create a prompt');
+      showError('Insufficient Tickets', 'You need at least 1 topic ticket to create a prompt');
       return;
     }
 
@@ -42,26 +50,20 @@ export default function CreatePromptScreen({ navigation }) {
       });
 
       if (result.success) {
-        // Deduct token from user currency
         const newTokenCount = userCurrency.tokens - 1;
         await updateUserCurrency({ tokens: newTokenCount });
 
-        Alert.alert(
-          'Success!', 
-          'Your prompt has been created and is now live in the community!',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack()
-            }
-          ]
+        showSuccess(
+          'Success!',
+          'Your prompt has been created and is now live in the community!'
         );
+        setTimeout(() => navigation.goBack(), 1500);
       } else {
-        Alert.alert('Error', result.error || 'Failed to create prompt');
+        showError('Error', result.error || 'Failed to create prompt');
       }
     } catch (error) {
       console.error('[CreatePromptScreen] Error creating prompt:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      showError('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -82,12 +84,15 @@ export default function CreatePromptScreen({ navigation }) {
             <View style={styles.header}>
               <Text style={styles.title}>Create Custom Prompt</Text>
               <Text style={styles.subtitle}>
-                Share your creativity with the Snapple Park community
+                Share your creativity with the Snappled community
               </Text>
+              <Pressable onPress={showGuidelines}>
+                <Text style={styles.guidelinesLink}>View Guidelines</Text>
+              </Pressable>
               <View style={styles.tokenInfo}>
-                <Text style={styles.tokenText}>🎫 Cost: 1 Token</Text>
+                <Text style={styles.tokenText}>🎫 Cost: 1 Topic Ticket</Text>
                 <Text style={styles.balanceText}>
-                  Your balance: {userCurrency.tokens || 0} tokens
+                  Your balance: {userCurrency.tokens || 0} tickets
                 </Text>
               </View>
             </View>
@@ -95,14 +100,13 @@ export default function CreatePromptScreen({ navigation }) {
             {/* Prompt Input */}
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>Your Prompt</Text>
-              <TextInput
-                style={styles.textInput}
+              <VibeInput
                 value={promptText}
                 onChangeText={setPromptText}
                 placeholder="Write an engaging prompt that inspires creativity..."
-                placeholderTextColor={theme.colors.textSecondary}
                 multiline
                 maxLength={200}
+                style={styles.textInput}
                 textAlignVertical="top"
               />
               <Text style={styles.characterCount}>
@@ -110,31 +114,19 @@ export default function CreatePromptScreen({ navigation }) {
               </Text>
             </View>
 
-            {/* Guidelines */}
-            <View style={styles.guidelines}>
-              <Text style={styles.guidelinesTitle}>Guidelines</Text>
-              <Text style={styles.guidelineItem}>• Keep it creative and engaging</Text>
-              <Text style={styles.guidelineItem}>• Make it clear and easy to understand</Text>
-              <Text style={styles.guidelineItem}>• Avoid inappropriate or offensive content</Text>
-              <Text style={styles.guidelineItem}>• Reported prompts may be removed by moderation</Text>
-            </View>
-
             {/* Buttons */}
             <View style={styles.buttonContainer}>
               <VibeButton
-                label={isSubmitting ? "Creating..." : "Create Prompt (1 Token)"}
+                label={isSubmitting ? "Creating..." : "Create Prompt (1 Ticket)"}
                 onPress={handleCreatePrompt}
-                style={[
-                  styles.createButton,
-                  { opacity: isSubmitting || userCurrency.tokens < 1 ? 0.5 : 1 }
-                ]}
+                variant="green"
                 disabled={isSubmitting || userCurrency.tokens < 1}
               />
-              
+
               <VibeButton
                 label="Cancel"
                 onPress={() => navigation.goBack()}
-                style={styles.cancelButton}
+                variant="red"
               />
             </View>
           </ScrollView>
@@ -173,19 +165,25 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
     lineHeight: 22,
   },
+  guidelinesLink: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: theme.fontWeights.semiBold,
+    marginBottom: 20,
+  },
   tokenInfo: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: theme.colors.vibeBackgroundBlue,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 3,
+    borderColor: theme.colors.vibeBlue,
   },
   tokenText: {
-    color: theme.colors.vibePink,
+    color: theme.colors.vibeBlue,
     fontSize: 16,
     fontWeight: theme.fontWeights.semiBold,
     textAlign: 'center',
@@ -206,15 +204,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   textInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    padding: 16,
-    color: theme.colors.textPrimary,
-    fontSize: 16,
     minHeight: 120,
-    fontFamily: theme.fonts.main,
   },
   characterCount: {
     color: theme.colors.textSecondary,
@@ -222,35 +212,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 8,
   },
-  guidelines: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 30,
-  },
-  guidelinesTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: theme.fontWeights.semiBold,
-    marginBottom: 12,
-  },
-  guidelineItem: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    marginBottom: 6,
-    lineHeight: 20,
-  },
   buttonContainer: {
     gap: 16,
     paddingBottom: 40,
-  },
-  createButton: {
-    backgroundColor: 'rgba(255, 20, 147, 0.15)',
-    borderColor: theme.colors.vibePink,
-    borderWidth: 2,
-  },
-  cancelButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 });

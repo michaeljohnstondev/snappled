@@ -1,15 +1,23 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import VibeButton from '../components/ui/VibeButton';
+import { useAuth } from '../store/AuthContext';
+import { useModal } from '../store/ModalContext';
+import { uploadVideo } from '../services/videoStorage';
+import { snappleService } from '../services/snappleService';
 import theme from '../theme/themes';
 
 export default function VideoPreviewScreen({ route, navigation }) {
   const { recordedVideo, cameraFacing } = route.params || {};
+  const prompt = route.params?.prompt || {};
+  const { user, userCurrency, updateUserCurrency } = useAuth();
+  const { showSuccess, showError, showConfirm } = useModal();
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   console.log('[VideoPreview] Camera facing:', cameraFacing);
   
@@ -42,9 +50,144 @@ export default function VideoPreviewScreen({ route, navigation }) {
     navigation.goBack();
   };
 
-  const handleSubmit = () => {
-    // TODO: Navigate to submission flow
-    navigation.navigate('Home');
+  const handleSubmit = async () => {
+    if (!recordedVideo?.uri) {
+      showError('Error', 'No video to submit');
+      return;
+    }
+
+    if (!user?.uid) {
+      showError('Error', 'You must be logged in to submit');
+      return;
+    }
+
+    // Check prompt lockout (last 10 min)
+    if (prompt?.lockoutAt && new Date().toISOString() >= prompt.lockoutAt) {
+      showError('Prompt Closing', 'This prompt is closing soon — no new snapples allowed');
+      return;
+    }
+
+    // Check if user already made a snapple for this prompt this cycle
+    if (prompt?.id) {
+      try {
+        const { collection: col, query: q, where, getDocs } = await import('firebase/firestore');
+        const { db } = await import('../services/firebase');
+        const existingQuery = q(
+          col(db, 'snapples'),
+          where('promptId', '==', prompt.id),
+          where('creatorId', '==', user.uid)
+        );
+        const existing = await getDocs(existingQuery);
+        if (!existing.empty) {
+          const count = existing.size; // how many they already have
+          const price = count === 1 ? 1000 : 5000;
+          showConfirm(
+            'Extra Snapple',
+            `You have ${count} snapple${count > 1 ? 's' : ''} for this prompt. Extra slot costs ${price.toLocaleString()} coins.`,
+            async () => {
+              if ((userCurrency.coins || 0) < price) {
+                showError('Not Enough Coins', `You need ${price.toLocaleString()} coins`);
+                return;
+              }
+              await updateUserCurrency({ coins: (userCurrency.coins || 0) - price });
+              doSubmit();
+            }
+          );
+          return;
+        }
+      } catch (e) {}
+    }
+
+    doSubmit();
+  };
+
+  const doSubmit = async () => {
+    setIsSubmitting(true);
+    setUploadProgress(0);
+    player.pause();
+    setIsPlaying(false);
+
+    try {
+      // Upload video to Firebase Storage
+      const uploadResult = await uploadVideo(
+        recordedVideo.uri,
+        prompt?.text || 'Snapple video',
+        user.uid,
+        (progress) => setUploadProgress(progress)
+      );
+
+      // Create the snapple record
+      const snappleResult = await snappleService.createSnapple({
+        promptId: prompt?.id || 'unknown',
+        videoUrl: uploadResult.downloadURL,
+        videoId: uploadResult.id,
+        creatorId: user.uid,
+        creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
+        prompt: prompt?.text || 'Snapple video',
+        category: prompt?.category || 'general',
+      });
+
+      if (snappleResult.success) {
+        // Award 75 XP for creating a snapple
+        try {
+          const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc } = await import('firebase/firestore');
+          const { db: xpDb } = await import('../services/firebase');
+          await xpUpdate(xpDoc(xpDb, 'users', user.uid), {
+            'profile.experience': xpInc(75),
+            'stats.videosCreated': xpInc(1),
+          }).catch(() => {});
+        } catch (e) {}
+
+        // Increment participant count on the prompt
+        if (prompt?.id) {
+          try {
+            const { doc: docRef, updateDoc: update, increment: inc } = await import('firebase/firestore');
+            const { db: database } = await import('../services/firebase');
+            // Try both collections since prompt could be from either
+            await update(docRef(database, 'activePrompts', prompt.id), {
+              participantCount: inc(1),
+            }).catch(() =>
+              update(docRef(database, 'snapplePrompts', prompt.id), {
+                participantCount: inc(1),
+              }).catch(() => {})
+            );
+          } catch (e) {}
+        }
+        showConfirm(
+          'Snapple Created!',
+          'Save to your collection?',
+          async () => {
+            // Save to collection + mark ownership on snapple doc
+            const owned = [...(userCurrency.ownedSnapples || []), snappleResult.snappleId];
+            await updateUserCurrency({ ownedSnapples: owned });
+            // Add creator to owners array on the snapple
+            const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+            const { db } = await import('../services/firebase');
+            await updateDoc(doc(db, 'snapples', snappleResult.snappleId), {
+              owners: arrayUnion(user.uid),
+            });
+            navigation.navigate('Home');
+          },
+          () => {
+            // Skip — just go home
+            navigation.navigate('Home');
+          }
+        );
+      } else {
+        showError('Error', snappleResult.error || 'Failed to create snapple');
+      }
+    } catch (error) {
+      console.error('[VideoPreview] Submit error:', error);
+      console.error('[VideoPreview] Error details:', JSON.stringify(error, null, 2));
+      try {
+        showError('Upload Failed', error.message || 'Something went wrong. Please try again.');
+      } catch (e) {
+        // Modal not ready
+        console.error('[VideoPreview] Could not show error modal');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRetake = () => {
@@ -61,7 +204,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
             player={player}
             style={styles.videoInner}
             contentFit="cover"
-            allowsFullscreen={false}
+            fullscreenOptions={{ enabled: false }}
             allowsPictureInPicture={false}
             showsPlaybackControls={false}
             nativeControls={false}
@@ -79,39 +222,51 @@ export default function VideoPreviewScreen({ route, navigation }) {
         {/* Close Button */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
-              style={styles.controlButton}
-            >
+            <View style={styles.controlButton}>
               <Text style={styles.closeText}>✕</Text>
-            </LinearGradient>
+            </View>
           </Pressable>
         </View>
 
         {/* Play Button - Only show when paused */}
         {!isPlaying && (
           <View style={styles.playButton}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.4)']}
-              style={styles.playButtonGradient}
-            >
+            <View style={styles.playButtonGradient}>
               <Text style={styles.playText}>▶</Text>
-            </LinearGradient>
+            </View>
           </View>
         )}
 
         {/* Bottom Controls */}
         <View style={styles.controls}>
-          <VibeButton
-            label="Retake"
-            onPress={handleRetake}
-            style={styles.retakeButton}
-          />
-          <VibeButton
-            label="Submit Snapple"
-            onPress={handleSubmit}
-            style={styles.submitButton}
-          />
+          {isSubmitting ? (
+            <View style={styles.uploadingContainer}>
+              <ActivityIndicator size="small" color={theme.colors.vibeBlue} />
+              <Text style={styles.uploadingText}>
+                Uploading... {Math.round(uploadProgress)}%
+              </Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+              </View>
+            </View>
+          ) : (
+            <>
+              <VibeButton
+                label="Retake"
+                onPress={handleRetake}
+                variant="toggle"
+                color="blue"
+                style={{ flex: 1, backgroundColor: '#000000' }}
+              />
+              <VibeButton
+                label="Submit"
+                onPress={handleSubmit}
+                variant="toggle"
+                color="blue"
+                style={{ flex: 1, backgroundColor: '#000000' }}
+              />
+            </>
+          )}
         </View>
       </Pressable>
     </View>
@@ -153,6 +308,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'transparent',
+    zIndex: 10,
+    elevation: 10,
   },
   header: {
     position: 'absolute',
@@ -172,13 +329,18 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#000000',
+    borderWidth: 3,
+    borderColor: '#00C6FF',
   },
   playButton: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -40,
-    marginLeft: -40,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   playButtonGradient: {
     width: 80,
@@ -186,6 +348,9 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#000000',
+    borderWidth: 3,
+    borderColor: '#00C6FF',
   },
   controls: {
     position: 'absolute',
@@ -195,14 +360,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
-  retakeButton: {
+  uploadingContainer: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  submitButton: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 255, 255, 0.08)',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 3,
     borderColor: theme.colors.vibeBlue,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  uploadingText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  progressBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.vibeBlue,
+    borderRadius: 2,
   },
   closeText: {
     color: 'white',

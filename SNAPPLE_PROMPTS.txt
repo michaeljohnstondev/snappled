@@ -1,0 +1,184 @@
+SNAPPLE PROMPTS (Used for creating video snapples — rotated hourly)
+====================================================================
+
+WAVE 1 — Original Seed (96 prompts)
+------------------------------------
+
+LIFESTYLE
+1. Show us your morning routine in 10 seconds
+2. Your workspace right now — no cleaning allowed
+3. What's in your fridge? Be honest
+4. Your outfit of the day — spin for us
+5. Show us your hidden talent
+6. The view from your window right now
+7. Your most prized possession
+8. 10 seconds of your commute
+9. Your pet doing something funny
+10. Cook something in 10 seconds — GO
+
+COMEDY
+11. Your best impression of your parents
+12. React to finding out school is cancelled
+13. Pretend you just won the lottery
+14. Your worst dance move
+15. Tell us a joke in 10 seconds
+16. Act out your last text message
+17. Your best celebrity impression
+18. Reenact the last thing that made you laugh
+19. Pretend you're a news anchor reporting on your day
+20. Your face when you check your bank account
+21. Act out ordering food when you can't decide
+22. Pretend you just saw a ghost
+
+CREATIVE
+23. Draw something blindfolded
+24. Make art with whatever's in front of you
+25. Beatbox for 10 seconds
+26. Sing your name like an opera singer
+27. Create a 10-second short film with no words
+28. Make the most satisfying video you can
+29. Show us your best camera trick
+30. Make music with household items
+31. Speed draw your self portrait
+32. Create a transition without editing
+
+CHALLENGE
+33. Don't blink for 10 seconds
+34. Say the alphabet backwards as fast as you can
+35. Stack as many things as you can in 10 seconds
+36. How many pushups in 10 seconds?
+37. Speed solve something — anything
+38. Catch something behind your back
+39. Touch your nose with your tongue
+40. Spin 5 times and walk straight
+41. Balance something on your head for 10 seconds
+42. Do your best trick shot
+
+OPINION
+43. Hot take: pineapple on pizza — yes or no?
+44. What's the most overrated movie?
+45. One thing you'd change about your city
+46. The best food that exists — argue your case
+47. Is cereal a soup? Defend your answer
+48. What song is stuck in your head?
+49. Your most unpopular opinion
+50. The best decade for music — GO
+51. Cats or dogs? You have 10 seconds to convince us
+52. What would you rename your state/country?
+
+STORY
+53. Tell us about your most embarrassing moment
+54. Your worst date story in 10 seconds
+55. The craziest thing that happened to you this week
+56. A childhood memory in 10 seconds
+57. Your biggest flex — brag about it
+58. Tell us a secret nobody knows
+59. Your worst cooking disaster
+60. A time you got caught doing something
+61. Your most irrational fear — explain it
+62. The weirdest dream you've ever had
+
+SOCIAL
+63. Duet this with your best friend
+64. Show us your friend group's inside joke
+65. Show us what your friend does that annoys you
+66. Get a stranger to say hi to the camera
+67. Ask someone near you to tell a joke
+68. Show us your group chat energy IRL
+69. Your best handshake with someone
+
+SKILLS
+70. Your best sports move in 10 seconds
+71. Play an instrument — any instrument
+72. Show off a skill you've been working on
+73. Your best pen spin or card trick
+74. Make something disappear
+75. Your most impressive catch
+76. Speed run tying your shoes
+
+VIBES
+77. Your aesthetic in 10 seconds
+78. The most beautiful thing near you right now
+79. Golden hour selfie — make it cinematic
+80. Walk in slow motion with your best fit
+81. Your room tour in 10 seconds — GO
+82. Show us your vibe without words
+83. The sunset/sunrise from where you are
+84. Your playlist energy as a video
+
+FOOD
+85. The best thing you ate today
+86. Make a snack in 10 seconds
+87. Rate your fridge out of 10
+88. Your signature dish — show it off
+89. The weirdest food combo that actually slaps
+90. Your coffee/drink order — make it
+
+REACTIONS
+91. React to your camera roll's first photo
+92. Your reaction to your old photos
+93. Open your screen time and react
+94. Check your bank balance and react
+95. Read your last DM out loud and react
+96. Your face when your alarm goes off
+
+
+WAVE 2 — Recording Others/Environment (45 prompts)
+---------------------------------------------------
+
+OTHERS
+97. Film someone doing something they're amazing at
+98. Catch your friend's genuine laugh
+99. Record someone telling their best story
+100. Film a stranger's act of kindness
+101. Capture someone in their element — work, hobby, anything
+102. Record your friend's reaction to a surprise
+103. Film someone doing their signature move
+104. Catch someone singing when they think nobody's listening
+105. Record your crew's pre-game ritual
+106. Film someone explaining their passion
+107. Capture the energy of a crowd around you
+108. Record your parent or grandparent sharing wisdom
+109. Film someone's victory moment — big or small
+110. Catch your friend being dramatic about something minor
+111. Record someone's honest first reaction to tasting something
+
+ENVIRONMENT
+112. Film the chaos happening around you right now
+113. Record the most interesting thing within 10 feet of you
+114. Capture the vibe of wherever you are — no words
+115. Film what's outside your front door right now
+116. Record the sounds around you for 10 seconds
+117. Film something beautiful that most people walk past
+118. Capture a moment of pure chaos
+119. Record your neighborhood's personality
+120. Film something that's about to happen
+121. Capture a perfect moment — you'll know it when you see it
+
+INTERACTION
+122. Ask someone what they'd do with a million dollars
+123. Get someone to teach you something in 10 seconds
+124. Film a debate between two friends
+125. Ask a stranger their hot take on anything
+126. Record someone's answer to: what's your biggest flex?
+127. Get someone to do their best impression of you
+128. Ask the nearest person to tell you a secret
+129. Film two people competing at something random
+130. Get someone to rap about their day
+131. Ask someone: what's the dumbest thing you've ever done?
+
+ACTION
+132. Film something falling in slow motion
+133. Record the fastest thing near you
+134. Capture something being built or created
+135. Film a chain reaction — dominos, bumps, anything
+136. Record something spinning
+
+MOOD
+137. Film your city at night
+138. Capture the energy of a party or gathering
+139. Record the calm before the storm — literal or figurative
+140. Film the transition from day to night or night to day
+141. Capture a moment of silence in a loud world
+
+Total: 141 prompts

@@ -1,61 +1,102 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Pressable } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth - 40;
 const CARD_SPACING = 20;
+const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
 
-export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect, onPromptPress }) {
-  const scrollViewRef = useRef(null);
+const getPromptGradient = (index) => {
+  const gradients = [
+    [theme.colors.vibeBlue, theme.colors.vibeGreen],
+    [theme.colors.vibePurple, theme.colors.vibePink],
+    [theme.colors.vibeOrange, theme.colors.vibeYellow],
+    [theme.colors.vibePink, theme.colors.vibeBlue],
+    [theme.colors.vibeGreen, theme.colors.vibeOrange],
+  ];
+  return gradients[index % gradients.length];
+};
+
+export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect, onPromptPress, rightAccessory }) {
+  const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const isScrolling = useRef(false);
 
-  const handleScroll = (event) => {
-    const scrollPosition = event.nativeEvent.contentOffset.x;
-    const index = Math.round(scrollPosition / (CARD_WIDTH + CARD_SPACING));
-    
-    if (index !== currentIndex && index < prompts.length) {
-      setCurrentIndex(index);
-      onPromptSelect?.(prompts[index]);
-    }
+  // Triple the data for infinite scroll
+  const tripled = prompts.length > 1
+    ? [...prompts, ...prompts, ...prompts]
+    : prompts;
+  const offset = prompts.length; // Start of the middle set
+
+  const getInitialOffset = () => offset * SNAP_INTERVAL;
+
+  const getRealIndex = (index) => {
+    if (prompts.length === 0) return 0;
+    return ((index % prompts.length) + prompts.length) % prompts.length;
   };
 
-  const scrollToIndex = (index) => {
-    if (scrollViewRef.current && index >= 0 && index < prompts.length) {
-      scrollViewRef.current.scrollTo({
-        x: index * (CARD_WIDTH + CARD_SPACING),
-        animated: true
+  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+    if (viewableItems.length > 0 && !isScrolling.current) {
+      const idx = viewableItems[0].index;
+      const realIdx = getRealIndex(idx);
+      if (realIdx !== currentIndex) {
+        setCurrentIndex(realIdx);
+        onPromptSelect?.(prompts[realIdx]);
+      }
+    }
+  }, [currentIndex, prompts]);
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
+  const handleMomentumEnd = (event) => {
+    if (prompts.length <= 1) return;
+
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollX / SNAP_INTERVAL);
+    const realIdx = getRealIndex(index);
+
+    setCurrentIndex(realIdx);
+    onPromptSelect?.(prompts[realIdx]);
+
+    // If we've scrolled into the first or last copy, silently jump to the middle
+    if (index < offset || index >= offset + prompts.length) {
+      const middleIndex = offset + realIdx;
+      isScrolling.current = true;
+      flatListRef.current?.scrollToOffset({
+        offset: middleIndex * SNAP_INTERVAL,
+        animated: false,
       });
+      setTimeout(() => { isScrolling.current = false; }, 50);
     }
   };
 
-  const formatTimeRemaining = (expiresAt) => {
-    if (!expiresAt) return 'Active';
-    
-    const now = new Date();
-    const expiry = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
-    const diff = expiry - now;
-    
-    if (diff <= 0) return 'Expired';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) return `${hours}h ${minutes}m left`;
-    return `${minutes}m left`;
-  };
-
-  const getPromptGradient = (index) => {
-    const gradients = [
-      [theme.colors.vibeBlue, theme.colors.vibeGreen],
-      [theme.colors.vibePurple, theme.colors.vibePink],
-      [theme.colors.vibeOrange, theme.colors.vibeYellow],
-      [theme.colors.vibePink, theme.colors.vibeBlue],
-      [theme.colors.vibeGreen, theme.colors.vibeOrange]
-    ];
-    return gradients[index % gradients.length];
+  const renderItem = ({ item, index }) => {
+    const realIdx = getRealIndex(index);
+    return (
+      <Pressable
+        style={styles.promptCard}
+        onPress={() => {
+          if (onPromptPress) {
+            onPromptPress(item);
+          } else {
+            onPromptSelect?.(item);
+          }
+        }}
+      >
+        <LinearGradient
+          colors={getPromptGradient(realIdx)}
+          style={styles.cardGradient}
+        >
+          <View style={styles.cardContent}>
+            <Text style={styles.promptText} numberOfLines={3}>
+              {item.text || item.prompt || 'Create something amazing!'}
+            </Text>
+          </View>
+        </LinearGradient>
+      </Pressable>
+    );
   };
 
   if (!prompts || prompts.length === 0) {
@@ -68,58 +109,65 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        ref={scrollViewRef}
+      <FlatList
+        ref={flatListRef}
+        data={tripled}
+        keyExtractor={(item, index) => `${item.id || 'p'}-${index}`}
+        renderItem={renderItem}
         horizontal
         showsHorizontalScrollIndicator={false}
-        pagingEnabled={false}
-        decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + CARD_SPACING}
+        decelerationRate={0.85}
+        snapToInterval={SNAP_INTERVAL}
         snapToAlignment="start"
-        contentInset={{ left: 20, right: 20 }}
         contentContainerStyle={styles.scrollContainer}
-        onMomentumScrollEnd={handleScroll}
-      >
-        {prompts.map((prompt, index) => (
-          <Pressable
-            key={prompt.id || index}
-            style={styles.promptCard}
-            onPress={() => {
-              if (onPromptPress) {
-                onPromptPress(prompt);
-              } else {
-                setCurrentIndex(index);
-                onPromptSelect?.(prompt);
-                scrollToIndex(index);
-              }
-            }}
-          >
-            <LinearGradient
-              colors={getPromptGradient(index)}
-              style={styles.cardGradient}
-            >
-              <View style={styles.cardContent}>
-                <Text style={styles.promptText} numberOfLines={3}>
-                  {prompt.text || prompt.prompt || 'Create something amazing!'}
-                </Text>
-              </View>
-            </LinearGradient>
-          </Pressable>
-        ))}
-      </ScrollView>
+        onMomentumScrollEnd={handleMomentumEnd}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, index) => ({
+          length: SNAP_INTERVAL,
+          offset: SNAP_INTERVAL * index,
+          index,
+        })}
+        initialScrollIndex={prompts.length > 1 ? offset : 0}
+      />
 
-      {/* Pagination Dots */}
-      <View style={styles.pagination}>
-        {prompts.map((_, index) => (
-          <Pressable
-            key={index}
-            style={[
-              styles.paginationDot,
-              currentIndex === index && styles.activeDot
-            ]}
-            onPress={() => scrollToIndex(index)}
-          />
-        ))}
+      {/* Pagination Dots + Right Accessory */}
+      <View style={styles.paginationRow}>
+        <View style={styles.accessorySpacer} />
+        <View style={styles.pagination}>
+          {(() => {
+            const total = prompts.length;
+            if (total <= 4) {
+              return prompts.map((_, index) => (
+                <View
+                  key={index}
+                  style={[styles.paginationDot, currentIndex === index && styles.activeDot]}
+                />
+              ));
+            }
+            const last = total - 1;
+            const mid1 = Math.round(last * 1/3);
+            const mid2 = Math.round(last * 2/3);
+            const dots = [0, mid1, mid2, last];
+
+            let closestDot = 0;
+            let minDist = total;
+            dots.forEach((d, i) => {
+              const dist = Math.abs(currentIndex - d);
+              if (dist < minDist) { minDist = dist; closestDot = i; }
+            });
+
+            return dots.map((dotIndex, i) => (
+              <View
+                key={dotIndex}
+                style={[styles.paginationDot, i === closestDot && styles.activeDot]}
+              />
+            ));
+          })()}
+        </View>
+        <View style={styles.accessorySpacer}>
+          {rightAccessory}
+        </View>
       </View>
     </View>
   );
@@ -132,42 +180,17 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingHorizontal: 20,
-    gap: CARD_SPACING,
   },
   promptCard: {
     width: CARD_WIDTH,
     height: 140,
     borderRadius: 16,
     overflow: 'hidden',
+    marginRight: CARD_SPACING,
   },
   cardGradient: {
     flex: 1,
     padding: 16,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  promptInfo: {
-    flex: 1,
-  },
-  promptTheme: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: theme.fontWeights.semiBold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  timeRemaining: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 10,
-    fontWeight: theme.fontWeights.medium,
-  },
-  activeIndicator: {
-    marginLeft: 8,
   },
   cardContent: {
     flex: 1,
@@ -181,29 +204,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
   },
-  cardFooter: {
-    marginTop: 'auto',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  stat: {
+  paginationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    paddingHorizontal: 20,
+    marginTop: 12,
   },
-  statText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 10,
-    fontWeight: theme.fontWeights.medium,
+  accessorySpacer: {
+    width: 80,
+    alignItems: 'flex-end',
   },
   pagination: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    marginTop: 12,
   },
   paginationDot: {
     width: 6,

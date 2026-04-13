@@ -65,7 +65,7 @@ export default function SignupScreen({ navigation }) {
       if (result.success) {
         Alert.alert(
           'Account Created! 🎉',
-          `Welcome to Snapple Park, @${formData.username}!\n\nYou've been given:\n• 100 coins 🪙\n• 50 tickets 🎫\n• 3 topic tokens ✨\n\nTime to start creating!`,
+          `Welcome to Snappled, @${formData.username}!\n\nYou've been given:\n• 100 coins 🪙\n• 50 trophies 🏆\n• 3 topic tickets 🎫\n\nTime to start creating!`,
           [{ 
             text: 'Continue', 
             onPress: () => {
@@ -99,7 +99,7 @@ export default function SignupScreen({ navigation }) {
     >
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.title}>Join Snapple Park! 🍏</Text>
+          <Text style={styles.title}>Join Snappled! 🎬</Text>
           <Text style={styles.subtitle}>
             Create your account and start having fun with creative prompts!
           </Text>
@@ -157,7 +157,7 @@ export default function SignupScreen({ navigation }) {
           <View style={styles.termsContainer}>
             <Text style={styles.termsText}>
               By signing up, you agree to our Terms of Service and Privacy Policy.
-              Let's keep Snapple Park fun and safe for everyone! 🌟
+              Let's keep Snappled fun and safe for everyone! 🌟
             </Text>
           </View>
         </View>
@@ -209,7 +209,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.md || 16,
     textAlign: 'center',
-    ...theme.shadows?.textGlow,
   },
   subtitle: {
     fontSize: 16,

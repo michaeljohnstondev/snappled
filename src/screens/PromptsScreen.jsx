@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, SafeAreaView, ScrollView, View, Text, Pressable, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
@@ -7,72 +8,98 @@ import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import { useAuth } from '../store/AuthContext';
 import { promptService } from '../services/promptService';
+import { promptRotationService } from '../services/promptRotationService';
 import { userService } from '../services/userService';
+import HomeHeader from '../components/ui/headers/HomeHeader';
 import theme from '../theme/themes';
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function PromptsScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
   
+  // Animated gradient for create card
+  const gradientAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(gradientAnim, {
+      toValue: 1,
+      duration: 3000,
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const animatedStart = {
+    x: gradientAnim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 1, 0],
+    }),
+    y: gradientAnim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 0.5, 0],
+    }),
+  };
+
+  const animatedEnd = {
+    x: gradientAnim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [1, 0, 1],
+    }),
+    y: gradientAnim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [1, 0.5, 1],
+    }),
+  };
+
   // State
   const [prompts, setPrompts] = useState([]);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [minutesLeft, setMinutesLeft] = useState(0);
 
-  // Load initial data
+  // Countdown timer — minutes until next hour
   useEffect(() => {
-    loadData();
+    const calcMinutes = () => {
+      const now = new Date();
+      return 59 - now.getMinutes();
+    };
+    setMinutesLeft(calcMinutes());
+    const interval = setInterval(() => {
+      const mins = calcMinutes();
+      setMinutesLeft(mins);
+      // Reload prompts when a new hour hits
+      if (mins === 59) loadData();
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Refresh data when screen comes into focus
+  const formatTimer = () => {
+    const m = minutesLeft;
+    return `${m}m`;
+  };
+
+  const seededRef = useRef(false);
+
+  // Real-time listener for prompts
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
+    if (!seededRef.current) {
+      seededRef.current = true;
+      promptRotationService.seedPromptPool();
+    }
+
+    const unsubscribe = promptRotationService.subscribeToActivePrompts((livePrompts) => {
+      setPrompts(livePrompts);
+      setIsLoading(false);
     });
 
-    return unsubscribe;
-  }, [navigation]);
+    return () => unsubscribe();
+  }, []);
 
   const loadData = async () => {
-    setIsLoading(true);
-    try {
-      // Load recent snapple prompts (user-generated)
-      const promptsResult = await promptService.getRecentSnapplePrompts(20);
-      if (promptsResult.success && promptsResult.prompts?.length > 0) {
-        setPrompts(promptsResult.prompts);
-      } else {
-        // Fallback prompts if none exist
-        const fallbackPrompts = [
-          {
-            id: 'fallback-1',
-            text: 'Show us your morning routine in 10 seconds!',
-            theme: 'Lifestyle',
-            participantCount: 0,
-            totalViews: 0
-          },
-          {
-            id: 'fallback-2', 
-            text: 'What makes you laugh? Share a funny moment!',
-            theme: 'Comedy',
-            participantCount: 0,
-            totalViews: 0
-          },
-          {
-            id: 'fallback-3',
-            text: 'Create something beautiful with what\'s around you',
-            theme: 'Creative',
-            participantCount: 0,
-            totalViews: 0
-          }
-        ];
-        setPrompts(fallbackPrompts);
-      }
-    } catch (error) {
-      console.error('[PromptsScreen] Error loading data:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    const { prompts: allPrompts } = await promptRotationService.getActivePrompts();
+    setPrompts(allPrompts);
   };
 
   const handlePromptPress = (prompt) => {
@@ -85,7 +112,7 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptLike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.likePrompt(promptId, user.uid, 'snapplePrompts');
+    const result = await promptService.likePrompt(promptId, user.uid, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -111,7 +138,7 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptDislike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.dislikePrompt(promptId, user.uid, 'snapplePrompts');
+    const result = await promptService.dislikePrompt(promptId, user.uid, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -137,7 +164,7 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptReport = async (promptId, reason) => {
     if (!user?.uid) return;
-    const result = await promptService.reportPrompt(promptId, user.uid, reason, 'snapplePrompts');
+    const result = await promptService.reportPrompt(promptId, user.uid, reason, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -160,7 +187,7 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptView = async (promptId) => {
     try {
-      await promptService.incrementViews(promptId, 'snapplePrompts');
+      await promptService.incrementViews(promptId, 'activePrompts');
       
       // Update local state optimistically
       setPrompts(prevPrompts => 
@@ -249,6 +276,7 @@ export default function PromptsScreen({ navigation }) {
     coins: userCurrency.coins || 0,
     trophies: userCurrency.trophies || 0,
     level: userCurrency.level || 1,
+    xp: user?.profile?.experience || 0,
     username: user?.username || user?.email?.split('@')[0] || 'Player'
   };
 
@@ -258,12 +286,15 @@ export default function PromptsScreen({ navigation }) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
+        {/* Resource Bar */}
+        <HomeHeader userStats={userStats} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
+
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Prompts</Text>
-          <Text style={styles.headerSubtitle}>
-            {prompts.length} prompts available
-          </Text>
+          <View style={styles.timerPill}>
+            <Text style={styles.timerText}>{formatTimer()}</Text>
+          </View>
         </View>
 
         {/* Prompt Cards List */}
@@ -279,6 +310,27 @@ export default function PromptsScreen({ navigation }) {
           }
         >
           <View style={styles.promptsList}>
+            {/* Create Prompt Card */}
+            <Pressable
+              style={styles.promptCard}
+              onPress={handleCreatePrompt}
+              delayPressIn={0}
+              delayPressOut={0}
+            >
+              {({ pressed }) => (
+                <AnimatedLinearGradient
+                  colors={[theme.colors.vibeRoyalBlue, theme.colors.vibeCyan, theme.colors.vibeRoyalBlue]}
+                  start={animatedStart}
+                  end={animatedEnd}
+                  style={[styles.cardGradient, { opacity: pressed ? 0.8 : 1 }]}
+                >
+                  <View style={styles.cardContent}>
+                    <Text style={styles.createCardText}>Create a Prompt</Text>
+                  </View>
+                </AnimatedLinearGradient>
+              )}
+            </Pressable>
+
             {prompts.map((prompt, index) => (
               <Pressable
                 key={prompt.id || index}
@@ -290,10 +342,13 @@ export default function PromptsScreen({ navigation }) {
                   style={styles.cardGradient}
                 >
                   <View style={styles.cardContent}>
+                    {prompt.lockoutAt && new Date().toISOString() >= prompt.lockoutAt && (
+                      <Text style={styles.lockoutBadge}>CLOSING SOON</Text>
+                    )}
                     <Text style={styles.promptText} numberOfLines={3}>
                       {prompt.text || prompt.prompt || 'Create something amazing!'}
                     </Text>
-                    
+
                     {/* Stats */}
                     <View style={styles.statsRow}>
                       <Text style={styles.statText}>
@@ -340,10 +395,10 @@ export default function PromptsScreen({ navigation }) {
       </SafeAreaView>
       
       <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} />
+        <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} active />
         <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Play" />
-        <NavButton title="Deck" />
+        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
+        <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
       </ButtonContainer>
     </LinearGradient>
   );
@@ -359,19 +414,34 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     color: theme.colors.textPrimary,
     fontSize: 28,
     fontWeight: theme.fontWeights.bold,
-    marginBottom: 4,
   },
-  headerSubtitle: {
-    color: theme.colors.textSecondary,
+  timerPill: {
+    backgroundColor: 'rgba(0, 198, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: theme.colors.vibeBlue,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  timerText: {
+    color: theme.colors.vibeBlue,
     fontSize: 14,
-    fontWeight: theme.fontWeights.medium,
+    fontWeight: theme.fontWeights.bold,
+  },
+  createCardText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: theme.fontWeights.bold,
   },
   scrollView: {
     flex: 1,
@@ -414,5 +484,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
     fontWeight: theme.fontWeights.medium,
+  },
+  lockoutBadge: {
+    color: theme.colors.vibeRed,
+    fontSize: 10,
+    fontWeight: theme.fontWeights.bold,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 6,
+    textAlign: 'center',
   },
 });

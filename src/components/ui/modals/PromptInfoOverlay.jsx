@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   Modal,
   Pressable,
@@ -34,7 +35,11 @@ export default function PromptInfoOverlay({
   navigation,
   onRefresh,
 }) {
+  const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
   const { user } = useAuth();
+  const isAdmin = ADMIN_UIDS.includes(user?.uid);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
   const [userInteraction, setUserInteraction] = useState({
     hasLiked: false,
     hasDisliked: false,
@@ -318,10 +323,44 @@ export default function PromptInfoOverlay({
               colors={getPromptGradient()}
               style={styles.cardGradient}
             >
-              <Text style={styles.promptText}>
-                {prompt.text || prompt.prompt || "Create something amazing!"}
-              </Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.editPromptInput}
+                  value={editText}
+                  onChangeText={setEditText}
+                  multiline
+                  autoFocus
+                />
+              ) : (
+                <Text style={styles.promptText}>
+                  {prompt.text || prompt.prompt || "Create something amazing!"}
+                </Text>
+              )}
             </LinearGradient>
+            {isAdmin && (
+              <Pressable
+                style={styles.editPromptBtn}
+                onPress={async () => {
+                  if (isEditing) {
+                    // Save
+                    if (editText.trim() && editText !== prompt.text) {
+                      try {
+                        const { doc, updateDoc } = await import('firebase/firestore');
+                        const { db } = await import('../../../services/firebase');
+                        await updateDoc(doc(db, 'activePrompts', prompt.id), { text: editText.trim() });
+                        prompt.text = editText.trim();
+                      } catch (e) {}
+                    }
+                    setIsEditing(false);
+                  } else {
+                    setEditText(prompt.text || '');
+                    setIsEditing(true);
+                  }
+                }}
+              >
+                <Text style={styles.editPromptBtnText}>{isEditing ? 'Save' : 'Edit'}</Text>
+              </Pressable>
+            )}
           </View>
 
           {/* User & Follow Row */}
@@ -334,7 +373,7 @@ export default function PromptInfoOverlay({
 
               <Pressable onPress={() => onVisitProfile?.(prompt.createdBy)}>
                 <Text style={styles.usernameText}>
-                  {prompt.creatorUsername || "Anonymous"}
+                  {prompt.isSystem ? "Snappled" : (prompt.creatorUsername || "Anonymous")}
                 </Text>
               </Pressable>
 
@@ -452,23 +491,22 @@ export default function PromptInfoOverlay({
             {/* Action Buttons */}
             <View style={styles.actionButtonsContainer}>
               <VibeButton
-                label="Create Prompt"
-                onPress={() => {
-                  onCreatePrompt?.();
-                  onClose();
-                }}
-                style={styles.createPromptButton}
-                textStyle={styles.createPromptButtonText}
-              />
-
-              <VibeButton
                 label="Create Snapple"
                 onPress={() => {
                   onCreateSnapple?.(prompt);
                   onClose();
                 }}
-                style={styles.createButton}
-                textStyle={styles.createButtonText}
+                variant="green"
+              />
+
+              <VibeButton
+                label="Create Prompt"
+                onPress={() => {
+                  onCreatePrompt?.();
+                  onClose();
+                }}
+                variant="toggle"
+                color="blue"
               />
             </View>
           </View>
@@ -519,6 +557,31 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semiBold,
     textAlign: "center",
     lineHeight: 24,
+  },
+  editPromptInput: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: theme.fontWeights.semiBold,
+    textAlign: "center",
+    lineHeight: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    borderRadius: 8,
+    padding: 8,
+  },
+  editPromptBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  editPromptBtnText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: theme.fontWeights.bold,
   },
   userSection: {
     marginBottom: 24,
@@ -648,29 +711,7 @@ const styles = StyleSheet.create({
   actionsSection: {
     marginBottom: 60, // Increased margin for scrollview
   },
-  createButton: {
-    backgroundColor: "rgba(0, 255, 255, 0.1)",
-    borderColor: theme.colors.vibeBlue,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-  },
-  createButtonText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 16,
-    fontWeight: theme.fontWeights.semiBold,
-  },
   actionButtonsContainer: {
-    gap: 16,
-  },
-  createPromptButton: {
-    backgroundColor: "rgba(0, 255, 255, 0.1)",
-    borderColor: theme.colors.vibeBlue,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-  },
-  createPromptButtonText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 16,
-    fontWeight: theme.fontWeights.semiBold,
+    gap: 12,
   },
 });

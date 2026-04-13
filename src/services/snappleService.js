@@ -24,8 +24,8 @@ const WISHLISTS_COLLECTION = 'wishlists';
 export const snappleService = {
   async createSnapple(snappleData) {
     try {
-      const { promptId, videoUrl, videoId, creatorId, prompt } = snappleData;
-      
+      const { promptId, videoUrl, videoId, creatorId, creatorUsername, prompt, category } = snappleData;
+
       if (!promptId || !videoUrl || !videoId || !creatorId || !prompt) {
         throw new Error('Missing required snapple data');
       }
@@ -33,11 +33,16 @@ export const snappleService = {
       const snappleDoc = {
         // Core data
         creatorId,
+        creatorUsername: creatorUsername || 'anonymous',
         promptId,
         videoId,
         videoUrl,
         prompt,
-        
+        category: category || 'general',
+
+        // Ownership
+        owners: [],
+
         // Engagement metrics
         likes: 0,
         dislikes: 0,
@@ -49,7 +54,7 @@ export const snappleService = {
         // Pricing
         basePrice: 10, // Starting price in coins
         currentPrice: 10,
-        priceHistory: [{ price: 10, timestamp: serverTimestamp() }],
+        priceHistory: [{ price: 10, timestamp: new Date().toISOString() }],
         
         // Status
         isActive: true,
@@ -325,39 +330,23 @@ export const snappleService = {
     }
   },
 
-  async purchaseSnapple(snappleId, userId, priceMultiplier = 1.15) {
+  async purchaseSnapple(snappleId, userId) {
     try {
-      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-      const snappleDoc = await getDoc(snappleRef);
-      
-      if (!snappleDoc.exists()) {
-        return { success: false, error: 'Snapple not found' };
-      }
-      
-      const snappleData = snappleDoc.data();
-      const newBuyCount = snappleData.buyCount + 1;
-      const newPrice = Math.ceil(snappleData.basePrice * Math.pow(priceMultiplier, newBuyCount));
-      
-      // Update snapple with new stats and price
-      await updateDoc(snappleRef, {
-        buyCount: increment(1),
-        currentPrice: newPrice,
-        priceHistory: arrayUnion({
-          price: snappleData.currentPrice,
-          buyCount: newBuyCount,
-          timestamp: serverTimestamp()
-        }),
-        updatedAt: serverTimestamp()
-      });
-      
-      return {
-        success: true,
-        purchasePrice: snappleData.currentPrice,
-        newPrice: newPrice
-      };
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('./firebase');
+      const purchaseFn = httpsCallable(functions, 'purchaseSnapple');
+      const result = await purchaseFn({ snappleId });
+      return result.data;
     } catch (error) {
       console.error('Error purchasing snapple:', error);
-      return { success: false, error: 'Failed to purchase snapple' };
+      const message = error?.message || 'Failed to purchase snapple';
+      if (message.includes('Not enough coins')) {
+        return { success: false, error: 'Not enough coins' };
+      }
+      if (message.includes('Already owned')) {
+        return { success: false, error: 'You already own this snapple' };
+      }
+      return { success: false, error: message };
     }
   },
 
@@ -395,6 +384,119 @@ export const snappleService = {
       });
     } catch (error) {
       console.error('Error setting user interaction:', error);
+    }
+  },
+
+  async deleteSnapple(snappleId, userId) {
+    try {
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const snappleDoc = await getDoc(snappleRef);
+
+      if (!snappleDoc.exists()) {
+        return { success: false, error: 'Snapple not found' };
+      }
+
+      const data = snappleDoc.data();
+      if (data.creatorId !== userId) {
+        return { success: false, error: 'Only the creator can delete this snapple' };
+      }
+
+      // Check if anyone else owns it
+      const owners = (data.owners || []).filter(id => id !== userId);
+      if (owners.length > 0) {
+        // Others own it — refund all buyers and then delete
+        await this.refundBuyers(snappleId, data);
+        await deleteDoc(snappleRef);
+        return { success: true, note: 'Snapple deleted, buyers refunded' };
+      }
+
+      // Nobody else owns it — fully delete
+      await deleteDoc(snappleRef);
+
+      // Also delete video from storage
+      try {
+        const { ref: storageRef, deleteObject } = await import('firebase/storage');
+        const { storage } = await import('./firebase');
+        if (data.videoUrl) {
+          const videoRef = storageRef(storage, `videos/${userId}/${data.videoId || ''}.mp4`);
+          await deleteObject(videoRef).catch(() => {});
+        }
+      } catch (e) {
+        console.error('[SnappleService] Error deleting video file:', e);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting snapple:', error);
+      return { success: false, error: 'Failed to delete snapple' };
+    }
+  },
+
+  async refundBuyers(snappleId, snappleData) {
+    try {
+      const purchases = (snappleData.priceHistory || []).filter(p => p.buyer);
+
+      for (const purchase of purchases) {
+        if (!purchase.buyer || purchase.buyer === snappleData.creatorId) continue;
+
+        const buyerRef = doc(db, 'users', purchase.buyer);
+        await updateDoc(buyerRef, {
+          'resources.coins': increment(purchase.price || 0),
+          ownedSnapples: arrayRemove(snappleId),
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+
+        // Log the refund
+        await setDoc(doc(collection(db, 'refunds')), {
+          snappleId,
+          buyerId: purchase.buyer,
+          amount: purchase.price || 0,
+          reason: 'creator_deleted',
+          createdAt: serverTimestamp(),
+        }).catch(() => {});
+      }
+
+      console.log(`[SnappleService] Refunded ${purchases.length} buyers for snapple ${snappleId}`);
+    } catch (error) {
+      console.error('[SnappleService] Error refunding buyers:', error);
+    }
+  },
+
+  async unlikeSnapple(snappleId, userId) {
+    try {
+      const interactionRef = doc(db, 'user_interactions', `${userId}_${snappleId}`);
+      const interactionDoc = await getDoc(interactionRef);
+
+      if (interactionDoc.exists()) {
+        const type = interactionDoc.data().type;
+        const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+
+        await updateDoc(snappleRef, {
+          [type === 'like' ? 'likes' : 'dislikes']: increment(-1),
+          totalVotes: increment(-1),
+          updatedAt: serverTimestamp()
+        });
+        await deleteDoc(interactionRef);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error unliking snapple:', error);
+      return { success: false, error: 'Failed to remove interaction' };
+    }
+  },
+
+  async incrementViews(snappleId) {
+    try {
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      await updateDoc(snappleRef, {
+        views: increment(1),
+        updatedAt: serverTimestamp()
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error incrementing views:', error);
+      return { success: false };
     }
   }
 };

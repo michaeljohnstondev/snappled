@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
-import VibeModal from '../components/ui/VibeModal';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const ModalContext = createContext();
 
@@ -12,6 +11,7 @@ export function useModal() {
 }
 
 export function ModalProvider({ children }) {
+  const [VibeModalComponent, setVibeModalComponent] = useState(null);
   const [modalState, setModalState] = useState({
     visible: false,
     title: '',
@@ -20,14 +20,21 @@ export function ModalProvider({ children }) {
     type: 'info'
   });
 
+  useEffect(() => {
+    // Load VibeModal after first render to avoid cold start crash
+    const timer = setTimeout(() => {
+      try {
+        const mod = require('../components/ui/VibeModal');
+        setVibeModalComponent(() => mod.default);
+      } catch (e) {
+        console.error('[ModalContext] Failed to load VibeModal:', e);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const showModal = ({ title, message, buttons = [], type = 'info' }) => {
-    setModalState({
-      visible: true,
-      title,
-      message,
-      buttons,
-      type
-    });
+    setModalState({ visible: true, title, message, buttons, type });
   };
 
   const hideModal = () => {
@@ -35,12 +42,7 @@ export function ModalProvider({ children }) {
   };
 
   const showAlert = (title, message, buttons) => {
-    showModal({
-      title,
-      message,
-      buttons: buttons || [],
-      type: 'info'
-    });
+    showModal({ title, message, buttons: buttons || [], type: 'info' });
   };
 
   const showConfirm = (title, message, onConfirm, onCancel) => {
@@ -49,32 +51,18 @@ export function ModalProvider({ children }) {
       message,
       type: 'confirm',
       buttons: [
-        {
-          text: 'Cancel',
-          onPress: onCancel
-        },
-        {
-          text: 'Confirm',
-          onPress: onConfirm
-        }
+        { text: 'Cancel', onPress: onCancel },
+        { text: 'Confirm', onPress: onConfirm }
       ]
     });
   };
 
   const showSuccess = (title, message) => {
-    showModal({
-      title,
-      message,
-      type: 'success'
-    });
+    showModal({ title, message, type: 'success' });
   };
 
   const showError = (title, message) => {
-    showModal({
-      title,
-      message,
-      type: 'error'
-    });
+    showModal({ title, message, type: 'error' });
   };
 
   return (
@@ -86,14 +74,16 @@ export function ModalProvider({ children }) {
       hideModal
     }}>
       {children}
-      <VibeModal
-        visible={modalState.visible}
-        title={modalState.title}
-        message={modalState.message}
-        buttons={modalState.buttons}
-        type={modalState.type}
-        onClose={hideModal}
-      />
+      {VibeModalComponent && (
+        <VibeModalComponent
+          visible={modalState.visible}
+          title={modalState.title}
+          message={modalState.message}
+          buttons={modalState.buttons}
+          type={modalState.type}
+          onClose={hideModal}
+        />
+      )}
     </ModalContext.Provider>
   );
 }

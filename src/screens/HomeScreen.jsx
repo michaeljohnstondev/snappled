@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import PromptCarousel from '../components/ui/PromptCarousel';
-// import SnappleGrid from '../components/ui/snapples/SnappleGrid';
+import SnappleGrid from '../components/ui/snapples/SnappleGrid';
 import EmptySnappleList from '../components/ui/snapples/EmptySnappleList';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
+import SortModal from '../components/ui/modals/SortModal';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
@@ -12,6 +15,7 @@ import NavButton from '../components/ui/navigation/NavButton';
 import HomeHeader from '../components/ui/headers/HomeHeader';
 import { useAuth } from '../store/AuthContext';
 import { promptService } from '../services/promptService';
+import { promptRotationService } from '../services/promptRotationService';
 import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
@@ -22,91 +26,64 @@ export default function HomeScreen({ navigation }) {
   // State
   const [prompts, setPrompts] = useState([]);
   const [selectedPrompt, setSelectedPrompt] = useState(null);
+  const [allSnapples, setAllSnapples] = useState([]);
   const [snapples, setSnapples] = useState([]);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState('time');
+  const [ascending, setAscending] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
 
-  // Load initial data
+  // Load initial data only when user is available
   useEffect(() => {
+    if (!user?.uid) return;
     loadData();
-  }, []);
+  }, [user?.uid]);
 
-  // Refresh data when screen comes into focus (e.g., returning from CreatePrompt)
+  // Refresh data when screen comes into focus (throttled)
+  const lastLoadRef = useRef(0);
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      // Reload prompts when user navigates back to Home
-      loadData();
+      const now = Date.now();
+      if (now - lastLoadRef.current > 30000) { // Only reload every 30s
+        lastLoadRef.current = now;
+        loadData();
+      }
     });
 
     return unsubscribe;
   }, [navigation]);
 
-  // Load snapples when prompt changes
+  // Filter snapples locally when prompt changes
   useEffect(() => {
-    if (selectedPrompt) {
-      loadSnapplesForPrompt(selectedPrompt.id);
+    if (selectedPrompt?.id) {
+      setSnapples(allSnapples.filter(s => s.promptId === selectedPrompt.id));
     }
-  }, [selectedPrompt]);
+  }, [selectedPrompt, allSnapples]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load recent snapple prompts (user-generated)
-      const promptsResult = await promptService.getRecentSnapplePrompts(10);
-      if (promptsResult.success && promptsResult.prompts?.length > 0) {
-        setPrompts(promptsResult.prompts);
-        setSelectedPrompt(promptsResult.prompts[0]); // Select first prompt by default
-      } else {
-        // Fallback prompts if none exist
-        const fallbackPrompts = [
-          {
-            id: 'fallback-1',
-            text: 'Show us your morning routine in 10 seconds!',
-            theme: 'Lifestyle',
-            participantCount: 0,
-            totalViews: 0
-          },
-          {
-            id: 'fallback-2', 
-            text: 'What makes you laugh? Share a funny moment!',
-            theme: 'Comedy',
-            participantCount: 0,
-            totalViews: 0
-          },
-          {
-            id: 'fallback-3',
-            text: 'Create something beautiful with what\'s around you',
-            theme: 'Creative',
-            participantCount: 0,
-            totalViews: 0
-          }
-        ];
-        setPrompts(fallbackPrompts);
-        setSelectedPrompt(fallbackPrompts[0]);
+      // All prompts (system + user) live in activePrompts
+      const { prompts: allPrompts } = await promptRotationService.getActivePrompts();
+
+      if (allPrompts.length > 0) {
+        setPrompts(allPrompts);
+        setSelectedPrompt(allPrompts[0]);
+      }
+
+      // Load all snapples once
+      const snappleResult = await snappleService.getActiveSnapples(100);
+      if (snappleResult.success) {
+        setAllSnapples(snappleResult.snapples);
       }
     } catch (error) {
       console.error('[HomeScreen] Error loading data:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadSnapplesForPrompt = async (promptId) => {
-    try {
-      // For now, load all active snapples and filter by prompt later
-      // You might want to add a method to snappleService to filter by promptId
-      const result = await snappleService.getActiveSnapples(20);
-      if (result.success) {
-        // Filter snapples for this prompt or show all if none match
-        const filteredSnapples = result.snapples.filter(s => s.promptId === promptId);
-        setSnapples(filteredSnapples.length > 0 ? filteredSnapples : result.snapples.slice(0, 6));
-      }
-    } catch (error) {
-      console.error('[HomeScreen] Error loading snapples:', error);
-      setSnapples([]);
     }
   };
 
@@ -152,7 +129,7 @@ export default function HomeScreen({ navigation }) {
 
   const handlePromptLike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.likePrompt(promptId, user.uid, 'snapplePrompts');
+    const result = await promptService.likePrompt(promptId, user.uid, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -178,7 +155,7 @@ export default function HomeScreen({ navigation }) {
 
   const handlePromptDislike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.dislikePrompt(promptId, user.uid, 'snapplePrompts');
+    const result = await promptService.dislikePrompt(promptId, user.uid, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -204,7 +181,7 @@ export default function HomeScreen({ navigation }) {
 
   const handlePromptReport = async (promptId, reason) => {
     if (!user?.uid) return;
-    const result = await promptService.reportPrompt(promptId, user.uid, reason, 'snapplePrompts');
+    const result = await promptService.reportPrompt(promptId, user.uid, reason, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -227,7 +204,7 @@ export default function HomeScreen({ navigation }) {
 
   const handlePromptView = async (promptId) => {
     try {
-      await promptService.incrementViews(promptId, 'snapplePrompts');
+      await promptService.incrementViews(promptId, 'activePrompts');
       
       // Update local state optimistically
       setPrompts(prevPrompts => 
@@ -314,6 +291,7 @@ export default function HomeScreen({ navigation }) {
     coins: userCurrency.coins || 0,
     trophies: userCurrency.trophies || 0,
     level: userCurrency.level || 1,
+    xp: user?.profile?.experience || 0,
     username: user?.username || user?.email?.split('@')[0] || 'Player'
   };
 
@@ -323,7 +301,7 @@ export default function HomeScreen({ navigation }) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        <HomeHeader userStats={userStats} onProfilePress={handleProfilePress} onTokenPress={handleTokenPress} />
+        <HomeHeader userStats={userStats} onProfilePress={handleProfilePress} onTokenPress={handleTokenPress} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
 
         {/* Prompt Carousel */}
         <PromptCarousel
@@ -331,19 +309,44 @@ export default function HomeScreen({ navigation }) {
           selectedPrompt={selectedPrompt}
           onPromptSelect={handlePromptSelect}
           onPromptPress={handlePromptPress}
+          rightAccessory={
+            <Pressable style={styles.sortButton} onPress={() => setShowSortModal(true)}>
+              <Ionicons name="swap-vertical" size={14} color={theme.colors.vibeBlue} />
+              <Text style={styles.sortButtonText}>
+                {{ time: 'New', likes: 'Likes', views: 'Views', price: 'Price' }[sortBy]}
+              </Text>
+              <Ionicons name={ascending ? 'arrow-up' : 'arrow-down'} size={12} color={theme.colors.vibeBlue} />
+            </Pressable>
+          }
         />
 
         {/* Snapples Grid */}
-        {/* <SnappleGrid
-          snapples={snapples}
-          onSnapplePress={handleSnapplePress}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-        /> */}
-        
-        <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record', { prompt: selectedPrompt })} />
+        {snapples.length > 0 ? (
+          <SnappleGrid
+            snapples={snapples.filter(Boolean)}
+            onSnapplePress={handleSnapplePress}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            sortBy={sortBy}
+            ascending={ascending}
+            hideSort
+          />
+        ) : (
+          <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record', { prompt: selectedPrompt })} />
+        )}
 
         {/* Snapple Overlay */}
+        <SortModal
+          visible={showSortModal}
+          onClose={() => setShowSortModal(false)}
+          sortBy={sortBy}
+          ascending={ascending}
+          onSelect={(value, asc) => {
+            setSortBy(value);
+            setAscending(asc);
+          }}
+        />
+
         <SnappleOverlay
           visible={!!selectedSnapple}
           snapple={selectedSnapple}
@@ -352,6 +355,7 @@ export default function HomeScreen({ navigation }) {
           onDislike={handleDislike}
           onBuy={handleBuy}
           onReport={handleReport}
+          navigation={navigation}
         />
 
         {/* Prompt Info Overlay */}
@@ -382,9 +386,9 @@ export default function HomeScreen({ navigation }) {
       
       <ButtonContainer>
         <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} />
-        <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Play" />
-        <NavButton title="Deck" />
+        <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} active />
+        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
+        <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
       </ButtonContainer>
     </LinearGradient>
   );
@@ -397,5 +401,21 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingBottom: 80,
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderWidth: 1,
+    borderColor: theme.colors.vibeBlue,
+  },
+  sortButtonText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 11,
+    fontWeight: theme.fontWeights.semiBold,
   },
 });

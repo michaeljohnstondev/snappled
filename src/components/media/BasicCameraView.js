@@ -3,10 +3,10 @@ import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import theme from '../../theme/themes';
 
-export default function BasicCameraView({ 
+export default function BasicCameraView({
   onCameraReady,
   onError,
-  facing = 'front', // Default to front camera
+  facing = 'front',
   mode = 'video',
   style
 }) {
@@ -97,6 +97,7 @@ export default function BasicCameraView({
         style={styles.camera}
         facing={facing}
         mode={mode}
+        isPinchToZoomEnabled={true}
         onCameraReady={handleCameraReady}
         onMountError={handleMountError}
         onError={handleCameraError}

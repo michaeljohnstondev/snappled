@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { storage, db } from './firebase';
 
@@ -21,58 +21,51 @@ export async function uploadVideo(videoUri, promptText, userId = 'anonymous', on
     // Create storage reference
     const storageRef = ref(storage, filename);
     
-    // Convert URI to blob for upload
-    const response = await fetch(videoUri);
-    const blob = await response.blob();
-    
-    console.log('Video blob created, size:', blob.size, 'bytes');
-    
-    // Upload with progress tracking
-    const uploadTask = uploadBytesResumable(storageRef, blob, {
-      contentType: 'video/mp4',
-      customMetadata: {
-        prompt: promptText,
-        userId: userId,
-        uploadedAt: new Date().toISOString(),
-      }
+    // Upload using expo-file-system uploadAsync — bypasses broken RN blob/fetch
+    console.log('Reading video from:', videoUri);
+    const LegacyFS = require('expo-file-system/legacy');
+
+    if (onProgress) onProgress(5);
+
+    // Upload directly from file URI using expo-file-system
+    const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${storage.app.options.storageBucket}/o/${encodeURIComponent(filename)}?uploadType=media`;
+
+    // Get auth token for the upload
+    const { auth: firebaseAuth } = require('./firebase');
+    const token = await firebaseAuth.currentUser?.getIdToken();
+
+    if (onProgress) onProgress(10);
+
+    const uploadResult = await LegacyFS.uploadAsync(uploadUrl, videoUri, {
+      httpMethod: 'POST',
+      uploadType: LegacyFS.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'video/mp4',
+      },
     });
-    
-    // Handle upload progress
-    const uploadPromise = new Promise((resolve, reject) => {
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          console.log('Upload progress:', progress + '%');
-          if (onProgress) onProgress(progress);
-        },
-        (error) => {
-          console.error('Upload error:', error);
-          reject(error);
-        },
-        async () => {
-          // Upload completed successfully
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            console.log('Video uploaded successfully:', downloadURL);
-            resolve(downloadURL);
-          } catch (error) {
-            console.error('Error getting download URL:', error);
-            reject(error);
-          }
-        }
-      );
-    });
-    
-    const downloadURL = await uploadPromise;
+
+    if (onProgress) onProgress(90);
+
+    if (uploadResult.status !== 200) {
+      throw new Error(`Upload failed with status ${uploadResult.status}`);
+    }
+
+    const downloadURL = await getDownloadURL(storageRef);
+    const fileInfo = await LegacyFS.getInfoAsync(videoUri);
+    const fileSize = fileInfo.size || 0;
+    if (onProgress) onProgress(100);
+    console.log('Video uploaded successfully:', downloadURL, 'size:', fileSize);
+
     
     // Save video metadata to Firestore
     const videoMetadata = {
-      downloadURL,
+      videoUrl: downloadURL,
       filename,
-      promptText,
+      prompt: promptText,
       userId,
       createdAt: serverTimestamp(),
-      fileSize: blob.size,
+      fileSize,
       mimeType: 'video/mp4',
       status: 'active'
     };

@@ -1,16 +1,9 @@
-// Firebase v12 Configuration for Snapple Park
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  initializeAuth,
-  getReactNativePersistence,
-} from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getFunctions } from "firebase/functions";
 
-// Your Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDLBKPVH4XH-hJIcI3KNJwYqAI8fqboHF4",
   authDomain: "snapplepark.firebaseapp.com",
@@ -22,51 +15,21 @@ const firebaseConfig = {
   measurementId: "G-HQH7LYNDQS",
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Auth with React Native persistence
 let auth;
 try {
+  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
 } catch (e) {
-  // Auth already initialized
   auth = getAuth(app);
 }
 
-// Initialize Firestore
 const db = getFirestore(app);
-
-// Initialize Cloud Storage
 const storage = getStorage(app);
-
-// Initialize Cloud Functions
 const functions = getFunctions(app);
-
-// Connect to emulators in development
-if (__DEV__) {
-  // Uncomment if using Firebase emulators for development
-  // try {
-  //   connectFirestoreEmulator(db, 'localhost', 8080);
-  //   connectFunctionsEmulator(functions, 'localhost', 5001);
-  // } catch (e) {
-  //   console.log('Emulators already connected');
-  // }
-  
-  // Suppress excessive Firestore warnings in development
-  console.warn = (function(originalWarn) {
-    return function(message) {
-      if (typeof message === 'string' && 
-          (message.includes('WebChannelConnection RPC') || 
-           message.includes('transport errored'))) {
-        return; // Suppress these specific warnings
-      }
-      originalWarn.apply(console, arguments);
-    };
-  })(console.warn);
-}
 
 export { auth, db, storage, functions };
 export default app;

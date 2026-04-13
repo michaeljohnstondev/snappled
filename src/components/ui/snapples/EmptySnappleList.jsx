@@ -17,7 +17,6 @@ export default function EmptySnappleList({ onCreateSnapple }) {
         label="Create Snapple"
         onPress={onCreateSnapple}
         style={styles.createButton}
-        textStyle={styles.createButtonText}
       />
     </View>
   );
@@ -48,11 +47,5 @@ const styles = StyleSheet.create({
   },
   createButton: {
     marginTop: 24,
-    paddingHorizontal: 48,
-    backgroundColor: 'rgba(0, 255, 255, 0.08)',
-    borderColor: theme.colors.vibeBlue,
-  },
-  createButtonText: {
-    color: theme.colors.vibeBlue,
   },
 });

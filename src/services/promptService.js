@@ -227,12 +227,18 @@ class PromptService {
   // Create a new user-generated prompt
   async createPrompt(promptData) {
     try {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const lockoutAt = new Date(Date.now() + (24 * 60 - 10) * 60 * 1000).toISOString();
+
       const promptToCreate = {
         text: promptData.text,
         createdBy: promptData.createdBy,
         creatorUsername: promptData.creatorUsername,
-        timestamp: new Date(),
-        type: 'user-generated',
+        category: 'user',
+        createdAt: new Date().toISOString(),
+        expiresAt,
+        lockoutAt,
+        isSystem: false,
         likeCount: 0,
         dislikeCount: 0,
         likes: [],
@@ -240,10 +246,11 @@ class PromptService {
         reports: [],
         reportCount: 0,
         participantCount: 0,
-        totalViews: 0
+        totalViews: 0,
       };
 
-      const promptsRef = collection(db, 'snapplePrompts');
+      // Write directly to activePrompts — goes live immediately
+      const promptsRef = collection(db, 'activePrompts');
       const docRef = await addDoc(promptsRef, promptToCreate);
 
       return {
@@ -294,9 +301,11 @@ class PromptService {
   }
 
   // Increment view count for a prompt
-  async incrementViews(promptId, collection = 'hourlyPrompts') {
+  async incrementViews(promptId, collectionName = 'hourlyPrompts') {
     try {
-      const promptRef = doc(db, collection, promptId);
+      const promptRef = doc(db, collectionName, promptId);
+      const promptDoc = await getDoc(promptRef);
+      if (!promptDoc.exists()) return { success: false };
       await updateDoc(promptRef, {
         totalViews: increment(1)
       });

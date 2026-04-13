@@ -2,82 +2,97 @@ import { Platform } from 'react-native';
 
 const theme = {
   colors: {
-    background: "#080B1E",
-    backgroundGradient: ["#080B1E", "#0B1125", "#1A053E"],
-    buttonGradient: ["#8B00FF", "#00C6FF"],
-    buttonGradientAlt: ["#00FF41", "#00C6FF"],
-    buttonGradientCyan: ["#00FFFF", "#8B00FF"],
-    buttonGradientMatrix: ["#00FF41", "#008000"],
-    
-    baseColors: ["#8B00FF", "#00C6FF", "#00FFFF"],
-    textPrimary: "#FFFFFF",
-    textSecondary: "#778DA9",
-    inputBorder: "#555",
-    inputBackground: "rgba(255,255,255,0.05)",
-    shadowGlow: "#00FFFF",
-    accentBorder: "rgba(255, 16, 240, 0.3)",
-    pinkGlow: "rgba(255, 16, 240, 0.4)",
-    alertButton: "#00c6ff",
+    background: '#001020',
+    backgroundGradient: ['#001020', '#001840', '#002060'],
+    buttonGradient: ['#00c6ff', '#0072ff'],
+    royalPurpleGradient: ['#4B0082', '#0066FF', '#4B0082', '#0066FF', '#4B0082'],
+
+    textPrimary: '#FFFFFF',
+    textSecondary: '#778DA9',
+    inputBorder: '#555',
+    inputBackground: 'rgba(255,255,255,0.05)',
+    alertButton: '#00c6ff',
 
     //vibeColors
-    vibeBlue: "#00C6FF",
-    vibeGreen: "#00FF41",
-    vibeOrange: "#fd7e14",
-    vibePurple: "#8B00FF",
-    vibeYellow: "#FFFF00",
-    vibePink: "#FF10F0",
+    vibeBlue: '#00C6FF',
+    vibeGreen: '#00FF41',
+    vibeForest: '#228B22',
+    vibeOrange: '#FFCC66',
+    vibePurple: '#6B00CC',
+    vibeYellow: '#FFD700',
+    vibePink: '#FF10F0',
+    vibeRed: '#FF4444',
+    vibeCyan: '#00FFFF',
+    vibeTurquoise: '#40E0D0',
+    vibeAqua: '#00FFF7',
+    vibeTeal: '#00FFD4',
+    vibeElectricBlue: '#007FFF',
+    vibeRoyalBlue: '#4169E1',
+
+    // Basic colors
+    white: '#FFFFFF',
+    black: '#000000',
+    gray: '#778DA9',
+    darkGray: '#2d2d2d',
+
+    // UI accent colors
+    headerBackground: '#001020',
+    statusBarBackground: '#001020',
 
     // VibeBackgroundColors
-    vibeBackgroundBlue: "rgba(0, 198, 255, 0.1)",
-    vibeBackgroundGreen: "rgba(0, 255, 65, 0.1)",
-    vibeBackgroundOrange: "rgba(253, 126, 20, 0.1)",
-    vibeBackgroundPurple: "rgba(139, 0, 255, 0.1)",
-    vibeBackgroundYellow: "rgba(255, 255, 0, 0.1)",
-    vibeBackgroundPink: "rgba(255, 16, 240, 0.1)",
-    
-    // Button gradient
-    buttonGradientCyan: ["rgba(0, 255, 255, 0.1)", "rgba(0, 255, 255, 0.05)", "rgba(255, 255, 255, 0.05)"],
+    vibeBackgroundBlue: 'rgba(0, 198, 255, 0.1)',
+    vibeBackgroundGreen: 'rgba(0, 255, 65, 0.1)',
+    vibeBackgroundOrange: 'rgba(253, 126, 20, 0.1)',
+    vibeBackgroundPurple: 'rgba(139, 0, 255, 0.1)',
+    vibeBackgroundYellow: 'rgba(255, 255, 0, 0.1)',
+    vibeBackgroundPink: 'rgba(255, 16, 240, 0.1)',
+    vibeBackgroundCyan: 'rgba(0, 255, 255, 0.1)',
+    vibeBackgroundTurquoise: 'rgba(64, 224, 208, 0.2)',
+    vibeBackgroundAqua: 'rgba(0, 255, 247, 0.1)',
+    vibeBackgroundTeal: 'rgba(0, 255, 212, 0.1)',
+    vibeBackgroundElectricBlue: 'rgba(0, 127, 255, 0.1)',
+    vibeBackgroundRoyalBlue: 'rgba(65, 105, 225, 0.1)',
+
+    // Comment role colors
+    commentUser: '#28a745',
+    commentAdmin: '#6f42c1',
+    commentHost: '#fd7e14',
+    commentOther: '#007bff',
+
+    // Comment background colors (with transparency)
+    commentUserBg: 'rgba(40, 167, 69, 0.1)',
+    commentAdminBg: 'rgba(111, 66, 193, 0.1)',
+    commentHostBg: 'rgba(253, 126, 20, 0.1)',
+    commentOtherBg: 'rgba(0, 123, 255, 0.1)',
   },
   fonts: {
     main: Platform.select({
-      ios: "System",
-      android: "Roboto",
-      web: "system-ui, -apple-system, sans-serif",
-      default: "sans-serif"
+      ios: 'System',
+      android: 'Roboto',
+      web: 'system-ui, -apple-system, sans-serif',
+      default: 'sans-serif',
     }),
     bold: Platform.select({
-      ios: "System",
-      android: "Roboto",
-      web: "system-ui, -apple-system, sans-serif",
-      default: "sans-serif"
-    }),
-    light: Platform.select({
-      ios: "System",
-      android: "Roboto",
-      web: "system-ui, -apple-system, sans-serif",
-      default: "sans-serif"
+      ios: 'System',
+      android: 'Roboto',
+      web: 'system-ui, -apple-system, sans-serif',
+      default: 'sans-serif',
     }),
   },
   fontWeights: {
-    light: "300",
-    regular: "400",
-    medium: "500",
-    semiBold: "600",
-    bold: "700",
-    extraBold: "800"
+    light: '300',
+    regular: '400',
+    medium: '500',
+    semiBold: '600',
+    bold: '700',
+    extraBold: '800',
   },
   sizes: {
     borderRadius: 12,
     buttonRadius: 12,
-    inputPadding: 16,
+    inputPadding: 12,
   },
-  shadows: {
-    textGlow: {
-      textShadowColor: "#00FFFF",
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 30,
-    },
-  },
+  // UI Restrictions: NO glow effects - Use sharp neon borders instead
 };
 
 export default theme;

@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../components/ui/VibeButton';
 import VibeInput from '../components/ui/VibeInput';
 import theme from '../theme/themes';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
 export default function LandingScreen({ navigation }) {
@@ -53,6 +53,19 @@ export default function LandingScreen({ navigation }) {
     }
 
     return isValid;
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert('Reset Password', 'Enter your email first, then tap Forgot Password.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      Alert.alert('Email Sent', 'Check your inbox for a password reset link.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not send reset email. Check your email address.');
+    }
   }
 
   async function handleLogin() {
@@ -103,7 +116,7 @@ export default function LandingScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Snapple Park</Text>
+            <Text style={styles.title}>Snappled</Text>
           </View>
 
           <View style={styles.formContainer}>
@@ -170,6 +183,23 @@ export default function LandingScreen({ navigation }) {
               disabled={isLoading}
             />
 
+            <Pressable onPress={handleForgotPassword}>
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </Pressable>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <VibeButton
+              label="Continue with Google"
+              onPress={() => Alert.alert('Coming Soon', 'Google Sign-In will be available in a future update.')}
+              variant="toggle"
+              color="blue"
+            />
+
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
               <Pressable onPress={handleSignup}>
@@ -202,7 +232,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.bold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
-    ...theme.shadows?.textGlow,
   },
   formContainer: {
     marginBottom: 40,
@@ -260,6 +289,27 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 16,
     fontFamily: theme.fonts.main,
+  },
+  forgotText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dividerText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    marginHorizontal: 16,
   },
   signupLink: {
     color: theme.colors.vibeBlue,

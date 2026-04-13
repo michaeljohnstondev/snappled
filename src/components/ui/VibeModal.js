@@ -19,7 +19,7 @@ export default function VibeModal({
       case 'error': return '#FF4444';
       case 'success': return '#00FF41';
       case 'confirm': return '#00C6FF';
-      default: return theme.colors.shadowGlow;
+      default: return theme.colors.vibeCyan;
     }
   };
 
@@ -28,7 +28,7 @@ export default function VibeModal({
       case 'error': return '⚠️';
       case 'success': return '✓';
       case 'confirm': return '?';
-      default: return 'ℹ️';
+      default: return null;
     }
   };
 
@@ -55,7 +55,7 @@ export default function VibeModal({
 
             {/* Message */}
             <View style={styles.content}>
-              <Text style={styles.message}>{message}</Text>
+              <Text style={[styles.message, { color: getTypeColor() }]}>{message}</Text>
             </View>
 
             {/* Buttons */}

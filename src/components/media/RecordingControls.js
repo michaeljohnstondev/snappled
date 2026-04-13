@@ -79,17 +79,6 @@ export default function RecordingControls({
     console.log("Starting recording...");
 
     try {
-      // Force stop any existing recording first
-      console.log("Ensuring camera is not recording...");
-      try {
-        cameraRef.stopRecording();
-        console.log("Stopped any existing recording");
-        // Small delay to ensure cleanup
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      } catch (stopError) {
-        console.log("No existing recording to stop (this is normal)");
-      }
-
       // Update state
       isRecordingRef.current = true;
       setCanStopManually(false);
