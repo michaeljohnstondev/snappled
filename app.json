@@ -24,6 +24,8 @@
       },
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.bigvibestudiosadmin.snapplepark"
@@ -49,6 +51,12 @@
         "projectId": "a9e37a08-f738-46fc-b005-13392ce18692"
       }
     },
-    "owner": "bigvibestudiosadmin"
+    "owner": "bigvibestudiosadmin",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a9e37a08-f738-46fc-b005-13392ce18692"
+    }
   }
 }

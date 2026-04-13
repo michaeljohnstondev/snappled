@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, StyleSheet, Pressable, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, getDocs, doc, deleteDoc, updateDoc, addDoc, orderBy, limit, where } from 'firebase/firestore';
+import { collection, query, getDocs, doc, deleteDoc, updateDoc, addDoc, orderBy, limit, where, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../services/firebase';
 import { useAuth } from '../store/AuthContext';
@@ -188,6 +188,28 @@ export default function AdminScreen({ navigation }) {
     });
   };
 
+  const [grantUserId, setGrantUserId] = useState(null);
+  const [grantCoins, setGrantCoins] = useState('');
+  const [grantTickets, setGrantTickets] = useState('');
+
+  const handleGrant = async (userId, username) => {
+    const coins = parseInt(grantCoins) || 0;
+    const tickets = parseInt(grantTickets) || 0;
+    if (coins === 0 && tickets === 0) return;
+    const updates = {};
+    if (coins !== 0) updates['resources.coins'] = increment(coins);
+    if (tickets !== 0) updates['resources.tokens'] = increment(tickets);
+    await updateDoc(doc(db, 'users', userId), updates);
+    const parts = [];
+    if (coins !== 0) parts.push(`${coins > 0 ? '+' : ''}${coins} coins`);
+    if (tickets !== 0) parts.push(`${tickets > 0 ? '+' : ''}${tickets} tickets`);
+    showAlert('Granted', `${parts.join(', ')} to @${username}`);
+    setGrantUserId(null);
+    setGrantCoins('');
+    setGrantTickets('');
+    loadTab();
+  };
+
   const handleDismissReport = (reportId) => {
     showConfirm('Dismiss', 'Dismiss this report?', async () => {
       await updateDoc(doc(db, 'reports', reportId), {
@@ -359,6 +381,7 @@ export default function AdminScreen({ navigation }) {
         );
 
       case 'users':
+        const isGranting = grantUserId === item.id;
         return (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -367,10 +390,44 @@ export default function AdminScreen({ navigation }) {
             </View>
             <Text style={styles.metaText}>UID: {item.id}</Text>
             <Text style={styles.metaText}>Coins: {item.resources?.coins || item.coins || 0}  Tickets: {item.resources?.tokens || 0}</Text>
-            {!item.isBanned && (
-              <Pressable style={styles.deleteBtn} onPress={() => handleBanUser(item.id, item.username)}>
-                <Text style={styles.deleteBtnText}>Ban</Text>
-              </Pressable>
+            {isGranting ? (
+              <View style={styles.grantRow}>
+                <TextInput
+                  style={styles.grantInput}
+                  placeholder="Coins"
+                  placeholderTextColor="#888"
+                  keyboardType="number-pad"
+                  value={grantCoins}
+                  onChangeText={setGrantCoins}
+                />
+                <TextInput
+                  style={styles.grantInput}
+                  placeholder="Tickets"
+                  placeholderTextColor="#888"
+                  keyboardType="number-pad"
+                  value={grantTickets}
+                  onChangeText={setGrantTickets}
+                />
+                <Pressable style={styles.grantBtn} onPress={() => handleGrant(item.id, item.username)}>
+                  <Ionicons name="checkmark" size={20} color={theme.colors.vibeGreen} />
+                </Pressable>
+                <Pressable style={styles.grantBtn} onPress={() => { setGrantUserId(null); setGrantCoins(''); setGrantTickets(''); }}>
+                  <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.userActions}>
+                <Pressable style={styles.actionBtn} onPress={() => setGrantUserId(item.id)}>
+                  <Ionicons name="gift" size={18} color={theme.colors.vibeYellow} />
+                  <Text style={styles.actionBtnLabel}>Grant</Text>
+                </Pressable>
+                {!item.isBanned && (
+                  <Pressable style={styles.actionBtn} onPress={() => handleBanUser(item.id, item.username)}>
+                    <Ionicons name="ban" size={18} color={theme.colors.vibeRed} />
+                    <Text style={styles.actionBtnLabel}>Ban</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
           </View>
         );
@@ -953,4 +1010,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,68,68,0.1)', borderWidth: 1, borderColor: theme.colors.vibeRed,
   },
   deleteBtnText: { color: theme.colors.vibeRed, fontSize: 12, fontWeight: 'bold' },
+  userActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)' },
+  actionBtnLabel: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  grantRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  grantInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: theme.colors.textPrimary, fontSize: 13 },
+  grantBtn: { padding: 6 },
 });

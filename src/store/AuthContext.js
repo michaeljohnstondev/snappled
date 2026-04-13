@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../services/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../services/firebase";
 import { userService } from "../services/userService";
 
 const AuthContext = createContext({});
@@ -19,23 +20,31 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const unsubUserDoc = useRef(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
+
+      // Clean up previous user doc listener
+      if (unsubUserDoc.current) {
+        unsubUserDoc.current();
+        unsubUserDoc.current = null;
+      }
 
       if (firebaseUser) {
         try {
           // Load user data from our service with retry for new users
           console.log('[AuthContext] Loading user data for:', firebaseUser.uid);
           let userData = await userService.getUserData(firebaseUser.uid);
-          
+
           // If user data not found, retry once after a short delay (for new users)
           if (!userData) {
             console.log('[AuthContext] User data not found, retrying in 1 second...');
             await new Promise(resolve => setTimeout(resolve, 1000));
             userData = await userService.getUserData(firebaseUser.uid);
           }
-          
+
           console.log('[AuthContext] User data loaded:', !!userData);
           if (userData) {
             setUser({
@@ -49,13 +58,30 @@ export function AuthProvider({ children }) {
               tokens: userData.resources?.tokens || userData.topicTokens || 0,
               trophies: userData.resources?.trophies || userData.tickets || 0,
               level: userData.profile?.level || 1,
+              xp: userData.profile?.xp || 0,
               ownedSnapples: userData.ownedSnapples || [],
               wishlistedSnapples: userData.wishlistedSnapples || [],
               ownedCards: userData.ownedCards || [],
             });
             setIsAuthenticated(true);
+
+            // Real-time listener for resource bar updates
+            unsubUserDoc.current = onSnapshot(doc(db, 'users', firebaseUser.uid), (snap) => {
+              if (!snap.exists()) return;
+              const d = snap.data();
+              setUserCurrency(prev => ({
+                ...prev,
+                coins: d.resources?.coins || d.coins || 0,
+                tokens: d.resources?.tokens || d.topicTokens || 0,
+                trophies: d.resources?.trophies || d.tickets || 0,
+                level: d.profile?.level || 1,
+                xp: d.profile?.xp || 0,
+                ownedSnapples: d.ownedSnapples || [],
+                wishlistedSnapples: d.wishlistedSnapples || [],
+                ownedCards: d.ownedCards || [],
+              }));
+            });
           } else {
-            // User exists in Firebase Auth but not in our database
             console.log('[AuthContext] User data not found in database for:', firebaseUser.uid);
             setUser(null);
             setUserCurrency({});
@@ -78,6 +104,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       unsubscribe();
+      if (unsubUserDoc.current) unsubUserDoc.current();
     };
   }, []);
 

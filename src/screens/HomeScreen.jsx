@@ -224,13 +224,11 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleProfilePress = () => {
-    // TODO: Navigate to profile screen
-    console.log('Profile pressed - TODO: Navigate to profile screen');
+    navigation.navigate('UserProfile', { userId: user?.uid });
   };
 
   const handleVisitProfile = (userId) => {
-    // TODO: Navigate to user profile screen
-    console.log('Visit profile for user:', userId);
+    navigation.navigate('UserProfile', { userId });
   };
 
   const handleFollowUser = async (userId) => {
