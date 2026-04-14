@@ -43,17 +43,11 @@ export default function HomeScreen({ navigation, route }) {
     loadData();
   }, [user?.uid]);
 
-  // Refresh data when screen comes into focus (throttled)
-  const lastLoadRef = useRef(0);
+  // Reload data every time screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      const now = Date.now();
-      if (now - lastLoadRef.current > 30000) { // Only reload every 30s
-        lastLoadRef.current = now;
-        loadData();
-      }
+      loadData();
     });
-
     return unsubscribe;
   }, [navigation]);
 
