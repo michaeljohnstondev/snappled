@@ -142,7 +142,7 @@ export default function StoreScreen({ navigation }) {
         </View>
 
         {/* Section Tabs */}
-        <View style={styles.tabRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} contentContainerStyle={styles.tabRow}>
           {sections.map(s => (
             <Pressable
               key={s.key}
@@ -152,7 +152,7 @@ export default function StoreScreen({ navigation }) {
               <Text style={[styles.tabText, activeSection === s.key && styles.tabTextActive]}>{s.label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
 
@@ -339,9 +339,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBg: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+    borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   headerTitle: {
     fontSize: 24, fontWeight: theme.fontWeights.bold,
@@ -359,21 +360,24 @@ const styles = StyleSheet.create({
   balanceDivider: {
     fontSize: 12, color: theme.colors.textSecondary, marginHorizontal: 4,
   },
+  tabScroll: {
+    flexGrow: 0, marginBottom: 12,
+  },
   tabRow: {
-    flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12,
+    flexDirection: 'row', paddingHorizontal: 16, gap: 8,
   },
   tab: {
-    flex: 1, paddingVertical: 8, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center',
+    paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
   },
   tabActive: {
-    backgroundColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,198,255,0.15)', borderColor: theme.colors.vibeBlue,
   },
   tabText: {
-    fontSize: 13, fontWeight: theme.fontWeights.semiBold, color: theme.colors.textSecondary,
+    fontSize: 13, fontWeight: theme.fontWeights.bold, color: theme.colors.textSecondary,
   },
   tabTextActive: {
-    color: '#fff',
+    color: theme.colors.vibeBlue,
   },
   scrollArea: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 20, gap: 12 },
@@ -382,6 +386,7 @@ const styles = StyleSheet.create({
   bundleCard: {
     borderRadius: 16, padding: 20, marginBottom: 4,
     position: 'relative', overflow: 'hidden',
+    borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   bundleName: {
     fontSize: 20, fontWeight: theme.fontWeights.bold, color: '#fff', marginBottom: 8,
@@ -404,8 +409,8 @@ const styles = StyleSheet.create({
   // Packs
   packCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
-    padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 14,
+    padding: 16, borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   packLeft: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -424,7 +429,7 @@ const styles = StyleSheet.create({
   },
   priceBtn: {
     backgroundColor: 'rgba(0,0,0,0.3)', paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 10, borderWidth: 2, borderColor: theme.colors.vibeBlue,
   },
   priceBtnText: {
     fontSize: 14, fontWeight: theme.fontWeights.bold, color: '#fff',
@@ -433,8 +438,8 @@ const styles = StyleSheet.create({
   // Cosmetics
   cosmeticCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
-    padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 14,
+    padding: 14, borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   cosmeticIcon: {
     width: 48, height: 48, borderRadius: 12,
@@ -450,8 +455,8 @@ const styles = StyleSheet.create({
     fontSize: 12, color: theme.colors.textSecondary, marginTop: 2,
   },
   cosmeticPrice: {
-    backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)', paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8, borderWidth: 2, borderColor: theme.colors.vibeYellow,
   },
   cosmeticPriceText: {
     fontSize: 12, fontWeight: theme.fontWeights.bold, color: theme.colors.vibeYellow,

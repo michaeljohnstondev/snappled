@@ -196,6 +196,7 @@ export default function GameScreen({ navigation }) {
   const [mySnapples, setMySnapples] = useState([]);
   const [allSnapples, setAllSnapples] = useState([]);
   const [useRandomCards, setUseRandomCards] = useState(false);
+  const [showCustomMenu, setShowCustomMenu] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
@@ -708,17 +709,34 @@ export default function GameScreen({ navigation }) {
 
           <View style={styles.lobbyButtons}>
             <VibeButton
-              label={isLoading ? "Searching..." : "Find Game"}
-              onPress={handleFindGame}
-              disabled={isLoading}
+              label="Ranked"
+              onPress={() => showAlert('Coming Soon', 'Ranked matches will be available soon!')}
+              color="yellow"
             />
             <VibeButton
-              label="Create Game"
-              onPress={handleCreateGame}
+              label="Custom"
+              onPress={() => setShowCustomMenu(prev => !prev)}
               variant="toggle"
               color="blue"
-              disabled={isLoading}
             />
+            {showCustomMenu && (
+              <View style={styles.customMenu}>
+                <VibeButton
+                  label={isLoading ? "Searching..." : "Find Game"}
+                  onPress={handleFindGame}
+                  variant="toggle"
+                  color="green"
+                  disabled={isLoading}
+                />
+                <VibeButton
+                  label="Create Game"
+                  onPress={handleCreateGame}
+                  variant="toggle"
+                  color="blue"
+                  disabled={isLoading}
+                />
+              </View>
+            )}
             <VibeButton
               label={isLoading ? "Loading..." : "Practice (Solo)"}
               onPress={handlePractice}
@@ -1189,6 +1207,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary, fontSize: 14, fontWeight: theme.fontWeights.medium,
   },
   lobbyButtons: { width: '100%', gap: 12, marginTop: 16 },
+  customMenu: { width: '100%', gap: 10, paddingLeft: 20 },
   warningText: {
     color: theme.colors.vibeRed, fontSize: 13, textAlign: 'center', marginTop: 8,
   },
