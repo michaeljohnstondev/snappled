@@ -664,8 +664,13 @@ exports.purchaseSnapple = functions.https.onCall(async (data, context) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Creator milestone payouts — only on exact thresholds
+    // Track creator sales stats + milestone payouts
     if (snapple.creatorId && snapple.creatorId !== userId) {
+      const creatorRef = db.collection('users').doc(snapple.creatorId);
+      transaction.update(creatorRef, {
+        'stats.snapplesSold': admin.firestore.FieldValue.increment(1),
+        'stats.totalRevenue': admin.firestore.FieldValue.increment(currentPrice),
+      });
       const milestones = {
         1:       { coins: 0,      xp: 25 },
         10:      { coins: 1000,   xp: 50 },
@@ -692,7 +697,6 @@ exports.purchaseSnapple = functions.https.onCall(async (data, context) => {
         if (milestone.xp > 0) {
           updates['profile.experience'] = admin.firestore.FieldValue.increment(milestone.xp);
         }
-        const creatorRef = db.collection('users').doc(snapple.creatorId);
         transaction.update(creatorRef, updates);
       }
     }

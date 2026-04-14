@@ -8,13 +8,15 @@ import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { uploadVideo } from '../services/videoStorage';
 import { snappleService } from '../services/snappleService';
+import { achievementService } from '../services/achievementService';
+import { levelService } from '../services/levelService';
 import theme from '../theme/themes';
 
 export default function VideoPreviewScreen({ route, navigation }) {
   const { recordedVideo, cameraFacing } = route.params || {};
   const prompt = route.params?.prompt || {};
   const { user, userCurrency, updateUserCurrency } = useAuth();
-  const { showSuccess, showError, showConfirm } = useModal();
+  const { showSuccess, showError, showConfirm, showToast } = useModal();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -130,12 +132,44 @@ export default function VideoPreviewScreen({ route, navigation }) {
       if (snappleResult.success) {
         // Award 75 XP for creating a snapple
         try {
-          const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc } = await import('firebase/firestore');
+          const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc, getDoc: xpGet } = await import('firebase/firestore');
           const { db: xpDb } = await import('../services/firebase');
+
+          const beforeSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
+          const beforeData = beforeSnap.data() || {};
+          const beforeXP = beforeData.profile?.experience || beforeData.profile?.xp || 0;
+          const beforeLevel = levelService.getLevelFromXP(beforeXP);
+
+          // Check XP boost
+          const boosts = beforeData.boosts || {};
+          const now = new Date().toISOString();
+          const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
+
           await xpUpdate(xpDoc(xpDb, 'users', user.uid), {
-            'profile.experience': xpInc(75),
+            'profile.experience': xpInc(xpAmount),
+            'profile.xp': xpInc(xpAmount),
             'stats.videosCreated': xpInc(1),
           }).catch(() => {});
+
+          showToast('reward', `+${xpAmount} XP`, xpAmount > 75 ? 'Snapple created (2x boost!)' : 'Snapple created');
+
+          const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
+          if (afterLevel > beforeLevel) {
+            setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1500);
+          }
+
+          // Check achievements
+          const afterSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
+          const stats = afterSnap.data()?.stats || {};
+          stats.level = afterLevel;
+          stats.trophies = afterSnap.data()?.resources?.trophies || 0;
+          const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+          newAchievements.forEach((a, i) => {
+            const rewards = [];
+            if (a.coins) rewards.push(`+${a.coins}c`);
+            if (a.xp) rewards.push(`+${a.xp}xp`);
+            setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3000 + i * 1500);
+          });
         } catch (e) {}
 
         // Increment participant count on the prompt

@@ -7,6 +7,7 @@ import NavButton from '../components/ui/navigation/NavButton';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import { useAuth } from '../store/AuthContext';
+import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
 import { promptRotationService } from '../services/promptRotationService';
 import { userService } from '../services/userService';
@@ -16,8 +17,23 @@ import theme from '../theme/themes';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function PromptsScreen({ navigation }) {
-  const { user, userCurrency } = useAuth();
-  
+  const { user, userCurrency, pendingAchievements, clearPendingAchievements } = useAuth();
+  const { showToast } = useModal();
+
+  // Show pending achievements from login check
+  useEffect(() => {
+    if (pendingAchievements.length > 0) {
+      pendingAchievements.forEach((a, i) => {
+        const rewards = [];
+        if (a.coins) rewards.push(`+${a.coins}c`);
+        if (a.xp) rewards.push(`+${a.xp}xp`);
+        if (a.trophies) rewards.push(`+${a.trophies}t`);
+        setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 1000 + i * 1500);
+      });
+      clearPendingAchievements();
+    }
+  }, [pendingAchievements]);
+
   // Animated gradient for create card
   const gradientAnim = useRef(new Animated.Value(0)).current;
 
@@ -103,6 +119,10 @@ export default function PromptsScreen({ navigation }) {
   };
 
   const handlePromptPress = (prompt) => {
+    navigation.navigate('Snapples', { promptId: prompt.id });
+  };
+
+  const handlePromptLongPress = (prompt) => {
     setSelectedPromptForInfo(prompt);
   };
 
@@ -336,6 +356,7 @@ export default function PromptsScreen({ navigation }) {
                 key={prompt.id || index}
                 style={styles.promptCard}
                 onPress={() => handlePromptPress(prompt)}
+                onLongPress={() => handlePromptLongPress(prompt)}
               >
                 <LinearGradient
                   colors={getPromptGradient(index)}
@@ -395,10 +416,11 @@ export default function PromptsScreen({ navigation }) {
       </SafeAreaView>
       
       <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} active />
-        <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} />
+        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} active />
+        <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
         <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
+        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
       </ButtonContainer>
     </LinearGradient>
   );

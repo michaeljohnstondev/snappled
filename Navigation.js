@@ -18,6 +18,8 @@ import UserProfileScreen from './src/screens/UserProfileScreen';
 import DeckBuilderScreen from './src/screens/DeckBuilderScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import GameScreen from './src/screens/GameScreen';
+import StoreScreen from './src/screens/StoreScreen';
+import AchievementsScreen from './src/screens/AchievementsScreen';
 
 const Stack = createStackNavigator();
 
@@ -77,8 +79,9 @@ export default function Navigation() {
         </Stack.Navigator>
       ) : (
         <Stack.Navigator initialRouteName="Home" screenOptions={screenOptions}>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Prompts" component={PromptsScreen} />
+          <Stack.Screen name="Home" component={PromptsScreen} />
+          <Stack.Screen name="Snapples" component={HomeScreen} />
+          <Stack.Screen name="Store" component={StoreScreen} />
           <Stack.Screen name="Prompt" component={PromptScreen} />
           <Stack.Screen name="CreatePrompt" component={CreatePromptScreen} />
           <Stack.Screen name="Record" component={RecordScreen} />
@@ -86,6 +89,7 @@ export default function Navigation() {
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
           <Stack.Screen name="DeckBuilder" component={DeckBuilderScreen} />
           <Stack.Screen name="Game" component={GameScreen} />
+          <Stack.Screen name="Achievements" component={AchievementsScreen} />
           <Stack.Screen name="Admin" component={AdminScreen} />
         </Stack.Navigator>
       )}

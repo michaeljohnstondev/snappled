@@ -20,7 +20,7 @@ import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const { user, userCurrency } = useAuth();
   
   // State
@@ -72,7 +72,9 @@ export default function HomeScreen({ navigation }) {
 
       if (allPrompts.length > 0) {
         setPrompts(allPrompts);
-        setSelectedPrompt(allPrompts[0]);
+        const targetId = route?.params?.promptId;
+        const match = targetId && allPrompts.find(p => p.id === targetId);
+        setSelectedPrompt(match || allPrompts[0]);
       }
 
       // Load all snapples once
@@ -383,10 +385,11 @@ export default function HomeScreen({ navigation }) {
       </SafeAreaView>
       
       <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} />
-        <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} active />
+        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
+        <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
         <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
+        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
       </ButtonContainer>
     </LinearGradient>
   );

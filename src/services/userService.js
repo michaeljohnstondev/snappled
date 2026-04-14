@@ -20,8 +20,8 @@ import { auth, db } from "./firebase";
 const USERS_COLLECTION = "users";
 const SNAPPLE_PROMPTS_COLLECTION = "snapplePrompts";
 const STARTING_COINS = 100;
-const STARTING_TROPHIES = 50; // Player rating system - trophies earned through gameplay
-const STARTING_TOPIC_TOKENS = 3; // Keep for backwards compatibility
+const STARTING_TROPHIES = 0;
+const STARTING_TOPIC_TOKENS = 10;
 
 export const userService = {
   async createUser(userData) {
@@ -296,6 +296,12 @@ export const userService = {
   async updateTrophies(userId, amount) {
     try {
       const userRef = doc(db, USERS_COLLECTION, userId);
+      if (amount < 0) {
+        const userData = await this.getUserData(userId);
+        const current = userData?.resources?.trophies || 0;
+        if (current + amount < 0) amount = -current; // clamp to 0
+        if (amount === 0) return { success: true };
+      }
       await updateDoc(userRef, {
         "resources.trophies": increment(amount),
         "stats.totalTrophiesSpent":

@@ -186,7 +186,7 @@ function SwipeCard({ submission, onSwipeRight, onSwipeLeft, onBuy, onReport, onP
 // ── Main Game Screen ──
 export default function GameScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
-  const { showAlert, showError, showConfirm } = useModal();
+  const { showAlert, showError, showConfirm, showToast } = useModal();
   const [gameId, setGameId] = useState(null);
   const [game, setGame] = useState(null);
   const [hand, setHand] = useState([]);
@@ -552,26 +552,96 @@ export default function GameScreen({ navigation }) {
             .filter(p => p.uid !== user.uid && !p.uid?.startsWith('bot_'))
             .map(() => 1); // TODO: track player levels in game doc
 
-          const xpEarned = levelService.calculateGameXP(myReward.placement, opponentLevels, myLevel);
+          let xpEarned = levelService.calculateGameXP(myReward.placement, opponentLevels, myLevel);
+          let trophiesEarned = levelService.calculateTrophies(myReward.placement);
+
+          const { doc, updateDoc, increment, getDoc } = await import('firebase/firestore');
+          const { db } = await import('../services/firebase');
+
+          // Check active boosts
+          const boostSnap = await getDoc(doc(db, 'users', user.uid));
+          const boosts = boostSnap.data()?.boosts || {};
+          const now = new Date().toISOString();
+          if (boosts.xpBoost && boosts.xpBoost > now) {
+            xpEarned = xpEarned * 2;
+          }
+          if (boosts.trophyBoost && boosts.trophyBoost > now && trophiesEarned > 0) {
+            trophiesEarned = trophiesEarned * 2;
+          }
+
+          // Check shield — block trophy loss
+          const inventory = boostSnap.data()?.inventory || {};
+          if (trophiesEarned < 0 && (inventory.shields || 0) > 0) {
+            trophiesEarned = 0;
+            await updateDoc(doc(db, 'users', user.uid), {
+              'inventory.shields': increment(-1),
+            });
+            showToast('reward', 'Shield Used!', 'Trophy loss blocked');
+          }
 
           await updateUserCurrency({
             coins: (userCurrency.coins || 0) + myReward.coinsEarned,
           });
 
-          const { doc, updateDoc, increment } = await import('firebase/firestore');
-          const { db } = await import('../services/firebase');
-          await updateDoc(doc(db, 'users', user.uid), {
+          const userRef = doc(db, 'users', user.uid);
+          const updates = {
             'profile.experience': increment(xpEarned),
+            'profile.xp': increment(xpEarned),
             'stats.gamesPlayed': increment(1),
             'stats.gamesWon': myReward.placement === 1 ? increment(1) : increment(0),
             'stats.totalCoinsEarned': increment(myReward.coinsEarned),
-          }).catch(() => {});
+          };
+          if (trophiesEarned !== 0) {
+            updates['resources.trophies'] = increment(trophiesEarned);
+          }
+          await updateDoc(userRef, updates).catch(() => {});
 
+          // Show game over
           const parts = [`#${myReward.placement}`];
           if (myReward.coinsEarned > 0) parts.push(`${myReward.coinsEarned} coins`);
           parts.push(`${xpEarned} XP`);
+          if (trophiesEarned > 0) parts.push(`+${trophiesEarned} trophies`);
+          if (trophiesEarned < 0) parts.push(`${trophiesEarned} trophies`);
 
           showAlert('Game Over!', parts.join(' — '));
+
+          // Level up check
+          const afterLevel = levelService.getLevelFromXP((user?.profile?.experience || 0) + xpEarned);
+          if (afterLevel > myLevel) {
+            setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1000);
+          }
+
+          // Win streak toast
+          if (myReward.placement === 1) {
+            const afterSnap = await getDoc(userRef);
+            const streak = (afterSnap.data()?.stats?.winStreak || 0) + 1;
+            await updateDoc(userRef, { 'stats.winStreak': streak }).catch(() => {});
+            if (streak >= 3) {
+              setTimeout(() => showToast('streak', `${streak} Win Streak!`, 'Keep it going!'), 2000);
+            }
+          } else {
+            await updateDoc(userRef, { 'stats.winStreak': 0 }).catch(() => {});
+          }
+
+          // Check achievements
+          try {
+            const { default: achievementService } = await import('../services/achievementService');
+            const afterSnap = await getDoc(userRef);
+            const afterData = afterSnap.data();
+            const stats = {
+              ...(afterData?.stats || {}),
+              level: afterLevel,
+              trophies: afterData?.resources?.trophies || 0,
+            };
+            const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+            newAchievements.forEach((a, i) => {
+              const rewards = [];
+              if (a.coins) rewards.push(`+${a.coins}c`);
+              if (a.xp) rewards.push(`+${a.xp}xp`);
+              if (a.trophies) rewards.push(`+${a.trophies}t`);
+              setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3500 + i * 1500);
+            });
+          } catch (e) {}
         } catch (e) {
           showAlert('Game Over', `You placed #${myReward.placement}`);
         }
@@ -671,10 +741,11 @@ export default function GameScreen({ navigation }) {
         </View>
 
         <ButtonContainer>
-          <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} />
-          <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} />
+          <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
+          <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
           <NavButton title="Play" onPress={() => navigation.navigate('Game')} active />
           <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
+          <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
         </ButtonContainer>
       </LinearGradient>
     );
@@ -762,7 +833,35 @@ export default function GameScreen({ navigation }) {
           </View>
         ) : (
           <>
-            <Text style={styles.pickInstruction}>Tap a card to preview, then play it</Text>
+            <View style={styles.pickHeader}>
+              <Text style={styles.pickInstruction}>Tap a card to preview, then play it</Text>
+              {(user?.inventory?.mulligans || 0) > 0 && (
+                <Pressable style={styles.mulliganBtn} onPress={async () => {
+                  if (hand.length === 0) return;
+                  // Remove worst card, draw a new one
+                  const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
+                  if (remaining.length === 0) {
+                    showAlert('No Cards', 'No more cards to draw from your deck');
+                    return;
+                  }
+                  const newCard = remaining[Math.floor(Math.random() * remaining.length)];
+                  const newHand = [...hand];
+                  newHand[newHand.length - 1] = newCard;
+                  setHand(newHand);
+                  try {
+                    const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
+                    const { db: mDb } = await import('../services/firebase');
+                    await mUpdate(mDoc(mDb, 'users', user.uid), {
+                      'inventory.mulligans': mInc(-1),
+                    });
+                  } catch (e) {}
+                  showToast('reward', 'Mulligan!', 'Card swapped');
+                }}>
+                  <Ionicons name="refresh" size={16} color={theme.colors.vibeGreen} />
+                  <Text style={styles.mulliganText}>Mulligan ({user?.inventory?.mulligans || 0})</Text>
+                </Pressable>
+              )}
+            </View>
             <FlatList
               data={hand}
               keyExtractor={(item, i) => item?.id || `hand-${i}`}
@@ -1123,8 +1222,19 @@ const styles = StyleSheet.create({
     color: 'white', fontSize: 18, fontWeight: theme.fontWeights.bold,
     textAlign: 'center', lineHeight: 24,
   },
+  pickHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, marginBottom: 8, gap: 12, paddingHorizontal: 16,
+  },
   pickInstruction: {
-    color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 12, marginBottom: 8,
+    color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
+  },
+  mulliganBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,255,65,0.1)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(0,255,65,0.3)',
+  },
+  mulliganText: {
+    color: theme.colors.vibeGreen, fontSize: 12, fontWeight: 'bold',
   },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   submittedCount: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },

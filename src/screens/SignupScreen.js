@@ -65,7 +65,7 @@ export default function SignupScreen({ navigation }) {
       if (result.success) {
         Alert.alert(
           'Account Created! 🎉',
-          `Welcome to Snappled, @${formData.username}!\n\nYou've been given:\n• 100 coins 🪙\n• 50 trophies 🏆\n• 3 topic tickets 🎫\n\nTime to start creating!`,
+          `Welcome to Snappled, @${formData.username}!\n\nYou've been given:\n• 100 coins 🪙\n• 10 topic tickets 🎫\n\nTime to start creating!`,
           [{ 
             text: 'Continue', 
             onPress: () => {

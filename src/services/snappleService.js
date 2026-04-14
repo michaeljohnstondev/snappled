@@ -189,7 +189,7 @@ export const snappleService = {
       
       await updateDoc(snappleRef, updates);
       await this.setUserInteraction(snappleId, userId, 'like');
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error liking snapple:', error);

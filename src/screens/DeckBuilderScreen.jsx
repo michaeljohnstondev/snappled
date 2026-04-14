@@ -275,10 +275,11 @@ export default function DeckBuilderScreen({ navigation }) {
       />
 
       <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Prompts')} />
-        <NavButton title="Snapples" onPress={() => navigation.navigate('Home')} />
+        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
+        <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
         <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} active />
+        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
       </ButtonContainer>
     </LinearGradient>
   );

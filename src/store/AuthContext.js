@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 import { userService } from "../services/userService";
+import { achievementService } from "../services/achievementService";
+import { levelService } from "../services/levelService";
 
 const AuthContext = createContext({});
 
@@ -19,6 +21,7 @@ export function AuthProvider({ children }) {
   const [userCurrency, setUserCurrency] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pendingAchievements, setPendingAchievements] = useState([]);
 
   const unsubUserDoc = useRef(null);
 
@@ -80,7 +83,46 @@ export function AuthProvider({ children }) {
                 wishlistedSnapples: d.wishlistedSnapples || [],
                 ownedCards: d.ownedCards || [],
               }));
+              setUser(prev => prev ? ({
+                ...prev,
+                inventory: d.inventory || {},
+                boosts: d.boosts || {},
+                upgrades: d.upgrades || {},
+              }) : prev);
             });
+
+            // Check achievements on login (delayed so it doesn't block render)
+            setTimeout(async () => {
+              try {
+                const savedStats = userData.stats || {};
+                let totalLikes = 0, maxLikesOnOne = 0, uniquePrompts = new Set();
+                try {
+                  const snapQ = query(collection(db, 'snapples'), where('creatorId', '==', firebaseUser.uid));
+                  const snapSnap = await getDocs(snapQ);
+                  snapSnap.forEach(d => {
+                    const s = d.data();
+                    const likes = s.likes || s.likeCount || 0;
+                    totalLikes += likes;
+                    if (likes > maxLikesOnOne) maxLikesOnOne = likes;
+                    if (s.promptId) uniquePrompts.add(s.promptId);
+                  });
+                } catch (e) {}
+                const stats = {
+                  ...savedStats,
+                  totalLikesReceived: totalLikes,
+                  maxLikesOnOne,
+                  uniquePromptsUsed: uniquePrompts.size,
+                  level: levelService.getLevelFromXP(userData.profile?.xp || userData.profile?.experience || 0),
+                  trophies: userData.resources?.trophies || 0,
+                };
+                const newAchievements = await achievementService.checkAndAward(firebaseUser.uid, stats);
+                if (newAchievements.length > 0) {
+                  setPendingAchievements(newAchievements);
+                }
+              } catch (e) {
+                console.error('[AuthContext] Achievement check error:', e);
+              }
+            }, 3000);
           } else {
             console.log('[AuthContext] User data not found in database for:', firebaseUser.uid);
             setUser(null);
@@ -148,6 +190,8 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const clearPendingAchievements = () => setPendingAchievements([]);
+
   const value = {
     user,
     userCurrency,
@@ -155,6 +199,8 @@ export function AuthProvider({ children }) {
     isAuthenticated,
     refreshUserCurrency,
     updateUserCurrency,
+    pendingAchievements,
+    clearPendingAchievements,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

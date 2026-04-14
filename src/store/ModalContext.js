@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import RewardToast from '../components/ui/RewardToast';
 
 const ModalContext = createContext();
 
@@ -65,13 +66,34 @@ export function ModalProvider({ children }) {
     showModal({ title, message, type: 'error' });
   };
 
+  // Toast queue
+  const [toastQueue, setToastQueue] = useState([]);
+  const [activeToast, setActiveToast] = useState(null);
+
+  const showToast = useCallback((type, title, subtitle) => {
+    setToastQueue(prev => [...prev, { type, title, subtitle, id: Date.now() }]);
+  }, []);
+
+  // Pop next toast from queue
+  useEffect(() => {
+    if (!activeToast && toastQueue.length > 0) {
+      setActiveToast(toastQueue[0]);
+      setToastQueue(prev => prev.slice(1));
+    }
+  }, [activeToast, toastQueue]);
+
+  const dismissToast = useCallback(() => {
+    setActiveToast(null);
+  }, []);
+
   return (
     <ModalContext.Provider value={{
       showAlert,
       showConfirm,
       showSuccess,
       showError,
-      hideModal
+      hideModal,
+      showToast,
     }}>
       {children}
       {VibeModalComponent && (
@@ -84,6 +106,13 @@ export function ModalProvider({ children }) {
           onClose={hideModal}
         />
       )}
+      <RewardToast
+        visible={!!activeToast}
+        type={activeToast?.type}
+        title={activeToast?.title}
+        subtitle={activeToast?.subtitle}
+        onDismiss={dismissToast}
+      />
     </ModalContext.Provider>
   );
 }

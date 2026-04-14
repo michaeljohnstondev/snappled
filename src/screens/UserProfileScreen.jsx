@@ -167,8 +167,8 @@ export default function UserProfileScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* Follow Button */}
-      {!isOwnProfile && (
+      {/* Actions */}
+      {!isOwnProfile ? (
         <View style={styles.actionSection}>
           <VibeButton
             label={isFollowing ? 'Following' : 'Follow'}
@@ -177,6 +177,12 @@ export default function UserProfileScreen({ route, navigation }) {
             color={isFollowing ? 'green' : 'blue'}
           />
         </View>
+      ) : (
+        <Pressable style={styles.achievementsBtn} onPress={() => navigation.navigate('Achievements')}>
+          <Ionicons name="trophy" size={20} color={theme.colors.vibeYellow} />
+          <Text style={styles.achievementsBtnText}>Achievements</Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+        </Pressable>
       )}
 
       {/* Tabs */}
@@ -348,6 +354,24 @@ const styles = StyleSheet.create({
   },
   actionSection: {
     paddingTop: 20,
+  },
+  achievementsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,215,0,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.2)',
+  },
+  achievementsBtnText: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: theme.fontWeights.semiBold,
   },
   tabSection: {
     paddingTop: 20,

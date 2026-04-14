@@ -261,6 +261,24 @@ export default function SnappleOverlay({
 
           <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={async () => {
+              const wishlisted = (userCurrency.wishlistedSnapples || []).includes(snapple.id);
+              if (wishlisted) {
+                await snappleService.removeFromWishlist(user.uid, snapple.id);
+                await updateUserCurrency({ wishlistedSnapples: (userCurrency.wishlistedSnapples || []).filter(id => id !== snapple.id) });
+              } else {
+                await snappleService.addToWishlist(user.uid, snapple.id);
+                await updateUserCurrency({ wishlistedSnapples: [...(userCurrency.wishlistedSnapples || []), snapple.id] });
+              }
+            }}>
+              <View style={[styles.buttonBg, (userCurrency.wishlistedSnapples || []).includes(snapple.id) && styles.activeBg]}>
+                <Ionicons name={(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? "bookmark" : "bookmark-outline"} size={20} color={(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? theme.colors.vibeYellow : 'white'} />
+              </View>
+            </Pressable>
+            <Text style={styles.actionCount}>{(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? 'Saved' : 'Save'}</Text>
+          </View>
+
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={async () => {
               try {
                 await Share.share({
                   message: `Check out this Snapple by @${snapple.creatorUsername || 'anonymous'}: "${snapple.prompt}"`,
