@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated } from 'react-native';
+import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
@@ -118,8 +118,8 @@ export default function PromptsScreen({ navigation }) {
     setPrompts(allPrompts);
   };
 
-  const handlePromptPress = (prompt) => {
-    navigation.navigate('Snapples', { promptId: prompt.id });
+  const handlePromptPress = (prompt, index) => {
+    navigation.navigate('Snapples', { promptId: prompt.id, promptIndex: index });
   };
 
   const handlePromptLongPress = (prompt) => {
@@ -300,6 +300,17 @@ export default function PromptsScreen({ navigation }) {
     username: user?.username || user?.email?.split('@')[0] || 'Player'
   };
 
+  if (isLoading && prompts.length === 0) {
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   return (
     <LinearGradient
       colors={theme.colors.backgroundGradient}
@@ -355,7 +366,7 @@ export default function PromptsScreen({ navigation }) {
               <Pressable
                 key={prompt.id || index}
                 style={styles.promptCard}
-                onPress={() => handlePromptPress(prompt)}
+                onPress={() => handlePromptPress(prompt, index)}
                 onLongPress={() => handlePromptLongPress(prompt)}
               >
                 <LinearGradient

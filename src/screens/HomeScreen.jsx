@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Pressable } from 'react-native';
+import { StyleSheet, View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,7 +67,14 @@ export default function HomeScreen({ navigation, route }) {
       if (allPrompts.length > 0) {
         setPrompts(allPrompts);
         const targetId = route?.params?.promptId;
-        const match = targetId && allPrompts.find(p => p.id === targetId);
+        const targetIndex = route?.params?.promptIndex;
+        let match = null;
+        if (targetId) {
+          match = allPrompts.find(p => p.id === targetId);
+        }
+        if (!match && targetIndex != null && allPrompts[targetIndex]) {
+          match = allPrompts[targetIndex];
+        }
         setSelectedPrompt(match || allPrompts[0]);
       }
 
@@ -289,6 +296,17 @@ export default function HomeScreen({ navigation, route }) {
     username: user?.username || user?.email?.split('@')[0] || 'Player'
   };
 
+  if (isLoading && prompts.length === 0) {
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+          <Text style={styles.loadingText}>Loading snapples...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   return (
     <LinearGradient
       colors={theme.colors.backgroundGradient}
@@ -392,6 +410,12 @@ export default function HomeScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12,
+  },
+  loadingText: {
+    color: theme.colors.textSecondary, fontSize: 14,
   },
   safeArea: {
     flex: 1,

@@ -846,6 +846,17 @@ export default function GameScreen({ navigation }) {
       setHand(gameService.drawHand(mySnapples, allSnapples));
     }
 
+    if (hand.length === 0) {
+      return (
+        <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+          <View style={styles.loadingHand}>
+            <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+            <Text style={styles.loadingHandText}>Drawing your hand...</Text>
+          </View>
+        </LinearGradient>
+      );
+    }
+
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
         <View style={styles.header}>
@@ -1278,6 +1289,8 @@ const styles = StyleSheet.create({
     color: theme.colors.vibeGreen, fontSize: 12, fontWeight: 'bold',
   },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingHand: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingHandText: { color: theme.colors.textSecondary, fontSize: 14 },
   submittedCount: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
   handContainer: { paddingHorizontal: 12, paddingBottom: 40 },
   handRow: { gap: 8, marginBottom: 8 },

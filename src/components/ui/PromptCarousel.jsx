@@ -53,16 +53,19 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
     if (!selectedPrompt || prompts.length === 0) return;
     const realIdx = prompts.findIndex(p => p.id === selectedPrompt.id);
     if (realIdx >= 0 && realIdx !== currentIndex) {
-      const targetIndex = offset + realIdx;
-      isScrolling.current = true;
-      flatListRef.current?.scrollToOffset({
-        offset: targetIndex * SNAP_INTERVAL,
-        animated: false,
-      });
-      setCurrentIndex(realIdx);
-      setTimeout(() => { isScrolling.current = false; }, 50);
+      // Delay to ensure FlatList has rendered
+      setTimeout(() => {
+        const targetIndex = offset + realIdx;
+        isScrolling.current = true;
+        flatListRef.current?.scrollToOffset({
+          offset: targetIndex * SNAP_INTERVAL,
+          animated: false,
+        });
+        setCurrentIndex(realIdx);
+        setTimeout(() => { isScrolling.current = false; }, 50);
+      }, 100);
     }
-  }, [selectedPrompt?.id]);
+  }, [selectedPrompt?.id, prompts.length]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
