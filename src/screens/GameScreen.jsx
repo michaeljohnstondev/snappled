@@ -383,6 +383,16 @@ export default function GameScreen({ navigation }) {
     }
   };
 
+  const handleAddBot = async () => {
+    if (!gameId || !game) return;
+    const currentPlayers = game.players.length;
+    if (currentPlayers >= gameService.MAX_PLAYERS) return;
+    const botPool = ['SnapBot', 'VibeMaster', 'CardShark', 'PixelPro', 'ClipKing'];
+    const existingBots = game.players.filter(p => p.uid?.startsWith('bot_')).length;
+    const botName = botPool[existingBots] || `Bot${existingBots + 1}`;
+    await gameService.joinGame(gameId, `bot_${botName}`, botName);
+  };
+
   const handleStartGame = async () => {
     try {
       const prompts = await gameService.getGamePrompts(gameService.ROUNDS_PER_GAME);
@@ -390,6 +400,15 @@ export default function GameScreen({ navigation }) {
       if (result.success) {
         const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
         setHand(drawnHand);
+
+        // Bots auto-submit random cards
+        const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
+        for (const bot of botPlayers) {
+          const botSnapple = allSnapples[Math.floor(Math.random() * allSnapples.length)];
+          if (botSnapple) {
+            await gameService.submitPick(gameId, bot.uid, botSnapple);
+          }
+        }
       } else {
         showError('Error', result.error);
       }
@@ -470,14 +489,14 @@ export default function GameScreen({ navigation }) {
     if (nextIndex >= votable.length) {
       // Done voting — finish round (in practice, we're always host)
       if (game.hostId === user.uid) {
-        // In practice, bots cast random votes first
+        // In practice, bots cast random votes
         if (isPractice) {
-          const botNames = ['SnapBot', 'VibeMaster', 'CardShark'];
+          const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
           const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
-          botNames.forEach(name => {
+          botPlayers.forEach(bot => {
             if (nonBotSubmissions.length > 0) {
               const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
-              gameService.castVote(gameId, `bot_${name}`, randomSub.uid);
+              gameService.castVote(gameId, bot.uid, randomSub.uid);
             }
           });
         }
@@ -496,14 +515,12 @@ export default function GameScreen({ navigation }) {
     if (game.hostId === user.uid) {
       await gameService.nextRound(gameId);
 
-      // Bots auto-submit in practice mode
-      if (isPractice) {
-        const botNames = ['SnapBot', 'VibeMaster', 'CardShark'];
-        for (const name of botNames) {
-          const botSnapple = allSnapples[Math.floor(Math.random() * allSnapples.length)];
-          if (botSnapple) {
-            await gameService.submitPick(gameId, `bot_${name}`, botSnapple);
-          }
+      // Bots auto-submit each round
+      const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
+      for (const bot of botPlayers) {
+        const botSnapple = allSnapples[Math.floor(Math.random() * allSnapples.length)];
+        if (botSnapple) {
+          await gameService.submitPick(gameId, bot.uid, botSnapple);
         }
       }
     }
@@ -800,12 +817,17 @@ export default function GameScreen({ navigation }) {
             ))}
           </View>
 
-          {isHost && game.players.length >= 2 && (
-            <VibeButton label="Start Game" onPress={handleStartGame} variant="green" />
-          )}
-
-          {isHost && game.players.length < 2 && (
-            <Text style={styles.waitingText}>Need at least 2 players to start</Text>
+          {isHost && (
+            <View style={styles.lobbyButtons}>
+              {game.players.length < gameService.MAX_PLAYERS && (
+                <VibeButton label="+ Add Bot" onPress={handleAddBot} variant="toggle" color="cyan" />
+              )}
+              {game.players.length >= 2 ? (
+                <VibeButton label="Start Game" onPress={handleStartGame} />
+              ) : (
+                <Text style={styles.waitingText}>Need at least 2 players to start</Text>
+              )}
+            </View>
           )}
 
           <Text style={styles.gameCode}>Game ID: {gameId.slice(0, 6).toUpperCase()}</Text>
