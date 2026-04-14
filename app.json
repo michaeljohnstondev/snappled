@@ -7,6 +7,7 @@
     "scheme": "snappled",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.bigvibestudios.snappled",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to record videos for prompts.",
