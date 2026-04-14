@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import { userService } from '../services/userService';
+import { levelService } from '../services/levelService';
 import { snappleService } from '../services/snappleService';
 import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
 import VibeButton from '../components/ui/VibeButton';
@@ -86,8 +87,8 @@ export default function UserProfileScreen({ route, navigation }) {
   };
 
   const username = profileData?.username || profileData?.email?.split('@')[0] || 'Unknown';
-  const level = profileData?.profile?.level || profileData?.level || 1;
-  const xp = profileData?.profile?.experience || profileData?.experience || 0;
+  const totalXP = profileData?.profile?.xp || profileData?.profile?.experience || 0;
+  const level = levelService.getLevelFromXP(totalXP);
   const rank = profileData?.profile?.rank || profileData?.rank || 'Rookie';
   const followers = profileData?.social?.followers?.length || 0;
   const followingCount = profileData?.social?.following?.length || 0;

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/themes';
@@ -47,6 +47,22 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
       }
     }
   }, [currentIndex, prompts]);
+
+  // Scroll to selected prompt when it changes externally
+  useEffect(() => {
+    if (!selectedPrompt || prompts.length === 0) return;
+    const realIdx = prompts.findIndex(p => p.id === selectedPrompt.id);
+    if (realIdx >= 0 && realIdx !== currentIndex) {
+      const targetIndex = offset + realIdx;
+      isScrolling.current = true;
+      flatListRef.current?.scrollToOffset({
+        offset: targetIndex * SNAP_INTERVAL,
+        animated: false,
+      });
+      setCurrentIndex(realIdx);
+      setTimeout(() => { isScrolling.current = false; }, 50);
+    }
+  }, [selectedPrompt?.id]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 

@@ -322,10 +322,10 @@ export default function StoreScreen({ navigation }) {
 
       <ButtonContainer>
         <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Store" onPress={() => navigation.navigate('Store')} active />
-        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
         <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
+        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
         <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
+        <NavButton title="Store" onPress={() => navigation.navigate('Store')} active />
       </ButtonContainer>
     </LinearGradient>
   );

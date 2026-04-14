@@ -383,7 +383,7 @@ export default function AdminScreen({ navigation }) {
       case 'users':
         const isGranting = grantUserId === item.id;
         return (
-          <View style={styles.card}>
+          <Pressable style={styles.card} onPress={() => navigation.navigate('UserProfile', { userId: item.id })}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>@{item.username || item.email}</Text>
               {item.isBanned && <Text style={styles.badgeRed}>BANNED</Text>}
@@ -429,7 +429,7 @@ export default function AdminScreen({ navigation }) {
                 )}
               </View>
             )}
-          </View>
+          </Pressable>
         );
 
       case 'games':

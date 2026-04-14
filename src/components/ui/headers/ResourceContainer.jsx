@@ -11,7 +11,7 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
   return (
     <View style={styles.statsRow}>
       <Pressable
-        style={[styles.statItem, styles.tokenButton]}
+        style={styles.statItem}
         onPress={onTokenPress}
         disabled={!userStats.tokens || userStats.tokens <= 0}
       >
@@ -51,10 +51,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   statText: {
     color: theme.colors.textPrimary,
@@ -65,12 +67,7 @@ const styles = StyleSheet.create({
   iconText: {
     fontSize: 14,
   },
-  tokenButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    transform: [{ scale: 1.05 }],
-  },
+  tokenButton: {},
   levelItem: {
     position: 'relative',
     paddingHorizontal: 10,
@@ -79,6 +76,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     minWidth: 55,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   levelBg: {
     position: 'absolute',
@@ -86,7 +85,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
   },
   levelFill: {
