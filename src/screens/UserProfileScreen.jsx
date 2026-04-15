@@ -9,6 +9,7 @@ import { snappleService } from '../services/snappleService';
 import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
 import VibeButton from '../components/ui/VibeButton';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
+import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -80,10 +81,10 @@ export default function UserProfileScreen({ route, navigation }) {
     }
   };
 
+  const [selectedSnapple, setSelectedSnapple] = useState(null);
+
   const handleSnapplePress = (snapple) => {
-    // Navigate back and open the snapple overlay
-    // For now just log it
-    console.log('[UserProfileScreen] Snapple pressed:', snapple.id);
+    setSelectedSnapple(snapple);
   };
 
   const username = profileData?.username || profileData?.email?.split('@')[0] || 'Unknown';
@@ -242,6 +243,15 @@ export default function UserProfileScreen({ route, navigation }) {
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         />
       )}
+
+      <SnappleOverlay
+        visible={!!selectedSnapple}
+        snapple={selectedSnapple}
+        onClose={() => setSelectedSnapple(null)}
+        onLike={(id) => snappleService.likeSnapple(id, user?.uid)}
+        onDislike={(id) => snappleService.dislikeSnapple(id, user?.uid)}
+        navigation={navigation}
+      />
     </LinearGradient>
   );
 }
