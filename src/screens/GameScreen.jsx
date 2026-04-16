@@ -273,13 +273,35 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.VOTING) {
-      setTimer(15); // 15 seconds per card
+      setTimer(30); // 30 seconds to pick a favorite
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
-            // Auto-skip when time runs out on this card
-            advanceVote();
-            return 15; // Reset for next card
+            // Auto-pick random if they haven't voted
+            if (!hasVoted) {
+              const votable = game.submissions.filter(s => s.uid !== user.uid);
+              if (votable.length > 0) {
+                const random = votable[Math.floor(Math.random() * votable.length)];
+                setFavoriteCard(random);
+                gameService.castVote(gameId, user.uid, random.uid);
+                setHasVoted(true);
+                if (game.hostId === user.uid) {
+                  if (isPractice) {
+                    const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
+                    const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
+                    botPlayers.forEach(bot => {
+                      if (nonBotSubmissions.length > 0) {
+                        const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
+                        gameService.castVote(gameId, bot.uid, randomSub.uid);
+                      }
+                    });
+                  }
+                  setTimeout(() => gameService.finishRound(gameId), 500);
+                }
+              }
+            }
+            clearInterval(timerRef.current);
+            return 0;
           }
           return prev - 1;
         });
@@ -468,48 +490,37 @@ export default function GameScreen({ navigation }) {
     }
   };
 
-  const handleSwipeRight = async () => {
-    if (!game) return;
-    const submission = game.submissions[currentVoteIndex];
-    if (submission && submission.uid !== user.uid) {
-      await gameService.castVote(gameId, user.uid, submission.uid);
-    }
-    advanceVote();
-  };
+  const [favoriteCard, setFavoriteCard] = useState(null);
+  const [hasVoted, setHasVoted] = useState(false);
 
-  const handleSwipeLeft = () => {
-    advanceVote();
-  };
+  const handleSubmitVote = async () => {
+    if (!game || !favoriteCard || hasVoted) return;
+    setHasVoted(true);
 
-  const advanceVote = () => {
-    if (!game) return;
-    setTimer(15); // Reset per-card timer
-    const votable = game.submissions.filter(s => s.uid !== user.uid);
-    const nextIndex = currentVoteIndex + 1;
-    if (nextIndex >= votable.length) {
-      // Done voting — finish round (in practice, we're always host)
-      if (game.hostId === user.uid) {
-        // In practice, bots cast random votes
-        if (isPractice) {
-          const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-          const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
-          botPlayers.forEach(bot => {
-            if (nonBotSubmissions.length > 0) {
-              const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
-              gameService.castVote(gameId, bot.uid, randomSub.uid);
-            }
-          });
-        }
-        setTimeout(() => gameService.finishRound(gameId), isPractice ? 500 : 0);
+    // Cast vote for the selected card's owner
+    await gameService.castVote(gameId, user.uid, favoriteCard.uid);
+
+    // If host, handle bot votes and finish round
+    if (game.hostId === user.uid) {
+      if (isPractice) {
+        const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
+        const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
+        botPlayers.forEach(bot => {
+          if (nonBotSubmissions.length > 0) {
+            const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
+            gameService.castVote(gameId, bot.uid, randomSub.uid);
+          }
+        });
       }
-    } else {
-      setCurrentVoteIndex(nextIndex);
+      setTimeout(() => gameService.finishRound(gameId), isPractice ? 500 : 0);
     }
   };
 
   const handleNextRound = async () => {
     setSelectedCard(null);
     setCurrentVoteIndex(0);
+    setFavoriteCard(null);
+    setHasVoted(false);
     const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
     setHand(drawnHand);
     if (game.hostId === user.uid) {
@@ -964,13 +975,11 @@ export default function GameScreen({ navigation }) {
     );
   }
 
-  // Voting phase — swipe through submissions (skip own unless spectating)
+  // Voting phase — pick your favorite from all submissions
   if (game.phase === GAME_PHASES.VOTING) {
     const votableSubmissions = isSpectating
       ? game.submissions
       : game.submissions.filter(s => s.uid !== user.uid);
-    const currentSubmission = votableSubmissions[currentVoteIndex];
-    const doneVoting = currentVoteIndex >= votableSubmissions.length;
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
@@ -982,13 +991,6 @@ export default function GameScreen({ navigation }) {
           </Pressable>
           <Text style={styles.headerTitle}>{isSpectating ? 'Watching' : 'Vote'} — Round {game.currentRound}</Text>
           {!isSpectating && <Text style={styles.timerText}>{timer}s</Text>}
-          {isSpectating && (
-            <Pressable onPress={handleLeaveGame}>
-              <View style={styles.backBg}>
-                <Ionicons name="close" size={18} color="white" />
-              </View>
-            </Pressable>
-          )}
         </View>
 
         {isSpectating && (
@@ -1002,51 +1004,65 @@ export default function GameScreen({ navigation }) {
           <Text style={styles.promptText}>{game.prompts[game.currentRound - 1]}</Text>
         </View>
 
-        {doneVoting ? (
+        {hasVoted ? (
           <View style={styles.centerContent}>
-            <Text style={styles.waitingText}>Votes are in! Tallying results...</Text>
-            <ActivityIndicator color={theme.colors.vibeBlue} style={{ marginTop: 16 }} />
+            <Ionicons name="checkmark-circle" size={48} color={theme.colors.vibeGreen} />
+            <Text style={styles.waitingText}>Vote submitted! Waiting for others...</Text>
           </View>
         ) : (
-          <View style={styles.swipeContainer}>
-            <SwipeCard
-              key={currentVoteIndex}
-              submission={currentSubmission}
-              onSwipeRight={handleSwipeRight}
-              onSwipeLeft={handleSwipeLeft}
-              onBuy={(sub) => {
-                showConfirm(
-                  'Buy Snapple',
-                  `Add this snapple to your collection?`,
-                  async () => {
-                    try {
-                      await snappleService.purchaseSnapple(sub.snappleId, user.uid);
-                    } catch (e) {}
-                  }
-                );
-              }}
-              onReport={(sub) => {
-                showConfirm(
-                  'Report Snapple',
-                  'Report this content as inappropriate?',
-                  async () => {
-                    try {
-                      await snappleService.reportSnapple(sub.snappleId, user.uid, 'inappropriate');
-                    } catch (e) {}
-                  }
-                );
-              }}
-              onProfilePress={(uid) => {
-                navigation.navigate('UserProfile', { userId: uid });
-              }}
+          <>
+            <Text style={styles.pickInstruction}>Tap to preview, pick your favorite</Text>
+            <FlatList
+              data={votableSubmissions}
+              keyExtractor={(item, i) => item?.snappleId || `vote-${i}`}
+              numColumns={3}
+              columnWrapperStyle={styles.handRow}
+              contentContainerStyle={styles.handContainer}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.handCard, favoriteCard?.uid === item.uid && styles.handCardSelected]}
+                  onPress={() => setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true })}
+                >
+                  <View style={styles.handCardVideo}>
+                    {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
+                  </View>
+                  {favoriteCard?.uid === item.uid && (
+                    <View style={styles.favoriteTag}>
+                      <Ionicons name="heart" size={14} color={theme.colors.vibeRed} />
+                    </View>
+                  )}
+                </Pressable>
+              )}
             />
+            {favoriteCard && (
+              <Pressable style={styles.submitVoteBtn} onPress={handleSubmitVote}>
+                <Text style={styles.submitVoteText}>Submit Vote</Text>
+              </Pressable>
+            )}
+          </>
+        )}
 
-            <View style={styles.swipeHints}>
-              <Text style={styles.swipeHintLeft}>← SKIP</Text>
-              <Text style={styles.voteCounter}>{currentVoteIndex + 1}/{votableSubmissions.length}</Text>
-              <Text style={styles.swipeHintRight}>VOTE →</Text>
+        {/* Card Preview Modal — reused for voting */}
+        {previewCard && previewCard._isVoting && (
+          <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewCard(null)}>
+            <View style={styles.previewOverlay}>
+              <View style={styles.previewCard}>
+                <PreviewPlayer videoUrl={previewCard.videoUrl} />
+
+                <View style={styles.previewButtons}>
+                  <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
+                    <Text style={styles.previewCancelText}>Back</Text>
+                  </Pressable>
+                  <Pressable style={styles.previewPlay} onPress={() => {
+                    setFavoriteCard(previewCard);
+                    setPreviewCard(null);
+                  }}>
+                    <Text style={styles.previewPlayText}>Pick as Favorite</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
-          </View>
+          </Modal>
         )}
       </LinearGradient>
     );
@@ -1300,6 +1316,17 @@ const styles = StyleSheet.create({
   },
   handCardSelected: { borderColor: theme.colors.vibeGreen, borderWidth: 3 },
   handCardVideo: { flex: 1 },
+  favoriteTag: {
+    position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10, padding: 3,
+  },
+  submitVoteBtn: {
+    backgroundColor: theme.colors.vibeGreen, paddingVertical: 14, paddingHorizontal: 32,
+    borderRadius: 12, alignSelf: 'center', marginBottom: 16,
+  },
+  submitVoteText: {
+    color: '#000', fontSize: 16, fontWeight: theme.fontWeights.bold, textAlign: 'center',
+  },
   // Voting
   swipeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   swipeCard: {
