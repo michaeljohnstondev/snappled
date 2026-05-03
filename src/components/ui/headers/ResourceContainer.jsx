@@ -34,7 +34,7 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
         <View style={styles.levelBg}>
           <View style={[styles.levelFill, { width: `${Math.min(levelInfo.progress * 100, 100)}%`, backgroundColor: levelColor }]} />
         </View>
-        <Text style={[styles.levelText, { color: levelColor }]}>Lvl {levelInfo.level}</Text>
+        <Text style={styles.levelText}>Lvl {levelInfo.level}</Text>
       </View>
     </View>
   );
@@ -94,11 +94,12 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     borderRadius: 12,
-    opacity: 0.3,
+    opacity: 0.65,
   },
   levelText: {
     fontSize: 12,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
+    color: theme.colors.textPrimary,
   },
 });

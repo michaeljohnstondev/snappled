@@ -58,13 +58,9 @@ export const levelService = {
     };
   },
 
-  // Visual level color progression
+  // XP bar color (consistent across all levels)
   getLevelColor(level) {
-    if (level >= 76) return '#FFD700'; // Gold glow
-    if (level >= 51) return '#8B00FF'; // Purple
-    if (level >= 26) return '#00C6FF'; // Cyan
-    if (level >= 11) return '#00FF41'; // Green
-    return '#778DA9'; // Gray (starter)
+    return '#00C6FF'; // vibeBlue
   },
 
   // Calculate XP earned from a game
