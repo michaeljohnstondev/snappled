@@ -63,7 +63,8 @@ export default function VideoPreviewScreen({ route, navigation }) {
     navigation.goBack();
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (overridePrompt) => {
+    const activePrompt = overridePrompt || prompt;
     if (!recordedVideo?.uri) {
       showError('Error', 'No video to submit');
       return;
@@ -75,24 +76,24 @@ export default function VideoPreviewScreen({ route, navigation }) {
     }
 
     // Check prompt lockout (last 10 min)
-    if (prompt?.lockoutAt && new Date().toISOString() >= prompt.lockoutAt) {
+    if (activePrompt?.lockoutAt && new Date().toISOString() >= activePrompt.lockoutAt) {
       showError('Prompt Closing', 'This prompt is closing soon — no new snapples allowed');
       return;
     }
 
     // Check if user already made a snapple for this prompt this cycle
-    if (prompt?.id) {
+    if (activePrompt?.id) {
       try {
         const { collection: col, query: q, where, getDocs } = await import('firebase/firestore');
         const { db } = await import('../services/firebase');
         const existingQuery = q(
           col(db, 'snapples'),
-          where('promptId', '==', prompt.id),
+          where('promptId', '==', activePrompt.id),
           where('creatorId', '==', user.uid)
         );
         const existing = await getDocs(existingQuery);
         if (!existing.empty) {
-          const count = existing.size; // how many they already have
+          const count = existing.size;
           const price = count === 1 ? 1000 : 5000;
           showConfirm(
             'Extra Snapple',
@@ -103,7 +104,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                 return;
               }
               await updateUserCurrency({ coins: (userCurrency.coins || 0) - price });
-              doSubmit();
+              doSubmit(activePrompt);
             }
           );
           return;
@@ -111,10 +112,11 @@ export default function VideoPreviewScreen({ route, navigation }) {
       } catch (e) {}
     }
 
-    doSubmit();
+    doSubmit(activePrompt);
   };
 
-  const doSubmit = async () => {
+  const doSubmit = async (activePrompt) => {
+    const submitPrompt = activePrompt || prompt;
     setIsSubmitting(true);
     setUploadProgress(0);
     player.pause();
@@ -124,20 +126,20 @@ export default function VideoPreviewScreen({ route, navigation }) {
       // Upload video to Firebase Storage
       const uploadResult = await uploadVideo(
         recordedVideo.uri,
-        prompt?.text || 'Snapple video',
+        submitPrompt?.text || 'Snapple video',
         user.uid,
         (progress) => setUploadProgress(progress)
       );
 
       // Create the snapple record
       const snappleResult = await snappleService.createSnapple({
-        promptId: prompt?.id || 'unknown',
+        promptId: submitPrompt?.id || 'unknown',
         videoUrl: uploadResult.downloadURL,
         videoId: uploadResult.id,
         creatorId: user.uid,
         creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
-        prompt: prompt?.text || 'Snapple video',
-        category: prompt?.category || 'general',
+        prompt: submitPrompt?.text || 'Snapple video',
+        category: submitPrompt?.category || 'general',
       });
 
       if (snappleResult.success) {
@@ -184,15 +186,14 @@ export default function VideoPreviewScreen({ route, navigation }) {
         } catch (e) {}
 
         // Increment participant count on the prompt
-        if (prompt?.id) {
+        if (submitPrompt?.id) {
           try {
             const { doc: docRef, updateDoc: update, increment: inc } = await import('firebase/firestore');
             const { db: database } = await import('../services/firebase');
-            // Try both collections since prompt could be from either
-            await update(docRef(database, 'activePrompts', prompt.id), {
+            await update(docRef(database, 'activePrompts', submitPrompt.id), {
               participantCount: inc(1),
             }).catch(() =>
-              update(docRef(database, 'snapplePrompts', prompt.id), {
+              update(docRef(database, 'snapplePrompts', submitPrompt.id), {
                 participantCount: inc(1),
               }).catch(() => {})
             );
@@ -254,6 +255,8 @@ export default function VideoPreviewScreen({ route, navigation }) {
     setShowPromptPicker(false);
     setCreatingPrompt(false);
     setNewPromptText('');
+    // Auto-submit with the picked prompt
+    handleSubmit(p);
   };
 
   const handleCreatePrompt = async () => {
@@ -414,7 +417,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
               {/* Create your own */}
               {!creatingPrompt ? (
                 <Pressable style={styles.createPromptCard} onPress={() => setCreatingPrompt(true)}>
-                  <Ionicons name="add-circle" size={28} color={theme.colors.vibeGreen} />
+                  <Ionicons name="add-circle" size={28} color={theme.colors.vibeBlue} />
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.createPromptTitle}>Create Your Own</Text>
                     <Text style={styles.createPromptDesc}>Use 1 ticket to make a custom prompt</Text>
@@ -422,7 +425,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                   <Text style={styles.ticketPrice}>1 ticket</Text>
                 </Pressable>
               ) : (
-                <View style={styles.createPromptEditCard}>
+                <View style={styles.createPromptEditWrap}>
                   <TextInput
                     style={styles.promptInput}
                     placeholder="Enter your prompt..."
@@ -433,6 +436,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                     multiline
                     maxLength={PROMPT_MAX_LENGTH}
                   />
+                  <Text style={styles.charCounter}>{newPromptText.length}/{PROMPT_MAX_LENGTH}</Text>
                   <View style={styles.promptInputButtons}>
                     <Pressable style={styles.cancelBtn} onPress={() => { setCreatingPrompt(false); setNewPromptText(''); }}>
                       <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -532,24 +536,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 2,
-    borderColor: theme.colors.vibeGreen,
+    borderColor: theme.colors.vibeBlue,
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
   },
-  createPromptEditCard: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 2,
-    borderColor: theme.colors.vibeGreen,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+  createPromptEditWrap: {
     width: '100%',
-    alignSelf: 'stretch',
+    marginBottom: 16,
+  },
+  charCounter: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 4,
   },
   promptInputButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     marginTop: 12,
     width: '100%',
   },
@@ -572,32 +576,41 @@ const styles = StyleSheet.create({
     width: '100%',
     color: '#fff',
     fontSize: 15,
-    minHeight: 60,
-    borderRadius: 8,
-    padding: 10,
+    minHeight: 80,
+    borderRadius: 12,
+    padding: 14,
     textAlignVertical: 'top',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
   },
   cancelBtnText: {
     color: '#fff',
     fontWeight: 'bold',
+    fontSize: 15,
   },
   confirmBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: theme.colors.vibeGreen,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
     alignItems: 'center',
   },
   confirmBtnText: {
-    color: '#000',
+    color: theme.colors.vibeBlue,
     fontWeight: 'bold',
+    fontSize: 15,
   },
   sectionLabel: {
     color: theme.colors.vibeBlue,

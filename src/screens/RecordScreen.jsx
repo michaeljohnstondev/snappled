@@ -274,6 +274,7 @@ export default function RecordScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
   cameraContainer: {
     flex: 1,

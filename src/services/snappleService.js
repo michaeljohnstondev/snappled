@@ -63,8 +63,8 @@ export const snappleService = {
         moderationStatus: 'approved', // approved, pending, rejected
         
         // Timestamps
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         expiresAt: null // Will be set based on prompt expiration
       };
 
