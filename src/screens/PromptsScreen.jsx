@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
+import RecordNavButton from '../components/ui/navigation/RecordNavButton';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import { useAuth } from '../store/AuthContext';
@@ -428,8 +429,8 @@ export default function PromptsScreen({ navigation }) {
       
       <ButtonContainer>
         <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} active />
-        <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
+        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
         <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
         <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
       </ButtonContainer>

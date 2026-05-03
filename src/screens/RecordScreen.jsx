@@ -23,7 +23,7 @@ export default function RecordScreen({ route }) {
   
   const maxDuration = 10; // 10 second max for Snapples
   const { prompt } = route.params || {};
-  const promptText = prompt?.text || "Record your response to today's Snapple prompt!";
+  const promptText = prompt?.text || "Free record — pick a prompt for your snapple after recording";
 
   // Auto-hide prompt after 5 seconds
   useEffect(() => {

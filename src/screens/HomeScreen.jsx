@@ -12,6 +12,7 @@ import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
+import RecordNavButton from '../components/ui/navigation/RecordNavButton';
 import HomeHeader from '../components/ui/headers/HomeHeader';
 import { useAuth } from '../store/AuthContext';
 import { promptService } from '../services/promptService';
@@ -398,8 +399,8 @@ export default function HomeScreen({ navigation, route }) {
       
       <ButtonContainer>
         <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
+        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
         <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
         <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
       </ButtonContainer>

@@ -11,6 +11,7 @@ import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import SortModal from '../components/ui/modals/SortModal';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
+import RecordNavButton from '../components/ui/navigation/RecordNavButton';
 import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -276,8 +277,8 @@ export default function DeckBuilderScreen({ navigation }) {
 
       <ButtonContainer>
         <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} active />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
+        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
         <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
         <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
       </ButtonContainer>

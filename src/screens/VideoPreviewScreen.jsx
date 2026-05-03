@@ -1,6 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { promptRotationService } from '../services/promptRotationService';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import VibeButton from '../components/ui/VibeButton';
@@ -14,12 +17,19 @@ import theme from '../theme/themes';
 
 export default function VideoPreviewScreen({ route, navigation }) {
   const { recordedVideo, cameraFacing } = route.params || {};
-  const prompt = route.params?.prompt || {};
+  const initialPrompt = route.params?.prompt;
   const { user, userCurrency, updateUserCurrency } = useAuth();
   const { showSuccess, showError, showConfirm, showToast } = useModal();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Prompt selection (for free-record mode)
+  const [prompt, setPrompt] = useState(initialPrompt || null);
+  const [showPromptPicker, setShowPromptPicker] = useState(!initialPrompt);
+  const [activePrompts, setActivePrompts] = useState([]);
+  const [creatingPrompt, setCreatingPrompt] = useState(false);
+  const [newPromptText, setNewPromptText] = useState('');
   
   console.log('[VideoPreview] Camera facing:', cameraFacing);
   
@@ -229,6 +239,70 @@ export default function VideoPreviewScreen({ route, navigation }) {
     navigation.goBack();
   };
 
+  // Load active prompts when picker opens
+  useEffect(() => {
+    if (showPromptPicker && activePrompts.length === 0) {
+      promptRotationService.getActivePrompts().then(({ prompts }) => {
+        setActivePrompts(prompts || []);
+      }).catch(() => {});
+    }
+  }, [showPromptPicker]);
+
+  const handlePickPrompt = (p) => {
+    setPrompt(p);
+    setShowPromptPicker(false);
+    setCreatingPrompt(false);
+    setNewPromptText('');
+  };
+
+  const handleCreatePrompt = async () => {
+    const text = newPromptText.trim();
+    if (!text) {
+      showError('Empty', 'Enter a prompt first');
+      return;
+    }
+    if ((userCurrency.tokens || 0) < 1) {
+      showConfirm(
+        'Not Enough Tickets',
+        'You need 1 ticket to create a prompt. Go to the Store to buy more?',
+        () => {
+          setShowPromptPicker(false);
+          navigation.navigate('Store');
+        }
+      );
+      return;
+    }
+    showConfirm('Use 1 Ticket?', `Create prompt: "${text}"`, async () => {
+      try {
+        // Deduct ticket
+        await updateDoc(doc(db, 'users', user.uid), {
+          'resources.tokens': increment(-1),
+        });
+        // Create prompt in activePrompts
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        const lockoutAt = new Date(Date.now() + (24 * 60 - 10) * 60 * 1000).toISOString();
+        const newDoc = await addDoc(collection(db, 'activePrompts'), {
+          text,
+          category: 'user',
+          expiresAt,
+          lockoutAt,
+          createdAt: new Date().toISOString(),
+          createdBy: user.uid,
+          creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
+          isSystem: false,
+          likeCount: 0, dislikeCount: 0,
+          likes: [], dislikes: [],
+          participantCount: 0, totalViews: 0,
+        });
+        const newPrompt = { id: newDoc.id, text, category: 'user', expiresAt, lockoutAt };
+        showToast('reward', 'Prompt Created!', '-1 ticket');
+        handlePickPrompt(newPrompt);
+      } catch (e) {
+        showError('Error', 'Failed to create prompt');
+      }
+    });
+  };
+
   return (
     <View style={styles.container}>
       {/* Full Screen Video Player */}
@@ -292,17 +366,98 @@ export default function VideoPreviewScreen({ route, navigation }) {
                 color="blue"
                 style={{ flex: 1, backgroundColor: '#000000' }}
               />
-              <VibeButton
-                label="Submit"
-                onPress={handleSubmit}
-                variant="toggle"
-                color="blue"
-                style={{ flex: 1, backgroundColor: '#000000' }}
-              />
+              {prompt ? (
+                <VibeButton
+                  label="Submit"
+                  onPress={handleSubmit}
+                  variant="toggle"
+                  color="blue"
+                  style={{ flex: 1, backgroundColor: '#000000' }}
+                />
+              ) : (
+                <VibeButton
+                  label="Pick Prompt"
+                  onPress={() => setShowPromptPicker(true)}
+                  variant="toggle"
+                  color="green"
+                  style={{ flex: 1, backgroundColor: '#000000' }}
+                />
+              )}
             </>
           )}
         </View>
+
+        {/* Selected prompt indicator */}
+        {prompt && !isSubmitting && (
+          <Pressable style={styles.promptIndicator} onPress={() => setShowPromptPicker(true)}>
+            <Text style={styles.promptIndicatorLabel}>Prompt:</Text>
+            <Text style={styles.promptIndicatorText} numberOfLines={2}>{prompt.text}</Text>
+            <Ionicons name="swap-horizontal" size={16} color={theme.colors.vibeBlue} />
+          </Pressable>
+        )}
       </Pressable>
+
+      {/* Prompt Picker Modal */}
+      <Modal visible={showPromptPicker} transparent animationType="slide" onRequestClose={() => setShowPromptPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerCard}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Pick a Prompt</Text>
+              <Pressable onPress={() => setShowPromptPicker(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.pickerScroll}>
+              {/* Create your own */}
+              {!creatingPrompt ? (
+                <Pressable style={styles.createPromptCard} onPress={() => setCreatingPrompt(true)}>
+                  <Ionicons name="add-circle" size={28} color={theme.colors.vibeGreen} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.createPromptTitle}>Create Your Own</Text>
+                    <Text style={styles.createPromptDesc}>Use 1 ticket to make a custom prompt</Text>
+                  </View>
+                  <Text style={styles.ticketPrice}>1 ticket</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.createPromptCard}>
+                  <TextInput
+                    style={styles.promptInput}
+                    placeholder="Enter your prompt..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={newPromptText}
+                    onChangeText={setNewPromptText}
+                    autoFocus
+                    multiline
+                    maxLength={120}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <Pressable style={styles.cancelBtn} onPress={() => { setCreatingPrompt(false); setNewPromptText(''); }}>
+                      <Text style={styles.cancelBtnText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable style={styles.confirmBtn} onPress={handleCreatePrompt}>
+                      <Text style={styles.confirmBtnText}>Use Ticket</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* Active prompts */}
+              <Text style={styles.sectionLabel}>Active Prompts</Text>
+              {activePrompts.length === 0 ? (
+                <ActivityIndicator color={theme.colors.vibeBlue} style={{ marginVertical: 20 }} />
+              ) : (
+                activePrompts.map(p => (
+                  <Pressable key={p.id} style={styles.promptOption} onPress={() => handlePickPrompt(p)}>
+                    <Text style={styles.promptOptionText} numberOfLines={2}>{p.text}</Text>
+                    <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -311,6 +466,140 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  promptIndicator: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  promptIndicatorLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  promptIndicatorText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  pickerCard: {
+    backgroundColor: '#0a0f1e',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    paddingBottom: 30,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  pickerTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  pickerScroll: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  createPromptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeGreen,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  createPromptTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  createPromptDesc: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  ticketPrice: {
+    color: theme.colors.vibeYellow,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  promptInput: {
+    width: '100%',
+    color: '#fff',
+    fontSize: 15,
+    minHeight: 60,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: 10,
+    textAlignVertical: 'top',
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: theme.colors.vibeGreen,
+    alignItems: 'center',
+  },
+  confirmBtnText: {
+    color: '#000',
+    fontWeight: 'bold',
+  },
+  sectionLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  promptOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  promptOptionText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
   },
   video: {
     position: 'absolute',

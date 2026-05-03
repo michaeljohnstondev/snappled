@@ -14,6 +14,7 @@ import { snappleService } from '../services/snappleService';
 import VibeButton from '../components/ui/VibeButton';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
+import RecordNavButton from '../components/ui/navigation/RecordNavButton';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -788,8 +789,8 @@ export default function GameScreen({ navigation }) {
 
         <ButtonContainer>
           <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-          <NavButton title="Deck" onPress={() => navigation.navigate('DeckBuilder')} />
           <NavButton title="Play" onPress={() => navigation.navigate('Game')} active />
+          <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
           <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
           <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
         </ButtonContainer>
