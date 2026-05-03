@@ -1,7 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/themes';
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth - 40;
@@ -23,6 +25,28 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const isScrolling = useRef(false);
+  const gradientAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(gradientAnim, { toValue: 1, duration: 3000, useNativeDriver: false }),
+        Animated.delay(5000),
+        Animated.timing(gradientAnim, { toValue: 0, duration: 0, useNativeDriver: false }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const animatedStart = {
+    x: gradientAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 0] }),
+    y: gradientAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0] }),
+  };
+  const animatedEnd = {
+    x: gradientAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0, 1] }),
+    y: gradientAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.5, 1] }),
+  };
 
   // Triple the data for infinite scroll
   const tripled = prompts.length > 1
@@ -104,16 +128,18 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
           }
         }}
       >
-        <LinearGradient
+        <AnimatedLinearGradient
           colors={getPromptGradient(realIdx)}
           style={styles.cardGradient}
+          start={animatedStart}
+          end={animatedEnd}
         >
           <View style={styles.cardContent}>
             <Text style={styles.promptText} numberOfLines={3}>
               {item.text || item.prompt || 'Create something amazing!'}
             </Text>
           </View>
-        </LinearGradient>
+        </AnimatedLinearGradient>
       </Pressable>
     );
   };

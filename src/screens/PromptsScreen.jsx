@@ -39,11 +39,23 @@ export default function PromptsScreen({ navigation }) {
   const gradientAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(gradientAnim, {
-      toValue: 1,
-      duration: 3000,
-      useNativeDriver: false,
-    }).start();
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(gradientAnim, {
+          toValue: 1,
+          duration: 3000,
+          useNativeDriver: false,
+        }),
+        Animated.delay(5000),
+        Animated.timing(gradientAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   const animatedStart = {

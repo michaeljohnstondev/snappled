@@ -13,12 +13,12 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 export default function RecordScreen({ route }) {
   const navigation = useNavigation();
   const [cameraRef, setCameraRef] = useState(null);
-  const [facing, setFacing] = useState('front');
+  const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [showPrompt, setShowPrompt] = useState(true);
+  const [showPrompt, setShowPrompt] = useState(!!route.params?.prompt);
   const [cameraKey, setCameraKey] = useState(0); // Force camera remount
   
   const maxDuration = 10; // 10 second max for Snapples
@@ -230,17 +230,12 @@ export default function RecordScreen({ route }) {
             {/* Spacer */}
           </View>
 
-          <Pressable 
-            onPress={toggleCamera} 
-            style={styles.flipButton}
+          <Pressable
+            onPress={toggleCamera}
+            style={[styles.controlButton, isRecording && styles.disabledButton]}
             disabled={isRecording}
           >
-            <LinearGradient
-              colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
-              style={[styles.controlButton, isRecording && styles.disabledButton]}
-            >
-              <Text style={[styles.flipText, isRecording && styles.disabledText]}>⟲</Text>
-            </LinearGradient>
+            <Ionicons name="camera-reverse" size={24} color={isRecording ? '#666' : 'white'} />
           </Pressable>
         </View>
 
@@ -305,16 +300,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
-  flipButton: {
-    width: 44,
-    height: 44,
-  },
   controlButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
   },
   disabledButton: {
     opacity: 0.5,

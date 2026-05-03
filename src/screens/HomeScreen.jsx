@@ -398,7 +398,7 @@ export default function HomeScreen({ navigation, route }) {
       </SafeAreaView>
       
       <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
+        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} active />
         <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
         <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
         <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
