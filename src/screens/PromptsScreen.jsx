@@ -313,16 +313,7 @@ export default function PromptsScreen({ navigation }) {
     username: user?.username || user?.email?.split('@')[0] || 'Player'
   };
 
-  if (isLoading && prompts.length === 0) {
-    return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
-          <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
-          <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
+  const showLoadingState = isLoading && prompts.length === 0;
 
   return (
     <LinearGradient
@@ -341,7 +332,12 @@ export default function PromptsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Prompt Cards List */}
+        {showLoadingState ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+            <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
+          </View>
+        ) : (
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
@@ -412,6 +408,7 @@ export default function PromptsScreen({ navigation }) {
             ))}
           </View>
         </ScrollView>
+        )}
 
         {/* Prompt Info Overlay */}
         <PromptInfoOverlay

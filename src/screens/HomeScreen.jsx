@@ -297,16 +297,7 @@ export default function HomeScreen({ navigation, route }) {
     username: user?.username || user?.email?.split('@')[0] || 'Player'
   };
 
-  if (isLoading && prompts.length === 0) {
-    return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
-          <Text style={styles.loadingText}>Loading snapples...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
+  const showLoadingState = isLoading && prompts.length === 0;
 
   return (
     <LinearGradient
@@ -316,6 +307,13 @@ export default function HomeScreen({ navigation, route }) {
       <SafeAreaView style={styles.safeArea}>
         <HomeHeader userStats={userStats} onProfilePress={handleProfilePress} onTokenPress={handleTokenPress} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
 
+        {showLoadingState ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+            <Text style={styles.loadingText}>Loading snapples...</Text>
+          </View>
+        ) : (
+        <>
         {/* Prompt Carousel */}
         <PromptCarousel
           prompts={prompts}
@@ -346,6 +344,8 @@ export default function HomeScreen({ navigation, route }) {
           />
         ) : (
           <EmptySnappleList onCreateSnapple={() => navigation.navigate('Record', { prompt: selectedPrompt })} />
+        )}
+        </>
         )}
 
         {/* Snapple Overlay */}
