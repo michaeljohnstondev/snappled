@@ -15,6 +15,7 @@ import VibeInput from '../components/ui/VibeInput';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
+import { validatePrompt, PROMPT_MAX_LENGTH } from '../utils/promptFilter';
 import theme from '../theme/themes';
 
 export default function CreatePromptScreen({ navigation }) {
@@ -31,8 +32,9 @@ export default function CreatePromptScreen({ navigation }) {
   };
 
   const handleCreatePrompt = async () => {
-    if (!promptText.trim()) {
-      showError('Error', 'Please enter a prompt');
+    const validation = validatePrompt(promptText);
+    if (!validation.valid) {
+      showError('Invalid Prompt', validation.error);
       return;
     }
 
@@ -44,7 +46,7 @@ export default function CreatePromptScreen({ navigation }) {
     setIsSubmitting(true);
     try {
       const result = await promptService.createPrompt({
-        text: promptText.trim(),
+        text: validation.cleaned,
         createdBy: user.uid,
         creatorUsername: user.username || user.email?.split('@')[0] || 'Anonymous'
       });
@@ -105,12 +107,12 @@ export default function CreatePromptScreen({ navigation }) {
                 onChangeText={setPromptText}
                 placeholder="Write an engaging prompt that inspires creativity..."
                 multiline
-                maxLength={200}
+                maxLength={PROMPT_MAX_LENGTH}
                 style={styles.textInput}
                 textAlignVertical="top"
               />
               <Text style={styles.characterCount}>
-                {promptText.length}/200 characters
+                {promptText.length}/{PROMPT_MAX_LENGTH} characters
               </Text>
             </View>
 

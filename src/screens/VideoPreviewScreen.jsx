@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { promptRotationService } from '../services/promptRotationService';
+import { validatePrompt, PROMPT_MAX_LENGTH } from '../utils/promptFilter';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import VibeButton from '../components/ui/VibeButton';
@@ -256,11 +257,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
   };
 
   const handleCreatePrompt = async () => {
-    const text = newPromptText.trim();
-    if (!text) {
-      showError('Empty', 'Enter a prompt first');
+    const validation = validatePrompt(newPromptText);
+    if (!validation.valid) {
+      showError('Invalid Prompt', validation.error);
       return;
     }
+    const text = validation.cleaned;
     if ((userCurrency.tokens || 0) < 1) {
       showConfirm(
         'Not Enough Tickets',
@@ -429,7 +431,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                     onChangeText={setNewPromptText}
                     autoFocus
                     multiline
-                    maxLength={120}
+                    maxLength={PROMPT_MAX_LENGTH}
                   />
                   <View style={styles.promptInputButtons}>
                     <Pressable style={styles.cancelBtn} onPress={() => { setCreatingPrompt(false); setNewPromptText(''); }}>
@@ -542,11 +544,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   promptInputButtons: {
     flexDirection: 'row',
     gap: 8,
     marginTop: 12,
+    width: '100%',
   },
   createPromptTitle: {
     color: '#fff',
@@ -568,7 +573,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     minHeight: 60,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 8,
     padding: 10,
     textAlignVertical: 'top',

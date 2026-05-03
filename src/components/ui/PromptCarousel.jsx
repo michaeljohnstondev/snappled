@@ -39,6 +39,22 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
     return () => loop.stop();
   }, []);
 
+  // Jiggle hint — scroll a bit forward and back to signal it's a carousel
+  const hasJiggled = useRef(false);
+  useEffect(() => {
+    if (hasJiggled.current || prompts.length <= 1) return;
+    hasJiggled.current = true;
+    const baseOffset = offset * SNAP_INTERVAL;
+    const jiggleOffset = baseOffset + 60;
+    const t1 = setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: jiggleOffset, animated: true });
+    }, 800);
+    const t2 = setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: baseOffset, animated: true });
+    }, 1300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [prompts.length]);
+
   const animatedStart = {
     x: gradientAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 0] }),
     y: gradientAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0] }),
