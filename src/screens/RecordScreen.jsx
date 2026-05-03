@@ -466,10 +466,11 @@ const styles = StyleSheet.create({
   },
   overlayControls: {
     position: 'absolute',
-    bottom: 48,
+    bottom: 80,
     left: 0,
     right: 0,
-    padding: 32,
+    paddingHorizontal: 32,
+    paddingTop: 32,
     alignItems: 'center',
   },
 });

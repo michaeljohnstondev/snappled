@@ -408,7 +408,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
               </Pressable>
             </View>
 
-            <ScrollView style={styles.pickerScroll}>
+            <ScrollView style={styles.pickerScroll} contentContainerStyle={styles.pickerScrollContent}>
               {/* Create your own */}
               {!creatingPrompt ? (
                 <Pressable style={styles.createPromptCard} onPress={() => setCreatingPrompt(true)}>
@@ -420,7 +420,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                   <Text style={styles.ticketPrice}>1 ticket</Text>
                 </Pressable>
               ) : (
-                <View style={styles.createPromptCard}>
+                <View style={styles.createPromptEditCard}>
                   <TextInput
                     style={styles.promptInput}
                     placeholder="Enter your prompt..."
@@ -431,12 +431,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
                     multiline
                     maxLength={120}
                   />
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <View style={styles.promptInputButtons}>
                     <Pressable style={styles.cancelBtn} onPress={() => { setCreatingPrompt(false); setNewPromptText(''); }}>
                       <Text style={styles.cancelBtnText}>Cancel</Text>
                     </Pressable>
                     <Pressable style={styles.confirmBtn} onPress={handleCreatePrompt}>
-                      <Text style={styles.confirmBtnText}>Use Ticket</Text>
+                      <Text style={styles.confirmBtnText}>Use 1 Ticket</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -522,6 +522,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
+  pickerScrollContent: {
+    paddingBottom: 40,
+  },
   createPromptCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -531,6 +534,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
+  },
+  createPromptEditCard: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeGreen,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  promptInputButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
   },
   createPromptTitle: {
     color: '#fff',
