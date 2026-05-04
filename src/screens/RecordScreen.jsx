@@ -254,7 +254,7 @@ export default function RecordScreen({ route }) {
         )}
 
         {/* Record Controls - Always visible */}
-        <View style={[styles.overlayControls, { bottom: Math.max(insets.bottom, 24) + 80 }]}>
+        <View style={[styles.overlayControls, { paddingBottom: Math.max(insets.bottom, 24) + 24 }]}>
           <RecordingControls
             cameraRef={cameraRef}
             isRecording={isRecording}
@@ -264,7 +264,7 @@ export default function RecordScreen({ route }) {
             onRecordingComplete={handleRecordingComplete}
             onRecordingTimeUpdate={handleRecordingTimeUpdate}
             onCameraReset={handleCameraReset}
-            maxDuration={10} // 10 second max for Snapples
+            maxDuration={10}
           />
         </View>
       </Pressable>
@@ -471,8 +471,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    bottom: 0,
     paddingHorizontal: 32,
     paddingTop: 32,
     alignItems: 'center',
+    justifyContent: 'flex-end',
   },
 });
