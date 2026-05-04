@@ -254,7 +254,7 @@ export default function RecordScreen({ route }) {
         )}
 
         {/* Record Controls - Always visible */}
-        <View style={[styles.overlayControls, { bottom: 40 + insets.bottom }]}>
+        <View style={[styles.overlayControls, { bottom: Math.max(insets.bottom, 24) + 80 }]}>
           <RecordingControls
             cameraRef={cameraRef}
             isRecording={isRecording}
