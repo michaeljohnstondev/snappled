@@ -879,7 +879,7 @@ export const userService = {
         return { success: false, error: "User not found" };
       }
 
-      // Build the update object for the resources field
+      // Build the update object
       const resourceUpdates = {};
       if (updates.coins !== undefined) {
         resourceUpdates['resources.coins'] = updates.coins;
@@ -889,6 +889,19 @@ export const userService = {
       }
       if (updates.trophies !== undefined) {
         resourceUpdates['resources.trophies'] = updates.trophies;
+      }
+      // Top-level fields (collections, wishlist, etc)
+      if (updates.ownedSnapples !== undefined) {
+        resourceUpdates.ownedSnapples = updates.ownedSnapples;
+      }
+      if (updates.wishlistedSnapples !== undefined) {
+        resourceUpdates.wishlistedSnapples = updates.wishlistedSnapples;
+      }
+      if (updates.ownedCards !== undefined) {
+        resourceUpdates.ownedCards = updates.ownedCards;
+      }
+      if (updates.discardedSnapples !== undefined) {
+        resourceUpdates.discardedSnapples = updates.discardedSnapples;
       }
 
       await updateDoc(userRef, resourceUpdates);
