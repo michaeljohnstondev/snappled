@@ -45,7 +45,7 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {!hideHeader && (
           <HomeHeader
             userStats={userStats}
@@ -56,17 +56,16 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
           />
         )}
         <View style={styles.content}>{children}</View>
+        {!hideNav && (
+          <ButtonContainer>
+            <NavButton title="Prompts" onPress={() => navigation?.navigate('Home')} active={active === 'prompts'} />
+            <NavButton title="Play" onPress={() => navigation?.navigate('Game')} active={active === 'play'} />
+            <RecordNavButton onPress={() => navigation?.navigate('Record', { prompt: null })} />
+            <NavButton title="Profile" onPress={() => navigation?.navigate('UserProfile', { userId: user?.uid })} active={active === 'profile'} />
+            <NavButton title="Store" onPress={() => navigation?.navigate('Store')} active={active === 'store'} />
+          </ButtonContainer>
+        )}
       </SafeAreaView>
-
-      {!hideNav && (
-        <ButtonContainer>
-          <NavButton title="Prompts" onPress={() => navigation?.navigate('Home')} active={active === 'prompts'} />
-          <NavButton title="Play" onPress={() => navigation?.navigate('Game')} active={active === 'play'} />
-          <RecordNavButton onPress={() => navigation?.navigate('Record', { prompt: null })} />
-          <NavButton title="Profile" onPress={() => navigation?.navigate('UserProfile', { userId: user?.uid })} active={active === 'profile'} />
-          <NavButton title="Store" onPress={() => navigation?.navigate('Store')} active={active === 'store'} />
-        </ButtonContainer>
-      )}
 
       <TokenPromptModal
         visible={showTokenModal}
