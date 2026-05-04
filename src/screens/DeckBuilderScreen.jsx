@@ -9,9 +9,7 @@ import VibeInput from '../components/ui/VibeInput';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import SortModal from '../components/ui/modals/SortModal';
-import ButtonContainer from '../components/ui/navigation/ButtonContainer';
-import NavButton from '../components/ui/navigation/NavButton';
-import RecordNavButton from '../components/ui/navigation/RecordNavButton';
+import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -198,7 +196,7 @@ export default function DeckBuilderScreen({ navigation }) {
   );
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <AppLayout navigation={navigation}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>
@@ -275,14 +273,7 @@ export default function DeckBuilderScreen({ navigation }) {
         navigation={navigation}
       />
 
-      <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
-        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
-        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
-        <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
-      </ButtonContainer>
-    </LinearGradient>
+    </AppLayout>
   );
 }
 

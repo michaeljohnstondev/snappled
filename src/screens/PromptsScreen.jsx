@@ -1,19 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import ButtonContainer from '../components/ui/navigation/ButtonContainer';
-import NavButton from '../components/ui/navigation/NavButton';
-import RecordNavButton from '../components/ui/navigation/RecordNavButton';
+import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
-import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
 import { promptRotationService } from '../services/promptRotationService';
 import { userService } from '../services/userService';
-import HomeHeader from '../components/ui/headers/HomeHeader';
 import theme from '../theme/themes';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -84,7 +79,6 @@ export default function PromptsScreen({ navigation }) {
   // State
   const [prompts, setPrompts] = useState([]);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
-  const [showTokenModal, setShowTokenModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [minutesLeft, setMinutesLeft] = useState(0);
@@ -284,10 +278,6 @@ export default function PromptsScreen({ navigation }) {
     navigation.navigate('CreatePrompt');
   };
 
-  const handleTokenModalClose = () => {
-    setShowTokenModal(false);
-  };
-
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadData();
@@ -317,13 +307,7 @@ export default function PromptsScreen({ navigation }) {
   const showLoadingState = isLoading && prompts.length === 0;
 
   return (
-    <LinearGradient
-      colors={theme.colors.backgroundGradient}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        {/* Resource Bar */}
-        <HomeHeader userStats={userStats} onTokenPress={() => setShowTokenModal(true)} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
+    <AppLayout navigation={navigation} active="prompts">
 
         {/* Header */}
         <View style={styles.header}>
@@ -430,24 +414,7 @@ export default function PromptsScreen({ navigation }) {
           onRefresh={loadData}
         />
 
-        {/* Token Prompt Modal */}
-        <TokenPromptModal
-          visible={showTokenModal}
-          onClose={handleTokenModalClose}
-          onCreatePrompt={handleCreatePrompt}
-          userTokens={userStats.tokens}
-          navigation={navigation}
-        />
-      </SafeAreaView>
-      
-      <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} active />
-        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
-        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
-        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
-        <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
-      </ButtonContainer>
-    </LinearGradient>
+    </AppLayout>
   );
 }
 

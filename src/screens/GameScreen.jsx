@@ -12,9 +12,7 @@ import { gameService, GAME_PHASES } from '../services/gameService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
 import VibeButton from '../components/ui/VibeButton';
-import ButtonContainer from '../components/ui/navigation/ButtonContainer';
-import NavButton from '../components/ui/navigation/NavButton';
-import RecordNavButton from '../components/ui/navigation/RecordNavButton';
+import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -712,7 +710,7 @@ export default function GameScreen({ navigation }) {
   // No game — show lobby options
   if (!gameId || !game) {
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <AppLayout navigation={navigation} active="play">
         <View style={styles.lobbyContent}>
           <Ionicons name="game-controller" size={64} color={theme.colors.vibeBlue} />
           <Text style={styles.lobbyTitle}>Snappled</Text>
@@ -787,14 +785,7 @@ export default function GameScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <ButtonContainer>
-          <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-          <NavButton title="Play" onPress={() => navigation.navigate('Game')} active />
-          <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
-          <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
-          <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
-        </ButtonContainer>
-      </LinearGradient>
+      </AppLayout>
     );
   }
 

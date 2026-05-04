@@ -10,6 +10,7 @@ import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
 import VibeButton from '../components/ui/VibeButton';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
+import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -17,7 +18,7 @@ const ITEM_SIZE = (screenWidth - 60) / 2;
 
 export default function UserProfileScreen({ route, navigation }) {
   const { userId } = route.params || {};
-  const { user } = useAuth();
+  const { user, userCurrency } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -224,18 +225,7 @@ export default function UserProfileScreen({ route, navigation }) {
   );
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <View style={styles.backBg}>
-            <Ionicons name="arrow-back" size={20} color="white" />
-          </View>
-        </Pressable>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
+    <AppLayout navigation={navigation} active="profile">
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
@@ -267,7 +257,7 @@ export default function UserProfileScreen({ route, navigation }) {
         onDislike={(id) => snappleService.dislikeSnapple(id, user?.uid)}
         navigation={navigation}
       />
-    </LinearGradient>
+    </AppLayout>
   );
 }
 

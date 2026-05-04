@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import ButtonContainer from '../components/ui/navigation/ButtonContainer';
-import NavButton from '../components/ui/navigation/NavButton';
-import RecordNavButton from '../components/ui/navigation/RecordNavButton';
+import AppLayout from '../components/ui/layout/AppLayout';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
@@ -123,24 +120,10 @@ export default function StoreScreen({ navigation }) {
   ];
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()}>
-            <View style={styles.backBg}>
-              <Ionicons name="arrow-back" size={20} color="white" />
-            </View>
-          </Pressable>
-          <Text style={styles.headerTitle}>Store</Text>
-          <View style={styles.balanceRow}>
-            <Text style={styles.balanceText}>{(userCurrency.coins || 0).toLocaleString()}</Text>
-            <Text style={styles.balanceIcon}>coins</Text>
-            <Text style={styles.balanceDivider}>|</Text>
-            <Text style={styles.balanceText}>{userCurrency.tokens || 0}</Text>
-            <Text style={styles.balanceIcon}>tickets</Text>
-          </View>
-        </View>
+    <AppLayout navigation={navigation} active="store">
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Store</Text>
+      </View>
 
         {/* Section Tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} contentContainerStyle={styles.tabRow}>
@@ -319,16 +302,7 @@ export default function StoreScreen({ navigation }) {
           })()}
 
         </ScrollView>
-      </SafeAreaView>
-
-      <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} />
-        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
-        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
-        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
-        <NavButton title="Store" onPress={() => navigation.navigate('Store')} active />
-      </ButtonContainer>
-    </LinearGradient>
+    </AppLayout>
   );
 }
 

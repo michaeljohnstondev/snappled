@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Pressable, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import PromptCarousel from '../components/ui/PromptCarousel';
 import SnappleGrid from '../components/ui/snapples/SnappleGrid';
@@ -9,11 +7,7 @@ import EmptySnappleList from '../components/ui/snapples/EmptySnappleList';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import SortModal from '../components/ui/modals/SortModal';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
-import TokenPromptModal from '../components/ui/modals/TokenPromptModal';
-import ButtonContainer from '../components/ui/navigation/ButtonContainer';
-import NavButton from '../components/ui/navigation/NavButton';
-import RecordNavButton from '../components/ui/navigation/RecordNavButton';
-import HomeHeader from '../components/ui/headers/HomeHeader';
+import AppLayout from '../components/ui/layout/AppLayout';
 import { useAuth } from '../store/AuthContext';
 import { promptService } from '../services/promptService';
 import { promptRotationService } from '../services/promptRotationService';
@@ -300,12 +294,7 @@ export default function HomeScreen({ navigation, route }) {
   const showLoadingState = isLoading && prompts.length === 0;
 
   return (
-    <LinearGradient
-      colors={theme.colors.backgroundGradient}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        <HomeHeader userStats={userStats} onProfilePress={handleProfilePress} onTokenPress={handleTokenPress} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
+    <AppLayout navigation={navigation} active="prompts">
 
         {showLoadingState ? (
           <View style={styles.loadingContainer}>
@@ -388,24 +377,7 @@ export default function HomeScreen({ navigation, route }) {
           onRefresh={loadData}
         />
 
-        {/* Token Prompt Modal */}
-        <TokenPromptModal
-          visible={showTokenModal}
-          onClose={handleTokenModalClose}
-          onCreatePrompt={handleCreatePrompt}
-          userTokens={userStats.tokens}
-          navigation={navigation}
-        />
-      </SafeAreaView>
-      
-      <ButtonContainer>
-        <NavButton title="Prompts" onPress={() => navigation.navigate('Home')} active />
-        <NavButton title="Play" onPress={() => navigation.navigate('Game')} />
-        <RecordNavButton onPress={() => navigation.navigate('Record', { prompt: null })} />
-        <NavButton title="Profile" onPress={() => navigation.navigate('UserProfile', { userId: user?.uid })} />
-        <NavButton title="Store" onPress={() => navigation.navigate('Store')} />
-      </ButtonContainer>
-    </LinearGradient>
+    </AppLayout>
   );
 }
 
