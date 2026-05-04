@@ -25,7 +25,7 @@ const Stack = createStackNavigator();
 
 const screenOptions = {
   headerShown: false,
-  cardStyle: { backgroundColor: 'transparent' },
+  cardStyle: { backgroundColor: theme.colors.background },
   animationEnabled: false,
 };
 
