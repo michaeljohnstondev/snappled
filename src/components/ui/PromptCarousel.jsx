@@ -47,8 +47,8 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
     hasJiggled.current = true;
     const t = setTimeout(() => {
       Animated.sequence([
-        Animated.timing(jiggleAnim, { toValue: -20, duration: 250, useNativeDriver: true }),
-        Animated.timing(jiggleAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(jiggleAnim, { toValue: -60, duration: 350, useNativeDriver: true }),
+        Animated.timing(jiggleAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]).start();
     }, 800);
     return () => clearTimeout(t);

@@ -231,7 +231,8 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 80, // Reduced space since nav bar is hidden
+    paddingTop: 6,
+    paddingBottom: 80,
   },
   row: {
     justifyContent: 'space-between',

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert, Pressable, Dimensions } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BasicCameraView from '../components/media/BasicCameraView';
 import RecordingControls from '../components/media/RecordingControls';
 import VibeButton from '../components/ui/VibeButton';
@@ -12,6 +13,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function RecordScreen({ route }) {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [cameraRef, setCameraRef] = useState(null);
   const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
@@ -252,7 +254,7 @@ export default function RecordScreen({ route }) {
         )}
 
         {/* Record Controls - Always visible */}
-        <View style={styles.overlayControls}>
+        <View style={[styles.overlayControls, { bottom: 40 + insets.bottom }]}>
           <RecordingControls
             cameraRef={cameraRef}
             isRecording={isRecording}
@@ -467,7 +469,6 @@ const styles = StyleSheet.create({
   },
   overlayControls: {
     position: 'absolute',
-    bottom: 80,
     left: 0,
     right: 0,
     paddingHorizontal: 32,
