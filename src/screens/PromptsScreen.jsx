@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import ButtonContainer from '../components/ui/navigation/ButtonContainer';
 import NavButton from '../components/ui/navigation/NavButton';
 import RecordNavButton from '../components/ui/navigation/RecordNavButton';
@@ -322,12 +323,14 @@ export default function PromptsScreen({ navigation }) {
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Resource Bar */}
-        <HomeHeader userStats={userStats} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
+        <HomeHeader userStats={userStats} onTokenPress={() => setShowTokenModal(true)} onAdminPress={() => navigation.navigate('Admin')} userId={user?.uid} />
 
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Prompts</Text>
           <View style={styles.timerPill}>
+            <Ionicons name="time-outline" size={14} color={theme.colors.vibeBlue} />
+            <Text style={styles.timerLabel}>Next prompt in</Text>
             <Text style={styles.timerText}>{formatTimer()}</Text>
           </View>
         </View>
@@ -433,6 +436,7 @@ export default function PromptsScreen({ navigation }) {
           onClose={handleTokenModalClose}
           onCreatePrompt={handleCreatePrompt}
           userTokens={userStats.tokens}
+          navigation={navigation}
         />
       </SafeAreaView>
       
@@ -469,12 +473,20 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   timerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: 'rgba(0, 198, 255, 0.15)',
     borderWidth: 1,
     borderColor: theme.colors.vibeBlue,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
+  },
+  timerLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: theme.fontWeights.semiBold,
   },
   timerText: {
     color: theme.colors.vibeBlue,

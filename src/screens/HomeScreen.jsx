@@ -394,6 +394,7 @@ export default function HomeScreen({ navigation, route }) {
           onClose={handleTokenModalClose}
           onCreatePrompt={handleCreatePrompt}
           userTokens={userStats.tokens}
+          navigation={navigation}
         />
       </SafeAreaView>
       

@@ -1322,11 +1322,20 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 3,
   },
   submitVoteBtn: {
-    backgroundColor: theme.colors.vibeGreen, paddingVertical: 14, paddingHorizontal: 32,
-    borderRadius: 12, alignSelf: 'center', marginBottom: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   submitVoteText: {
-    color: '#000', fontSize: 16, fontWeight: theme.fontWeights.bold, textAlign: 'center',
+    color: theme.colors.vibeBlue,
+    fontSize: 16,
+    fontWeight: theme.fontWeights.bold,
+    textAlign: 'center',
   },
   // Voting
   swipeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },

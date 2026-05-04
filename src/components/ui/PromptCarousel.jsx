@@ -39,20 +39,19 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
     return () => loop.stop();
   }, []);
 
-  // Jiggle hint — scroll a bit forward and back to signal it's a carousel
+  // Visual jiggle hint to signal carousel is scrollable
+  const jiggleAnim = useRef(new Animated.Value(0)).current;
   const hasJiggled = useRef(false);
   useEffect(() => {
     if (hasJiggled.current || prompts.length <= 1) return;
     hasJiggled.current = true;
-    const baseOffset = offset * SNAP_INTERVAL;
-    const jiggleOffset = baseOffset + 60;
-    const t1 = setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: jiggleOffset, animated: true });
+    const t = setTimeout(() => {
+      Animated.sequence([
+        Animated.timing(jiggleAnim, { toValue: -20, duration: 250, useNativeDriver: true }),
+        Animated.timing(jiggleAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
     }, 800);
-    const t2 = setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: baseOffset, animated: true });
-    }, 1300);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    return () => clearTimeout(t);
   }, [prompts.length]);
 
   const animatedStart = {
@@ -170,27 +169,29 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
 
   return (
     <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={tripled}
-        keyExtractor={(item, index) => `${item.id || 'p'}-${index}`}
-        renderItem={renderItem}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate={0.85}
-        snapToInterval={SNAP_INTERVAL}
-        snapToAlignment="start"
-        contentContainerStyle={styles.scrollContainer}
-        onMomentumScrollEnd={handleMomentumEnd}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        getItemLayout={(_, index) => ({
-          length: SNAP_INTERVAL,
-          offset: SNAP_INTERVAL * index,
-          index,
-        })}
-        initialScrollIndex={prompts.length > 1 ? offset : 0}
-      />
+      <Animated.View style={{ transform: [{ translateX: jiggleAnim }] }}>
+        <FlatList
+          ref={flatListRef}
+          data={tripled}
+          keyExtractor={(item, index) => `${item.id || 'p'}-${index}`}
+          renderItem={renderItem}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          decelerationRate={0.85}
+          snapToInterval={SNAP_INTERVAL}
+          snapToAlignment="start"
+          contentContainerStyle={styles.scrollContainer}
+          onMomentumScrollEnd={handleMomentumEnd}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          getItemLayout={(_, index) => ({
+            length: SNAP_INTERVAL,
+            offset: SNAP_INTERVAL * index,
+            index,
+          })}
+          initialScrollIndex={prompts.length > 1 ? offset : 0}
+        />
+      </Animated.View>
 
       {/* Pagination Dots + Right Accessory */}
       <View style={styles.paginationRow}>

@@ -13,7 +13,6 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
       <Pressable
         style={styles.statItem}
         onPress={onTokenPress}
-        disabled={!userStats.tokens || userStats.tokens <= 0}
       >
         <Text style={styles.iconText}>🎫</Text>
         <Text style={styles.statText}>{userStats.tokens || 0}</Text>

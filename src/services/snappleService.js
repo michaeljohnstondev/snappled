@@ -24,10 +24,29 @@ const WISHLISTS_COLLECTION = 'wishlists';
 export const snappleService = {
   async createSnapple(snappleData) {
     try {
-      const { promptId, videoUrl, videoId, creatorId, creatorUsername, prompt, category } = snappleData;
+      const { promptId, videoUrl, videoId, creatorId, creatorUsername } = snappleData;
+      let { prompt, category } = snappleData;
 
-      if (!promptId || !videoUrl || !videoId || !creatorId || !prompt) {
+      if (!promptId || !videoUrl || !videoId || !creatorId) {
         throw new Error('Missing required snapple data');
+      }
+
+      // Backfill prompt text from the prompt doc if missing or default
+      if (!prompt || prompt === 'Snapple video' || prompt === 'Snapple Video') {
+        try {
+          const promptDoc = await getDoc(doc(db, 'activePrompts', promptId));
+          if (promptDoc.exists()) {
+            const data = promptDoc.data();
+            prompt = data.text || prompt;
+            if (!category || category === 'general') category = data.category || category;
+          }
+        } catch (e) {
+          console.warn('[createSnapple] failed to backfill prompt text:', e);
+        }
+      }
+
+      if (!prompt) {
+        throw new Error('Missing prompt text');
       }
 
       const snappleDoc = {
