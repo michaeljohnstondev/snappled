@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// Temporarily testing without SafeAreaView
+// import { SafeAreaView } from 'react-native-safe-area-context';
+const SafeAreaView = ({ children, style }) => <View style={style}>{children}</View>;
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
