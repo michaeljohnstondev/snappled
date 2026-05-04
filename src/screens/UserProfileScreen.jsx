@@ -62,8 +62,23 @@ export default function UserProfileScreen({ route, navigation }) {
         const created = result.snapples.filter(s => s.creatorId === userId);
         setCreatedSnapples(created);
       }
-      // TODO: Load owned/purchased snapples from user's deck
-      setOwnedSnapples([]);
+      // Load owned snapples from user doc
+      const userData = await userService.getUserData(userId);
+      const ownedIds = userData?.ownedSnapples || [];
+      if (ownedIds.length > 0) {
+        const owned = [];
+        for (const id of ownedIds) {
+          try {
+            const snapResult = await snappleService.getSnapple(id);
+            if (snapResult?.success && snapResult.snapple) {
+              owned.push(snapResult.snapple);
+            }
+          } catch (e) {}
+        }
+        setOwnedSnapples(owned);
+      } else {
+        setOwnedSnapples([]);
+      }
     } catch (error) {
       console.error('[UserProfileScreen] Error loading snapples:', error);
     }
