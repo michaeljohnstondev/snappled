@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+// All system UI hiding removed for testing
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
