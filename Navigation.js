@@ -84,7 +84,7 @@ export default function Navigation() {
           <Stack.Screen name="Store" component={StoreScreen} />
           <Stack.Screen name="Prompt" component={PromptScreen} />
           <Stack.Screen name="CreatePrompt" component={CreatePromptScreen} />
-          <Stack.Screen name="Record" component={RecordScreen} />
+          <Stack.Screen name="Record" component={RecordScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="VideoPreview" component={VideoPreviewScreen} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
           <Stack.Screen name="DeckBuilder" component={DeckBuilderScreen} />
