@@ -1,8 +1,10 @@
 import React from 'react';
 import { ActivityIndicator, View, Text } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from './src/store/AuthContext';
 import theme from './src/theme/themes';
+import CustomTabBar from './src/components/ui/navigation/CustomTabBar';
 
 // Screen imports
 import LandingScreen from './src/screens/LandingScreen';
@@ -22,34 +24,42 @@ import StoreScreen from './src/screens/StoreScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 
 const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
 
 const screenOptions = {
   headerShown: false,
   animationEnabled: false,
-  detachPreviousScreen: true,
-  unmountOnBlur: true,
 };
+
+function EmptyScreen() {
+  return null;
+}
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+    >
+      <Tab.Screen name="Prompts" component={PromptsScreen} />
+      <Tab.Screen name="Play" component={GameScreen} />
+      <Tab.Screen name="RecordTab" component={EmptyScreen} />
+      <Tab.Screen name="Profile" component={UserProfileScreen} />
+      <Tab.Screen name="Store" component={StoreScreen} />
+    </Tab.Navigator>
+  );
+}
 
 class ErrorBoundary extends React.Component {
   state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, info) {
-    console.error('[ErrorBoundary]', error, info);
-  }
-
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error, info) { console.error('[ErrorBoundary]', error, info); }
   render() {
     if (this.state.hasError) {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#001020' }}>
           <Text style={{ color: '#00C6FF', fontSize: 16, marginBottom: 16 }}>Something went wrong</Text>
-          <Text
-            style={{ color: '#778DA9', fontSize: 14 }}
-            onPress={() => this.setState({ hasError: false })}
-          >
+          <Text style={{ color: '#778DA9', fontSize: 14 }} onPress={() => this.setState({ hasError: false })}>
             Tap to retry
           </Text>
         </View>
@@ -79,10 +89,10 @@ export default function Navigation() {
           <Stack.Screen name="Signup" component={SignupScreen} />
         </Stack.Navigator>
       ) : (
-        <Stack.Navigator initialRouteName="Home" screenOptions={screenOptions}>
+        <Stack.Navigator initialRouteName="Main" screenOptions={screenOptions}>
+          <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Home" component={PromptsScreen} />
           <Stack.Screen name="Snapples" component={HomeScreen} />
-          <Stack.Screen name="Store" component={StoreScreen} />
           <Stack.Screen name="Prompt" component={PromptScreen} />
           <Stack.Screen name="CreatePrompt" component={CreatePromptScreen} />
           <Stack.Screen name="Record" component={RecordScreen} options={{ presentation: 'modal' }} />
