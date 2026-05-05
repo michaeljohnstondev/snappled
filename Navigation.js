@@ -27,6 +27,7 @@ const screenOptions = {
   headerShown: false,
   animationEnabled: false,
   detachPreviousScreen: true,
+  unmountOnBlur: true,
 };
 
 class ErrorBoundary extends React.Component {

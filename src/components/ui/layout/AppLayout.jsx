@@ -30,8 +30,9 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
   const { user, userCurrency } = useAuth();
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [screenHeight, setScreenHeight] = useState(Dimensions.get('screen').height);
+  const [settling, setSettling] = useState(false);
 
-  // Force system UI re-hide on focus + recalc dimensions
+  // Force system UI re-hide on focus + recalc dimensions + brief settle delay
   useFocusEffect(
     useCallback(() => {
       RNStatusBar.setHidden(true, 'fade');
@@ -42,8 +43,13 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
           NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
         } catch (e) {}
       }
-      // Force re-render with current screen dimensions
-      setScreenHeight(Dimensions.get('screen').height);
+      // Brief settle period to let Android re-layout after camera dismounts
+      setSettling(true);
+      const t1 = setTimeout(() => {
+        setScreenHeight(Dimensions.get('screen').height);
+        setSettling(false);
+      }, 250);
+      return () => clearTimeout(t1);
     }, [])
   );
 
@@ -85,7 +91,7 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
             userId={user?.uid}
           />
         )}
-        <View style={styles.content}>{children}</View>
+        <View style={styles.content}>{settling ? null : children}</View>
         {!hideNav && (
           <ButtonContainer>
             <NavButton title="Prompts" onPress={() => navigation?.navigate('Home')} active={active === 'prompts'} />
