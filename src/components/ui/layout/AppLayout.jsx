@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Platform, StatusBar as RNStatusBar } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, Platform, StatusBar as RNStatusBar, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 const SafeAreaView = ({ children, style }) => <View style={style}>{children}</View>;
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,8 +29,9 @@ import theme from '../../../theme/themes';
 export default function AppLayout({ navigation, active, children, hideNav = false, hideHeader = false }) {
   const { user, userCurrency } = useAuth();
   const [showTokenModal, setShowTokenModal] = useState(false);
+  const [screenHeight, setScreenHeight] = useState(Dimensions.get('screen').height);
 
-  // Force system UI re-hide on focus (fixes layout stuck after camera nav)
+  // Force system UI re-hide on focus + recalc dimensions
   useFocusEffect(
     useCallback(() => {
       RNStatusBar.setHidden(true, 'fade');
@@ -41,8 +42,18 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
           NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
         } catch (e) {}
       }
+      // Force re-render with current screen dimensions
+      setScreenHeight(Dimensions.get('screen').height);
     }, [])
   );
+
+  // Listen for dimension changes (e.g. after camera releases system bars)
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ screen }) => {
+      setScreenHeight(screen.height);
+    });
+    return () => sub?.remove();
+  }, []);
 
   const userStats = {
     tokens: userCurrency.tokens || 0,
@@ -59,7 +70,7 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
   const handleCreatePrompt = () => navigation?.navigate('CreatePrompt');
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={theme.colors.backgroundGradient} style={[styles.container, { height: screenHeight }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {!hideHeader && (
           <HomeHeader
