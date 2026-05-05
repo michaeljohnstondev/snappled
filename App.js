@@ -38,10 +38,7 @@ export default function App() {
       <StatusBar hidden translucent backgroundColor="transparent" />
       <AuthProvider>
         <ModalProvider>
-          <NavigationContainer
-            ref={navRef}
-            onStateChange={() => setTimeout(hideNavBar, 50)}
-          >
+          <NavigationContainer ref={navRef}>
             <Navigation />
           </NavigationContainer>
         </ModalProvider>
