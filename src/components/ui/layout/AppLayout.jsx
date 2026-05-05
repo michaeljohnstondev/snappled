@@ -70,7 +70,11 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
   const handleCreatePrompt = () => navigation?.navigate('CreatePrompt');
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={[styles.container, { height: screenHeight }]}>
+    <LinearGradient
+      key={screenHeight}
+      colors={theme.colors.backgroundGradient}
+      style={styles.container}
+    >
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {!hideHeader && (
           <HomeHeader
@@ -105,7 +109,7 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, borderWidth: 4, borderColor: 'red' },
-  safeArea: { flex: 1, borderWidth: 4, borderColor: 'yellow' },
-  content: { flex: 1, borderWidth: 4, borderColor: 'lime' },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  content: { flex: 1 },
 });
