@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // All system UI hiding removed for testing
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,9 +20,6 @@ import theme from '../../../theme/themes';
 export default function AppLayout({ navigation, children, hideHeader = false }) {
   const { user, userCurrency } = useAuth();
   const [showTokenModal, setShowTokenModal] = useState(false);
-  const [layoutDims, setLayoutDims] = useState({ w: 0, h: 0 });
-  const screen = Dimensions.get('screen');
-  const win = Dimensions.get('window');
 
   const userStats = {
     tokens: userCurrency.tokens || 0,
@@ -39,19 +36,7 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
   const handleCreatePrompt = () => navigation?.navigate('CreatePrompt');
 
   return (
-    <LinearGradient
-      colors={theme.colors.backgroundGradient}
-      style={styles.container}
-      onLayout={(e) => {
-        const { width, height } = e.nativeEvent.layout;
-        setLayoutDims({ w: Math.round(width), h: Math.round(height) });
-      }}
-    >
-      <View style={styles.debugBox} pointerEvents="none">
-        <Text style={styles.debugText}>L:{layoutDims.w}x{layoutDims.h}</Text>
-        <Text style={styles.debugText}>W:{Math.round(win.width)}x{Math.round(win.height)}</Text>
-        <Text style={styles.debugText}>S:{Math.round(screen.width)}x{Math.round(screen.height)}</Text>
-      </View>
+    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {!hideHeader && (
           <HomeHeader
@@ -80,18 +65,4 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   content: { flex: 1 },
-  debugBox: {
-    position: 'absolute',
-    top: 50,
-    right: 10,
-    backgroundColor: 'rgba(255,0,0,0.9)',
-    padding: 6,
-    borderRadius: 6,
-    zIndex: 9999,
-  },
-  debugText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
 });

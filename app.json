@@ -37,10 +37,11 @@
     },
     "plugins": [
       [
-        "expo-camera",
+        "react-native-vision-camera",
         {
-          "cameraPermission": "Allow Snappled to access your camera to record videos for prompts.",
-          "microphonePermission": "Allow Snappled to access your microphone to record audio with videos."
+          "cameraPermissionText": "Allow Snappled to access your camera to record videos for prompts.",
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "Allow Snappled to access your microphone to record audio with videos."
         }
       ],
       "expo-video",

@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useMicrophonePermission,
+} from 'react-native-vision-camera';
 import theme from '../../theme/themes';
 
 export default function BasicCameraView({
@@ -8,107 +13,80 @@ export default function BasicCameraView({
   onError,
   facing = 'front',
   mode = 'video',
-  style
+  style,
 }) {
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
-  const [isCameraReady, setIsCameraReady] = useState(false);
+  const { hasPermission: cameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
+  const { hasPermission: microphonePermission, requestPermission: requestMicrophonePermission } = useMicrophonePermission();
+  const [isReady, setIsReady] = useState(false);
   const cameraRef = useRef(null);
 
-  useEffect(() => {
-    console.log('BasicCameraView: Initializing permissions...');
-    console.log('Platform:', Platform.OS);
-    
-    if (!cameraPermission) {
-      console.log('Requesting camera permission...');
-      requestCameraPermission();
-    }
-    
-    if (!microphonePermission && mode === 'video') {
-      console.log('Requesting microphone permission...');
-      requestMicrophonePermission();
-    }
-  }, [cameraPermission, microphonePermission, mode]);
+  const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
 
   useEffect(() => {
-    console.log('Camera permission status:', cameraPermission);
-    console.log('Microphone permission status:', microphonePermission);
-  }, [cameraPermission, microphonePermission]);
+    if (!cameraPermission) requestCameraPermission().catch(() => {});
+    if (!microphonePermission && mode === 'video') requestMicrophonePermission().catch(() => {});
+  }, []);
 
-  function handleCameraReady() {
-    console.log('BasicCameraView: Camera is ready!');
-    setIsCameraReady(true);
-    onCameraReady?.(cameraRef.current);
-  }
+  // Build a wrapper that matches expo-camera's API used by RecordingControls
+  const cameraWrapper = useRef({
+    recordAsync: async (options = {}) => {
+      return new Promise((resolve, reject) => {
+        if (!cameraRef.current) {
+          reject(new Error('Camera not ready'));
+          return;
+        }
+        cameraRef.current.startRecording({
+          fileType: 'mp4',
+          onRecordingFinished: (video) => resolve({ uri: 'file://' + video.path }),
+          onRecordingError: (err) => reject(err),
+        });
+      });
+    },
+    stopRecording: async () => {
+      if (cameraRef.current) {
+        try { await cameraRef.current.stopRecording(); } catch (e) {}
+      }
+    },
+  }).current;
 
-  function handleMountError(error) {
-    console.error('BasicCameraView: Camera mount error:', error);
-    const errorMessage = error?.nativeEvent?.message || error?.message || 'Unknown camera error';
-    onError?.(errorMessage);
-    Alert.alert(
-      'Camera Error',
-      `Failed to start camera: ${errorMessage}`
-    );
-  }
+  useEffect(() => {
+    if (isReady && device && cameraPermission) {
+      onCameraReady?.(cameraWrapper);
+    }
+  }, [isReady, device, cameraPermission]);
 
-  function handleCameraError(error) {
-    console.error('BasicCameraView: Camera runtime error:', error);
-    const errorMessage = error?.nativeEvent?.message || error?.message || 'Camera runtime error';
-    onError?.(errorMessage);
-  }
-
-  // Check if we're still loading permissions
-  if (!cameraPermission || (mode === 'video' && !microphonePermission)) {
+  if (!cameraPermission || !microphonePermission) {
     return (
-      <View style={[styles.container, styles.loadingContainer, style]}>
-        <Text style={styles.loadingText}>Loading camera permissions...</Text>
-      </View>
-    );
-  }
-
-  // Check if permissions were denied
-  if (!cameraPermission.granted) {
-    return (
-      <View style={[styles.container, styles.errorContainer, style]}>
+      <View style={[styles.container, style, styles.center]}>
         <Text style={styles.errorTitle}>Camera Permission Required</Text>
-        <Text style={styles.errorText}>
-          Please enable camera access in your device settings to use this feature.
-        </Text>
+        <Text style={styles.errorText}>Please enable camera access in settings.</Text>
       </View>
     );
   }
 
-  if (mode === 'video' && !microphonePermission?.granted) {
+  if (!device) {
     return (
-      <View style={[styles.container, styles.errorContainer, style]}>
-        <Text style={styles.errorTitle}>Microphone Permission Required</Text>
-        <Text style={styles.errorText}>
-          Please enable microphone access to record videos with audio.
-        </Text>
+      <View style={[styles.container, style, styles.center]}>
+        <Text style={styles.errorText}>No camera available</Text>
       </View>
     );
   }
 
-  // Render camera
   return (
     <View style={[styles.container, style]}>
-      <CameraView
+      <Camera
         ref={cameraRef}
-        style={styles.camera}
-        facing={facing}
-        mode={mode}
-        isPinchToZoomEnabled={true}
-        onCameraReady={handleCameraReady}
-        onMountError={handleMountError}
-        onError={handleCameraError}
+        style={StyleSheet.absoluteFill}
+        device={device}
+        isActive={true}
+        video={true}
+        audio={true}
+        onInitialized={() => setIsReady(true)}
+        onError={(err) => {
+          console.error('VisionCamera error:', err);
+          onError?.(err);
+        }}
       />
-      
-      {/* Camera status overlay */}
-      {!isCameraReady && (
-        <View style={styles.statusOverlay}>
-          <Text style={styles.statusText}>Initializing camera...</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -118,51 +96,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  camera: {
-    flex: 1,
-  },
-  loadingContainer: {
+  center: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-  },
-  loadingText: {
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    padding: 24,
+    padding: 20,
   },
   errorTitle: {
     color: theme.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
     marginBottom: 8,
   },
   errorText: {
     color: theme.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
-    lineHeight: 20,
-  },
-  statusOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
   },
 });
