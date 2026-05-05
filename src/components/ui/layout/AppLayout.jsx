@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-// Temporarily testing without SafeAreaView
-// import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 const SafeAreaView = ({ children, style }) => <View style={style}>{children}</View>;
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../../store/AuthContext';
@@ -30,6 +29,20 @@ import theme from '../../../theme/themes';
 export default function AppLayout({ navigation, active, children, hideNav = false, hideHeader = false }) {
   const { user, userCurrency } = useAuth();
   const [showTokenModal, setShowTokenModal] = useState(false);
+
+  // Force system UI re-hide on focus (fixes layout stuck after camera nav)
+  useFocusEffect(
+    useCallback(() => {
+      RNStatusBar.setHidden(true, 'fade');
+      if (Platform.OS === 'android') {
+        try {
+          const NavigationBar = require('expo-navigation-bar');
+          NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+          NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
+        } catch (e) {}
+      }
+    }, [])
+  );
 
   const userStats = {
     tokens: userCurrency.tokens || 0,
