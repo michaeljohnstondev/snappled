@@ -25,8 +25,8 @@ const Stack = createStackNavigator();
 
 const screenOptions = {
   headerShown: false,
-  cardStyle: { backgroundColor: theme.colors.background },
   animationEnabled: false,
+  detachPreviousScreen: true,
 };
 
 class ErrorBoundary extends React.Component {
