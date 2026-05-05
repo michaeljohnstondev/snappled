@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { View, StatusBar, Platform, LogBox, AppState } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
+import { enableScreens } from "react-native-screens";
+enableScreens(false);
 import Navigation from "./Navigation";
 import { AuthProvider } from "./src/store/AuthContext";
 import { ModalProvider } from "./src/store/ModalContext";
