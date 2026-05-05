@@ -81,7 +81,7 @@ export default function AppLayout({ navigation, active, children, hideNav = fals
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1 },
-  content: { flex: 1 },
+  container: { flex: 1, borderWidth: 4, borderColor: 'red' },
+  safeArea: { flex: 1, borderWidth: 4, borderColor: 'yellow' },
+  content: { flex: 1, borderWidth: 4, borderColor: 'lime' },
 });
