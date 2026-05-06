@@ -12,7 +12,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const liftAbove = Math.max(insets.bottom, 16);
 
   return (
-    <View style={[styles.container, { paddingBottom: liftAbove, height: 64 + liftAbove }]}>
+    <View style={[styles.container, { height: 64 + liftAbove }]}>
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const isRecord = route.name === 'RecordTab';
@@ -30,7 +30,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
 
         if (isRecord) {
           return (
-            <View key={route.key} style={styles.recordSlot}>
+            <View key={route.key} style={[styles.recordSlot, { paddingBottom: liftAbove }]}>
               <Pressable onPress={onPress} style={({ pressed }) => [styles.recordBtn, { opacity: pressed ? 0.85 : 1 }]}>
                 <LinearGradient
                   colors={[theme.colors.vibeBlue, theme.colors.vibePurple]}
@@ -71,7 +71,8 @@ const styles = StyleSheet.create({
   },
   tabBtnActive: {
     backgroundColor: 'rgba(0, 198, 255, 0.15)',
-    borderTopWidth: 3,
+    marginTop: -1,
+    borderTopWidth: 4,
     borderTopColor: theme.colors.vibeBlue,
   },
   tabText: {
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    marginTop: -24,
+    marginTop: -12,
     shadowColor: theme.colors.vibeBlue,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
