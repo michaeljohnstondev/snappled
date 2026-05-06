@@ -2,11 +2,17 @@ import React from 'react';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import theme from '../../../theme/themes';
 
 export default function CustomTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
+  // Lift the tab bar above the Android gesture-nav home-swipe zone (~16-32px)
+  // so taps near the bottom of the tab don't fight with the system gesture.
+  const liftAbove = Math.max(insets.bottom, 16);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: liftAbove, height: 64 + liftAbove }]}>
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const isRecord = route.name === 'RecordTab';
@@ -51,7 +57,6 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    height: 64,
     flexDirection: 'row',
     backgroundColor: theme.colors.background,
     borderTopWidth: 1,
