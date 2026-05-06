@@ -192,7 +192,7 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptReport = async (promptId, reason) => {
     if (!user?.uid) return;
-    const result = await promptService.reportPrompt(promptId, user.uid, reason, 'activePrompts');
+    const result = await promptService.reportPrompt(promptId, user.uid, reason);
     
     // Update the prompt in local state if successful
     if (result?.success) {

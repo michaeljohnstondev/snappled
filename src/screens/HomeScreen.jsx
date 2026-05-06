@@ -21,7 +21,6 @@ export default function HomeScreen({ navigation, route }) {
   // State
   const [prompts, setPrompts] = useState([]);
   const [selectedPrompt, setSelectedPrompt] = useState(null);
-  const [allSnapples, setAllSnapples] = useState([]);
   const [snapples, setSnapples] = useState([]);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
@@ -32,31 +31,33 @@ export default function HomeScreen({ navigation, route }) {
   const [ascending, setAscending] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
 
-  // Load initial data only when user is available
+  // Load prompts on mount / user change
   useEffect(() => {
     if (!user?.uid) return;
-    loadData();
+    loadPrompts();
   }, [user?.uid]);
 
-  // Reload data every time screen comes into focus
+  // Reload prompts on focus (in case a new one was created)
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
+      loadPrompts();
+      if (selectedPrompt?.id) loadSnapplesForPrompt(selectedPrompt.id);
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, selectedPrompt?.id]);
 
-  // Filter snapples locally when prompt changes
+  // Fetch snapples whenever selected prompt changes
   useEffect(() => {
     if (selectedPrompt?.id) {
-      setSnapples(allSnapples.filter(s => s.promptId === selectedPrompt.id));
+      loadSnapplesForPrompt(selectedPrompt.id);
+    } else {
+      setSnapples([]);
     }
-  }, [selectedPrompt, allSnapples]);
+  }, [selectedPrompt?.id]);
 
-  const loadData = async () => {
+  const loadPrompts = async () => {
     setIsLoading(true);
     try {
-      // All prompts (system + user) live in activePrompts
       const { prompts: allPrompts } = await promptRotationService.getActivePrompts();
 
       if (allPrompts.length > 0) {
@@ -72,16 +73,19 @@ export default function HomeScreen({ navigation, route }) {
         }
         setSelectedPrompt(match || allPrompts[0]);
       }
-
-      // Load all snapples once
-      const snappleResult = await snappleService.getActiveSnapples(100);
-      if (snappleResult.success) {
-        setAllSnapples(snappleResult.snapples);
-      }
     } catch (error) {
-      console.error('[HomeScreen] Error loading data:', error);
+      console.error('[HomeScreen] Error loading prompts:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSnapplesForPrompt = async (promptId) => {
+    try {
+      const result = await snappleService.getSnapplesByPrompt(promptId, 100);
+      if (result.success) setSnapples(result.snapples);
+    } catch (error) {
+      console.error('[HomeScreen] Error loading snapples for prompt:', error);
     }
   };
 
@@ -179,7 +183,7 @@ export default function HomeScreen({ navigation, route }) {
 
   const handlePromptReport = async (promptId, reason) => {
     if (!user?.uid) return;
-    const result = await promptService.reportPrompt(promptId, user.uid, reason, 'activePrompts');
+    const result = await promptService.reportPrompt(promptId, user.uid, reason);
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -278,7 +282,8 @@ export default function HomeScreen({ navigation, route }) {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadPrompts();
+    if (selectedPrompt?.id) await loadSnapplesForPrompt(selectedPrompt.id);
     setRefreshing(false);
   };
 
@@ -374,7 +379,7 @@ export default function HomeScreen({ navigation, route }) {
           onVisitProfile={handleVisitProfile}
           onFollowUser={handleFollowUser}
           navigation={navigation}
-          onRefresh={loadData}
+          onRefresh={loadPrompts}
         />
 
     </AppLayout>

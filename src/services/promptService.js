@@ -200,15 +200,15 @@ class PromptService {
     }
   }
 
-  // Report a prompt (works for both hourly and snapple prompts)
-  async reportPrompt(promptId, userId, reason, collection = 'hourlyPrompts') {
+  // Report a prompt — writes to the `promptReports` collection for moderation review.
+  async reportPrompt(promptId, userId, reason) {
     try {
       const reportData = {
         promptId,
         userId,
         reason,
         timestamp: new Date(),
-        status: 'pending'
+        status: 'pending',
       };
 
       const reportsRef = collection(db, 'promptReports');
@@ -219,7 +219,7 @@ class PromptService {
       console.error('[PromptService] Error reporting prompt:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }

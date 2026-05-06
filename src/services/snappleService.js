@@ -122,6 +122,34 @@ export const snappleService = {
     }
   },
 
+  async getSnapplesByPrompt(promptId, limitCount = 100) {
+    try {
+      if (!promptId) return { success: true, snapples: [] };
+
+      // No orderBy on the server side — keeps us off composite-index land.
+      const q = query(
+        collection(db, SNAPPLES_COLLECTION),
+        where('promptId', '==', promptId),
+        limit(limitCount * 2)
+      );
+
+      const snap = await getDocs(q);
+      const snapples = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data.isActive === true && data.isBanned !== true) {
+          snapples.push({ id: d.id, ...data });
+        }
+      });
+
+      snapples.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return { success: true, snapples: snapples.slice(0, limitCount) };
+    } catch (error) {
+      console.error('[SnappleService] getSnapplesByPrompt error:', error);
+      return { success: false, error: 'Failed to fetch prompt snapples' };
+    }
+  },
+
   async getActiveSnapples(limitCount = 20) {
     try {
       // Simplified query to avoid composite index requirement

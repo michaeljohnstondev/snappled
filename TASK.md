@@ -73,6 +73,25 @@
 
 ## Active Tasks
 
+### 🐛 Snapple Display Bug — Per-Prompt Fetch
+- **Date**: 2026-05-06
+- **Status**: IN PROGRESS
+- **Description**: Snapples don't appear on a prompt's detail page once total system snapples > ~100
+- **Root Cause**: `snappleService.getActiveSnapples(100)` fetches the newest 100 globally; HomeScreen filters client-side. Snapples on less-recent prompts get evicted.
+- **Fix Plan**:
+  - Add `snappleService.getSnapplesByPrompt(promptId, limitCount)` — `where('promptId', '==', id)`, no orderBy (avoids composite index), client-side sort
+  - Replace HomeScreen's `allSnapples + filter` with on-demand per-prompt fetch (refetch on prompt change + on focus)
+- **Files Touched**:
+  - `src/services/snappleService.js`
+  - `src/screens/HomeScreen.jsx`
+
+### 🐛 Resource Bar Disappears After Camera
+- **Date**: 2026-05-06
+- **Status**: FIX COMMITTED, NEEDS REBUILD/RELOAD
+- **Description**: Top resource bar (tokens/coins/trophies/level) disappeared after navigating to camera and back
+- **Root Cause**: `SafeAreaProvider` was removed from `App.js` in commit `ff5e724` while debugging the old nav-bar issue and never re-added. Consumers (`SafeAreaView` in `AppLayout`, `useSafeAreaInsets` in `RecordScreen`) had no provider, so insets went stale after the camera modal popped.
+- **Fix**: Re-added `<SafeAreaProvider>` at the root of `App.js`
+
 ### ✅ User Data Creation and Storage - COMPLETED!
 - **Date**: August 14, 2025
 - **Status**: COMPLETED ✅
