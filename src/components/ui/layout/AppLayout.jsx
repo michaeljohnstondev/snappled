@@ -11,7 +11,7 @@ import theme from '../../../theme/themes';
 
 const APP_VERSION = Constants.expoConfig?.version || '?';
 const UPDATE_TAG = Updates.updateId
-  ? Updates.updateId.slice(0, 6)
+  ? Updates.updateId.slice(0, 8)
   : 'embed';
 
 /**
