@@ -12,7 +12,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const liftAbove = Math.max(insets.bottom, 16);
 
   return (
-    <View style={[styles.container, { height: 64 + liftAbove }]}>
+    <View style={[styles.container, { height: 54 + liftAbove }]}>
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const isRecord = route.name === 'RecordTab';
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   tabBtnActive: {
     backgroundColor: 'rgba(0, 198, 255, 0.15)',
     marginTop: -1,
-    borderTopWidth: 4,
+    borderTopWidth: 3,
     borderTopColor: theme.colors.vibeBlue,
   },
   tabText: {
