@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// All system UI hiding removed for testing
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
 import TokenPromptModal from '../modals/TokenPromptModal';
 import theme from '../../../theme/themes';
+
+const APP_VERSION = Constants.expoConfig?.version || '?';
+const UPDATE_TAG = Updates.updateId
+  ? Updates.updateId.slice(0, 6)
+  : 'embed';
 
 /**
  * Wraps a screen with:
@@ -57,6 +63,10 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
         userTokens={userStats.tokens}
         navigation={navigation}
       />
+
+      <Text style={styles.versionTag} pointerEvents="none">
+        v{APP_VERSION} · {UPDATE_TAG}
+      </Text>
     </LinearGradient>
   );
 }
@@ -65,4 +75,12 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   content: { flex: 1 },
+  versionTag: {
+    position: 'absolute',
+    top: 4,
+    left: 8,
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 9,
+    fontFamily: 'monospace',
+  },
 });

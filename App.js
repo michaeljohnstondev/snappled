@@ -12,8 +12,29 @@ LogBox.ignoreLogs([
   "SafeAreaView has been deprecated",
 ]);
 
+const hideAndroidNavBar = () => {
+  if (Platform.OS !== "android") return;
+  try {
+    const NavigationBar = require("expo-navigation-bar");
+    NavigationBar.setVisibilityAsync("hidden").catch(() => {});
+    NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
+  } catch (e) {}
+};
+
 export default function App() {
   const navRef = useRef(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const t = setTimeout(hideAndroidNavBar, 500);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") setTimeout(hideAndroidNavBar, 100);
+    });
+    return () => {
+      clearTimeout(t);
+      sub.remove();
+    };
+  }, []);
 
   return (
     <SafeAreaProvider>
