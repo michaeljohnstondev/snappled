@@ -17,8 +17,9 @@ const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 2;
 
 export default function UserProfileScreen({ route, navigation }) {
-  const { userId } = route.params || {};
   const { user, userCurrency } = useAuth();
+  // Default to current user if no userId param (e.g. when navigating via Profile tab)
+  const userId = route?.params?.userId || user?.uid;
   const [profileData, setProfileData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
