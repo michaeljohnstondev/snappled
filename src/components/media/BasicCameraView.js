@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   useAnimatedProps,
 } from 'react-native-reanimated';
+import { useIsFocused } from '@react-navigation/native';
 import theme from '../../theme/themes';
 
 const AnimatedCamera = Animated.createAnimatedComponent(Camera);
@@ -26,6 +27,9 @@ export default function BasicCameraView({
   const { hasPermission: microphonePermission, requestPermission: requestMicrophonePermission } = useMicrophonePermission();
   const [isReady, setIsReady] = useState(false);
   const cameraRef = useRef(null);
+  // Only stream when this screen is focused — prevents the camera's native
+  // preview surface from sticking around behind other screens after nav.
+  const isFocused = useIsFocused();
 
   const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
 
@@ -105,7 +109,7 @@ export default function BasicCameraView({
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
-          isActive={true}
+          isActive={isFocused}
           video={true}
           audio={true}
           animatedProps={animatedProps}

@@ -35,13 +35,24 @@ function EmptyScreen() {
   return null;
 }
 
+// Inner stack for the Prompts tab — keeps the bottom tab bar visible when
+// drilling into the per-prompt snapple grid (HomeScreen).
+function PromptsStack() {
+  return (
+    <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Screen name="PromptsList" component={PromptsScreen} />
+      <Stack.Screen name="Snapples" component={HomeScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{ headerShown: false }}
       tabBar={(props) => <CustomTabBar {...props} />}
     >
-      <Tab.Screen name="Prompts" component={PromptsScreen} />
+      <Tab.Screen name="Prompts" component={PromptsStack} />
       <Tab.Screen name="Play" component={GameScreen} />
       <Tab.Screen name="RecordTab" component={EmptyScreen} />
       <Tab.Screen name="Profile" component={UserProfileScreen} />
@@ -92,7 +103,6 @@ export default function Navigation() {
         <Stack.Navigator initialRouteName="Main" screenOptions={screenOptions}>
           <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Home" component={PromptsScreen} />
-          <Stack.Screen name="Snapples" component={HomeScreen} />
           <Stack.Screen name="Prompt" component={PromptScreen} />
           <Stack.Screen name="CreatePrompt" component={CreatePromptScreen} />
           <Stack.Screen name="Record" component={RecordScreen} options={{ presentation: 'modal' }} />
