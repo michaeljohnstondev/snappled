@@ -64,7 +64,11 @@ export default function VideoPreviewScreen({ route, navigation }) {
   };
 
   const handleSubmit = async (overridePrompt) => {
-    const activePrompt = overridePrompt || prompt;
+    // Only honor overridePrompt if it actually looks like a prompt object — otherwise
+    // a button onPress event leaks in as the first arg and overrides the picked prompt.
+    const isValidPrompt = (p) => p && typeof p === 'object' && typeof p.id === 'string';
+    const activePrompt = isValidPrompt(overridePrompt) ? overridePrompt : prompt;
+
     if (!recordedVideo?.uri) {
       showError('Error', 'No video to submit');
       return;
@@ -72,6 +76,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
 
     if (!user?.uid) {
       showError('Error', 'You must be logged in to submit');
+      return;
+    }
+
+    if (!isValidPrompt(activePrompt)) {
+      showError('Pick a Prompt', 'Choose a prompt before submitting your snapple.');
+      setShowPromptPicker(true);
       return;
     }
 
@@ -131,15 +141,16 @@ export default function VideoPreviewScreen({ route, navigation }) {
         (progress) => setUploadProgress(progress)
       );
 
-      // Create the snapple record
+      // Create the snapple record. handleSubmit guarantees submitPrompt is valid,
+      // so no defensive 'unknown' fallback here — that path produced orphan snapples.
       const snappleResult = await snappleService.createSnapple({
-        promptId: submitPrompt?.id || 'unknown',
+        promptId: submitPrompt.id,
         videoUrl: uploadResult.downloadURL,
         videoId: uploadResult.id,
         creatorId: user.uid,
         creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
-        prompt: submitPrompt?.text || 'Snapple video',
-        category: submitPrompt?.category || 'general',
+        prompt: submitPrompt.text || 'Snapple video',
+        category: submitPrompt.category || 'general',
       });
 
       if (snappleResult.success) {
@@ -374,7 +385,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
               {prompt ? (
                 <VibeButton
                   label="Submit"
-                  onPress={handleSubmit}
+                  onPress={() => handleSubmit()}
                   variant="toggle"
                   color="blue"
                   style={{ flex: 1, backgroundColor: '#000000' }}
