@@ -102,23 +102,28 @@ export default function BasicCameraView({
     );
   }
 
+  // Fully unmount the Camera when blurred. isActive={false} alone leaves
+  // the native preview surface in the compositor — it keeps painting black
+  // over other screens (touches pass through, but the pixels don't).
   return (
     <GestureDetector gesture={pinchGesture}>
       <View style={[styles.container, style]}>
-        <AnimatedCamera
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={isFocused}
-          video={true}
-          audio={true}
-          animatedProps={animatedProps}
-          onInitialized={() => setIsReady(true)}
-          onError={(err) => {
-            console.error('VisionCamera error:', err);
-            onError?.(err);
-          }}
-        />
+        {isFocused ? (
+          <AnimatedCamera
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            device={device}
+            isActive={true}
+            video={true}
+            audio={true}
+            animatedProps={animatedProps}
+            onInitialized={() => setIsReady(true)}
+            onError={(err) => {
+              console.error('VisionCamera error:', err);
+              onError?.(err);
+            }}
+          />
+        ) : null}
       </View>
     </GestureDetector>
   );
