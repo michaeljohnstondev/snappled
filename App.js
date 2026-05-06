@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { View, StatusBar, Platform, LogBox, AppState } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { enableScreens } from "react-native-screens";
 enableScreens(false);
 import Navigation from "./Navigation";
@@ -37,17 +38,19 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: "#001020" }}>
-        <StatusBar hidden translucent backgroundColor="transparent" />
-        <AuthProvider>
-          <ModalProvider>
-            <NavigationContainer ref={navRef}>
-              <Navigation />
-            </NavigationContainer>
-          </ModalProvider>
-        </AuthProvider>
-      </View>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: "#001020" }}>
+          <StatusBar hidden translucent backgroundColor="transparent" />
+          <AuthProvider>
+            <ModalProvider>
+              <NavigationContainer ref={navRef}>
+                <Navigation />
+              </NavigationContainer>
+            </ModalProvider>
+          </AuthProvider>
+        </View>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

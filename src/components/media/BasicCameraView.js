@@ -1,12 +1,19 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import {
   Camera,
   useCameraDevice,
   useCameraPermission,
   useMicrophonePermission,
 } from 'react-native-vision-camera';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+} from 'react-native-reanimated';
 import theme from '../../theme/themes';
+
+const AnimatedCamera = Animated.createAnimatedComponent(Camera);
 
 export default function BasicCameraView({
   onCameraReady,
@@ -21,6 +28,25 @@ export default function BasicCameraView({
   const cameraRef = useRef(null);
 
   const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
+
+  // Pinch-to-zoom: zoom is a shared value clamped between device.minZoom and device.maxZoom.
+  // pinchStart captures the zoom level at gesture begin so scaling is relative, not absolute.
+  const zoom = useSharedValue(device?.neutralZoom ?? 1);
+  const pinchStart = useSharedValue(1);
+
+  const minZoom = device?.minZoom ?? 1;
+  const maxZoom = Math.min(device?.maxZoom ?? 8, 8);
+
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      pinchStart.value = zoom.value;
+    })
+    .onUpdate((e) => {
+      const next = pinchStart.value * e.scale;
+      zoom.value = Math.min(Math.max(next, minZoom), maxZoom);
+    });
+
+  const animatedProps = useAnimatedProps(() => ({ zoom: zoom.value }));
 
   useEffect(() => {
     if (!cameraPermission) requestCameraPermission().catch(() => {});
@@ -73,21 +99,24 @@ export default function BasicCameraView({
   }
 
   return (
-    <View style={[styles.container, style]}>
-      <Camera
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={true}
-        video={true}
-        audio={true}
-        onInitialized={() => setIsReady(true)}
-        onError={(err) => {
-          console.error('VisionCamera error:', err);
-          onError?.(err);
-        }}
-      />
-    </View>
+    <GestureDetector gesture={pinchGesture}>
+      <View style={[styles.container, style]}>
+        <AnimatedCamera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive={true}
+          video={true}
+          audio={true}
+          animatedProps={animatedProps}
+          onInitialized={() => setIsReady(true)}
+          onError={(err) => {
+            console.error('VisionCamera error:', err);
+            onError?.(err);
+          }}
+        />
+      </View>
+    </GestureDetector>
   );
 }
 
