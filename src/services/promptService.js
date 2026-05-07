@@ -372,7 +372,7 @@ class PromptService {
       console.error('[PromptService] summonPrompt error:', error);
       return { success: false, error: error.message };
     }
-  },
+  }
 
   // Legacy create — kept for backwards compat. New callers should use summonPrompt.
   async createPrompt(promptData) {
