@@ -11,6 +11,7 @@ import { useModal } from '../store/ModalContext';
 import { gameService, GAME_PHASES } from '../services/gameService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
+import { userService } from '../services/userService';
 import VibeButton from '../components/ui/VibeButton';
 import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
@@ -181,6 +182,151 @@ function SwipeCard({ submission, onSwipeRight, onSwipeLeft, onBuy, onReport, onP
     </Animated.View>
   );
 }
+
+// ── Creator action row for preview modals ──
+// Shows the snapple's creator and instant follow/wishlist/buy buttons. Skips
+// the action row entirely for the user's own snapples since those don't make
+// sense as targets.
+function CreatorActionRow({ submission, currentUser, ownedSnappleIds, showToast, showError }) {
+  const snappleId = submission?.snappleId || submission?.id;
+  const creatorId = submission?.creatorId;
+  const isMine = creatorId && creatorId === currentUser?.uid;
+
+  const [following, setFollowing] = useState(false);
+  const [wishlisted, setWishlisted] = useState(false);
+  const [owned, setOwned] = useState(!!snappleId && (ownedSnappleIds || []).includes(snappleId));
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.uid || !creatorId || isMine) return;
+    userService.isFollowing(currentUser.uid, creatorId)
+      .then(setFollowing)
+      .catch(() => {});
+  }, [currentUser?.uid, creatorId, isMine]);
+
+  const handleFollow = async () => {
+    if (busy || !creatorId || isMine) return;
+    setBusy(true);
+    try {
+      const r = await userService.toggleFollow(currentUser.uid, creatorId);
+      if (r.success) setFollowing(r.isFollowing);
+    } finally { setBusy(false); }
+  };
+
+  const handleWishlist = async () => {
+    if (busy || !snappleId || isMine) return;
+    setBusy(true);
+    try {
+      if (wishlisted) {
+        await snappleService.removeFromWishlist(snappleId, currentUser.uid);
+        setWishlisted(false);
+      } else {
+        await snappleService.addToWishlist(snappleId, currentUser.uid);
+        setWishlisted(true);
+        showToast?.('reward', 'Added to Wishlist', `@${submission?.creatorUsername || ''}`);
+      }
+    } finally { setBusy(false); }
+  };
+
+  const handleBuy = async () => {
+    if (busy || !snappleId || isMine || owned) return;
+    setBusy(true);
+    try {
+      const r = await snappleService.purchaseSnapple(snappleId, currentUser.uid);
+      if (r?.success) {
+        setOwned(true);
+        showToast?.('reward', 'Purchased!', `Snapple added to your collection`);
+      } else {
+        showError?.('Purchase Failed', r?.error || 'Something went wrong');
+      }
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <View style={creatorRowStyles.wrap}>
+      <Text style={creatorRowStyles.creator} numberOfLines={1}>
+        by @{submission?.creatorUsername || 'anonymous'}
+      </Text>
+      {!isMine && creatorId && (
+        <View style={creatorRowStyles.actions}>
+          <Pressable
+            style={[creatorRowStyles.btn, following && creatorRowStyles.btnActive]}
+            onPress={handleFollow}
+            disabled={busy}
+          >
+            <Ionicons
+              name={following ? 'person' : 'person-add'}
+              size={13}
+              color={following ? theme.colors.vibeBlue : 'white'}
+            />
+          </Pressable>
+          <Pressable
+            style={[creatorRowStyles.btn, wishlisted && creatorRowStyles.btnActive]}
+            onPress={handleWishlist}
+            disabled={busy}
+          >
+            <Ionicons
+              name={wishlisted ? 'heart' : 'heart-outline'}
+              size={13}
+              color={wishlisted ? theme.colors.vibeRed : 'white'}
+            />
+          </Pressable>
+          <Pressable
+            style={[creatorRowStyles.btn, owned && creatorRowStyles.btnActive, { paddingHorizontal: 10 }]}
+            onPress={handleBuy}
+            disabled={busy || owned}
+          >
+            <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
+            <Text style={creatorRowStyles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const creatorRowStyles = StyleSheet.create({
+  wrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  creator: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    flexShrink: 1,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  btnActive: {
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,198,255,0.12)',
+  },
+  btnText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+});
 
 // ── Main Game Screen ──
 export default function GameScreen({ navigation }) {
@@ -1078,9 +1224,18 @@ export default function GameScreen({ navigation }) {
                 <PreviewPlayer videoUrl={previewCard.videoUrl} />
 
                 <View style={styles.previewInfo}>
-                  <Text style={styles.previewCreator}>@{previewCard.creatorUsername || 'anonymous'}</Text>
                   <Text style={styles.previewPromptLabel}>{previewCard.prompt}</Text>
                 </View>
+
+                {previewCard._isWaiting && (
+                  <CreatorActionRow
+                    submission={previewCard}
+                    currentUser={user}
+                    ownedSnappleIds={userCurrency.ownedSnapples || []}
+                    showToast={showToast}
+                    showError={showError}
+                  />
+                )}
 
                 <View style={styles.previewButtons}>
                   <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
@@ -1176,6 +1331,14 @@ export default function GameScreen({ navigation }) {
             <View style={styles.previewOverlay}>
               <View style={styles.previewCard}>
                 <PreviewPlayer videoUrl={previewCard.videoUrl} />
+
+                <CreatorActionRow
+                  submission={previewCard}
+                  currentUser={user}
+                  ownedSnappleIds={userCurrency.ownedSnapples || []}
+                  showToast={showToast}
+                  showError={showError}
+                />
 
                 <View style={styles.previewButtons}>
                   <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>

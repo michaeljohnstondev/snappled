@@ -209,6 +209,7 @@ export const gameService = {
           snappleId: snapple.id,
           videoUrl: snapple.videoUrl,
           prompt: snapple.prompt,
+          creatorId: snapple.creatorId || null,
           creatorUsername: snapple.creatorUsername || 'anonymous',
         }),
         updatedAt: serverTimestamp(),
