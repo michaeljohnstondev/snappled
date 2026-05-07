@@ -18,7 +18,20 @@ import ButtonContainer from "../navigation/ButtonContainer";
 import NavButton from "../navigation/NavButton";
 import { useAuth } from "../../../store/AuthContext";
 import { userService } from "../../../services/userService";
+import { db } from "../../../services/firebase";
+import { doc, getDoc, collection, query, where, limit, getDocs } from "firebase/firestore";
+import { normalizePromptText } from "../../../utils/promptKey";
 import theme from "../../../theme/themes";
+
+// Single stat in the lifetime row. Compact for fitting 5 inline.
+function LifetimeStat({ label, value }) {
+  return (
+    <View style={styles.lifetimeStat}>
+      <Text style={styles.lifetimeStatValue}>{value}</Text>
+      <Text style={styles.lifetimeStatLabel}>{label}</Text>
+    </View>
+  );
+}
 
 export default function PromptInfoOverlay({
   visible,
@@ -52,8 +65,43 @@ export default function PromptInfoOverlay({
     totalViews: 0,
     followerCount: 0,
   });
+  // Lifetime stats accumulated on the prompt's pool entry across all instances.
+  // null while loading or if no pool doc exists for this prompt yet.
+  const [lifetimeStats, setLifetimeStats] = useState(null);
   // Track viewed prompts across the entire session (outside component state)
   const viewedPromptsRef = useRef(new Set());
+
+  // Fetch the pool doc for this prompt to display lifetime stats. Tries
+  // poolDocId first, falls back to textKey lookup for legacy prompts.
+  useEffect(() => {
+    let cancelled = false;
+    const fetch = async () => {
+      if (!prompt) return setLifetimeStats(null);
+      try {
+        let poolData = null;
+        if (prompt.poolDocId) {
+          const snap = await getDoc(doc(db, 'promptPool', prompt.poolDocId));
+          if (snap.exists()) poolData = snap.data();
+        }
+        if (!poolData) {
+          const tk = prompt.textKey || normalizePromptText(prompt.text || '');
+          if (tk) {
+            const matchSnap = await getDocs(query(
+              collection(db, 'promptPool'),
+              where('textKey', '==', tk),
+              limit(1),
+            ));
+            if (!matchSnap.empty) poolData = matchSnap.docs[0].data();
+          }
+        }
+        if (!cancelled) setLifetimeStats(poolData);
+      } catch (e) {
+        if (!cancelled) setLifetimeStats(null);
+      }
+    };
+    fetch();
+    return () => { cancelled = true; };
+  }, [prompt?.id, prompt?.poolDocId, prompt?.textKey]);
 
   // Check user's existing interactions when prompt changes
   useEffect(() => {
@@ -397,6 +445,21 @@ export default function PromptInfoOverlay({
             </View>
           </View>
 
+          {/* Lifetime stats — accumulated across every instance of this prompt
+              text. Falls back to nothing if pool doc isn't present yet. */}
+          {lifetimeStats && (
+            <View style={styles.lifetimeRow}>
+              <Text style={styles.lifetimeLabel}>LIFETIME</Text>
+              <View style={styles.lifetimeStats}>
+                <LifetimeStat label="instances" value={lifetimeStats.instanceCount || 0} />
+                <LifetimeStat label="views" value={lifetimeStats.totalViewsLifetime || 0} />
+                <LifetimeStat label="participants" value={lifetimeStats.participantCountLifetime || 0} />
+                <LifetimeStat label="👍" value={lifetimeStats.likeCountLifetime || 0} />
+                <LifetimeStat label="👎" value={lifetimeStats.dislikeCountLifetime || 0} />
+              </View>
+            </View>
+          )}
+
           {/* Interactions Row */}
           <View style={styles.interactionRow}>
             {/* Left Side - Metrics Container */}
@@ -643,6 +706,41 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     paddingHorizontal: 16,
     minHeight: 120,
+  },
+  lifetimeRow: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  lifetimeLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+  lifetimeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  lifetimeStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  lifetimeStatValue: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  lifetimeStatLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 9,
+    marginTop: 2,
   },
   rightSideActions: {
     alignItems: "center",
