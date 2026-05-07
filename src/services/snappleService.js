@@ -148,26 +148,39 @@ export const snappleService = {
     }
   },
 
-  async getSnapplesByPrompt(promptId, limitCount = 100) {
+  async getSnapplesByPrompt(promptId, promptText, limitCount = 100) {
     try {
-      if (!promptId) return { success: true, snapples: [] };
+      if (!promptId && !promptText) return { success: true, snapples: [] };
 
-      // No orderBy on the server side — keeps us off composite-index land.
-      const q = query(
-        collection(db, SNAPPLES_COLLECTION),
-        where('promptId', '==', promptId),
-        limit(limitCount * 2)
-      );
+      // Query by promptId AND promptText so snapples persist across prompt
+      // recycles. When a prompt expires and a new one with the same text comes
+      // back, the new prompt has a fresh doc id but the existing snapples'
+      // prompt field still matches the text — they show up on the new prompt.
+      const queries = [];
+      if (promptId) {
+        queries.push(getDocs(query(
+          collection(db, SNAPPLES_COLLECTION),
+          where('promptId', '==', promptId),
+          limit(limitCount * 2),
+        )));
+      }
+      if (promptText) {
+        queries.push(getDocs(query(
+          collection(db, SNAPPLES_COLLECTION),
+          where('prompt', '==', promptText),
+          limit(limitCount * 2),
+        )));
+      }
 
-      const snap = await getDocs(q);
-      const snapples = [];
-      snap.forEach((d) => {
+      const results = await Promise.all(queries);
+      const byId = new Map();
+      results.forEach(snap => snap.forEach(d => {
         const data = d.data();
         if (data.isActive === true && data.isBanned !== true) {
-          snapples.push({ id: d.id, ...data });
+          byId.set(d.id, { id: d.id, ...data });
         }
-      });
-
+      }));
+      const snapples = Array.from(byId.values());
       snapples.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return { success: true, snapples: snapples.slice(0, limitCount) };
     } catch (error) {

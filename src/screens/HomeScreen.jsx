@@ -41,7 +41,7 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadPrompts();
-      if (selectedPrompt?.id) loadSnapplesForPrompt(selectedPrompt.id);
+      if (selectedPrompt?.id) loadSnapplesForPrompt(selectedPrompt);
     });
     return unsubscribe;
   }, [navigation, selectedPrompt?.id]);
@@ -49,7 +49,7 @@ export default function HomeScreen({ navigation, route }) {
   // Fetch snapples whenever selected prompt changes
   useEffect(() => {
     if (selectedPrompt?.id) {
-      loadSnapplesForPrompt(selectedPrompt.id);
+      loadSnapplesForPrompt(selectedPrompt);
     } else {
       setSnapples([]);
     }
@@ -80,9 +80,10 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
-  const loadSnapplesForPrompt = async (promptId) => {
+  const loadSnapplesForPrompt = async (prompt) => {
     try {
-      const result = await snappleService.getSnapplesByPrompt(promptId, 100);
+      // Pass both id and text so snapples carry over when a prompt is recycled.
+      const result = await snappleService.getSnapplesByPrompt(prompt?.id, prompt?.text, 100);
       if (result.success) setSnapples(result.snapples);
     } catch (error) {
       console.error('[HomeScreen] Error loading snapples for prompt:', error);
@@ -283,7 +284,7 @@ export default function HomeScreen({ navigation, route }) {
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadPrompts();
-    if (selectedPrompt?.id) await loadSnapplesForPrompt(selectedPrompt.id);
+    if (selectedPrompt?.id) await loadSnapplesForPrompt(selectedPrompt);
     setRefreshing(false);
   };
 

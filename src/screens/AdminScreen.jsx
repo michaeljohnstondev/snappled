@@ -553,6 +553,26 @@ export default function AdminScreen({ navigation }) {
             }}
           />
           <UtilButton
+            label="Clean Expired Prompts"
+            desc="Delete activePrompts whose expiresAt is in the past. Stuck prompts from old bug get cleared and rotation can restock them."
+            color={theme.colors.vibeOrange}
+            onPress={async () => {
+              try {
+                const now = new Date().toISOString();
+                const snap = await getDocs(query(collection(db, 'activePrompts'), limit(500)));
+                let removed = 0;
+                for (const d of snap.docs) {
+                  const data = d.data();
+                  if (data.expiresAt && data.expiresAt < now) {
+                    await deleteDoc(doc(db, 'activePrompts', d.id));
+                    removed++;
+                  }
+                }
+                showAlert('Done', `Removed ${removed} expired prompts`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
             label="Reset Game Prompt Usage"
             desc="Set usageCount back to 0 on every gamePrompts doc — least-used rotation starts fresh"
             color={theme.colors.vibeBlue}
