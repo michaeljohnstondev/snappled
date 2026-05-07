@@ -204,8 +204,28 @@ export default function GameScreen({ navigation }) {
   const [playedCardIds, setPlayedCardIds] = useState([]);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
+  // Round number we last scheduled bot picks for — guards against multiple
+  // schedules per round if the phase effect re-runs.
+  const lastBotScheduleRoundRef = useRef(null);
 
   const hasDeck = mySnapples.length >= 6;
+
+  // Schedule bot picks once per round when PICKING starts — bots fire on
+  // randomized 10-15s delays so the round doesn't slam shut.
+  useEffect(() => {
+    if (!gameId || !game) return;
+    if (game.phase !== GAME_PHASES.PICKING) return;
+    if (game.hostId !== user?.uid) return;
+    if (lastBotScheduleRoundRef.current === game.currentRound) return;
+    lastBotScheduleRoundRef.current = game.currentRound;
+    const botPlayers = (game.players || []).filter(p => p.uid?.startsWith('bot_'));
+    botPlayers.forEach(bot => scheduleBotPick(gameId, bot.uid));
+  }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid]);
+
+  // Reset the bot-schedule guard when leaving a game.
+  useEffect(() => {
+    if (!gameId) lastBotScheduleRoundRef.current = null;
+  }, [gameId]);
 
   // Hide the bottom tab bar whenever the user is inside an active game so the
   // game UI gets full-screen real estate. Restore it whenever they leave.
@@ -267,7 +287,22 @@ export default function GameScreen({ navigation }) {
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
 
-    if (game?.phase === GAME_PHASES.PICKING) {
+    if (game?.phase === GAME_PHASES.REVIEW) {
+      setTimer(60);
+      timerRef.current = setInterval(() => {
+        setTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            // Host transitions to PICKING when review timer ends
+            if (game.hostId === user?.uid) {
+              gameService.startPicking(gameId);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (game?.phase === GAME_PHASES.PICKING) {
       setTimer(30);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
@@ -463,10 +498,7 @@ export default function GameScreen({ navigation }) {
       if (result.success) {
         const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
         setHand(drawnHand);
-
-        // Bots auto-submit random cards on a staggered random delay
-        const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-        botPlayers.forEach(bot => scheduleBotPick(gameId, bot.uid));
+        // Bots are scheduled by a phase-change effect once PICKING starts.
       } else {
         showError('Error', result.error);
       }
@@ -499,9 +531,7 @@ export default function GameScreen({ navigation }) {
 
       await gameService.startGame(createResult.gameId, user.uid, prompts);
 
-      // Bots auto-submit on staggered random delays
-      botNames.forEach(name => scheduleBotPick(createResult.gameId, `bot_${name}`));
-
+      // Bots are scheduled by a phase-change effect once PICKING starts.
       const drawnHand = gameService.drawHand(allSnapples, allSnapples);
       setHand(drawnHand);
     } catch (error) {
@@ -557,10 +587,7 @@ export default function GameScreen({ navigation }) {
     setHand(drawnHand);
     if (game.hostId === user.uid) {
       await gameService.nextRound(gameId);
-
-      // Bots auto-submit on staggered random delays
-      const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-      botPlayers.forEach(bot => scheduleBotPick(gameId, bot.uid));
+      // Bots are scheduled by a phase-change effect once PICKING starts.
     }
   };
 
@@ -855,6 +882,64 @@ export default function GameScreen({ navigation }) {
           )}
 
           <Text style={styles.gameCode}>Game ID: {gameId.slice(0, 6).toUpperCase()}</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // Review phase — show the prompt + your hand before picking starts so
+  // players can scout. Auto-advances to PICKING when the timer runs out;
+  // host can also start early.
+  if (game.phase === GAME_PHASES.REVIEW) {
+    const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
+    const isHost = game.hostId === user.uid;
+
+    // Draw the round's hand now so players can see it during review.
+    if (hand.length === 0 && (mySnapples.length > 0 || allSnapples.length > 0)) {
+      setHand(gameService.drawHand(getHandSnapples(), allSnapples));
+    }
+
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={handleLeaveGame}>
+            <View style={styles.backBg}>
+              <Ionicons name="close" size={18} color="white" />
+            </View>
+          </Pressable>
+          <Text style={styles.headerTitle}>Round {game.currentRound}/{game.totalRounds}</Text>
+          <Text style={styles.timerText}>{timer}s</Text>
+        </View>
+
+        <View style={styles.reviewBanner}>
+          <Text style={styles.reviewLabel}>Review Your Hand</Text>
+          <Text style={styles.promptText}>{currentPrompt}</Text>
+        </View>
+
+        <FlatList
+          data={hand}
+          keyExtractor={(item, idx) => item?.id || `hand-${idx}`}
+          numColumns={2}
+          contentContainerStyle={styles.handGrid}
+          columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 12 }}
+          renderItem={({ item, index }) => (
+            <Pressable
+              style={styles.reviewCard}
+              onPress={() => setPreviewCard({ ...item, _isWaiting: true })}
+            >
+              <View style={StyleSheet.absoluteFill}>
+                <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
+              </View>
+            </Pressable>
+          )}
+        />
+
+        <View style={styles.reviewFooter}>
+          {isHost ? (
+            <VibeButton label="Start Round" onPress={() => gameService.startPicking(gameId)} />
+          ) : (
+            <Text style={styles.waitingText}>Waiting for host... {timer}s</Text>
+          )}
         </View>
       </LinearGradient>
     );
@@ -1351,6 +1436,35 @@ const styles = StyleSheet.create({
   loadingHand: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingHandText: { color: theme.colors.textSecondary, fontSize: 14 },
   submittedCount: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
+  reviewBanner: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  reviewLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+    marginBottom: 4,
+  },
+  handGrid: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  reviewCard: {
+    width: (screenWidth - 32 - 12) / 2,
+    aspectRatio: 9 / 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  reviewFooter: {
+    padding: 16,
+    paddingBottom: 24,
+  },
   waitingArea: {
     flex: 1,
     paddingHorizontal: 20,

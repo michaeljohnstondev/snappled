@@ -58,13 +58,14 @@ const DEFAULT_PROMPTS = [
 ];
 const ROUNDS_PER_GAME = 5;
 const HAND_SIZE = 6;
+const REVIEW_TIME = 60000; // 1 minute to review your hand before each round's picking starts
 const PICK_TIME = 15000; // 15 seconds to pick
-const FIRST_ROUND_REVIEW_BONUS = 60000; // Extra minute on round 1 so players can review their hand
 const VOTE_TIME = 15000; // 15 seconds per submission to vote
 const MAX_PLAYERS = 6;
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
+  REVIEW: 'review',
   PICKING: 'picking',
   VOTING: 'voting',
   ROUND_RESULTS: 'roundResults',
@@ -181,13 +182,12 @@ export const gameService = {
       if (data.players.length < 2) return { success: false, error: 'Need at least 2 players' };
 
       await updateDoc(gameRef, {
-        phase: GAME_PHASES.PICKING,
+        phase: GAME_PHASES.REVIEW,
         currentRound: 1,
         prompts: prompts.slice(0, ROUNDS_PER_GAME),
         submissions: [],
         votes: {},
-        // Round 1 gets an extra minute so players can scout their hand.
-        pickDeadline: new Date(Date.now() + PICK_TIME + FIRST_ROUND_REVIEW_BONUS).toISOString(),
+        reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
 
@@ -339,7 +339,8 @@ export const gameService = {
     }
   },
 
-  // Advance to next round
+  // Advance to next round — enters REVIEW phase first so players can scout
+  // the next prompt and their refreshed hand before picking starts.
   async nextRound(gameId) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
@@ -347,17 +348,34 @@ export const gameService = {
       const data = gameDoc.data();
 
       await updateDoc(gameRef, {
-        phase: GAME_PHASES.PICKING,
+        phase: GAME_PHASES.REVIEW,
         currentRound: data.currentRound + 1,
         submissions: [],
         votes: {},
-        pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
+        reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
 
       return { success: true };
     } catch (error) {
       console.error('[GameService] Error advancing round:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Transition from REVIEW to PICKING — host calls this when reviewDeadline
+  // elapses (or when host taps "Start Round" early).
+  async startPicking(gameId) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        phase: GAME_PHASES.PICKING,
+        pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error starting picking:', error);
       return { success: false, error: error.message };
     }
   },
@@ -486,6 +504,7 @@ export const gameService = {
   ROUNDS_PER_GAME,
   HAND_SIZE,
   MAX_PLAYERS,
+  REVIEW_TIME,
   PICK_TIME,
   VOTE_TIME,
 };
