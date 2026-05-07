@@ -11,6 +11,11 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   // so taps near the bottom of the tab don't fight with the system gesture.
   const liftAbove = Math.max(insets.bottom, 16);
 
+  // Honor tabBarStyle.display === 'none' from the focused screen so screens
+  // can hide the bar (e.g. inside an active game).
+  const focusedDescriptor = descriptors[state.routes[state.index].key];
+  if (focusedDescriptor?.options?.tabBarStyle?.display === 'none') return null;
+
   return (
     <View style={[styles.container, { height: 54 + liftAbove }]}>
       {state.routes.map((route, index) => {

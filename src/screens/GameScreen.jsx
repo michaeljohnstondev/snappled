@@ -396,11 +396,11 @@ export default function GameScreen({ navigation }) {
     return source.filter(s => !playedCardIds.includes(s.id));
   };
 
-  // Schedule a bot pick with a random 10-25s delay so the round doesn't end
+  // Schedule a bot pick with a random 10-15s delay so the round doesn't end
   // instantly and other players have time to actually preview each submission
   // as it lands.
   const scheduleBotPick = (gid, botUid) => {
-    const delay = 10000 + Math.floor(Math.random() * 15000);
+    const delay = 10000 + Math.floor(Math.random() * 5000);
     setTimeout(() => {
       const pool = allSnapples;
       if (!pool.length) return;
@@ -899,12 +899,40 @@ export default function GameScreen({ navigation }) {
         </View>
 
         {alreadyPicked ? (
-          <View style={styles.centerContent}>
-            <Ionicons name="checkmark-circle" size={48} color={theme.colors.vibeGreen} />
-            <Text style={styles.waitingText}>Card submitted! Waiting for others...</Text>
-            <Text style={styles.submittedCount}>
+          <View style={styles.waitingArea}>
+            <Text style={styles.waitingHeader}>
               {game.submissions.length}/{game.players.length} submitted
             </Text>
+            <Text style={styles.waitingSub}>Tap any filled card to preview</Text>
+            <View style={styles.placeholderGrid}>
+              {game.players.map(player => {
+                const submission = game.submissions.find(s => s.uid === player.uid);
+                const isSelf = player.uid === user.uid;
+                const filled = !!submission;
+                return (
+                  <Pressable
+                    key={player.uid}
+                    style={[styles.slot, filled ? styles.slotFilled : styles.slotPending]}
+                    onPress={filled ? () => setPreviewCard({ ...submission, _isWaiting: true }) : undefined}
+                  >
+                    {filled ? (
+                      <View style={StyleSheet.absoluteFill}>
+                        <CardThumbnailDelayed videoUrl={submission.videoUrl} delay={isSelf ? 0 : 50} />
+                      </View>
+                    ) : (
+                      <View style={styles.slotEmpty}>
+                        <Ionicons name="time-outline" size={22} color="rgba(255,255,255,0.3)" />
+                      </View>
+                    )}
+                    <View style={styles.slotNameWrap}>
+                      <Text style={styles.slotName} numberOfLines={1}>
+                        {isSelf ? 'You' : player.username}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         ) : (
           <>
@@ -973,12 +1001,14 @@ export default function GameScreen({ navigation }) {
                   <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
                     <Text style={styles.previewCancelText}>Back</Text>
                   </Pressable>
-                  <Pressable style={styles.previewPlay} onPress={() => {
-                    handlePickCard(previewCard);
-                    setPreviewCard(null);
-                  }}>
-                    <Text style={styles.previewPlayText}>Play This Card</Text>
-                  </Pressable>
+                  {!previewCard._isWaiting && (
+                    <Pressable style={styles.previewPlay} onPress={() => {
+                      handlePickCard(previewCard);
+                      setPreviewCard(null);
+                    }}>
+                      <Text style={styles.previewPlayText}>Play This Card</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             </View>
@@ -1321,6 +1351,65 @@ const styles = StyleSheet.create({
   loadingHand: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingHandText: { color: theme.colors.textSecondary, fontSize: 14 },
   submittedCount: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
+  waitingArea: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    alignItems: 'center',
+  },
+  waitingHeader: {
+    color: theme.colors.vibeBlue,
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  waitingSub: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginBottom: 18,
+  },
+  placeholderGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+    width: '100%',
+  },
+  slot: {
+    width: (screenWidth - 40 - 24) / 3,
+    aspectRatio: 9 / 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 2,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  slotPending: {
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderStyle: 'dashed',
+  },
+  slotFilled: {
+    borderColor: theme.colors.vibeBlue,
+  },
+  slotEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  slotNameWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  slotName: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   handContainer: { paddingHorizontal: 12, paddingBottom: 40 },
   handRow: { gap: 8, marginBottom: 8 },
   handCard: {

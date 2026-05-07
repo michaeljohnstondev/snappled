@@ -60,7 +60,7 @@ const ROUNDS_PER_GAME = 5;
 const HAND_SIZE = 6;
 const PICK_TIME = 15000; // 15 seconds to pick
 const FIRST_ROUND_REVIEW_BONUS = 60000; // Extra minute on round 1 so players can review their hand
-const VOTE_TIME = 18000; // 18 seconds per submission to vote
+const VOTE_TIME = 15000; // 15 seconds per submission to vote
 const MAX_PLAYERS = 6;
 
 export const GAME_PHASES = {
