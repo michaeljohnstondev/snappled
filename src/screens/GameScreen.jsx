@@ -328,7 +328,7 @@ const creatorRowStyles = StyleSheet.create({
   },
 });
 
-// ── Round results reveal — staged animation: grid → spotlight → scoreboard ──
+// ── Round results reveal — staged animation: grid → spotlight → shrink → scoreboard ──
 function RoundResultsReveal({
   submissions, rankings, players, prompt,
   currentRound, totalRounds, timer,
@@ -337,11 +337,16 @@ function RoundResultsReveal({
   const winners = (rankings || []).filter(r => r.placement === 1);
   const winnerUids = useRef(new Set(winners.map(w => w.uid))).current;
   const sortedPlayers = [...(players || [])].sort((a, b) => b.points - a.points);
-  // 1 winner → 1.4x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
-  const winnerTargetScale = winners.length === 1 ? 1.4 : winners.length === 2 ? 1.2 : 0.9;
+  // 1 winner → 1.5x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
+  const winnerTargetScale = winners.length === 1 ? 1.5 : winners.length === 2 ? 1.2 : 0.9;
 
-  const [stage, setStage] = useState('reveal'); // reveal → spotlight → scoreboard
+  // reveal: grid full opacity (1.5s)
+  // spotlight: losers fade+shrink, winner scales up (3s)
+  // shrink: winner shrinks toward scoreboard (1s)
+  // scoreboard: existing scoreboard layout
+  const [stage, setStage] = useState('reveal');
   const losersOpacity = useRef(new Animated.Value(1)).current;
+  const losersScale = useRef(new Animated.Value(1)).current;
   const winnerScale = useRef(new Animated.Value(0.6)).current;
   const winnerOpacity = useRef(new Animated.Value(0)).current;
 
@@ -349,13 +354,22 @@ function RoundResultsReveal({
     const t1 = setTimeout(() => {
       setStage('spotlight');
       Animated.parallel([
-        Animated.timing(losersOpacity, { toValue: 0.18, duration: 500, useNativeDriver: true }),
-        Animated.spring(winnerScale, { toValue: winnerTargetScale, tension: 70, friction: 9, useNativeDriver: true }),
-        Animated.timing(winnerOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(losersOpacity, { toValue: 0.12, duration: 700, useNativeDriver: true }),
+        Animated.timing(losersScale, { toValue: 0.7, duration: 700, useNativeDriver: true }),
+        Animated.spring(winnerScale, { toValue: winnerTargetScale, tension: 60, friction: 8, useNativeDriver: true }),
+        Animated.timing(winnerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
       ]).start();
-    }, 1200);
-    const t2 = setTimeout(() => setStage('scoreboard'), 3800);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, 1500);
+    const t2 = setTimeout(() => {
+      setStage('shrink');
+      Animated.parallel([
+        Animated.timing(winnerScale, { toValue: 0.25, duration: 700, useNativeDriver: true }),
+        Animated.timing(winnerOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
+        Animated.timing(losersOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ]).start();
+    }, 4500);
+    const t3 = setTimeout(() => setStage('scoreboard'), 5400);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
   if (stage === 'scoreboard') {
@@ -404,10 +418,10 @@ function RoundResultsReveal({
     );
   }
 
-  // reveal + spotlight stages share the grid layout. spotlight overlays the
-  // winner card(s) at center; losers fade.
-  const cols = (submissions?.length || 0) > 6 ? 4 : 3;
-  const gridCardWidth = (screenWidth - 32 - (cols - 1) * 8) / cols;
+  // reveal + spotlight + shrink share the grid layout for visual continuity
+  // with the picking/voting screens. The spotlight overlay drops the winner's
+  // big card on top during stages spotlight + shrink.
+  const showWinnerOverlay = stage === 'spotlight' || stage === 'shrink';
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
@@ -421,28 +435,32 @@ function RoundResultsReveal({
         <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
       </View>
 
-      <Animated.View style={[styles.revealGrid, { opacity: losersOpacity }]}>
-        {(submissions || []).map((sub, idx) => {
-          const player = (players || []).find(p => p.uid === sub.uid);
+      <FlatList
+        data={submissions || []}
+        keyExtractor={(item, i) => item?.snappleId || `sub-${i}`}
+        numColumns={3}
+        columnWrapperStyle={styles.handRow}
+        contentContainerStyle={styles.handContainer}
+        renderItem={({ item, index }) => {
+          const isWinner = winnerUids.has(item.uid);
+          // During spotlight/shrink, hide the winner's grid slot (only the big
+          // overlay is shown) and shrink+fade the losers.
+          const animStyle = isWinner
+            ? { opacity: showWinnerOverlay ? 0 : 1 }
+            : { opacity: losersOpacity, transform: [{ scale: losersScale }] };
           return (
-            <View
-              key={sub.uid}
-              style={[styles.revealCard, { width: gridCardWidth, aspectRatio: 9 / 16 }]}
-            >
-              <View style={StyleSheet.absoluteFill}>
-                <CardThumbnailDelayed videoUrl={sub.videoUrl} delay={idx * 80} />
+            <Animated.View style={animStyle}>
+              <View style={styles.handCard}>
+                <View style={styles.handCardVideo}>
+                  <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
+                </View>
               </View>
-              <View style={styles.revealCardLabel}>
-                <Text style={styles.revealCardName} numberOfLines={1}>
-                  @{player?.username || '?'}
-                </Text>
-              </View>
-            </View>
+            </Animated.View>
           );
-        })}
-      </Animated.View>
+        }}
+      />
 
-      {stage === 'spotlight' && (
+      {showWinnerOverlay && (
         <View style={styles.spotlightOverlay} pointerEvents="none">
           <View style={styles.spotlightRow}>
             {winners.map(w => {
@@ -467,7 +485,7 @@ function RoundResultsReveal({
                       {winners.length > 1 ? 'TIE' : 'WINNER'}
                     </Text>
                     <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
-                    {sub?.creatorUsername && (
+                    {sub?.creatorUsername && sub.creatorUsername !== player?.username && (
                       <Text style={styles.spotlightCreator}>by @{sub.creatorUsername}</Text>
                     )}
                   </View>
@@ -1295,41 +1313,34 @@ export default function GameScreen({ navigation }) {
         </View>
 
         {alreadyPicked ? (
-          <View style={styles.waitingArea}>
-            <Text style={styles.waitingHeader}>
-              {game.submissions.length}/{game.players.length} submitted
+          <>
+            <Text style={styles.pickInstruction}>
+              {game.submissions.length}/{game.players.length} submitted — tap to preview
             </Text>
-            <Text style={styles.waitingSub}>Tap any filled card to preview</Text>
-            <View style={styles.placeholderGrid}>
-              {game.players.map(player => {
-                const submission = game.submissions.find(s => s.uid === player.uid);
-                const isSelf = player.uid === user.uid;
-                const filled = !!submission;
-                return (
-                  <Pressable
-                    key={player.uid}
-                    style={[styles.slot, filled ? styles.slotFilled : styles.slotPending]}
-                    onPress={filled ? () => setPreviewCard({ ...submission, _isWaiting: true }) : undefined}
-                  >
-                    {filled ? (
-                      <View style={StyleSheet.absoluteFill}>
-                        <CardThumbnailDelayed videoUrl={submission.videoUrl} delay={isSelf ? 0 : 50} />
-                      </View>
-                    ) : (
-                      <View style={styles.slotEmpty}>
-                        <Ionicons name="time-outline" size={22} color="rgba(255,255,255,0.3)" />
-                      </View>
-                    )}
-                    <View style={styles.slotNameWrap}>
-                      <Text style={styles.slotName} numberOfLines={1}>
-                        {isSelf ? 'You' : player.username}
-                      </Text>
+            <FlatList
+              data={Array.from({ length: game.players.length }).map((_, i) => game.submissions[i] || null)}
+              keyExtractor={(_, i) => `slot-${i}`}
+              numColumns={3}
+              columnWrapperStyle={styles.handRow}
+              contentContainerStyle={styles.handContainer}
+              renderItem={({ item, index }) => (
+                <Pressable
+                  style={[styles.handCard, !item && styles.handCardEmpty]}
+                  onPress={item ? () => setPreviewCard({ ...item, _isWaiting: true }) : undefined}
+                >
+                  {item ? (
+                    <View style={styles.handCardVideo}>
+                      <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 50} />
                     </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
+                  ) : (
+                    <View style={[styles.handCardVideo, styles.handCardEmptyInner]}>
+                      <Ionicons name="time-outline" size={22} color="rgba(255,255,255,0.25)" />
+                    </View>
+                  )}
+                </Pressable>
+              )}
+            />
+          </>
         ) : (
           <>
             <View style={styles.pickHeader}>
@@ -1907,6 +1918,15 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: theme.colors.vibeBlue, backgroundColor: 'rgba(0,0,0,0.3)',
   },
   handCardSelected: { borderColor: theme.colors.vibeGreen, borderWidth: 3 },
+  handCardEmpty: {
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  handCardEmptyInner: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   handCardVideo: { flex: 1 },
   favoriteTag: {
     position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
