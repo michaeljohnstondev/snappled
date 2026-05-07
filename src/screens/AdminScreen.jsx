@@ -553,6 +553,35 @@ export default function AdminScreen({ navigation }) {
             }}
           />
           <UtilButton
+            label="Reset Game Prompt Usage"
+            desc="Set usageCount back to 0 on every gamePrompts doc — least-used rotation starts fresh"
+            color={theme.colors.vibeBlue}
+            onPress={async () => {
+              try {
+                const snap = await getDocs(query(collection(db, 'gamePrompts'), limit(500)));
+                let reset = 0;
+                for (const d of snap.docs) {
+                  if ((d.data().usageCount || 0) === 0) continue;
+                  await updateDoc(doc(db, 'gamePrompts', d.id), { usageCount: 0 });
+                  reset++;
+                }
+                showAlert('Done', `Reset ${reset} prompts (${snap.size} total)`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
+            label="Reseed Game Prompts"
+            desc="Add any prompts from the local DEFAULT_PROMPTS list that aren't already in gamePrompts (safe to repeat — dedupes by text)"
+            color={theme.colors.vibeGreen}
+            onPress={async () => {
+              try {
+                const { gameService } = await import('../services/gameService');
+                const result = await gameService.seedGamePrompts();
+                showAlert('Done', `Added ${result.added}, total ${result.total}`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
             label="Clean Orphan Snapples"
             desc="Delete snapples with no owner and remove their video files"
             color={theme.colors.vibeRed}

@@ -419,15 +419,29 @@ export const gameService = {
     }
   },
 
+  // Seed any DEFAULT_PROMPTS that aren't already in the gamePrompts collection.
+  // Safe to call repeatedly — existing prompts are skipped (matched by text,
+  // case-insensitive trim).
   async seedGamePrompts() {
+    const existingSnap = await getDocs(query(collection(db, 'gamePrompts'), limit(500)));
+    const existing = new Set();
+    existingSnap.forEach(d => {
+      const t = d.data().text?.toLowerCase().trim();
+      if (t) existing.add(t);
+    });
+    let added = 0;
     for (const text of DEFAULT_PROMPTS) {
+      const key = text.toLowerCase().trim();
+      if (existing.has(key)) continue;
       await setDoc(doc(collection(db, 'gamePrompts')), {
         text,
         usageCount: 0,
         createdAt: new Date().toISOString(),
       });
+      added++;
     }
-    console.log('[GameService] Seeded', DEFAULT_PROMPTS.length, 'prompts');
+    console.log('[GameService] Seeded', added, 'new prompts (skipped', existing.size, 'existing)');
+    return { added, total: existing.size + added };
   },
 
   // Draw a hand from deck
