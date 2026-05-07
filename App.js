@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Navigation from "./Navigation";
 import { AuthProvider } from "./src/store/AuthContext";
 import { ModalProvider } from "./src/store/ModalContext";
+import { RewardClaimProvider } from "./src/store/RewardClaimContext";
 
 LogBox.ignoreLogs([
   "SafeAreaView has been deprecated",
@@ -42,9 +43,11 @@ export default function App() {
           <StatusBar hidden translucent backgroundColor="transparent" />
           <AuthProvider>
             <ModalProvider>
-              <NavigationContainer ref={navRef}>
-                <Navigation />
-              </NavigationContainer>
+              <RewardClaimProvider>
+                <NavigationContainer ref={navRef}>
+                  <Navigation />
+                </NavigationContainer>
+              </RewardClaimProvider>
             </ModalProvider>
           </AuthProvider>
         </View>

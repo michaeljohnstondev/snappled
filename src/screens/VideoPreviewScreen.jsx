@@ -10,6 +10,7 @@ import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanima
 import VibeButton from '../components/ui/VibeButton';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
+import { useRewardClaim } from '../store/RewardClaimContext';
 import { uploadVideo } from '../services/videoStorage';
 import { snappleService } from '../services/snappleService';
 import { achievementService } from '../services/achievementService';
@@ -21,6 +22,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const initialPrompt = route.params?.prompt;
   const { user, userCurrency, updateUserCurrency } = useAuth();
   const { showSuccess, showError, showConfirm, showToast } = useModal();
+  const { flyRewards } = useRewardClaim();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -169,13 +171,19 @@ export default function VideoPreviewScreen({ route, navigation }) {
           const now = new Date().toISOString();
           const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
 
-          await xpUpdate(xpDoc(xpDb, 'users', user.uid), {
-            'profile.experience': xpInc(xpAmount),
-            'profile.xp': xpInc(xpAmount),
-            'stats.videosCreated': xpInc(1),
-          }).catch(() => {});
-
-          showToast('reward', `+${xpAmount} XP`, xpAmount > 75 ? 'Snapple created (2x boost!)' : 'Snapple created');
+          // Fire-and-forget claim — XP only, no fly icons, just a bar tick.
+          // commit runs at the apex so the resource bar's XP/level bar moves
+          // in sync with the (very brief) overlay.
+          flyRewards({
+            rewards: { xp: xpAmount },
+            commit: async () => {
+              await xpUpdate(xpDoc(xpDb, 'users', user.uid), {
+                'profile.experience': xpInc(xpAmount),
+                'profile.xp': xpInc(xpAmount),
+                'stats.videosCreated': xpInc(1),
+              }).catch(() => {});
+            },
+          });
 
           const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
           if (afterLevel > beforeLevel) {

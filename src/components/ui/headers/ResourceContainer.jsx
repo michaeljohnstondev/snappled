@@ -1,8 +1,13 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
 import { levelService } from "../../../services/levelService";
+import TickingNumber from "../TickingNumber";
 import theme from "../../../theme/themes";
 
+// Resource bar at the top of the app. Each numeric stat ticks rather than
+// snaps when its value changes. The trophy slot also flashes white when the
+// trophy count goes DOWN (e.g. ranked loss) so the user gets a quick
+// notification without going as loud as red.
 export default function ResourceContainer({ userStats, onTokenPress }) {
   const xp = userStats.xp || 0;
   const levelInfo = levelService.getLevelInfo(xp);
@@ -10,32 +15,67 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
 
   return (
     <View style={styles.statsRow}>
-      <Pressable
-        style={styles.statItem}
-        onPress={onTokenPress}
-      >
+      <Pressable style={styles.statItem} onPress={onTokenPress}>
         <Text style={styles.iconText}>🎫</Text>
-        <Text style={styles.statText}>{userStats.tokens || 0}</Text>
+        <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
 
       <View style={styles.statItem}>
         <Text style={styles.iconText}>💰</Text>
-        <Text style={styles.statText}>{(userStats.coins || 0).toLocaleString()}</Text>
+        <TickingNumber
+          value={userStats.coins || 0}
+          format={(n) => n.toLocaleString()}
+          style={styles.statText}
+        />
       </View>
 
-      <View style={styles.statItem}>
+      <FlashOnDecreaseSlot value={userStats.trophies || 0}>
         <Text style={styles.iconText}>🏆</Text>
-        <Text style={styles.statText}>{userStats.trophies || 0}</Text>
-      </View>
+        <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
+      </FlashOnDecreaseSlot>
 
       <View style={styles.levelItem}>
-        {/* XP progress background */}
         <View style={styles.levelBg}>
-          <View style={[styles.levelFill, { width: `${Math.min(levelInfo.progress * 100, 100)}%`, backgroundColor: levelColor }]} />
+          <View
+            style={[
+              styles.levelFill,
+              {
+                width: `${Math.min(levelInfo.progress * 100, 100)}%`,
+                backgroundColor: levelColor,
+              },
+            ]}
+          />
         </View>
         <Text style={styles.levelText}>Lvl {levelInfo.level}</Text>
       </View>
     </View>
+  );
+}
+
+// Wraps a stat slot so its background flashes white briefly when `value` goes
+// down. Used for trophy losses — soft notification, not punitive red.
+function FlashOnDecreaseSlot({ value, children }) {
+  const flash = useRef(new Animated.Value(0)).current;
+  const lastRef = useRef(value);
+  useEffect(() => {
+    if (value < lastRef.current) {
+      Animated.sequence([
+        Animated.timing(flash, { toValue: 1, duration: 180, useNativeDriver: false }),
+        Animated.timing(flash, { toValue: 0, duration: 600, useNativeDriver: false }),
+      ]).start();
+    }
+    lastRef.current = value;
+  }, [value]);
+
+  const bg = flash.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.55)'],
+  });
+
+  return (
+    <Animated.View style={[styles.statItem, { backgroundColor: bg }]}>
+      {children}
+    </Animated.View>
   );
 }
 

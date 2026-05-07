@@ -326,15 +326,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 68, 68, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 2,
-    borderColor: theme.colors.vibeRed,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   replaceText: {
-    color: theme.colors.vibeRed,
+    color: 'white',
     fontSize: 13,
     fontWeight: theme.fontWeights.semiBold,
     flex: 1,
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   pillTextRemove: {
-    color: theme.colors.vibeRed,
+    color: 'white',
   },
   emptyContainer: {
     paddingVertical: 60,

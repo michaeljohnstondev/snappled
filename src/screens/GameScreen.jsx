@@ -9,6 +9,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
+import { useRewardClaim } from '../store/RewardClaimContext';
 import { gameService, GAME_PHASES } from '../services/gameService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
@@ -659,6 +660,7 @@ function RoundResultsReveal({
 export default function GameScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
   const { showAlert, showError, showConfirm, showToast } = useModal();
+  const { claimRewards } = useRewardClaim();
   const [gameId, setGameId] = useState(null);
   const [game, setGame] = useState(null);
   const [hand, setHand] = useState([]);
@@ -1126,7 +1128,8 @@ export default function GameScreen({ navigation }) {
             .map(() => 1); // TODO: track player levels in game doc
 
           let xpEarned = levelService.calculateGameXP(myReward.placement, opponentLevels, myLevel);
-          let trophiesEarned = levelService.calculateTrophies(myReward.placement);
+          let trophiesEarned = isPractice ? 0 : levelService.calculateTrophies(myReward.placement);
+          let coinsEarned = myReward.coinsEarned || 0;
 
           const { doc, updateDoc, increment, getDoc } = await import('firebase/firestore');
           const { db } = await import('../services/firebase');
@@ -1144,56 +1147,76 @@ export default function GameScreen({ navigation }) {
 
           // Check shield — block trophy loss
           const inventory = boostSnap.data()?.inventory || {};
+          let shieldUsed = false;
           if (trophiesEarned < 0 && (inventory.shields || 0) > 0) {
             trophiesEarned = 0;
-            await updateDoc(doc(db, 'users', user.uid), {
-              'inventory.shields': increment(-1),
-            });
-            showToast('reward', 'Shield Used!', 'Trophy loss blocked');
+            shieldUsed = true;
           }
 
-          await updateUserCurrency({
-            coins: (userCurrency.coins || 0) + myReward.coinsEarned,
+          // Build the commit function — runs at the apex of the fly animation
+          // so resource bar values tick up as icons land.
+          const userRef = doc(db, 'users', user.uid);
+          const commit = async () => {
+            try {
+              if (shieldUsed) {
+                await updateDoc(doc(db, 'users', user.uid), {
+                  'inventory.shields': increment(-1),
+                }).catch(() => {});
+              }
+              if (coinsEarned > 0) {
+                await updateUserCurrency({
+                  coins: (userCurrency.coins || 0) + coinsEarned,
+                });
+              }
+              const updates = {
+                'profile.experience': increment(xpEarned),
+                'profile.xp': increment(xpEarned),
+                'stats.gamesPlayed': increment(1),
+                'stats.gamesWon': myReward.placement === 1 ? increment(1) : increment(0),
+                'stats.totalCoinsEarned': increment(coinsEarned),
+              };
+              if (trophiesEarned !== 0) {
+                updates['resources.trophies'] = increment(trophiesEarned);
+              }
+              await updateDoc(userRef, updates).catch(() => {});
+              if (myReward.placement === 1) {
+                const afterSnap = await getDoc(userRef);
+                const streak = (afterSnap.data()?.stats?.winStreak || 0) + 1;
+                await updateDoc(userRef, { 'stats.winStreak': streak }).catch(() => {});
+              } else {
+                await updateDoc(userRef, { 'stats.winStreak': 0 }).catch(() => {});
+              }
+            } catch (e) {}
+          };
+
+          await claimRewards({
+            title: 'Game Over',
+            subtitle: `#${myReward.placement} place`,
+            rewards: {
+              coins: coinsEarned,
+              trophies: trophiesEarned,
+              xp: xpEarned,
+            },
+            commit,
           });
 
-          const userRef = doc(db, 'users', user.uid);
-          const updates = {
-            'profile.experience': increment(xpEarned),
-            'profile.xp': increment(xpEarned),
-            'stats.gamesPlayed': increment(1),
-            'stats.gamesWon': myReward.placement === 1 ? increment(1) : increment(0),
-            'stats.totalCoinsEarned': increment(myReward.coinsEarned),
-          };
-          if (trophiesEarned !== 0) {
-            updates['resources.trophies'] = increment(trophiesEarned);
+          if (shieldUsed) {
+            showToast('reward', 'Shield Used!', 'Trophy loss blocked');
           }
-          await updateDoc(userRef, updates).catch(() => {});
-
-          // Show game over
-          const parts = [`#${myReward.placement}`];
-          if (myReward.coinsEarned > 0) parts.push(`${myReward.coinsEarned} coins`);
-          parts.push(`${xpEarned} XP`);
-          if (trophiesEarned > 0) parts.push(`+${trophiesEarned} trophies`);
-          if (trophiesEarned < 0) parts.push(`${trophiesEarned} trophies`);
-
-          showAlert('Game Over!', parts.join(' — '));
 
           // Level up check
           const afterLevel = levelService.getLevelFromXP((user?.profile?.experience || 0) + xpEarned);
           if (afterLevel > myLevel) {
-            setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1000);
+            setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 400);
           }
 
           // Win streak toast
           if (myReward.placement === 1) {
             const afterSnap = await getDoc(userRef);
-            const streak = (afterSnap.data()?.stats?.winStreak || 0) + 1;
-            await updateDoc(userRef, { 'stats.winStreak': streak }).catch(() => {});
+            const streak = (afterSnap.data()?.stats?.winStreak || 0);
             if (streak >= 3) {
-              setTimeout(() => showToast('streak', `${streak} Win Streak!`, 'Keep it going!'), 2000);
+              setTimeout(() => showToast('streak', `${streak} Win Streak!`, 'Keep it going!'), 1000);
             }
-          } else {
-            await updateDoc(userRef, { 'stats.winStreak': 0 }).catch(() => {});
           }
 
           // Check achievements
@@ -1208,15 +1231,15 @@ export default function GameScreen({ navigation }) {
             };
             const newAchievements = await achievementService.checkAndAward(user.uid, stats);
             newAchievements.forEach((a, i) => {
-              const rewards = [];
-              if (a.coins) rewards.push(`+${a.coins}c`);
-              if (a.xp) rewards.push(`+${a.xp}xp`);
-              if (a.trophies) rewards.push(`+${a.trophies}t`);
-              setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3500 + i * 1500);
+              const ach = [];
+              if (a.coins) ach.push(`+${a.coins}c`);
+              if (a.xp) ach.push(`+${a.xp}xp`);
+              if (a.trophies) ach.push(`+${a.trophies}t`);
+              setTimeout(() => showToast('achievement', a.name, ach.join(' ')), 1800 + i * 1500);
             });
           } catch (e) {}
         } catch (e) {
-          showAlert('Game Over', `You placed #${myReward.placement}`);
+          console.error('[GameScreen] handleFinish error:', e);
         }
       }
     }
@@ -1757,7 +1780,6 @@ export default function GameScreen({ navigation }) {
               <Text style={styles.resultPlacement}>#{p.placement}</Text>
               <Text style={styles.resultName}>@{p.username}</Text>
               <Text style={styles.resultTotal}>{p.points} pts</Text>
-              <Text style={styles.resultCoins}>+{p.coinsEarned} 🪙</Text>
             </View>
           ))}
 
