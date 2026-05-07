@@ -404,6 +404,8 @@ function RoundResultsReveal({
   const losersScale = useRef(new Animated.Value(1)).current;
   const overlayBgOpacity = useRef(new Animated.Value(1)).current;
   const scoreboardOpacity = useRef(new Animated.Value(0.15)).current;
+  // Drives the per-card jiggle during the reveal stage.
+  const wobble = useRef(new Animated.Value(0)).current;
 
   // Per-winner animated values. Map to support 2+ way ties cleanly. Spread
   // is handled by flex layout in spotlightOverlay (row direction with gap).
@@ -432,6 +434,21 @@ function RoundResultsReveal({
     }
   };
 
+  // Card wobble loop — runs through the reveal stage so cards visibly tease
+  // before the winner reveal. Stops when we leave reveal.
+  useEffect(() => {
+    if (stage !== 'reveal') return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wobble, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.timing(wobble, { toValue: -1, duration: 440, useNativeDriver: true }),
+        Animated.timing(wobble, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [stage]);
+
   useEffect(() => {
     const t1 = setTimeout(() => {
       setStage('spotlight');
@@ -449,7 +466,7 @@ function RoundResultsReveal({
         );
       });
       Animated.parallel(anims).start();
-    }, 1500);
+    }, 2800); // Extended so the card wobble has visible airtime before reveal
 
     // Hold spotlight for ~3.5s so the snapple video has time to actually play
     // on screen. Then shrink into each winner's scoreboard row.
@@ -472,9 +489,9 @@ function RoundResultsReveal({
         );
       });
       Animated.parallel(anims).start();
-    }, 5000);
+    }, 6300);
 
-    const t3 = setTimeout(() => setStage('scoreboard'), 5800);
+    const t3 = setTimeout(() => setStage('scoreboard'), 7100);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
@@ -585,12 +602,24 @@ function RoundResultsReveal({
             contentContainerStyle={styles.handContainer}
             scrollEnabled={false}
             renderItem={({ item, index }) => {
-              const isWinner = winnerUids.has(item.uid);
-              const animStyle = isWinner
-                ? { opacity: showWinnerOverlay ? 0 : 1 }
-                : { opacity: losersOpacity, transform: [{ scale: losersScale }] };
+              // Per-card rotation magnitude — gives the wobble varied energy
+              // so the grid doesn't look mechanically synced.
+              const wobbleMag = ((index * 7) % 5) + 2;
+              const cardRotate = wobble.interpolate({
+                inputRange: [-1, 0, 1],
+                outputRange: [`-${wobbleMag}deg`, '0deg', `${wobbleMag}deg`],
+              });
+              const inReveal = stage === 'reveal';
               return (
-                <Animated.View style={animStyle}>
+                <Animated.View
+                  style={{
+                    opacity: losersOpacity,
+                    transform: [
+                      { scale: losersScale },
+                      ...(inReveal ? [{ rotate: cardRotate }] : []),
+                    ],
+                  }}
+                >
                   <View style={styles.handCard}>
                     <View style={styles.handCardVideo}>
                       <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
@@ -646,6 +675,8 @@ export default function GameScreen({ navigation }) {
   // IDs of snapples this user has already played in the current game — used to
   // filter the hand pool so each round reveals unseen cards.
   const [playedCardIds, setPlayedCardIds] = useState([]);
+  // When true, tapping a card in the hand replaces it instead of previewing.
+  const [mulliganMode, setMulliganMode] = useState(false);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
   // Round number we last scheduled bot picks for — guards against multiple
@@ -1030,6 +1061,7 @@ export default function GameScreen({ navigation }) {
     setCurrentVoteIndex(0);
     setFavoriteCard(null);
     setHasVoted(false);
+    setMulliganMode(false);
 
     if (playedThisRound) {
       setHand(prev => {
@@ -1077,6 +1109,7 @@ export default function GameScreen({ navigation }) {
     setCurrentVoteIndex(0);
     setIsSpectating(false);
     setPlayedCardIds([]);
+    setMulliganMode(false);
   };
 
   const handleFinish = async () => {
@@ -1216,6 +1249,7 @@ export default function GameScreen({ navigation }) {
     setIsSpectating(false);
     setIsPractice(false);
     setPlayedCardIds([]);
+    setMulliganMode(false);
   };
 
   // ── RENDER PHASES ──
@@ -1465,7 +1499,9 @@ export default function GameScreen({ navigation }) {
           </>
         ) : (
           <>
-            <Text style={styles.pickInstruction}>Tap a card to preview, then play it</Text>
+            <Text style={styles.pickInstruction}>
+              {mulliganMode ? 'Tap a card to replace it' : 'Tap a card to preview, then play it'}
+            </Text>
             <FlatList
               data={hand}
               keyExtractor={(item, i) => item?.id || `hand-${i}`}
@@ -1474,8 +1510,35 @@ export default function GameScreen({ navigation }) {
               contentContainerStyle={styles.handContainer}
               renderItem={({ item, index }) => (
                 <Pressable
-                  style={[styles.handCard, selectedCard?.id === item.id && styles.handCardSelected]}
-                  onPress={() => setPreviewCard(item)}
+                  style={[
+                    styles.handCard,
+                    selectedCard?.id === item.id && styles.handCardSelected,
+                    mulliganMode && styles.handCardMulligan,
+                  ]}
+                  onPress={async () => {
+                    if (mulliganMode) {
+                      // Swap this card for one from the unused pool — no confirm.
+                      const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
+                      if (remaining.length === 0) {
+                        showAlert('No Cards', 'No more cards to draw from your deck');
+                        setMulliganMode(false);
+                        return;
+                      }
+                      const newCard = remaining[Math.floor(Math.random() * remaining.length)];
+                      setHand(prev => prev.map(h => h.id === item.id ? newCard : h));
+                      setMulliganMode(false);
+                      try {
+                        const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
+                        const { db: mDb } = await import('../services/firebase');
+                        await mUpdate(mDoc(mDb, 'users', user.uid), {
+                          'inventory.mulligans': mInc(-1),
+                        });
+                      } catch (e) {}
+                      showToast('reward', 'Mulligan!', 'Card swapped');
+                    } else {
+                      setPreviewCard(item);
+                    }
+                  }}
                 >
                   <View style={styles.handCardVideo}>
                     {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
@@ -1484,29 +1547,18 @@ export default function GameScreen({ navigation }) {
               )}
             />
             {(user?.inventory?.mulligans || 0) > 0 && (
-              <Pressable style={styles.mulliganBtnBottom} onPress={async () => {
-                if (hand.length === 0) return;
-                // Remove worst card, draw a new one
-                const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
-                if (remaining.length === 0) {
-                  showAlert('No Cards', 'No more cards to draw from your deck');
-                  return;
-                }
-                const newCard = remaining[Math.floor(Math.random() * remaining.length)];
-                const newHand = [...hand];
-                newHand[newHand.length - 1] = newCard;
-                setHand(newHand);
-                try {
-                  const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
-                  const { db: mDb } = await import('../services/firebase');
-                  await mUpdate(mDoc(mDb, 'users', user.uid), {
-                    'inventory.mulligans': mInc(-1),
-                  });
-                } catch (e) {}
-                showToast('reward', 'Mulligan!', 'Card swapped');
-              }}>
-                <Ionicons name="refresh" size={16} color={theme.colors.vibeGreen} />
-                <Text style={styles.mulliganText}>Mulligan ({user?.inventory?.mulligans || 0})</Text>
+              <Pressable
+                style={[styles.mulliganBtnBottom, mulliganMode && styles.mulliganBtnBottomActive]}
+                onPress={() => setMulliganMode(prev => !prev)}
+              >
+                <Ionicons
+                  name={mulliganMode ? 'close' : 'refresh'}
+                  size={16}
+                  color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
+                />
+                <Text style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}>
+                  {mulliganMode ? 'Cancel' : `Mulligan (${user?.inventory?.mulligans || 0})`}
+                </Text>
               </Pressable>
             )}
           </>
@@ -1863,6 +1915,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 2,
     borderColor: theme.colors.vibeGreen,
+  },
+  mulliganBtnBottomActive: {
+    borderColor: theme.colors.vibeRed,
+    backgroundColor: 'rgba(255, 80, 80, 0.12)',
+  },
+  handCardMulligan: {
+    borderColor: theme.colors.vibeRed,
+    borderWidth: 3,
   },
   mulliganBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
