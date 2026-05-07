@@ -1363,13 +1363,8 @@ export default function GameScreen({ navigation }) {
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>Warming Up</Text>
+          <Text style={styles.headerTitle}>Warmup</Text>
           <Text style={styles.timerText}>{timer}s</Text>
-        </View>
-
-        <View style={styles.reviewBanner}>
-          <Text style={styles.reviewLabel}>Review Your Hand</Text>
-          <Text style={styles.promptText}>{currentPrompt}</Text>
         </View>
 
         <FlatList
@@ -1573,7 +1568,7 @@ export default function GameScreen({ navigation }) {
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>{isSpectating ? 'Watching' : 'Voting'}</Text>
+          <Text style={styles.headerTitle}>{isSpectating ? 'Watching' : 'Vote'}</Text>
           {!isSpectating && <Text style={styles.timerText}>{timer}s</Text>}
         </View>
 
@@ -1841,7 +1836,7 @@ const styles = StyleSheet.create({
   waitingText: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   // Picking
   promptBanner: {
-    marginHorizontal: 16, marginTop: 12, padding: 20, borderRadius: 16,
+    marginHorizontal: 16, marginTop: 12, marginBottom: 12, padding: 20, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },

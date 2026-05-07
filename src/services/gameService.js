@@ -382,22 +382,37 @@ export const gameService = {
     }
   },
 
-  // Fetch random game prompts — seeds if empty
+  // Fetch random game prompts — seeds if empty. Prefers least-used prompts
+  // so games actually cycle through the full pool instead of replaying the
+  // same handful every match.
   async getGamePrompts(count = 5) {
     try {
-      const q = query(collection(db, 'gamePrompts'), limit(50));
+      // Order by usageCount ascending so least-used bubble up; pull a window
+      // of 30 then shuffle to add randomness without going stale.
+      const q = query(
+        collection(db, 'gamePrompts'),
+        orderBy('usageCount', 'asc'),
+        limit(30),
+      );
       let snapshot = await getDocs(q);
 
-      // Seed if empty
       if (snapshot.empty) {
         console.log('[GameService] Seeding game prompts...');
         await this.seedGamePrompts();
         snapshot = await getDocs(q);
       }
 
-      const prompts = [];
-      snapshot.forEach(d => prompts.push(d.data().text));
-      return prompts.sort(() => Math.random() - 0.5).slice(0, count);
+      const candidates = [];
+      snapshot.forEach(d => candidates.push({ id: d.id, text: d.data().text }));
+      const shuffled = candidates.sort(() => Math.random() - 0.5).slice(0, count);
+
+      // Increment usageCount for the selected prompts so next game prefers
+      // others. Fire-and-forget — don't block on it.
+      shuffled.forEach(p => {
+        updateDoc(doc(db, 'gamePrompts', p.id), { usageCount: increment(1) }).catch(() => {});
+      });
+
+      return shuffled.map(p => p.text);
     } catch (error) {
       console.error('[GameService] Error fetching game prompts:', error);
       return DEFAULT_PROMPTS.slice(0, count);
