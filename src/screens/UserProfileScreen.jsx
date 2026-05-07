@@ -14,7 +14,8 @@ import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
-const ITEM_SIZE = (screenWidth - 60) / 2;
+// 3-col grid: 40px horizontal padding (20+20) + 20px split across 2 gaps = 10px each.
+const ITEM_SIZE = (screenWidth - 60) / 3;
 
 export default function UserProfileScreen({ route, navigation }) {
   const { user, userCurrency } = useAuth();
@@ -240,7 +241,7 @@ export default function UserProfileScreen({ route, navigation }) {
           data={activeSnapples}
           keyExtractor={(item, index) => item?.id || `snapple-${index}`}
           renderItem={renderSnappleItem}
-          numColumns={2}
+          numColumns={3}
           columnWrapperStyle={styles.row}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
