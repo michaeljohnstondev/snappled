@@ -13,8 +13,11 @@ import {
   deleteDoc,
   orderBy,
   limit,
+  increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
+
+const SNAPPLES_COLLECTION = 'snapples';
 
 const GAMES_COLLECTION = 'games';
 
@@ -209,6 +212,14 @@ export const gameService = {
         updatedAt: serverTimestamp(),
       });
 
+      // Track that this snapple was played in a game. Best-effort — don't fail
+      // the pick if the snapple doc happens to be missing.
+      if (snapple?.id) {
+        updateDoc(doc(db, SNAPPLES_COLLECTION, snapple.id), {
+          gamesPlayed: increment(1),
+        }).catch(() => {});
+      }
+
       return { success: true };
     } catch (error) {
       console.error('[GameService] Error submitting pick:', error);
@@ -305,6 +316,19 @@ export const gameService = {
         }),
         updatedAt: serverTimestamp(),
       });
+
+      // Track wins on the snapple itself. A "win" = the snapple submitted by
+      // the player at placement 1 for this round. Tie-breaks fall to whichever
+      // submission sort put first — we don't double-count.
+      const winnerUid = roundResult.find(r => r.placement === 1)?.uid;
+      if (winnerUid) {
+        const winningSubmission = (data.submissions || []).find(s => s.uid === winnerUid);
+        if (winningSubmission?.snappleId) {
+          updateDoc(doc(db, SNAPPLES_COLLECTION, winningSubmission.snappleId), {
+            gamesWon: increment(1),
+          }).catch(() => {});
+        }
+      }
 
       return { success: true, roundResult, isLastRound };
     } catch (error) {

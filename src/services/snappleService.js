@@ -69,6 +69,8 @@ export const snappleService = {
         buyCount: 0,
         wishlistCount: 0,
         reports: 0,
+        gamesPlayed: 0,
+        gamesWon: 0,
         
         // Pricing
         basePrice: 10, // Starting price in coins
