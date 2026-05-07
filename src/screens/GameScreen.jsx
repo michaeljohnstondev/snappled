@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { gameService, GAME_PHASES } from '../services/gameService';
@@ -328,30 +329,6 @@ const creatorRowStyles = StyleSheet.create({
   },
 });
 
-// Animated points counter — ticks displayed value from prev → target over 1s
-// when `animate` becomes true. Used in the scoreboard row to make the round's
-// earned points feel like a reward rather than a number that just jumped.
-function PointsTicker({ from, to, animate, style }) {
-  const [displayed, setDisplayed] = useState(from);
-  useEffect(() => {
-    if (!animate || from === to) {
-      setDisplayed(to);
-      return;
-    }
-    const duration = 900;
-    const steps = 18;
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      const progress = Math.min(i / steps, 1);
-      setDisplayed(Math.round(from + (to - from) * progress));
-      if (progress >= 1) clearInterval(id);
-    }, duration / steps);
-    return () => clearInterval(id);
-  }, [animate, from, to]);
-  return <Text style={style}>{displayed} pts</Text>;
-}
-
 // Spotlight card for a winner — plays the snapple video on loop. Each winner
 // has its own animated values so multi-winner ties can shrink to their own
 // scoreboard rows independently. Layout is flex-row inside spotlightOverlay,
@@ -396,9 +373,31 @@ function RoundResultsReveal({
 }) {
   const winners = (rankings || []).filter(r => r.placement === 1);
   const winnerUids = useRef(new Set(winners.map(w => w.uid))).current;
-  const sortedPlayers = [...(players || [])].sort((a, b) => b.points - a.points);
   // 1 winner → 1.5x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
   const winnerTargetScale = winners.length === 1 ? 1.5 : winners.length === 2 ? 1.2 : 0.9;
+
+  // earnedByUid lookup so the row can show +N this round.
+  const earnedByUid = {};
+  (rankings || []).forEach(r => { earnedByUid[r.uid] = r.pointsEarned || 0; });
+
+  // Displayed points per player — start at "before this round" total. Tick up
+  // to the post-round total when stage hits shrink. Sorting is driven by these
+  // displayed values so rank swaps happen mid-animation.
+  const [displayedPoints, setDisplayedPoints] = useState(() =>
+    Object.fromEntries(
+      (players || []).map(p => {
+        const ranking = (rankings || []).find(r => r.uid === p.uid);
+        const earned = ranking?.pointsEarned || 0;
+        return [p.uid, Math.max(0, p.points - earned)];
+      })
+    )
+  );
+
+  const orderedPlayers = [...(players || [])].sort((a, b) => {
+    const aPts = displayedPoints[a.uid] ?? a.points;
+    const bPts = displayedPoints[b.uid] ?? b.points;
+    return bPts - aPts;
+  });
 
   const [stage, setStage] = useState('reveal');
   const losersOpacity = useRef(new Animated.Value(1)).current;
@@ -481,7 +480,32 @@ function RoundResultsReveal({
 
   const showWinnerOverlay = stage === 'spotlight' || stage === 'shrink';
   const showOverlay = stage !== 'scoreboard';
-  const tickPoints = stage === 'shrink' || stage === 'scoreboard';
+
+  // Tick displayed points up to actual when shrink starts; the orderedPlayers
+  // sort below is driven by displayedPoints, so reanimated LinearTransition
+  // animates the row swap whenever someone overtakes another player mid-tick.
+  useEffect(() => {
+    if (stage !== 'shrink') return;
+    const targets = {};
+    (players || []).forEach(p => { targets[p.uid] = p.points; });
+    const startVals = { ...displayedPoints };
+    const duration = 1200;
+    const steps = 24;
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      const t = Math.min(i / steps, 1);
+      const next = {};
+      (players || []).forEach(p => {
+        const start = startVals[p.uid] ?? 0;
+        const target = targets[p.uid] ?? 0;
+        next[p.uid] = Math.round(start + (target - start) * t);
+      });
+      setDisplayedPoints(next);
+      if (t >= 1) clearInterval(id);
+    }, duration / steps);
+    return () => clearInterval(id);
+  }, [stage]);
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
@@ -496,15 +520,18 @@ function RoundResultsReveal({
       </View>
 
       {/* BASE LAYER: scoreboard. Visible behind the overlay during reveal so
-          the user sees where the winner card ultimately lands. */}
+          the user sees where the winner card ultimately lands. Rows are
+          ordered by displayedPoints so they swap mid-tick when ranks
+          change; reanimated LinearTransition animates the swap. */}
       <Animated.View style={[styles.resultsContent, { opacity: scoreboardOpacity }]}>
-        {sortedPlayers.map((p, i) => {
-          const roundPts = (rankings || []).find(r => r.uid === p.uid);
-          const earned = roundPts?.pointsEarned || 0;
+        {orderedPlayers.map((p, i) => {
+          const earned = earnedByUid[p.uid] || 0;
           const playerSub = (submissions || []).find(s => s.uid === p.uid);
+          const displayed = displayedPoints[p.uid] ?? p.points;
           return (
-            <View
+            <Reanimated.View
               key={p.uid}
+              layout={LinearTransition.springify().damping(18).stiffness(140)}
               ref={handleRowRef(p.uid)}
               collapsable={false}
               style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
@@ -521,13 +548,8 @@ function RoundResultsReveal({
               <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
                 +{earned}
               </Text>
-              <PointsTicker
-                from={Math.max(0, p.points - earned)}
-                to={p.points}
-                animate={tickPoints}
-                style={styles.resultTotal}
-              />
-            </View>
+              <Text style={styles.resultTotal}>{displayed} pts</Text>
+            </Reanimated.View>
           );
         })}
 
@@ -943,7 +965,7 @@ export default function GameScreen({ navigation }) {
       setGameId(createResult.gameId);
 
       // Add fake bot players
-      const botNames = ['SnapBot', 'VibeMaster', 'CardShark'];
+      const botNames = ['SnapBot', 'VibeMaster', 'CardShark', 'PromptKing', 'NoFilter', 'BigVibe'];
       for (const name of botNames) {
         await gameService.joinGame(createResult.gameId, `bot_${name}`, name);
       }
@@ -1448,35 +1470,7 @@ export default function GameScreen({ navigation }) {
           </>
         ) : (
           <>
-            <View style={styles.pickHeader}>
-              <Text style={styles.pickInstruction}>Tap a card to preview, then play it</Text>
-              {(user?.inventory?.mulligans || 0) > 0 && (
-                <Pressable style={styles.mulliganBtn} onPress={async () => {
-                  if (hand.length === 0) return;
-                  // Remove worst card, draw a new one
-                  const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
-                  if (remaining.length === 0) {
-                    showAlert('No Cards', 'No more cards to draw from your deck');
-                    return;
-                  }
-                  const newCard = remaining[Math.floor(Math.random() * remaining.length)];
-                  const newHand = [...hand];
-                  newHand[newHand.length - 1] = newCard;
-                  setHand(newHand);
-                  try {
-                    const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
-                    const { db: mDb } = await import('../services/firebase');
-                    await mUpdate(mDoc(mDb, 'users', user.uid), {
-                      'inventory.mulligans': mInc(-1),
-                    });
-                  } catch (e) {}
-                  showToast('reward', 'Mulligan!', 'Card swapped');
-                }}>
-                  <Ionicons name="refresh" size={16} color={theme.colors.vibeGreen} />
-                  <Text style={styles.mulliganText}>Mulligan ({user?.inventory?.mulligans || 0})</Text>
-                </Pressable>
-              )}
-            </View>
+            <Text style={styles.pickInstruction}>Tap a card to preview, then play it</Text>
             <FlatList
               data={hand}
               keyExtractor={(item, i) => item?.id || `hand-${i}`}
@@ -1494,6 +1488,32 @@ export default function GameScreen({ navigation }) {
                 </Pressable>
               )}
             />
+            {(user?.inventory?.mulligans || 0) > 0 && (
+              <Pressable style={styles.mulliganBtnBottom} onPress={async () => {
+                if (hand.length === 0) return;
+                // Remove worst card, draw a new one
+                const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
+                if (remaining.length === 0) {
+                  showAlert('No Cards', 'No more cards to draw from your deck');
+                  return;
+                }
+                const newCard = remaining[Math.floor(Math.random() * remaining.length)];
+                const newHand = [...hand];
+                newHand[newHand.length - 1] = newCard;
+                setHand(newHand);
+                try {
+                  const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
+                  const { db: mDb } = await import('../services/firebase');
+                  await mUpdate(mDoc(mDb, 'users', user.uid), {
+                    'inventory.mulligans': mInc(-1),
+                  });
+                } catch (e) {}
+                showToast('reward', 'Mulligan!', 'Card swapped');
+              }}>
+                <Ionicons name="refresh" size={16} color={theme.colors.vibeGreen} />
+                <Text style={styles.mulliganText}>Mulligan ({user?.inventory?.mulligans || 0})</Text>
+              </Pressable>
+            )}
           </>
         )}
 
@@ -1575,7 +1595,6 @@ export default function GameScreen({ navigation }) {
           </View>
         ) : (
           <>
-            <Text style={styles.pickInstruction}>Tap to preview, pick your favorite</Text>
             <FlatList
               data={votableSubmissions}
               keyExtractor={(item, i) => item?.snappleId || `vote-${i}`}
@@ -1835,6 +1854,20 @@ const styles = StyleSheet.create({
   },
   pickInstruction: {
     color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
+  },
+  mulliganBtnBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeGreen,
   },
   mulliganBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,

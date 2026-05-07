@@ -61,7 +61,7 @@ const HAND_SIZE = 6;
 const REVIEW_TIME = 60000; // 1 minute to review your hand before each round's picking starts
 const PICK_TIME = 15000; // 15 seconds to pick
 const VOTE_TIME = 15000; // 15 seconds per submission to vote
-const MAX_PLAYERS = 6;
+const MAX_PLAYERS = 8;
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
