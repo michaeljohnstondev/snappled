@@ -10,6 +10,69 @@ const LOCKOUT_MINUTES = 10;
 const APPROVAL_THRESHOLD = 0.5; // 50% likes to recycle a prompt
 const TICKET_REWARD = 1; // Tickets earned for promoted snapples
 
+// Mirrors src/utils/promptKey.js — keep in sync.
+function normalizePromptText(text) {
+  if (!text) return '';
+  return String(text)
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{Letter}\p{Number}\s]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Roll a finishing prompt's per-instance stats into its promptPool entry's
+// lifetime totals. If no pool entry exists yet (legacy prompt or pre-revive
+// flow), create one keyed by textKey so future revives find it.
+async function accrueLifetimeStats(prompt) {
+  const textKey = prompt.textKey || normalizePromptText(prompt.text || '');
+  if (!textKey) return;
+
+  let poolRef = null;
+  if (prompt.poolDocId) {
+    poolRef = db.collection('promptPool').doc(prompt.poolDocId);
+    const snap = await poolRef.get();
+    if (!snap.exists) poolRef = null;
+  }
+  if (!poolRef) {
+    // Look up by textKey
+    const matchQuery = await db.collection('promptPool')
+      .where('textKey', '==', textKey)
+      .limit(1)
+      .get();
+    if (!matchQuery.empty) {
+      poolRef = matchQuery.docs[0].ref;
+    } else {
+      // Create a fresh pool doc.
+      poolRef = db.collection('promptPool').doc();
+      await poolRef.set({
+        text: prompt.text,
+        textKey,
+        category: prompt.category || 'general',
+        createdBy: prompt.createdBy || null,
+        creatorUsername: prompt.creatorUsername || null,
+        createdAt: prompt.createdAt || new Date().toISOString(),
+        likeCountLifetime: 0,
+        dislikeCountLifetime: 0,
+        participantCountLifetime: 0,
+        totalViewsLifetime: 0,
+        instanceCount: 0,
+        used: false,
+      }, { merge: true });
+    }
+  }
+
+  await poolRef.update({
+    likeCountLifetime: admin.firestore.FieldValue.increment(prompt.likeCount || 0),
+    dislikeCountLifetime: admin.firestore.FieldValue.increment(prompt.dislikeCount || 0),
+    participantCountLifetime: admin.firestore.FieldValue.increment(prompt.participantCount || 0),
+    totalViewsLifetime: admin.firestore.FieldValue.increment(prompt.totalViews || 0),
+    instanceCount: admin.firestore.FieldValue.increment(1),
+    lastExpiredAt: new Date().toISOString(),
+    used: false, // free to be picked again by rotation
+  });
+}
+
 // ── Scheduled: runs every hour ──
 exports.hourlyPromptRotation = functions.pubsub
   .schedule('0 * * * *')
@@ -91,6 +154,10 @@ async function expirePrompts() {
   for (const doc of expiredQuery.docs) {
     const prompt = doc.data();
     await promoteAndCleanupSnapples(doc.id, prompt);
+
+    // Accrue this instance's stats to the pool's lifetime totals before
+    // deleting the active doc.
+    try { await accrueLifetimeStats(prompt); } catch (e) { console.error('[Expire] accrue err:', e); }
 
     if (prompt.isSystem) {
       // System prompt — recycle if popular

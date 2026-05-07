@@ -45,24 +45,36 @@ export default function CreatePromptScreen({ navigation }) {
 
     setIsSubmitting(true);
     try {
-      const result = await promptService.createPrompt({
+      const result = await promptService.summonPrompt({
         text: validation.cleaned,
-        createdBy: user.uid,
-        creatorUsername: user.username || user.email?.split('@')[0] || 'Anonymous'
+        userId: user.uid,
+        username: user.username || user.email?.split('@')[0] || 'Anonymous',
       });
 
-      if (result.success) {
-        const newTokenCount = userCurrency.tokens - 1;
-        await updateUserCurrency({ tokens: newTokenCount });
-
-        showSuccess(
-          'Success!',
-          'Your prompt has been created and is now live in the community!'
-        );
-        setTimeout(() => navigation.goBack(), 1500);
-      } else {
+      if (!result.success) {
         showError('Error', result.error || 'Failed to create prompt');
+        return;
       }
+
+      // Banned text — refuse, no charge.
+      if (result.status === 'banned') {
+        showError('Not Allowed', 'This prompt isn\'t allowed.');
+        return;
+      }
+
+      // Already live — no charge, just point them to it.
+      if (result.status === 'already_active') {
+        showSuccess('Already Live', 'This prompt is already in the feed — go find it!');
+        setTimeout(() => navigation.goBack(), 1200);
+        return;
+      }
+
+      // Charge ticket on every successful create — internal status (created /
+      // revived / promoted) is invisible to the user; from their POV they just
+      // made a prompt.
+      await updateUserCurrency({ tokens: userCurrency.tokens - 1 });
+      showSuccess('Prompt Created!', 'Your prompt is now live in the community.');
+      setTimeout(() => navigation.goBack(), 1500);
     } catch (error) {
       console.error('[CreatePromptScreen] Error creating prompt:', error);
       showError('Error', 'Something went wrong. Please try again.');

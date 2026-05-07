@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, StyleSheet, Pressable, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, getDocs, doc, deleteDoc, updateDoc, addDoc, orderBy, limit, where, increment } from 'firebase/firestore';
+import { collection, query, getDocs, doc, deleteDoc, updateDoc, addDoc, orderBy, limit, where, increment, setDoc, getDoc } from 'firebase/firestore';
+import { normalizePromptText } from '../utils/promptKey';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../services/firebase';
 import { useAuth } from '../store/AuthContext';
@@ -34,6 +35,85 @@ const utilStyles = StyleSheet.create({
   },
   label: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
   desc: { color: '#778DA9', fontSize: 12, lineHeight: 16 },
+});
+
+// Add or remove a permabanned prompt text. Banned texts are keyed by their
+// normalized textKey so case/punctuation drift doesn't slip past the filter.
+function BanPromptCard({ showAlert, showError }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const handleBan = async () => {
+    if (!text.trim() || busy) return;
+    const textKey = normalizePromptText(text);
+    if (!textKey) return showError('Error', 'Empty text after normalization');
+    setBusy(true);
+    try {
+      await setDoc(doc(db, 'bannedPromptTexts', textKey), {
+        textKey,
+        text: text.trim(),
+        bannedAt: new Date().toISOString(),
+      });
+      showAlert('Banned', `"${text.trim()}" added to permaban list (key: ${textKey})`);
+      setText('');
+    } catch (e) { showError('Error', e.message); }
+    finally { setBusy(false); }
+  };
+
+  const handleUnban = async () => {
+    if (!text.trim() || busy) return;
+    const textKey = normalizePromptText(text);
+    if (!textKey) return;
+    setBusy(true);
+    try {
+      const banRef = doc(db, 'bannedPromptTexts', textKey);
+      const snap = await getDoc(banRef);
+      if (!snap.exists()) {
+        showAlert('Not banned', `No permaban found for key: ${textKey}`);
+      } else {
+        await deleteDoc(banRef);
+        showAlert('Unbanned', `Removed permaban for key: ${textKey}`);
+      }
+      setText('');
+    } catch (e) { showError('Error', e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <View style={[utilStyles.btn, { borderColor: theme.colors.vibeRed }]}>
+      <Text style={[utilStyles.label, { color: theme.colors.vibeRed }]}>Permaban / Unban Prompt Text</Text>
+      <Text style={utilStyles.desc}>Adds the normalized text to bannedPromptTexts. Future creates / revives with that text are refused.</Text>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        placeholder="Type the prompt text..."
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        style={banInputStyles.input}
+      />
+      <View style={banInputStyles.row}>
+        <Pressable style={[banInputStyles.btn, { borderColor: theme.colors.vibeRed }]} onPress={handleBan} disabled={busy}>
+          <Text style={[banInputStyles.btnText, { color: theme.colors.vibeRed }]}>Ban</Text>
+        </Pressable>
+        <Pressable style={[banInputStyles.btn, { borderColor: theme.colors.vibeBlue }]} onPress={handleUnban} disabled={busy}>
+          <Text style={[banInputStyles.btnText, { color: theme.colors.vibeBlue }]}>Unban</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const banInputStyles = StyleSheet.create({
+  input: {
+    color: 'white', fontSize: 14, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginTop: 8,
+  },
+  row: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  btn: {
+    flex: 1, borderWidth: 2, borderRadius: 8, paddingVertical: 10, alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  btnText: { fontSize: 13, fontWeight: 'bold' },
 });
 
 // Add your admin UIDs here
@@ -569,6 +649,50 @@ export default function AdminScreen({ navigation }) {
                   }
                 }
                 showAlert('Done', `Removed ${removed} expired prompts`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
+            label="Backfill textKey on prompts"
+            desc="Compute normalized textKey for every doc in activePrompts / onDeckPrompts / promptPool that doesn't have one yet. Required for revive / dupe-check to work."
+            color={theme.colors.vibeBlue}
+            onPress={async () => {
+              try {
+                let touched = 0;
+                for (const collName of ['activePrompts', 'onDeckPrompts', 'promptPool']) {
+                  const snap = await getDocs(query(collection(db, collName), limit(500)));
+                  for (const d of snap.docs) {
+                    const data = d.data();
+                    if (data.textKey) continue;
+                    const tk = normalizePromptText(data.text || '');
+                    if (!tk) continue;
+                    await updateDoc(doc(db, collName, d.id), { textKey: tk });
+                    touched++;
+                  }
+                }
+                showAlert('Done', `Backfilled textKey on ${touched} docs`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <BanPromptCard showAlert={showAlert} showError={showError} />
+          <UtilButton
+            label="Reset Snapple Game Stats"
+            desc="Zero out gamesPlayed and gamesWon on every snapple. Use this when the pool is small enough that the same handful of snapples are getting boosted unfairly."
+            color={theme.colors.vibeOrange}
+            onPress={async () => {
+              try {
+                const snap = await getDocs(query(collection(db, 'snapples'), limit(1000)));
+                let reset = 0;
+                for (const d of snap.docs) {
+                  const data = d.data();
+                  if (!data.gamesPlayed && !data.gamesWon) continue;
+                  await updateDoc(doc(db, 'snapples', d.id), {
+                    gamesPlayed: 0,
+                    gamesWon: 0,
+                  });
+                  reset++;
+                }
+                showAlert('Done', `Reset game stats on ${reset} snapples`);
               } catch (e) { showError('Error', e.message); }
             }}
           />

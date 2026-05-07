@@ -13,6 +13,7 @@ import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
 import { uploadVideo } from '../services/videoStorage';
 import { snappleService } from '../services/snappleService';
+import { promptService } from '../services/promptService';
 import { achievementService } from '../services/achievementService';
 import { levelService } from '../services/levelService';
 import theme from '../theme/themes';
@@ -143,6 +144,31 @@ export default function VideoPreviewScreen({ route, navigation }) {
         (progress) => setUploadProgress(progress)
       );
 
+      // Reviver perk: if this user revived/created the prompt instance and no
+      // boost is currently live for this prompt, float their snapple to the
+      // top for 2 hours.
+      let boostedUntil = null;
+      const isPromptOriginator =
+        submitPrompt.createdBy === user.uid ||
+        submitPrompt.revivedBy === user.uid ||
+        submitPrompt.summonedBy === user.uid;
+      if (isPromptOriginator) {
+        try {
+          const { collection: c, query: q, where: w, getDocs: g, limit: l } = await import('firebase/firestore');
+          const { db: d } = await import('../services/firebase');
+          const nowISO = new Date().toISOString();
+          const existingBoost = await g(q(
+            c(d, 'snapples'),
+            w('promptId', '==', submitPrompt.id),
+            w('boostedUntil', '>', nowISO),
+            l(1),
+          ));
+          if (existingBoost.empty) {
+            boostedUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+          }
+        } catch (e) {}
+      }
+
       // Create the snapple record. handleSubmit guarantees submitPrompt is valid,
       // so no defensive 'unknown' fallback here — that path produced orphan snapples.
       const snappleResult = await snappleService.createSnapple({
@@ -153,6 +179,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
         creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
         prompt: submitPrompt.text || 'Snapple video',
         category: submitPrompt.category || 'general',
+        boostedUntil,
       });
 
       if (snappleResult.success) {
@@ -284,29 +311,27 @@ export default function VideoPreviewScreen({ route, navigation }) {
     }
     showConfirm('Use 1 Ticket?', `Create prompt: "${text}"`, async () => {
       try {
-        // Deduct ticket
-        await updateDoc(doc(db, 'users', user.uid), {
-          'resources.tokens': increment(-1),
-        });
-        // Create prompt in activePrompts
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        const lockoutAt = new Date(Date.now() + (24 * 60 - 10) * 60 * 1000).toISOString();
-        const newDoc = await addDoc(collection(db, 'activePrompts'), {
+        const result = await promptService.summonPrompt({
           text,
-          category: 'user',
-          expiresAt,
-          lockoutAt,
-          createdAt: new Date().toISOString(),
-          createdBy: user.uid,
-          creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
-          isSystem: false,
-          likeCount: 0, dislikeCount: 0,
-          likes: [], dislikes: [],
-          participantCount: 0, totalViews: 0,
+          userId: user.uid,
+          username: user.username || user.email?.split('@')[0] || 'anonymous',
         });
-        const newPrompt = { id: newDoc.id, text, category: 'user', expiresAt, lockoutAt };
-        showToast('reward', 'Prompt Created!', '-1 ticket');
-        handlePickPrompt(newPrompt);
+        if (!result.success) {
+          showError('Error', result.error || 'Failed to create prompt');
+          return;
+        }
+        if (result.status === 'banned') {
+          showError('Not Allowed', 'This prompt isn\'t allowed.');
+          return;
+        }
+        // Already live → no ticket charged. Otherwise deduct 1.
+        if (result.status !== 'already_active') {
+          await updateDoc(doc(db, 'users', user.uid), {
+            'resources.tokens': increment(-1),
+          });
+          showToast('reward', 'Prompt Created!', '-1 ticket');
+        }
+        handlePickPrompt(result.prompt);
       } catch (e) {
         showError('Error', 'Failed to create prompt');
       }

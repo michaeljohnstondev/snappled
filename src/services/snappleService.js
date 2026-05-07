@@ -71,6 +71,10 @@ export const snappleService = {
         reports: 0,
         gamesPlayed: 0,
         gamesWon: 0,
+
+        // Reviver perk: floats this snapple to the top of its prompt's grid
+        // until this timestamp, then sorts normally. Null if no boost.
+        boostedUntil: snappleData.boostedUntil || null,
         
         // Pricing
         basePrice: 10, // Starting price in coins
@@ -181,7 +185,17 @@ export const snappleService = {
         }
       }));
       const snapples = Array.from(byId.values());
-      snapples.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      // Sort: still-boosted first (newest boost wins among them), then by
+      // createdAt desc. The reviver's perk floats their snapple to the top
+      // until boostedUntil expires.
+      const nowISO = new Date().toISOString();
+      const isBoosted = (s) => !!s.boostedUntil && s.boostedUntil > nowISO;
+      snapples.sort((a, b) => {
+        const ab = isBoosted(a);
+        const bb = isBoosted(b);
+        if (ab !== bb) return ab ? -1 : 1;
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      });
       return { success: true, snapples: snapples.slice(0, limitCount) };
     } catch (error) {
       console.error('[SnappleService] getSnapplesByPrompt error:', error);
