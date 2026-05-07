@@ -328,6 +328,159 @@ const creatorRowStyles = StyleSheet.create({
   },
 });
 
+// ── Round results reveal — staged animation: grid → spotlight → scoreboard ──
+function RoundResultsReveal({
+  submissions, rankings, players, prompt,
+  currentRound, totalRounds, timer,
+  isHost, onNextRound, onShare,
+}) {
+  const winners = (rankings || []).filter(r => r.placement === 1);
+  const winnerUids = useRef(new Set(winners.map(w => w.uid))).current;
+  const sortedPlayers = [...(players || [])].sort((a, b) => b.points - a.points);
+  // 1 winner → 1.4x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
+  const winnerTargetScale = winners.length === 1 ? 1.4 : winners.length === 2 ? 1.2 : 0.9;
+
+  const [stage, setStage] = useState('reveal'); // reveal → spotlight → scoreboard
+  const losersOpacity = useRef(new Animated.Value(1)).current;
+  const winnerScale = useRef(new Animated.Value(0.6)).current;
+  const winnerOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const t1 = setTimeout(() => {
+      setStage('spotlight');
+      Animated.parallel([
+        Animated.timing(losersOpacity, { toValue: 0.18, duration: 500, useNativeDriver: true }),
+        Animated.spring(winnerScale, { toValue: winnerTargetScale, tension: 70, friction: 9, useNativeDriver: true }),
+        Animated.timing(winnerOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]).start();
+    }, 1200);
+    const t2 = setTimeout(() => setStage('scoreboard'), 3800);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  if (stage === 'scoreboard') {
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <View style={styles.header}>
+          <View style={{ width: 36 }} />
+          <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
+          <Text style={styles.timerText}>{timer}s</Text>
+        </View>
+
+        <View style={styles.resultsContent}>
+          {sortedPlayers.map((p, i) => {
+            const roundPts = (rankings || []).find(r => r.uid === p.uid);
+            const playerSub = (submissions || []).find(s => s.uid === p.uid);
+            return (
+              <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
+                <Text style={styles.resultPlacement}>#{i + 1}</Text>
+                <View style={styles.resultInfo}>
+                  <Text style={styles.resultName}>@{p.username}</Text>
+                  {playerSub && (
+                    <Text style={styles.resultCard} numberOfLines={1}>
+                      Played: {playerSub.prompt || playerSub.creatorUsername || 'a snapple'}
+                    </Text>
+                  )}
+                </View>
+                <Text style={styles.resultRoundPts}>+{roundPts?.pointsEarned || 0}</Text>
+                <Text style={styles.resultTotal}>{p.points} pts</Text>
+              </View>
+            );
+          })}
+
+          <View style={styles.resultsActions}>
+            {isHost ? (
+              <VibeButton label="Next Round" onPress={onNextRound} />
+            ) : (
+              <Text style={styles.waitingText}>Next round in {timer}s...</Text>
+            )}
+            <Pressable style={styles.shareResultsBtn} onPress={onShare}>
+              <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
+              <Text style={styles.shareResultsText}>Share Round</Text>
+            </Pressable>
+          </View>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // reveal + spotlight stages share the grid layout. spotlight overlays the
+  // winner card(s) at center; losers fade.
+  const cols = (submissions?.length || 0) > 6 ? 4 : 3;
+  const gridCardWidth = (screenWidth - 32 - (cols - 1) * 8) / cols;
+
+  return (
+    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <View style={styles.header}>
+        <View style={{ width: 36 }} />
+        <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={styles.promptBanner}>
+        <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
+      </View>
+
+      <Animated.View style={[styles.revealGrid, { opacity: losersOpacity }]}>
+        {(submissions || []).map((sub, idx) => {
+          const player = (players || []).find(p => p.uid === sub.uid);
+          return (
+            <View
+              key={sub.uid}
+              style={[styles.revealCard, { width: gridCardWidth, aspectRatio: 9 / 16 }]}
+            >
+              <View style={StyleSheet.absoluteFill}>
+                <CardThumbnailDelayed videoUrl={sub.videoUrl} delay={idx * 80} />
+              </View>
+              <View style={styles.revealCardLabel}>
+                <Text style={styles.revealCardName} numberOfLines={1}>
+                  @{player?.username || '?'}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </Animated.View>
+
+      {stage === 'spotlight' && (
+        <View style={styles.spotlightOverlay} pointerEvents="none">
+          <View style={styles.spotlightRow}>
+            {winners.map(w => {
+              const sub = (submissions || []).find(s => s.uid === w.uid);
+              const player = (players || []).find(p => p.uid === w.uid);
+              return (
+                <Animated.View
+                  key={w.uid}
+                  style={[
+                    styles.spotlightCard,
+                    {
+                      opacity: winnerOpacity,
+                      transform: [{ scale: winnerScale }],
+                    },
+                  ]}
+                >
+                  <View style={StyleSheet.absoluteFill}>
+                    <CardThumbnailDelayed videoUrl={sub?.videoUrl} />
+                  </View>
+                  <View style={styles.spotlightLabel}>
+                    <Text style={styles.spotlightWinnerLabel}>
+                      {winners.length > 1 ? 'TIE' : 'WINNER'}
+                    </Text>
+                    <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
+                    {sub?.creatorUsername && (
+                      <Text style={styles.spotlightCreator}>by @{sub.creatorUsername}</Text>
+                    )}
+                  </View>
+                </Animated.View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+    </LinearGradient>
+  );
+}
+
 // ── Main Game Screen ──
 export default function GameScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
@@ -725,12 +878,24 @@ export default function GameScreen({ navigation }) {
   };
 
   const handleNextRound = async () => {
+    // Swap the just-played card for one new one from the unused pool — keeps
+    // the rest of the hand intact between rounds rather than redrawing all 6.
+    const playedThisRound = selectedCard;
     setSelectedCard(null);
     setCurrentVoteIndex(0);
     setFavoriteCard(null);
     setHasVoted(false);
-    const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
-    setHand(drawnHand);
+
+    if (playedThisRound) {
+      setHand(prev => {
+        const inHandIds = new Set(prev.map(h => h.id));
+        const pool = getHandSnapples().filter(s => !inHandIds.has(s.id));
+        const replacement = pool[Math.floor(Math.random() * pool.length)];
+        if (!replacement) return prev.filter(h => h.id !== playedThisRound.id);
+        return prev.map(h => h.id === playedThisRound.id ? replacement : h);
+      });
+    }
+
     if (game.hostId === user.uid) {
       await gameService.nextRound(gameId);
       // Bots are scheduled by a phase-change effect once PICKING starts.
@@ -1362,65 +1527,33 @@ export default function GameScreen({ navigation }) {
   // Round results
   if (game.phase === GAME_PHASES.ROUND_RESULTS) {
     const isHost = game.hostId === user.uid;
-    const sortedPlayers = [...game.players].sort((a, b) => b.points - a.points);
     const lastRoundResult = game.roundResults[game.roundResults.length - 1];
-
+    const sortedPlayers = [...game.players].sort((a, b) => b.points - a.points);
+    const handleShareRound = async () => {
+      try {
+        const { Share } = require('react-native');
+        const sharePrompt = game.prompts[game.currentRound - 1] || '';
+        const winnerUid = lastRoundResult?.rankings?.[0]?.uid;
+        const winningSub = game.submissions.find(s => s.uid === winnerUid);
+        const videoUrl = winningSub?.videoUrl || '';
+        await Share.share({
+          message: `"${sharePrompt}" 🎬\n\nCheck out this round on Snappled!\n\n${videoUrl ? videoUrl + '\n\n' : ''}${sortedPlayers.map((p, i) => `#${i+1} @${p.username}`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
+        });
+      } catch (e) {}
+    };
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.header}>
-          <View style={{ width: 36 }} />
-          <Text style={styles.headerTitle}>Round {game.currentRound} Results</Text>
-          <Text style={styles.timerText}>{timer}s</Text>
-        </View>
-
-        <View style={styles.resultsContent}>
-          {sortedPlayers.map((p, i) => {
-            const roundPts = lastRoundResult?.rankings?.find(r => r.uid === p.uid);
-            const playerSub = game.submissions.find(s => s.uid === p.uid);
-            return (
-              <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
-                <Text style={styles.resultPlacement}>#{i + 1}</Text>
-                <View style={styles.resultInfo}>
-                  <Text style={styles.resultName}>@{p.username}</Text>
-                  {playerSub && (
-                    <Text style={styles.resultCard} numberOfLines={1}>
-                      Played: {playerSub.prompt || playerSub.creatorUsername || 'a snapple'}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.resultRoundPts}>+{roundPts?.pointsEarned || 0}</Text>
-                <Text style={styles.resultTotal}>{p.points} pts</Text>
-              </View>
-            );
-          })}
-
-          <View style={styles.resultsActions}>
-            {isHost && (
-              <VibeButton label="Next Round" onPress={handleNextRound} />
-            )}
-            {!isHost && (
-              <Text style={styles.waitingText}>Next round in {timer}s...</Text>
-            )}
-            <Pressable style={styles.shareResultsBtn} onPress={async () => {
-              try {
-                const { Share } = require('react-native');
-                const prompt = game.prompts[game.currentRound - 1] || '';
-                // Find the winning submission's video
-                const winnerUid = lastRoundResult?.rankings?.[0]?.uid;
-                const winningSub = game.submissions.find(s => s.uid === winnerUid);
-                const videoUrl = winningSub?.videoUrl || '';
-
-                await Share.share({
-                  message: `"${prompt}" 🎬\n\nCheck out this round on Snappled!\n\n${videoUrl ? videoUrl + '\n\n' : ''}${sortedPlayers.map((p, i) => `#${i+1} @${p.username}`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
-                });
-              } catch (e) {}
-            }}>
-              <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
-              <Text style={styles.shareResultsText}>Share Round</Text>
-            </Pressable>
-          </View>
-        </View>
-      </LinearGradient>
+      <RoundResultsReveal
+        submissions={game.submissions}
+        rankings={lastRoundResult?.rankings || []}
+        players={game.players}
+        prompt={game.prompts[game.currentRound - 1] || ''}
+        currentRound={game.currentRound}
+        totalRounds={game.totalRounds}
+        timer={timer}
+        isHost={isHost}
+        onNextRound={handleNextRound}
+        onShare={handleShareRound}
+      />
     );
   }
 
@@ -1599,6 +1732,86 @@ const styles = StyleSheet.create({
   loadingHand: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingHandText: { color: theme.colors.textSecondary, fontSize: 14 },
   submittedCount: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
+  revealGrid: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  revealCard: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  revealCardLabel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  revealCardName: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  spotlightOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spotlightRow: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+  },
+  spotlightCard: {
+    width: 150,
+    aspectRatio: 9 / 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    shadowColor: theme.colors.vibeBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 24,
+    elevation: 16,
+  },
+  spotlightLabel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+  },
+  spotlightWinnerLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+  },
+  spotlightPlayer: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  spotlightCreator: {
+    color: theme.colors.textSecondary,
+    fontSize: 10,
+  },
   reviewBanner: {
     paddingHorizontal: 20,
     paddingVertical: 16,

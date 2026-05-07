@@ -340,8 +340,9 @@ export const gameService = {
     }
   },
 
-  // Advance to next round — enters REVIEW phase first so players can scout
-  // the next prompt and their refreshed hand before picking starts.
+  // Advance to next round — goes straight to PICKING. Review only happens
+  // once at game start; subsequent rounds keep the user's hand minus the
+  // card they played, with one fresh replacement drawn on the client.
   async nextRound(gameId) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
@@ -349,11 +350,11 @@ export const gameService = {
       const data = gameDoc.data();
 
       await updateDoc(gameRef, {
-        phase: GAME_PHASES.REVIEW,
+        phase: GAME_PHASES.PICKING,
         currentRound: data.currentRound + 1,
         submissions: [],
         votes: {},
-        reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
+        pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
 
