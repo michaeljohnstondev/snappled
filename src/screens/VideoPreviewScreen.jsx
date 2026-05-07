@@ -210,26 +210,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
             );
           } catch (e) {}
         }
-        showConfirm(
-          'Snapple Created!',
-          'Save to your collection?',
-          async () => {
-            // Save to collection + mark ownership on snapple doc
-            const owned = [...(userCurrency.ownedSnapples || []), snappleResult.snappleId];
-            await updateUserCurrency({ ownedSnapples: owned });
-            // Add creator to owners array on the snapple
-            const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
-            const { db } = await import('../services/firebase');
-            await updateDoc(doc(db, 'snapples', snappleResult.snappleId), {
-              owners: arrayUnion(user.uid),
-            });
-            navigation.popToTop();
-          },
-          () => {
-            // Skip — just go home
-            navigation.popToTop();
-          }
-        );
+        // Auto-add to creator's collection — they always own their own snapple.
+        // The snapple doc already has owners:[creatorId] from createSnapple.
+        const owned = [...(userCurrency.ownedSnapples || []), snappleResult.snappleId];
+        await updateUserCurrency({ ownedSnapples: owned });
+        showToast('reward', 'Snapple Saved', 'Added to your collection');
+        setTimeout(() => navigation.popToTop(), 800);
       } else {
         showError('Error', snappleResult.error || 'Failed to create snapple');
       }

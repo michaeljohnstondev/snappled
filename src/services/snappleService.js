@@ -59,8 +59,8 @@ export const snappleService = {
         prompt,
         category: category || 'general',
 
-        // Ownership
-        owners: [],
+        // Ownership — creator owns their own snapple by default.
+        owners: [creatorId],
 
         // Engagement metrics
         likes: 0,
@@ -121,6 +121,30 @@ export const snappleService = {
     } catch (error) {
       console.error('Error fetching snapple:', error);
       return { success: false, error: 'Failed to fetch snapple' };
+    }
+  },
+
+  async getSnapplesByCreator(creatorId, limitCount = 200) {
+    try {
+      if (!creatorId) return { success: true, snapples: [] };
+      const q = query(
+        collection(db, SNAPPLES_COLLECTION),
+        where('creatorId', '==', creatorId),
+        limit(limitCount)
+      );
+      const snap = await getDocs(q);
+      const snapples = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data.isActive === true && data.isBanned !== true) {
+          snapples.push({ id: d.id, ...data });
+        }
+      });
+      snapples.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return { success: true, snapples };
+    } catch (error) {
+      console.error('[SnappleService] getSnapplesByCreator error:', error);
+      return { success: false, error: 'Failed to fetch creator snapples' };
     }
   },
 

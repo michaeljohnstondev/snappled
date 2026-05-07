@@ -195,15 +195,27 @@ export default function GameScreen({ navigation }) {
   const [mySnapples, setMySnapples] = useState([]);
   const [allSnapples, setAllSnapples] = useState([]);
   const [useRandomCards, setUseRandomCards] = useState(false);
-  const [showCustomMenu, setShowCustomMenu] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
   const [previewCard, setPreviewCard] = useState(null);
+  // IDs of snapples this user has already played in the current game — used to
+  // filter the hand pool so each round reveals unseen cards.
+  const [playedCardIds, setPlayedCardIds] = useState([]);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
 
   const hasDeck = mySnapples.length >= 6;
+
+  // Hide the bottom tab bar whenever the user is inside an active game so the
+  // game UI gets full-screen real estate. Restore it whenever they leave.
+  useEffect(() => {
+    const parent = navigation.getParent?.();
+    if (!parent) return;
+    const inGame = !!gameId && !!game;
+    parent.setOptions({ tabBarStyle: inGame ? { display: 'none' } : undefined });
+    return () => parent.setOptions({ tabBarStyle: undefined });
+  }, [navigation, gameId, game]);
 
   // Load snapples + check for active game
   useEffect(() => {
@@ -349,22 +361,52 @@ export default function GameScreen({ navigation }) {
 
   const loadSnapples = async () => {
     try {
-      const result = await snappleService.getActiveSnapples(100);
-      if (result.success) {
-        setAllSnapples(result.snapples);
-        const deckIds = userCurrency.ownedCards || [];
-        const deckSnapples = result.snapples.filter(s =>
-          deckIds.includes(s.id) || s.creatorId === user?.uid
-        );
-        setMySnapples(deckSnapples);
+      // Community pool — used for random-cards mode and bot picks.
+      const allResult = await snappleService.getActiveSnapples(200);
+      if (allResult.success) {
+        setAllSnapples(allResult.snapples);
       }
+
+      if (!user?.uid) return;
+
+      // Build the user's playable deck: every snapple they created (no
+      // global-cap eviction) plus every owned card by id. De-dupe by id.
+      const created = await snappleService.getSnapplesByCreator(user.uid, 200);
+      const ownedCardIds = userCurrency.ownedSnapples || userCurrency.ownedCards || [];
+
+      const ownedCards = [];
+      for (const id of ownedCardIds) {
+        try {
+          const r = await snappleService.getSnapple(id);
+          if (r?.success && r.snapple) ownedCards.push(r.snapple);
+        } catch (e) {}
+      }
+
+      const merged = [...(created.snapples || []), ...ownedCards];
+      const uniqueById = Array.from(new Map(merged.map(s => [s.id, s])).values());
+      setMySnapples(uniqueById);
     } catch (error) {
       console.error('[GameScreen] Error loading snapples:', error);
     }
   };
 
   const getHandSnapples = () => {
-    return useRandomCards ? allSnapples : mySnapples;
+    const source = useRandomCards ? allSnapples : mySnapples;
+    if (playedCardIds.length === 0) return source;
+    return source.filter(s => !playedCardIds.includes(s.id));
+  };
+
+  // Schedule a bot pick with a random 10-25s delay so the round doesn't end
+  // instantly and other players have time to actually preview each submission
+  // as it lands.
+  const scheduleBotPick = (gid, botUid) => {
+    const delay = 10000 + Math.floor(Math.random() * 15000);
+    setTimeout(() => {
+      const pool = allSnapples;
+      if (!pool.length) return;
+      const botSnapple = pool[Math.floor(Math.random() * pool.length)];
+      gameService.submitPick(gid, botUid, botSnapple).catch(() => {});
+    }, delay);
   };
 
   const handleCreateGame = async () => {
@@ -422,14 +464,9 @@ export default function GameScreen({ navigation }) {
         const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
         setHand(drawnHand);
 
-        // Bots auto-submit random cards
+        // Bots auto-submit random cards on a staggered random delay
         const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-        for (const bot of botPlayers) {
-          const botSnapple = allSnapples[Math.floor(Math.random() * allSnapples.length)];
-          if (botSnapple) {
-            await gameService.submitPick(gameId, bot.uid, botSnapple);
-          }
-        }
+        botPlayers.forEach(bot => scheduleBotPick(gameId, bot.uid));
       } else {
         showError('Error', result.error);
       }
@@ -462,13 +499,8 @@ export default function GameScreen({ navigation }) {
 
       await gameService.startGame(createResult.gameId, user.uid, prompts);
 
-      // Bots auto-submit random snapples
-      for (const name of botNames) {
-        const botSnapple = allSnapples[Math.floor(Math.random() * allSnapples.length)];
-        if (botSnapple) {
-          await gameService.submitPick(createResult.gameId, `bot_${name}`, botSnapple);
-        }
-      }
+      // Bots auto-submit on staggered random delays
+      botNames.forEach(name => scheduleBotPick(createResult.gameId, `bot_${name}`));
 
       const drawnHand = gameService.drawHand(allSnapples, allSnapples);
       setHand(drawnHand);
@@ -483,6 +515,7 @@ export default function GameScreen({ navigation }) {
     setSelectedCard(snapple);
     try {
       await gameService.submitPick(gameId, user.uid, snapple);
+      setPlayedCardIds(prev => prev.includes(snapple.id) ? prev : [...prev, snapple.id]);
     } catch (error) {
       showError('Error', 'Failed to submit pick');
       setSelectedCard(null);
@@ -525,14 +558,9 @@ export default function GameScreen({ navigation }) {
     if (game.hostId === user.uid) {
       await gameService.nextRound(gameId);
 
-      // Bots auto-submit each round
+      // Bots auto-submit on staggered random delays
       const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-      for (const bot of botPlayers) {
-        const botSnapple = allSnapples[Math.floor(Math.random() * allSnapples.length)];
-        if (botSnapple) {
-          await gameService.submitPick(gameId, bot.uid, botSnapple);
-        }
-      }
+      botPlayers.forEach(bot => scheduleBotPick(gameId, bot.uid));
     }
   };
 
@@ -565,6 +593,7 @@ export default function GameScreen({ navigation }) {
     setSelectedCard(null);
     setCurrentVoteIndex(0);
     setIsSpectating(false);
+    setPlayedCardIds([]);
   };
 
   const handleFinish = async () => {
@@ -703,6 +732,7 @@ export default function GameScreen({ navigation }) {
     setCurrentVoteIndex(0);
     setIsSpectating(false);
     setIsPractice(false);
+    setPlayedCardIds([]);
   };
 
   // ── RENDER PHASES ──
@@ -742,28 +772,19 @@ export default function GameScreen({ navigation }) {
             />
             <VibeButton
               label="Custom"
-              onPress={() => setShowCustomMenu(prev => !prev)}
+              onPress={() => showAlert(
+                'Custom Game',
+                'Find an open game or create your own?',
+                [
+                  { text: 'Cancel' },
+                  { text: 'Find Game', onPress: handleFindGame },
+                  { text: 'Create Game', onPress: handleCreateGame },
+                ],
+              )}
               variant="toggle"
               color="blue"
+              disabled={isLoading}
             />
-            {showCustomMenu && (
-              <View style={styles.customMenu}>
-                <VibeButton
-                  label={isLoading ? "Searching..." : "Find Game"}
-                  onPress={handleFindGame}
-                  variant="toggle"
-                  color="green"
-                  disabled={isLoading}
-                />
-                <VibeButton
-                  label="Create Game"
-                  onPress={handleCreateGame}
-                  variant="toggle"
-                  color="blue"
-                  disabled={isLoading}
-                />
-              </View>
-            )}
             <VibeButton
               label={isLoading ? "Loading..." : "Practice (Solo)"}
               onPress={handlePractice}

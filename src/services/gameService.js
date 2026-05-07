@@ -59,7 +59,8 @@ const DEFAULT_PROMPTS = [
 const ROUNDS_PER_GAME = 5;
 const HAND_SIZE = 6;
 const PICK_TIME = 15000; // 15 seconds to pick
-const VOTE_TIME = 10000; // 10 seconds per submission to vote
+const FIRST_ROUND_REVIEW_BONUS = 60000; // Extra minute on round 1 so players can review their hand
+const VOTE_TIME = 18000; // 18 seconds per submission to vote
 const MAX_PLAYERS = 6;
 
 export const GAME_PHASES = {
@@ -185,7 +186,8 @@ export const gameService = {
         prompts: prompts.slice(0, ROUNDS_PER_GAME),
         submissions: [],
         votes: {},
-        pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
+        // Round 1 gets an extra minute so players can scout their hand.
+        pickDeadline: new Date(Date.now() + PICK_TIME + FIRST_ROUND_REVIEW_BONUS).toISOString(),
         updatedAt: serverTimestamp(),
       });
 
