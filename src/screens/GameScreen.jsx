@@ -1363,7 +1363,7 @@ export default function GameScreen({ navigation }) {
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>Round {game.currentRound}/{game.totalRounds}</Text>
+          <Text style={styles.headerTitle}>Warming Up</Text>
           <Text style={styles.timerText}>{timer}s</Text>
         </View>
 
@@ -1430,7 +1430,7 @@ export default function GameScreen({ navigation }) {
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>Round {game.currentRound}/{game.totalRounds}</Text>
+          <Text style={styles.headerTitle}>Picking</Text>
           <Text style={styles.timerText}>{timer}s</Text>
         </View>
 
@@ -1573,7 +1573,7 @@ export default function GameScreen({ navigation }) {
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>{isSpectating ? 'Watching' : 'Vote'} — Round {game.currentRound}</Text>
+          <Text style={styles.headerTitle}>{isSpectating ? 'Watching' : 'Voting'}</Text>
           {!isSpectating && <Text style={styles.timerText}>{timer}s</Text>}
         </View>
 
