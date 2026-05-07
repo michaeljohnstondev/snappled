@@ -518,10 +518,10 @@ export default function PromptInfoOverlay({
           onClose(); 
           navigation.navigate('Prompts'); 
         }} />
-        <NavButton title="Snapples" onPress={() => { 
-          onClose(); 
-          onRefresh?.(); 
-          navigation.navigate('Home'); 
+        <NavButton title="Snapples" onPress={() => {
+          onClose();
+          onRefresh?.();
+          navigation.popToTop();
         }} />
         <NavButton title="Play" />
         <NavButton title="Deck" />

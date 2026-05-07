@@ -102,7 +102,6 @@ export default function Navigation() {
       ) : (
         <Stack.Navigator initialRouteName="Main" screenOptions={screenOptions}>
           <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen name="Home" component={PromptsScreen} />
           <Stack.Screen name="Prompt" component={PromptScreen} />
           <Stack.Screen name="CreatePrompt" component={CreatePromptScreen} />
           <Stack.Screen name="Record" component={RecordScreen} />

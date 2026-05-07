@@ -99,7 +99,7 @@ export default function PromptScreen({ navigation }) {
   }
 
   function handleGoHome() {
-    navigation.navigate('Home');
+    navigation.popToTop();
   }
 
   return (

@@ -95,7 +95,7 @@ export default function RecordScreen({ route }) {
   function handleContinueWithVideo(video) {
     // For now, just go back to home screen
     // TODO: Navigate to proper submission flow
-    navigation.navigate('Home');
+    navigation.popToTop();
   }
 
   function handlePreviewVideo(video) {
@@ -207,7 +207,7 @@ export default function RecordScreen({ route }) {
                 />
                 <VibeButton
                   label="Go Home"
-                  onPress={() => navigation.navigate('Home')}
+                  onPress={() => navigation.popToTop()}
                   style={styles.homeButton}
                 />
               </View>

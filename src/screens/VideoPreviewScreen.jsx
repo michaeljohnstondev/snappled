@@ -223,11 +223,11 @@ export default function VideoPreviewScreen({ route, navigation }) {
             await updateDoc(doc(db, 'snapples', snappleResult.snappleId), {
               owners: arrayUnion(user.uid),
             });
-            navigation.navigate('Home');
+            navigation.popToTop();
           },
           () => {
             // Skip — just go home
-            navigation.navigate('Home');
+            navigation.popToTop();
           }
         );
       } else {
