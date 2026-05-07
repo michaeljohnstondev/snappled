@@ -352,10 +352,43 @@ function PointsTicker({ from, to, animate, style }) {
   return <Text style={style}>{displayed} pts</Text>;
 }
 
+// Spotlight card for a winner — plays the snapple video on loop. Each winner
+// has its own animated values so multi-winner ties can shrink to their own
+// scoreboard rows independently. Layout is flex-row inside spotlightOverlay,
+// so ties land side-by-side automatically; we only animate scale/opacity/Y.
+function WinnerSpotlightCard({ submission, player, isTie, anim }) {
+  return (
+    <Animated.View
+      style={[
+        styles.spotlightCard,
+        {
+          opacity: anim.opacity,
+          transform: [
+            { translateY: anim.translateY },
+            { scale: anim.scale },
+          ],
+        },
+      ]}
+    >
+      <View style={StyleSheet.absoluteFill}>
+        <PreviewPlayer videoUrl={submission?.videoUrl} />
+      </View>
+      <View style={styles.spotlightLabel}>
+        <Text style={styles.spotlightWinnerLabel}>{isTie ? 'TIE' : 'WINNER'}</Text>
+        <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
+        {submission?.creatorUsername && submission.creatorUsername !== player?.username && (
+          <Text style={styles.spotlightCreator}>by @{submission.creatorUsername}</Text>
+        )}
+      </View>
+    </Animated.View>
+  );
+}
+
 // ── Round results reveal — staged animation: grid → spotlight → shrink → scoreboard ──
-// Layout: scoreboard is the base layer (always rendered), the reveal grid +
-// winner spotlight are an overlay on top. Overlay fades down as the scoreboard
-// fades up — so the user sees the winner card "shrink into" the scoreboard.
+// Layout: scoreboard is the base layer (always rendered) so we can measure
+// each player's row Y in screen coords. The reveal grid + winner spotlight
+// are an overlay on top. During shrink each winner card scales down and
+// translates toward its actual row in the scoreboard.
 function RoundResultsReveal({
   submissions, rankings, players, prompt,
   currentRound, totalRounds, timer,
@@ -370,37 +403,79 @@ function RoundResultsReveal({
   const [stage, setStage] = useState('reveal');
   const losersOpacity = useRef(new Animated.Value(1)).current;
   const losersScale = useRef(new Animated.Value(1)).current;
-  const winnerScale = useRef(new Animated.Value(0.6)).current;
-  const winnerOpacity = useRef(new Animated.Value(0)).current;
-  const winnerTranslateY = useRef(new Animated.Value(0)).current;
   const overlayBgOpacity = useRef(new Animated.Value(1)).current;
   const scoreboardOpacity = useRef(new Animated.Value(0.15)).current;
+
+  // Per-winner animated values. Map to support 2+ way ties cleanly. Spread
+  // is handled by flex layout in spotlightOverlay (row direction with gap).
+  const winnerAnimsRef = useRef(new Map());
+  winners.forEach((w) => {
+    if (!winnerAnimsRef.current.has(w.uid)) {
+      winnerAnimsRef.current.set(w.uid, {
+        scale: new Animated.Value(0.6),
+        opacity: new Animated.Value(0),
+        translateY: new Animated.Value(0),
+      });
+    }
+  });
+
+  // Row screen Y positions, populated as scoreboard rows mount.
+  const rowScreenYsRef = useRef({});
+  const rowRefs = useRef({});
+  const handleRowRef = (uid) => (ref) => {
+    rowRefs.current[uid] = ref;
+    if (ref) {
+      setTimeout(() => {
+        ref.measureInWindow?.((x, y, w, h) => {
+          rowScreenYsRef.current[uid] = y + h / 2;
+        });
+      }, 80);
+    }
+  };
 
   useEffect(() => {
     const t1 = setTimeout(() => {
       setStage('spotlight');
-      Animated.parallel([
-        Animated.timing(losersOpacity, { toValue: 0.10, duration: 700, useNativeDriver: true }),
-        Animated.timing(losersScale, { toValue: 0.7, duration: 700, useNativeDriver: true }),
-        Animated.spring(winnerScale, { toValue: winnerTargetScale, tension: 60, friction: 8, useNativeDriver: true }),
-        Animated.timing(winnerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      const anims = [
+        // Losers fully fade and shrink — out of sight by spotlight peak.
+        Animated.timing(losersOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(losersScale, { toValue: 0.5, duration: 600, useNativeDriver: true }),
         Animated.timing(scoreboardOpacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ]).start();
+      ];
+      winners.forEach(w => {
+        const a = winnerAnimsRef.current.get(w.uid);
+        anims.push(
+          Animated.spring(a.scale, { toValue: winnerTargetScale, tension: 60, friction: 8, useNativeDriver: true }),
+          Animated.timing(a.opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        );
+      });
+      Animated.parallel(anims).start();
     }, 1500);
+
+    // Hold spotlight for ~3.5s so the snapple video has time to actually play
+    // on screen. Then shrink into each winner's scoreboard row.
     const t2 = setTimeout(() => {
       setStage('shrink');
-      Animated.parallel([
-        // Winner shrinks toward the scoreboard area below + fades.
-        Animated.timing(winnerScale, { toValue: 0.2, duration: 800, useNativeDriver: true }),
-        Animated.timing(winnerTranslateY, { toValue: 220, duration: 800, useNativeDriver: true }),
-        Animated.timing(winnerOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
-        // Grid + losers fade away; scoreboard surfaces fully.
-        Animated.timing(losersOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
-        Animated.timing(overlayBgOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+      const screenH = Dimensions.get('window').height;
+      const centerY = screenH / 2;
+      const anims = [
+        Animated.timing(overlayBgOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
         Animated.timing(scoreboardOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-      ]).start();
-    }, 4500);
-    const t3 = setTimeout(() => setStage('scoreboard'), 5400);
+      ];
+      winners.forEach(w => {
+        const a = winnerAnimsRef.current.get(w.uid);
+        const targetY = rowScreenYsRef.current[w.uid];
+        const translateY = (targetY != null ? (targetY - centerY) : -260);
+        anims.push(
+          Animated.timing(a.scale, { toValue: 0.15, duration: 800, useNativeDriver: true }),
+          Animated.timing(a.translateY, { toValue: translateY, duration: 800, useNativeDriver: true }),
+          Animated.timing(a.opacity, { toValue: 0, duration: 800, useNativeDriver: true }),
+        );
+      });
+      Animated.parallel(anims).start();
+    }, 5000);
+
+    const t3 = setTimeout(() => setStage('scoreboard'), 5800);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
@@ -428,7 +503,12 @@ function RoundResultsReveal({
           const earned = roundPts?.pointsEarned || 0;
           const playerSub = (submissions || []).find(s => s.uid === p.uid);
           return (
-            <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
+            <View
+              key={p.uid}
+              ref={handleRowRef(p.uid)}
+              collapsable={false}
+              style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
+            >
               <Text style={styles.resultPlacement}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
                 <Text style={styles.resultName}>@{p.username}</Text>
@@ -501,40 +581,21 @@ function RoundResultsReveal({
 
           {showWinnerOverlay && (
             <View style={styles.spotlightOverlay} pointerEvents="none">
-              <View style={styles.spotlightRow}>
-                {winners.map(w => {
-                  const sub = (submissions || []).find(s => s.uid === w.uid);
-                  const player = (players || []).find(p => p.uid === w.uid);
-                  return (
-                    <Animated.View
-                      key={w.uid}
-                      style={[
-                        styles.spotlightCard,
-                        {
-                          opacity: winnerOpacity,
-                          transform: [
-                            { translateY: winnerTranslateY },
-                            { scale: winnerScale },
-                          ],
-                        },
-                      ]}
-                    >
-                      <View style={StyleSheet.absoluteFill}>
-                        <CardThumbnailDelayed videoUrl={sub?.videoUrl} />
-                      </View>
-                      <View style={styles.spotlightLabel}>
-                        <Text style={styles.spotlightWinnerLabel}>
-                          {winners.length > 1 ? 'TIE' : 'WINNER'}
-                        </Text>
-                        <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
-                        {sub?.creatorUsername && sub.creatorUsername !== player?.username && (
-                          <Text style={styles.spotlightCreator}>by @{sub.creatorUsername}</Text>
-                        )}
-                      </View>
-                    </Animated.View>
-                  );
-                })}
-              </View>
+              {winners.map(w => {
+                const sub = (submissions || []).find(s => s.uid === w.uid);
+                const player = (players || []).find(p => p.uid === w.uid);
+                const anim = winnerAnimsRef.current.get(w.uid);
+                if (!anim) return null;
+                return (
+                  <WinnerSpotlightCard
+                    key={w.uid}
+                    submission={sub}
+                    player={player}
+                    isTie={winners.length > 1}
+                    anim={anim}
+                  />
+                );
+              })}
             </View>
           )}
         </Animated.View>
@@ -1820,13 +1881,10 @@ const styles = StyleSheet.create({
   spotlightOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  spotlightRow: {
-    flexDirection: 'row',
     gap: 16,
-    alignItems: 'center',
   },
   spotlightCard: {
     width: 150,
