@@ -1497,7 +1497,14 @@ export default function GameScreen({ navigation }) {
         {alreadyPicked ? (
           <>
             <FlatList
-              data={Array.from({ length: game.players.length }).map((_, i) => game.submissions[i] || null)}
+              // Show one slot per OTHER player, in submission-arrival order to
+              // keep things anonymous. Self is excluded — the user knows what
+              // they played.
+              data={(() => {
+                const otherCount = Math.max(0, (game.players?.length || 0) - 1);
+                const otherSubmissions = (game.submissions || []).filter(s => s.uid !== user.uid);
+                return Array.from({ length: otherCount }).map((_, i) => otherSubmissions[i] || null);
+              })()}
               keyExtractor={(_, i) => `slot-${i}`}
               numColumns={3}
               columnWrapperStyle={styles.handRow}
