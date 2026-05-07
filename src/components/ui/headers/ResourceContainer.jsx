@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    borderRadius: 12,
+    borderRadius: 4,
     opacity: 0.65,
   },
   levelText: {
