@@ -490,9 +490,9 @@ function RoundResultsReveal({
         );
       });
       Animated.parallel(anims).start();
-    }, 6300);
+    }, 7800);
 
-    const t3 = setTimeout(() => setStage('scoreboard'), 7100);
+    const t3 = setTimeout(() => setStage('scoreboard'), 8600);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
@@ -830,7 +830,9 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.ROUND_RESULTS) {
-      setTimer(10); // 10 seconds to view results
+      // Reveal animation runs ~8.6s, then user gets a few seconds with the
+      // scoreboard before host auto-advances.
+      setTimer(13);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -1189,6 +1191,37 @@ export default function GameScreen({ navigation }) {
             } catch (e) {}
           };
 
+          // Tear down the game first so the user lands on the lobby (with the
+          // resource bar visible) BEFORE the claim modal opens. Otherwise the
+          // fly icons have nowhere to land.
+          unsubscribeRef.current?.();
+          if (gameId && game) {
+            try {
+              const { doc: docRef, setDoc, deleteDoc } = await import('firebase/firestore');
+              const { db: db2 } = await import('../services/firebase');
+              await setDoc(docRef(db2, 'gameHistory', gameId), {
+                ...game,
+                finishedAt: new Date().toISOString(),
+              });
+              await deleteDoc(docRef(db2, 'games', gameId));
+            } catch (e) {
+              console.error('[GameScreen] Error archiving game:', e);
+            }
+          }
+          setGameId(null);
+          setGame(null);
+          setHand([]);
+          setSelectedCard(null);
+          setCurrentVoteIndex(0);
+          setIsSpectating(false);
+          setIsPractice(false);
+          setPlayedCardIds([]);
+          setMulliganMode(false);
+
+          // Brief beat so the lobby paints + resource bar mounts before the
+          // claim modal opens on top of it.
+          await new Promise(r => setTimeout(r, 250));
+
           await claimRewards({
             title: 'Game Over',
             subtitle: `#${myReward.placement} place`,
@@ -1243,36 +1276,6 @@ export default function GameScreen({ navigation }) {
         }
       }
     }
-
-    // Unsubscribe from game updates
-    unsubscribeRef.current?.();
-
-    // Archive the game then clean up
-    if (gameId && game) {
-      try {
-        const { doc: docRef, setDoc, deleteDoc } = await import('firebase/firestore');
-        const { db } = await import('../services/firebase');
-        // Archive to gameHistory
-        await setDoc(docRef(db, 'gameHistory', gameId), {
-          ...game,
-          finishedAt: new Date().toISOString(),
-        });
-        // Delete from active games
-        await deleteDoc(docRef(db, 'games', gameId));
-      } catch (e) {
-        console.error('[GameScreen] Error archiving game:', e);
-      }
-    }
-
-    setGameId(null);
-    setGame(null);
-    setHand([]);
-    setSelectedCard(null);
-    setCurrentVoteIndex(0);
-    setIsSpectating(false);
-    setIsPractice(false);
-    setPlayedCardIds([]);
-    setMulliganMode(false);
   };
 
   // ── RENDER PHASES ──
@@ -1428,7 +1431,7 @@ export default function GameScreen({ navigation }) {
           data={hand}
           keyExtractor={(item, idx) => item?.id || `hand-${idx}`}
           numColumns={3}
-          contentContainerStyle={styles.handContainer}
+          contentContainerStyle={[styles.handContainer, { paddingTop: 16 }]}
           columnWrapperStyle={styles.handRow}
           renderItem={({ item, index }) => (
             <Pressable
@@ -1493,9 +1496,6 @@ export default function GameScreen({ navigation }) {
 
         {alreadyPicked ? (
           <>
-            <Text style={styles.pickInstruction}>
-              {game.submissions.length}/{game.players.length} submitted — tap to preview
-            </Text>
             <FlatList
               data={Array.from({ length: game.players.length }).map((_, i) => game.submissions[i] || null)}
               keyExtractor={(_, i) => `slot-${i}`}
@@ -1523,7 +1523,7 @@ export default function GameScreen({ navigation }) {
         ) : (
           <>
             <Text style={styles.pickInstruction}>
-              {mulliganMode ? 'Tap a card to replace it' : 'Tap a card to preview, then play it'}
+              {mulliganMode ? 'Tap a card to replace it' : ''}
             </Text>
             <FlatList
               data={hand}
@@ -1679,11 +1679,6 @@ export default function GameScreen({ navigation }) {
                   <View style={styles.handCardVideo}>
                     {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
                   </View>
-                  {favoriteCard?.uid === item.uid && (
-                    <View style={styles.favoriteTag}>
-                      <Ionicons name="heart" size={14} color={theme.colors.vibeRed} />
-                    </View>
-                  )}
                 </Pressable>
               )}
             />

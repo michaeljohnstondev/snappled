@@ -249,6 +249,8 @@ const styles = StyleSheet.create({
   },
   flyIcon: {
     position: 'absolute',
+    top: 0,
+    left: 0,
     width: 48,
     height: 48,
     alignItems: 'center',
