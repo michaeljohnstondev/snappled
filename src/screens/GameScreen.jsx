@@ -780,7 +780,7 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.PICKING) {
-      setTimer(30);
+      setTimer(45);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -910,11 +910,12 @@ export default function GameScreen({ navigation }) {
     return source.filter(s => !playedCardIds.includes(s.id));
   };
 
-  // Schedule a bot pick with a random 10-15s delay so the round doesn't end
-  // instantly and other players have time to actually preview each submission
-  // as it lands.
+  // Schedule a bot pick with a random 15-40s delay so the round doesn't end
+  // instantly and other players have time to load each submission's video
+  // and watch the placeholder fill animations. Spread is wider so multiple
+  // bots don't all land at once.
   const scheduleBotPick = (gid, botUid) => {
-    const delay = 10000 + Math.floor(Math.random() * 5000);
+    const delay = 15000 + Math.floor(Math.random() * 25000);
     setTimeout(() => {
       const pool = allSnapples;
       if (!pool.length) return;
@@ -1668,7 +1669,6 @@ export default function GameScreen({ navigation }) {
         {hasVoted ? (
           <View style={styles.centerContent}>
             <Ionicons name="checkmark-circle" size={48} color={theme.colors.vibeGreen} />
-            <Text style={styles.waitingText}>Vote submitted! Waiting for others...</Text>
           </View>
         ) : (
           <>
