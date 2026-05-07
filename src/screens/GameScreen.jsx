@@ -328,7 +328,34 @@ const creatorRowStyles = StyleSheet.create({
   },
 });
 
+// Animated points counter — ticks displayed value from prev → target over 1s
+// when `animate` becomes true. Used in the scoreboard row to make the round's
+// earned points feel like a reward rather than a number that just jumped.
+function PointsTicker({ from, to, animate, style }) {
+  const [displayed, setDisplayed] = useState(from);
+  useEffect(() => {
+    if (!animate || from === to) {
+      setDisplayed(to);
+      return;
+    }
+    const duration = 900;
+    const steps = 18;
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      const progress = Math.min(i / steps, 1);
+      setDisplayed(Math.round(from + (to - from) * progress));
+      if (progress >= 1) clearInterval(id);
+    }, duration / steps);
+    return () => clearInterval(id);
+  }, [animate, from, to]);
+  return <Text style={style}>{displayed} pts</Text>;
+}
+
 // ── Round results reveal — staged animation: grid → spotlight → shrink → scoreboard ──
+// Layout: scoreboard is the base layer (always rendered), the reveal grid +
+// winner spotlight are an overlay on top. Overlay fades down as the scoreboard
+// fades up — so the user sees the winner card "shrink into" the scoreboard.
 function RoundResultsReveal({
   submissions, rankings, players, prompt,
   currentRound, totalRounds, timer,
@@ -340,68 +367,91 @@ function RoundResultsReveal({
   // 1 winner → 1.5x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
   const winnerTargetScale = winners.length === 1 ? 1.5 : winners.length === 2 ? 1.2 : 0.9;
 
-  // reveal: grid full opacity (1.5s)
-  // spotlight: losers fade+shrink, winner scales up (3s)
-  // shrink: winner shrinks toward scoreboard (1s)
-  // scoreboard: existing scoreboard layout
   const [stage, setStage] = useState('reveal');
   const losersOpacity = useRef(new Animated.Value(1)).current;
   const losersScale = useRef(new Animated.Value(1)).current;
   const winnerScale = useRef(new Animated.Value(0.6)).current;
   const winnerOpacity = useRef(new Animated.Value(0)).current;
+  const winnerTranslateY = useRef(new Animated.Value(0)).current;
+  const overlayBgOpacity = useRef(new Animated.Value(1)).current;
+  const scoreboardOpacity = useRef(new Animated.Value(0.15)).current;
 
   useEffect(() => {
     const t1 = setTimeout(() => {
       setStage('spotlight');
       Animated.parallel([
-        Animated.timing(losersOpacity, { toValue: 0.12, duration: 700, useNativeDriver: true }),
+        Animated.timing(losersOpacity, { toValue: 0.10, duration: 700, useNativeDriver: true }),
         Animated.timing(losersScale, { toValue: 0.7, duration: 700, useNativeDriver: true }),
         Animated.spring(winnerScale, { toValue: winnerTargetScale, tension: 60, friction: 8, useNativeDriver: true }),
         Animated.timing(winnerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(scoreboardOpacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
       ]).start();
     }, 1500);
     const t2 = setTimeout(() => {
       setStage('shrink');
       Animated.parallel([
-        Animated.timing(winnerScale, { toValue: 0.25, duration: 700, useNativeDriver: true }),
-        Animated.timing(winnerOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
-        Animated.timing(losersOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        // Winner shrinks toward the scoreboard area below + fades.
+        Animated.timing(winnerScale, { toValue: 0.2, duration: 800, useNativeDriver: true }),
+        Animated.timing(winnerTranslateY, { toValue: 220, duration: 800, useNativeDriver: true }),
+        Animated.timing(winnerOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
+        // Grid + losers fade away; scoreboard surfaces fully.
+        Animated.timing(losersOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(overlayBgOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(scoreboardOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]).start();
     }, 4500);
     const t3 = setTimeout(() => setStage('scoreboard'), 5400);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
-  if (stage === 'scoreboard') {
-    return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.header}>
-          <View style={{ width: 36 }} />
-          <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
-          <Text style={styles.timerText}>{timer}s</Text>
-        </View>
+  const showWinnerOverlay = stage === 'spotlight' || stage === 'shrink';
+  const showOverlay = stage !== 'scoreboard';
+  const tickPoints = stage === 'shrink' || stage === 'scoreboard';
 
-        <View style={styles.resultsContent}>
-          {sortedPlayers.map((p, i) => {
-            const roundPts = (rankings || []).find(r => r.uid === p.uid);
-            const playerSub = (submissions || []).find(s => s.uid === p.uid);
-            return (
-              <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
-                <Text style={styles.resultPlacement}>#{i + 1}</Text>
-                <View style={styles.resultInfo}>
-                  <Text style={styles.resultName}>@{p.username}</Text>
-                  {playerSub && (
-                    <Text style={styles.resultCard} numberOfLines={1}>
-                      Played: {playerSub.prompt || playerSub.creatorUsername || 'a snapple'}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.resultRoundPts}>+{roundPts?.pointsEarned || 0}</Text>
-                <Text style={styles.resultTotal}>{p.points} pts</Text>
+  return (
+    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <View style={styles.header}>
+        <View style={{ width: 36 }} />
+        <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
+        <Text style={styles.timerText}>{stage === 'scoreboard' ? `${timer}s` : ''}</Text>
+      </View>
+
+      <View style={styles.promptBanner}>
+        <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
+      </View>
+
+      {/* BASE LAYER: scoreboard. Visible behind the overlay during reveal so
+          the user sees where the winner card ultimately lands. */}
+      <Animated.View style={[styles.resultsContent, { opacity: scoreboardOpacity }]}>
+        {sortedPlayers.map((p, i) => {
+          const roundPts = (rankings || []).find(r => r.uid === p.uid);
+          const earned = roundPts?.pointsEarned || 0;
+          const playerSub = (submissions || []).find(s => s.uid === p.uid);
+          return (
+            <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
+              <Text style={styles.resultPlacement}>#{i + 1}</Text>
+              <View style={styles.resultInfo}>
+                <Text style={styles.resultName}>@{p.username}</Text>
+                {playerSub && (
+                  <Text style={styles.resultCard} numberOfLines={1}>
+                    Played: {playerSub.prompt || playerSub.creatorUsername || 'a snapple'}
+                  </Text>
+                )}
               </View>
-            );
-          })}
+              <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
+                +{earned}
+              </Text>
+              <PointsTicker
+                from={Math.max(0, p.points - earned)}
+                to={p.points}
+                animate={tickPoints}
+                style={styles.resultTotal}
+              />
+            </View>
+          );
+        })}
 
+        {stage === 'scoreboard' && (
           <View style={styles.resultsActions}>
             {isHost ? (
               <VibeButton label="Next Round" onPress={onNextRound} />
@@ -413,87 +463,81 @@ function RoundResultsReveal({
               <Text style={styles.shareResultsText}>Share Round</Text>
             </Pressable>
           </View>
-        </View>
-      </LinearGradient>
-    );
-  }
+        )}
+      </Animated.View>
 
-  // reveal + spotlight + shrink share the grid layout for visual continuity
-  // with the picking/voting screens. The spotlight overlay drops the winner's
-  // big card on top during stages spotlight + shrink.
-  const showWinnerOverlay = stage === 'spotlight' || stage === 'shrink';
-
-  return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <View style={styles.header}>
-        <View style={{ width: 36 }} />
-        <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <View style={styles.promptBanner}>
-        <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
-      </View>
-
-      <FlatList
-        data={submissions || []}
-        keyExtractor={(item, i) => item?.snappleId || `sub-${i}`}
-        numColumns={3}
-        columnWrapperStyle={styles.handRow}
-        contentContainerStyle={styles.handContainer}
-        renderItem={({ item, index }) => {
-          const isWinner = winnerUids.has(item.uid);
-          // During spotlight/shrink, hide the winner's grid slot (only the big
-          // overlay is shown) and shrink+fade the losers.
-          const animStyle = isWinner
-            ? { opacity: showWinnerOverlay ? 0 : 1 }
-            : { opacity: losersOpacity, transform: [{ scale: losersScale }] };
-          return (
-            <Animated.View style={animStyle}>
-              <View style={styles.handCard}>
-                <View style={styles.handCardVideo}>
-                  <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
-                </View>
-              </View>
-            </Animated.View>
-          );
-        }}
-      />
-
-      {showWinnerOverlay && (
-        <View style={styles.spotlightOverlay} pointerEvents="none">
-          <View style={styles.spotlightRow}>
-            {winners.map(w => {
-              const sub = (submissions || []).find(s => s.uid === w.uid);
-              const player = (players || []).find(p => p.uid === w.uid);
+      {/* OVERLAY: card grid + winner spotlight. Fades out during shrink. */}
+      {showOverlay && (
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { opacity: overlayBgOpacity }]}
+        >
+          {/* Spacer to roughly match header + prompt banner heights so the
+              grid sits where it would on the picking/voting screens. */}
+          <View style={{ height: 120 }} />
+          <FlatList
+            data={submissions || []}
+            keyExtractor={(item, i) => item?.snappleId || `sub-${i}`}
+            numColumns={3}
+            columnWrapperStyle={styles.handRow}
+            contentContainerStyle={styles.handContainer}
+            scrollEnabled={false}
+            renderItem={({ item, index }) => {
+              const isWinner = winnerUids.has(item.uid);
+              const animStyle = isWinner
+                ? { opacity: showWinnerOverlay ? 0 : 1 }
+                : { opacity: losersOpacity, transform: [{ scale: losersScale }] };
               return (
-                <Animated.View
-                  key={w.uid}
-                  style={[
-                    styles.spotlightCard,
-                    {
-                      opacity: winnerOpacity,
-                      transform: [{ scale: winnerScale }],
-                    },
-                  ]}
-                >
-                  <View style={StyleSheet.absoluteFill}>
-                    <CardThumbnailDelayed videoUrl={sub?.videoUrl} />
-                  </View>
-                  <View style={styles.spotlightLabel}>
-                    <Text style={styles.spotlightWinnerLabel}>
-                      {winners.length > 1 ? 'TIE' : 'WINNER'}
-                    </Text>
-                    <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
-                    {sub?.creatorUsername && sub.creatorUsername !== player?.username && (
-                      <Text style={styles.spotlightCreator}>by @{sub.creatorUsername}</Text>
-                    )}
+                <Animated.View style={animStyle}>
+                  <View style={styles.handCard}>
+                    <View style={styles.handCardVideo}>
+                      <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
+                    </View>
                   </View>
                 </Animated.View>
               );
-            })}
-          </View>
-        </View>
+            }}
+          />
+
+          {showWinnerOverlay && (
+            <View style={styles.spotlightOverlay} pointerEvents="none">
+              <View style={styles.spotlightRow}>
+                {winners.map(w => {
+                  const sub = (submissions || []).find(s => s.uid === w.uid);
+                  const player = (players || []).find(p => p.uid === w.uid);
+                  return (
+                    <Animated.View
+                      key={w.uid}
+                      style={[
+                        styles.spotlightCard,
+                        {
+                          opacity: winnerOpacity,
+                          transform: [
+                            { translateY: winnerTranslateY },
+                            { scale: winnerScale },
+                          ],
+                        },
+                      ]}
+                    >
+                      <View style={StyleSheet.absoluteFill}>
+                        <CardThumbnailDelayed videoUrl={sub?.videoUrl} />
+                      </View>
+                      <View style={styles.spotlightLabel}>
+                        <Text style={styles.spotlightWinnerLabel}>
+                          {winners.length > 1 ? 'TIE' : 'WINNER'}
+                        </Text>
+                        <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
+                        {sub?.creatorUsername && sub.creatorUsername !== player?.username && (
+                          <Text style={styles.spotlightCreator}>by @{sub.creatorUsername}</Text>
+                        )}
+                      </View>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </Animated.View>
       )}
     </LinearGradient>
   );
@@ -545,13 +589,13 @@ export default function GameScreen({ navigation }) {
   }, [gameId]);
 
   // Hide the bottom tab bar whenever the user is inside an active game so the
-  // game UI gets full-screen real estate. Restore it whenever they leave.
+  // game UI gets full-screen real estate. setOptions targets THIS screen's
+  // descriptor (which is what CustomTabBar reads via descriptors[focused.key]),
+  // not the parent navigator.
   useEffect(() => {
-    const parent = navigation.getParent?.();
-    if (!parent) return;
     const inGame = !!gameId && !!game;
-    parent.setOptions({ tabBarStyle: inGame ? { display: 'none' } : undefined });
-    return () => parent.setOptions({ tabBarStyle: undefined });
+    navigation.setOptions({ tabBarStyle: inGame ? { display: 'none' } : undefined });
+    return () => navigation.setOptions({ tabBarStyle: undefined });
   }, [navigation, gameId, game]);
 
   // Load snapples + check for active game
@@ -1248,15 +1292,15 @@ export default function GameScreen({ navigation }) {
         <FlatList
           data={hand}
           keyExtractor={(item, idx) => item?.id || `hand-${idx}`}
-          numColumns={2}
-          contentContainerStyle={styles.handGrid}
-          columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 12 }}
+          numColumns={3}
+          contentContainerStyle={styles.handContainer}
+          columnWrapperStyle={styles.handRow}
           renderItem={({ item, index }) => (
             <Pressable
-              style={styles.reviewCard}
+              style={styles.handCard}
               onPress={() => setPreviewCard({ ...item, _isWaiting: true })}
             >
-              <View style={StyleSheet.absoluteFill}>
+              <View style={styles.handCardVideo}>
                 <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
               </View>
             </Pressable>
@@ -2067,7 +2111,8 @@ const styles = StyleSheet.create({
   resultInfo: { flex: 1 },
   resultName: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold },
   resultCard: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 },
-  resultRoundPts: { color: theme.colors.vibeGreen, fontSize: 14, fontWeight: 'bold' },
+  resultRoundPts: { color: theme.colors.textSecondary, fontSize: 14, fontWeight: 'bold' },
+  resultRoundPtsEarned: { color: theme.colors.vibeGreen, fontSize: 16 },
   resultTotal: { color: theme.colors.vibeBlue, fontSize: 14, fontWeight: 'bold' },
   resultCoins: { color: theme.colors.vibeYellow, fontSize: 14, fontWeight: 'bold' },
   resultsActions: { marginTop: 24, gap: 12 },
