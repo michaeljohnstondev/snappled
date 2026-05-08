@@ -58,31 +58,34 @@ export default function VibeModal({
               <Text style={[styles.message, { color: getTypeColor() }]}>{message}</Text>
             </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              {buttons.length > 0 ? (
-                buttons.map((button, index) => (
+            {/* Buttons — pass buttons={null} to render no buttons; the
+                overlay Pressable still dismisses on tap-outside. */}
+            {buttons !== null && (
+              <View style={styles.buttonContainer}>
+                {buttons.length > 0 ? (
+                  buttons.map((button, index) => (
+                    <VibeButton
+                      key={index}
+                      label={button.text?.toUpperCase() || 'OK'}
+                      onPress={() => {
+                        button.onPress?.();
+                        onClose();
+                      }}
+                      style={[
+                        styles.button,
+                        buttons.length === 1 ? styles.singleButton : styles.multiButton
+                      ]}
+                    />
+                  ))
+                ) : (
                   <VibeButton
-                    key={index}
-                    label={button.text?.toUpperCase() || 'OK'}
-                    onPress={() => {
-                      button.onPress?.();
-                      onClose();
-                    }}
-                    style={[
-                      styles.button,
-                      buttons.length === 1 ? styles.singleButton : styles.multiButton
-                    ]}
+                    label="OK"
+                    onPress={onClose}
+                    style={styles.singleButton}
                   />
-                ))
-              ) : (
-                <VibeButton
-                  label="OK"
-                  onPress={onClose}
-                  style={styles.singleButton}
-                />
-              )}
-            </View>
+                )}
+              </View>
+            )}
           </LinearGradient>
         </View>
       </Pressable>

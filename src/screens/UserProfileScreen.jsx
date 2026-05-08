@@ -27,6 +27,7 @@ export default function UserProfileScreen({ route, navigation }) {
   const [activeTab, setActiveTab] = useState('created');
   const [createdSnapples, setCreatedSnapples] = useState([]);
   const [ownedSnapples, setOwnedSnapples] = useState([]);
+  const [savedSnapples, setSavedSnapples] = useState([]);
 
   const isOwnProfile = user?.uid === userId;
 
@@ -82,6 +83,21 @@ export default function UserProfileScreen({ route, navigation }) {
       } else {
         setOwnedSnapples([]);
       }
+
+      // Wishlist (saved). Returns [{ snappleId, snapple, ... }]
+      try {
+        const wishResult = await snappleService.getUserWishlist(userId);
+        if (wishResult?.success) {
+          const saved = (wishResult.wishlist || [])
+            .map(w => w.snapple)
+            .filter(Boolean);
+          setSavedSnapples(saved);
+        } else {
+          setSavedSnapples([]);
+        }
+      } catch (e) {
+        setSavedSnapples([]);
+      }
     } catch (error) {
       console.error('[UserProfileScreen] Error loading snapples:', error);
     }
@@ -116,6 +132,7 @@ export default function UserProfileScreen({ route, navigation }) {
     { label: 'Created', value: 'created' },
     { label: 'Deck', value: 'deck' },
     { label: 'Collection', value: 'collection' },
+    { label: 'Saved', value: 'saved' },
   ];
 
   const handleTabSelect = (tab) => {
@@ -128,7 +145,8 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const activeSnapples = activeTab === 'created' ? createdSnapples
     : activeTab === 'deck' ? ownedSnapples
-    : ownedSnapples; // TODO: filter collection vs deck
+    : activeTab === 'saved' ? savedSnapples
+    : ownedSnapples; // collection
 
   const renderSnappleItem = ({ item }) => (
     <Pressable style={styles.snappleItem} onPress={() => handleSnapplePress(item)}>
@@ -221,6 +239,7 @@ export default function UserProfileScreen({ route, navigation }) {
       <Text style={styles.emptyText}>
         {activeTab === 'created' ? 'No snapples created yet'
           : activeTab === 'deck' ? 'No snapples in deck yet'
+          : activeTab === 'saved' ? 'No saved snapples yet'
           : 'No snapples in collection yet'}
       </Text>
     </View>

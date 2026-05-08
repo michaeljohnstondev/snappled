@@ -28,7 +28,7 @@ export default function SnappleOverlay({
   navigation
 }) {
   const { user, userCurrency, updateUserCurrency } = useAuth();
-  const { showConfirm, showError } = useModal();
+  const { showConfirm, showError, showAlert } = useModal();
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showComments, setShowComments] = useState(false);
@@ -150,6 +150,16 @@ export default function SnappleOverlay({
   };
 
   const handleBuy = () => {
+    // Skip the confirm flow entirely if the user already owns this snapple —
+    // just tell them. Tap-anywhere-to-dismiss alert (no buttons).
+    const alreadyOwned =
+      (userCurrency.ownedSnapples || []).includes(snapple.id) ||
+      (snapple.owners || []).includes(user?.uid);
+    if (alreadyOwned) {
+      showAlert('Already Owned', 'You already have this snapple in your collection.', null);
+      return;
+    }
+
     showConfirm(
       'Purchase Snapple',
       `Buy this Snapple for ${metrics.currentPrice} coins?`,

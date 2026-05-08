@@ -196,7 +196,7 @@ export default function DeckBuilderScreen({ navigation }) {
   );
 
   return (
-    <AppLayout navigation={navigation}>
+    <AppLayout navigation={navigation} hideHeader>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>

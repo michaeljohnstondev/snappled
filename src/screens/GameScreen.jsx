@@ -21,7 +21,9 @@ import theme from '../theme/themes';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // ── Thumbnail for hand cards (with delayed mount) ──
-function CardThumbnailDelayed({ videoUrl, delay = 0 }) {
+// React.memo'd so the warmup grid doesn't re-mount its players on every
+// 1-second timer tick — same hand should keep its loaded thumbnails.
+const CardThumbnailDelayed = React.memo(function CardThumbnailDelayed({ videoUrl, delay = 0 }) {
   const [mounted, setMounted] = useState(delay === 0);
 
   useEffect(() => {
@@ -40,9 +42,9 @@ function CardThumbnailDelayed({ videoUrl, delay = 0 }) {
   }
 
   return <CardThumbnail videoUrl={videoUrl} />;
-}
+});
 
-function CardThumbnail({ videoUrl }) {
+const CardThumbnail = React.memo(function CardThumbnail({ videoUrl }) {
   const player = useVideoPlayer(videoUrl, (p) => {
     p.loop = false;
     p.muted = true;
@@ -58,7 +60,7 @@ function CardThumbnail({ videoUrl }) {
       nativeControls={false}
     />
   );
-}
+});
 
 // ── Preview player for hand cards ──
 function PreviewPlayer({ videoUrl, muted = false }) {
@@ -450,6 +452,45 @@ function RoundResultsReveal({
     return () => loop.stop();
   }, [stage]);
 
+  // Refs so we can clear timers if the user taps the spotlight to skip ahead.
+  const t2Ref = useRef(null);
+  const t3Ref = useRef(null);
+
+  // Run shrink animations. fastMode=true fires when the user taps to skip —
+  // shorter durations so the dismiss feels snappy.
+  const runShrinkAnims = (fastMode) => {
+    const screenH = Dimensions.get('window').height;
+    const centerY = screenH / 2;
+    const dur = fastMode ? 350 : 800;
+    const overlayDur = fastMode ? 350 : 700;
+    const sbDur = fastMode ? 300 : 600;
+    const anims = [
+      Animated.timing(overlayBgOpacity, { toValue: 0, duration: overlayDur, useNativeDriver: true }),
+      Animated.timing(scoreboardOpacity, { toValue: 1, duration: sbDur, useNativeDriver: true }),
+    ];
+    winners.forEach(w => {
+      const a = winnerAnimsRef.current.get(w.uid);
+      const targetY = rowScreenYsRef.current[w.uid];
+      const translateY = (targetY != null ? (targetY - centerY) : -260);
+      anims.push(
+        Animated.timing(a.scale, { toValue: 0.15, duration: dur, useNativeDriver: true }),
+        Animated.timing(a.translateY, { toValue: translateY, duration: dur, useNativeDriver: true }),
+        Animated.timing(a.opacity, { toValue: 0, duration: dur, useNativeDriver: true }),
+      );
+    });
+    Animated.parallel(anims).start();
+  };
+
+  // Tap on the spotlight area → skip ahead to scoreboard, faster shrink.
+  const handleSpotlightTap = () => {
+    if (stage !== 'spotlight') return;
+    if (t2Ref.current) clearTimeout(t2Ref.current);
+    if (t3Ref.current) clearTimeout(t3Ref.current);
+    setStage('shrink');
+    runShrinkAnims(true);
+    t3Ref.current = setTimeout(() => setStage('scoreboard'), 400);
+  };
+
   useEffect(() => {
     const t1 = setTimeout(() => {
       setStage('spotlight');
@@ -467,33 +508,18 @@ function RoundResultsReveal({
         );
       });
       Animated.parallel(anims).start();
-    }, 2800); // Extended so the card wobble has visible airtime before reveal
+    }, 2800);
 
-    // Hold spotlight for ~3.5s so the snapple video has time to actually play
-    // on screen. Then shrink into each winner's scoreboard row.
-    const t2 = setTimeout(() => {
+    t2Ref.current = setTimeout(() => {
       setStage('shrink');
-      const screenH = Dimensions.get('window').height;
-      const centerY = screenH / 2;
-      const anims = [
-        Animated.timing(overlayBgOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
-        Animated.timing(scoreboardOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-      ];
-      winners.forEach(w => {
-        const a = winnerAnimsRef.current.get(w.uid);
-        const targetY = rowScreenYsRef.current[w.uid];
-        const translateY = (targetY != null ? (targetY - centerY) : -260);
-        anims.push(
-          Animated.timing(a.scale, { toValue: 0.15, duration: 800, useNativeDriver: true }),
-          Animated.timing(a.translateY, { toValue: translateY, duration: 800, useNativeDriver: true }),
-          Animated.timing(a.opacity, { toValue: 0, duration: 800, useNativeDriver: true }),
-        );
-      });
-      Animated.parallel(anims).start();
+      runShrinkAnims(false);
     }, 11800);
-
-    const t3 = setTimeout(() => setStage('scoreboard'), 12600);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    t3Ref.current = setTimeout(() => setStage('scoreboard'), 12600);
+    return () => {
+      clearTimeout(t1);
+      if (t2Ref.current) clearTimeout(t2Ref.current);
+      if (t3Ref.current) clearTimeout(t3Ref.current);
+    };
   }, []);
 
   const showWinnerOverlay = stage === 'spotlight' || stage === 'shrink';
@@ -507,7 +533,7 @@ function RoundResultsReveal({
     const targets = {};
     (players || []).forEach(p => { targets[p.uid] = p.points; });
     const startVals = { ...displayedPoints };
-    const duration = 1200;
+    const duration = 2200;
     const steps = 24;
     let i = 0;
     const id = setInterval(() => {
@@ -549,7 +575,7 @@ function RoundResultsReveal({
           return (
             <Reanimated.View
               key={p.uid}
-              layout={LinearTransition.springify().damping(18).stiffness(140)}
+              layout={LinearTransition.springify().damping(12).stiffness(90)}
               ref={handleRowRef(p.uid)}
               collapsable={false}
               style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
@@ -584,7 +610,8 @@ function RoundResultsReveal({
       {/* OVERLAY: card grid + winner spotlight. Fades out during shrink. */}
       {showOverlay && (
         <Animated.View
-          pointerEvents="none"
+          // Outer overlay no longer blocks all touches — spotlight is tappable
+          // (skip-ahead). Loser grid below sets its own pointerEvents="none".
           style={[StyleSheet.absoluteFill, { opacity: overlayBgOpacity }]}
         >
           {/* Spacer to roughly match header + prompt banner heights so the
@@ -597,6 +624,7 @@ function RoundResultsReveal({
             columnWrapperStyle={styles.handRow}
             contentContainerStyle={styles.handContainer}
             scrollEnabled={false}
+            pointerEvents="none"
             renderItem={({ item, index }) => {
               // Per-card rotation magnitude — gives the wobble varied energy
               // so the grid doesn't look mechanically synced.
@@ -627,7 +655,7 @@ function RoundResultsReveal({
           />
 
           {showWinnerOverlay && (
-            <View style={styles.spotlightOverlay} pointerEvents="none">
+            <Pressable style={styles.spotlightOverlay} onPress={handleSpotlightTap}>
               {winners.map(w => {
                 const sub = (submissions || []).find(s => s.uid === w.uid);
                 const player = (players || []).find(p => p.uid === w.uid);
@@ -643,7 +671,7 @@ function RoundResultsReveal({
                   />
                 );
               })}
-            </View>
+            </Pressable>
           )}
         </Animated.View>
       )}
@@ -839,9 +867,10 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.ROUND_RESULTS) {
-      // Reveal animation runs ~12.6s, then user gets a few seconds with the
-      // scoreboard before host auto-advances.
-      setTimer(17);
+      // Reveal animation runs ~12.6s, then user gets ~10 seconds with the
+      // scoreboard before host auto-advances. Gives time for rank-swap
+      // animation to settle and people to read the board.
+      setTimer(22);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -919,9 +948,9 @@ export default function GameScreen({ navigation }) {
     return source.filter(s => !playedCardIds.includes(s.id));
   };
 
-  // Schedule a bot pick with a random 10-17s delay.
+  // Schedule a bot pick with a random 4-8s delay.
   const scheduleBotPick = (gid, botUid) => {
-    const delay = 10000 + Math.floor(Math.random() * 7000);
+    const delay = 4000 + Math.floor(Math.random() * 4000);
     setTimeout(() => {
       const pool = allSnapples;
       if (!pool.length) return;
@@ -1137,7 +1166,10 @@ export default function GameScreen({ navigation }) {
             .map(() => 1); // TODO: track player levels in game doc
 
           let xpEarned = levelService.calculateGameXP(myReward.placement, opponentLevels, myLevel);
-          let trophiesEarned = isPractice ? 0 : levelService.calculateTrophies(myReward.placement);
+          // Trophies only flow from ranked games. Ranked isn't implemented yet
+          // so for now: practice and custom both award zero. When ranked ships,
+          // gate this on a `ranked` flag stored on the game doc.
+          let trophiesEarned = 0;
           let coinsEarned = myReward.coinsEarned || 0;
 
           const { doc, updateDoc, increment, getDoc } = await import('firebase/firestore');
@@ -1163,39 +1195,45 @@ export default function GameScreen({ navigation }) {
           }
 
           // Build the commit function — runs at the apex of the fly animation
-          // so resource bar values tick up as icons land.
+          // so resource bar values tick up as icons land. Uses Firestore
+          // increments for atomicity (no read-then-write race when the user
+          // currency listener is mid-update). All resource/stat changes go
+          // through one updateDoc so the AuthContext listener fires once
+          // with the full new state.
           const userRef = doc(db, 'users', user.uid);
           const commit = async () => {
             try {
-              if (shieldUsed) {
-                await updateDoc(doc(db, 'users', user.uid), {
-                  'inventory.shields': increment(-1),
-                }).catch(() => {});
-              }
-              if (coinsEarned > 0) {
-                await updateUserCurrency({
-                  coins: (userCurrency.coins || 0) + coinsEarned,
-                });
-              }
               const updates = {
                 'profile.experience': increment(xpEarned),
                 'profile.xp': increment(xpEarned),
                 'stats.gamesPlayed': increment(1),
-                'stats.gamesWon': myReward.placement === 1 ? increment(1) : increment(0),
                 'stats.totalCoinsEarned': increment(coinsEarned),
               };
+              if (myReward.placement === 1) {
+                updates['stats.gamesWon'] = increment(1);
+              }
+              if (coinsEarned > 0) {
+                updates['resources.coins'] = increment(coinsEarned);
+              }
               if (trophiesEarned !== 0) {
                 updates['resources.trophies'] = increment(trophiesEarned);
               }
-              await updateDoc(userRef, updates).catch(() => {});
+              if (shieldUsed) {
+                updates['inventory.shields'] = increment(-1);
+              }
+              await updateDoc(userRef, updates);
+
+              // Win streak — read-then-write, separate doc update.
               if (myReward.placement === 1) {
                 const afterSnap = await getDoc(userRef);
                 const streak = (afterSnap.data()?.stats?.winStreak || 0) + 1;
-                await updateDoc(userRef, { 'stats.winStreak': streak }).catch(() => {});
+                await updateDoc(userRef, { 'stats.winStreak': streak });
               } else {
-                await updateDoc(userRef, { 'stats.winStreak': 0 }).catch(() => {});
+                await updateDoc(userRef, { 'stats.winStreak': 0 });
               }
-            } catch (e) {}
+            } catch (e) {
+              console.error('[GameScreen] commit error:', e);
+            }
           };
 
           // Tear down the game first so the user lands on the lobby (with the

@@ -46,6 +46,17 @@ function PromptsStack() {
   );
 }
 
+// Inner stack for the Profile tab — keeps the bottom tab bar visible when
+// drilling into DeckBuilder.
+function ProfileStack() {
+  return (
+    <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Screen name="ProfileHome" component={UserProfileScreen} />
+      <Stack.Screen name="DeckBuilder" component={DeckBuilderScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -55,7 +66,7 @@ function MainTabs() {
       <Tab.Screen name="Prompts" component={PromptsStack} />
       <Tab.Screen name="Play" component={GameScreen} />
       <Tab.Screen name="RecordTab" component={EmptyScreen} />
-      <Tab.Screen name="Profile" component={UserProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
       <Tab.Screen name="Store" component={StoreScreen} />
     </Tab.Navigator>
   );
@@ -107,7 +118,6 @@ export default function Navigation() {
           <Stack.Screen name="Record" component={RecordScreen} />
           <Stack.Screen name="VideoPreview" component={VideoPreviewScreen} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-          <Stack.Screen name="DeckBuilder" component={DeckBuilderScreen} />
           <Stack.Screen name="Game" component={GameScreen} />
           <Stack.Screen name="Achievements" component={AchievementsScreen} />
           <Stack.Screen name="Admin" component={AdminScreen} />
