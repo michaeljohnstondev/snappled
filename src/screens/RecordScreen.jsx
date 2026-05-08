@@ -145,7 +145,7 @@ export default function RecordScreen({ route }) {
     setIsRecording(false);
     setRecordedVideo(null); // This should hide the success overlay
     setRecordingTime(0);
-    setShowPrompt(true); // Show prompt again
+    setShowPrompt(false); // Stay clean — no overlay on record-again
     
     // Force camera component to remount by changing its key
     setCameraKey(prev => prev + 1);

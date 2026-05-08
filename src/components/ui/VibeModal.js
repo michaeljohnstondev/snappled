@@ -158,17 +158,18 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.main,
   },
   buttonContainer: {
-    flexDirection: 'row',
+    // Stack buttons vertically so labels don't get crammed when there are 3+
+    flexDirection: 'column',
     padding: 16,
-    gap: 12,
+    gap: 10,
   },
   button: {
     marginVertical: 0,
   },
   singleButton: {
-    flex: 1,
+    width: '100%',
   },
   multiButton: {
-    flex: 1,
+    width: '100%',
   },
 });

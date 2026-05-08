@@ -490,9 +490,9 @@ function RoundResultsReveal({
         );
       });
       Animated.parallel(anims).start();
-    }, 7800);
+    }, 11800);
 
-    const t3 = setTimeout(() => setStage('scoreboard'), 8600);
+    const t3 = setTimeout(() => setStage('scoreboard'), 12600);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
@@ -830,9 +830,9 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.ROUND_RESULTS) {
-      // Reveal animation runs ~8.6s, then user gets a few seconds with the
+      // Reveal animation runs ~12.6s, then user gets a few seconds with the
       // scoreboard before host auto-advances.
-      setTimer(13);
+      setTimer(17);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
