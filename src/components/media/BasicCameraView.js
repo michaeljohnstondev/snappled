@@ -31,7 +31,16 @@ export default function BasicCameraView({
   // preview surface from sticking around behind other screens after nav.
   const isFocused = useIsFocused();
 
-  const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
+  // Request a virtual device that combines ultra-wide + main + telephoto on
+  // back, so minZoom drops to ~0.5x (instead of being clamped to the main
+  // wide's 1.0x). On phones without an ultra-wide lens, vision-camera falls
+  // back to whatever's available — minZoom just stays at 1.0.
+  const device = useCameraDevice(
+    facing === 'front' ? 'front' : 'back',
+    facing === 'front'
+      ? undefined
+      : { physicalDevices: ['ultra-wide-camera', 'wide-angle-camera', 'telephoto-camera'] },
+  );
 
   // Pinch-to-zoom: zoom is a shared value clamped between device.minZoom and device.maxZoom.
   // pinchStart captures the zoom level at gesture begin so scaling is relative, not absolute.
