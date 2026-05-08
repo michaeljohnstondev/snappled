@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList, Dimensions,
-  ActivityIndicator, Animated, PanResponder, Modal,
+  ActivityIndicator, Animated, PanResponder, Modal, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
