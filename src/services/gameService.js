@@ -59,7 +59,7 @@ const DEFAULT_PROMPTS = [
 const ROUNDS_PER_GAME = 5;
 const HAND_SIZE = 6;
 const REVIEW_TIME = 60000; // 1 minute to review your hand before each round's picking starts
-const PICK_TIME = 30000; // 30 seconds to pick — bots stagger 10-25s
+const PICK_TIME = 45000; // 45 seconds to pick — bots stagger 10-25s
 const VOTE_TIME = 15000; // 15 seconds per submission to vote
 const MAX_PLAYERS = 8;
 

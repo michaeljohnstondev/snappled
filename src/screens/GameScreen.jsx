@@ -794,7 +794,7 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.PICKING) {
-      setTimer(30);
+      setTimer(45);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -924,10 +924,9 @@ export default function GameScreen({ navigation }) {
     return source.filter(s => !playedCardIds.includes(s.id));
   };
 
-  // Schedule a bot pick with a random 10-25s delay. Wide enough that bots
-  // don't all land at once, narrow enough that the round doesn't drag.
+  // Schedule a bot pick with a random 10-17s delay.
   const scheduleBotPick = (gid, botUid) => {
-    const delay = 10000 + Math.floor(Math.random() * 15000);
+    const delay = 10000 + Math.floor(Math.random() * 7000);
     setTimeout(() => {
       const pool = allSnapples;
       if (!pool.length) return;
