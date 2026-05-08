@@ -427,7 +427,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                 />
               ) : (
                 <VibeButton
-                  label="Pick Prompt"
+                  label="Prompts"
                   onPress={() => setShowPromptPicker(true)}
                   variant="toggle"
                   color="green"
