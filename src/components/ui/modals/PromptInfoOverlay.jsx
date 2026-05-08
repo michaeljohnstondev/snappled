@@ -386,28 +386,45 @@ export default function PromptInfoOverlay({
               )}
             </LinearGradient>
             {isAdmin && (
-              <Pressable
-                style={styles.editPromptBtn}
-                onPress={async () => {
-                  if (isEditing) {
-                    // Save
-                    if (editText.trim() && editText !== prompt.text) {
-                      try {
-                        const { doc, updateDoc } = await import('firebase/firestore');
-                        const { db } = await import('../../../services/firebase');
-                        await updateDoc(doc(db, 'activePrompts', prompt.id), { text: editText.trim() });
-                        prompt.text = editText.trim();
-                      } catch (e) {}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                  style={styles.editPromptBtn}
+                  onPress={async () => {
+                    if (isEditing) {
+                      if (editText.trim() && editText !== prompt.text) {
+                        try {
+                          const { doc, updateDoc } = await import('firebase/firestore');
+                          const { db } = await import('../../../services/firebase');
+                          await updateDoc(doc(db, 'activePrompts', prompt.id), { text: editText.trim() });
+                          prompt.text = editText.trim();
+                        } catch (e) {}
+                      }
+                      setIsEditing(false);
+                    } else {
+                      setEditText(prompt.text || '');
+                      setIsEditing(true);
                     }
-                    setIsEditing(false);
-                  } else {
-                    setEditText(prompt.text || '');
-                    setIsEditing(true);
-                  }
-                }}
-              >
-                <Text style={styles.editPromptBtnText}>{isEditing ? 'Save' : 'Edit'}</Text>
-              </Pressable>
+                  }}
+                >
+                  <Text style={styles.editPromptBtnText}>{isEditing ? 'Save' : 'Edit'}</Text>
+                </Pressable>
+                {!isEditing && (
+                  <Pressable
+                    style={[styles.editPromptBtn, { borderColor: theme.colors.vibeRed }]}
+                    onPress={async () => {
+                      try {
+                        const { doc, deleteDoc } = await import('firebase/firestore');
+                        const { db } = await import('../../../services/firebase');
+                        await deleteDoc(doc(db, 'activePrompts', prompt.id));
+                        onClose?.();
+                        onRefresh?.();
+                      } catch (e) {}
+                    }}
+                  >
+                    <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
           </View>
 

@@ -665,13 +665,29 @@ function RoundResultsReveal({
                       <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
                     </View>
                   </View>
-                  {/* Voter labels reveal who voted for whom during the
-                      reveal stage. Hidden during shrink/scoreboard. */}
-                  {(stage === 'reveal' || stage === 'spotlight') && votersFor(item.uid).length > 0 && (
-                    <Text style={styles.voterLabel} numberOfLines={1}>
-                      {votersFor(item.uid).join(', ')}
-                    </Text>
-                  )}
+                  {/* Voter + score labels reveal who voted for whom and how
+                      many points it scored. Hidden during shrink/scoreboard. */}
+                  {(stage === 'reveal' || stage === 'spotlight') && (() => {
+                    const voters = votersFor(item.uid);
+                    const ranking = (rankings || []).find(r => r.uid === item.uid);
+                    const pts = ranking?.pointsEarned || 0;
+                    const placement = ranking?.placement;
+                    if (voters.length === 0 && pts === 0) return null;
+                    return (
+                      <>
+                        {voters.length > 0 && (
+                          <Text style={styles.voterLabel} numberOfLines={1}>
+                            {voters.join(', ')}
+                          </Text>
+                        )}
+                        {pts > 0 && (
+                          <Text style={styles.scorePillLabel} numberOfLines={1}>
+                            #{placement} · +{pts} pts
+                          </Text>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Animated.View>
               );
             }}
@@ -706,6 +722,13 @@ function RoundResultsReveal({
 // ── Main Game Screen ──
 export default function GameScreen({ navigation }) {
   const { user, userCurrency } = useAuth();
+  const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
+  const isAdmin = ADMIN_UIDS.includes(user?.uid);
+  // Admin-only inline edit on the round's prompt banner. Mirrors the pattern
+  // in PromptInfoOverlay — Edit toggles a TextInput, Delete pulls a fresh
+  // prompt and restarts the round.
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [editPromptText, setEditPromptText] = useState('');
   const { showAlert, showError, showConfirm, showToast } = useModal();
   const { claimRewards } = useRewardClaim();
   const [gameId, setGameId] = useState(null);
@@ -780,6 +803,7 @@ export default function GameScreen({ navigation }) {
     setFavoriteCard(null);
     setHasVoted(false);
     setMulliganMode(false);
+    setPreviewCard(null);
   }, [gameId, game?.currentRound]);
 
   // Hide the bottom tab bar whenever the user is inside an active game so the
@@ -1113,10 +1137,15 @@ export default function GameScreen({ navigation }) {
 
   const handleSubmitVote = async () => {
     if (!game || !favoriteCard || hasVoted) return;
-    setHasVoted(true);
 
-    // Cast vote for the selected card's owner
-    await gameService.castVote(gameId, user.uid, favoriteCard.uid);
+    // Submit vote first; only mark hasVoted on success so a network failure
+    // doesn't lock the user into a fake "submitted" state.
+    const result = await gameService.castVote(gameId, user.uid, favoriteCard.uid);
+    if (!result?.success) {
+      showError('Vote Failed', result?.error || 'Could not submit vote — try again.');
+      return;
+    }
+    setHasVoted(true);
 
     // If host, handle bot votes and finish round
     if (game.hostId === user.uid) {
@@ -1206,7 +1235,10 @@ export default function GameScreen({ navigation }) {
             .filter(p => p.uid !== user.uid && !p.uid?.startsWith('bot_'))
             .map(() => 1); // TODO: track player levels in game doc
 
-          let xpEarned = levelService.calculateGameXP(myReward.placement, opponentLevels, myLevel);
+          // XP only flows from ranked games. Same gating as trophies — until
+          // ranked exists, custom + practice award nothing. When ranked ships,
+          // condition this on a `ranked` flag stored on the game doc.
+          let xpEarned = 0;
           // Trophies only flow from ranked games. Ranked isn't implemented yet
           // so for now: practice and custom both award zero. When ranked ships,
           // gate this on a `ranked` flag stored on the game doc.
@@ -1574,9 +1606,53 @@ export default function GameScreen({ navigation }) {
           <Text style={styles.timerText}>{timer}s</Text>
         </View>
 
-        {/* Prompt */}
+        {/* Prompt — admin gets inline Edit + Delete buttons (Delete pulls a
+            fresh prompt and restarts the round). */}
         <View style={styles.promptBanner}>
-          <Text style={styles.promptText}>{currentPrompt}</Text>
+          {isEditingPrompt ? (
+            <TextInput
+              style={styles.editPromptInput}
+              value={editPromptText}
+              onChangeText={setEditPromptText}
+              multiline
+              autoFocus
+            />
+          ) : (
+            <Text style={styles.promptText}>{currentPrompt}</Text>
+          )}
+          {isAdmin && (
+            <View style={styles.promptAdminRow}>
+              <Pressable
+                style={styles.promptAdminBtn}
+                onPress={async () => {
+                  if (isEditingPrompt) {
+                    const text = editPromptText.trim();
+                    if (text && text !== currentPrompt) {
+                      const r = await gameService.editRoundPrompt(gameId, game.currentRound - 1, text);
+                      if (!r.success) showError('Error', r.error || 'Failed to save');
+                    }
+                    setIsEditingPrompt(false);
+                  } else {
+                    setEditPromptText(currentPrompt);
+                    setIsEditingPrompt(true);
+                  }
+                }}
+              >
+                <Text style={styles.promptAdminBtnText}>{isEditingPrompt ? 'Save' : 'Edit'}</Text>
+              </Pressable>
+              {!isEditingPrompt && (
+                <Pressable
+                  style={[styles.promptAdminBtn, { borderColor: theme.colors.vibeRed }]}
+                  onPress={async () => {
+                    const r = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
+                    if (!r.success) showError('Error', r.error || 'Failed to replace prompt');
+                  }}
+                >
+                  <Text style={[styles.promptAdminBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
 
         {alreadyPicked ? (
@@ -1711,6 +1787,58 @@ export default function GameScreen({ navigation }) {
                 </View>
               </View>
             </View>
+          </Modal>
+        )}
+
+        {/* Admin: edit / replace the round's prompt mid-game */}
+        {editingPrompt && (
+          <Modal visible transparent animationType="fade" onRequestClose={() => setEditingPrompt(false)}>
+            <Pressable style={styles.previewOverlay} onPress={() => setEditingPrompt(false)}>
+              <Pressable
+                style={styles.editPromptCard}
+                onPress={() => {}}
+              >
+                <Text style={styles.editPromptTitle}>Edit Round Prompt</Text>
+                <TextInput
+                  value={editPromptText}
+                  onChangeText={setEditPromptText}
+                  style={styles.editPromptInput}
+                  multiline
+                  placeholder="New prompt text..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                />
+                <View style={styles.editPromptButtons}>
+                  <Pressable
+                    style={[styles.editPromptBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
+                    onPress={() => setEditingPrompt(false)}
+                  >
+                    <Text style={styles.editPromptBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.editPromptBtn, { borderColor: theme.colors.vibeRed }]}
+                    onPress={async () => {
+                      const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
+                      setEditingPrompt(false);
+                      if (!result.success) showError('Error', result.error || 'Failed to replace prompt');
+                    }}
+                  >
+                    <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeRed }]}>Replace & Restart</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.editPromptBtn, { borderColor: theme.colors.vibeBlue }]}
+                    onPress={async () => {
+                      const text = editPromptText.trim();
+                      if (!text) return;
+                      const result = await gameService.editRoundPrompt(gameId, game.currentRound - 1, text);
+                      setEditingPrompt(false);
+                      if (!result.success) showError('Error', result.error || 'Failed to save prompt');
+                    }}
+                  >
+                    <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeBlue }]}>Save</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Pressable>
           </Modal>
         )}
       </LinearGradient>
@@ -2001,6 +2129,36 @@ const styles = StyleSheet.create({
     color: 'white', fontSize: 18, fontWeight: theme.fontWeights.bold,
     textAlign: 'center', lineHeight: 24,
   },
+  editPromptInput: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: theme.fontWeights.bold,
+    textAlign: 'center',
+    lineHeight: 24,
+    minHeight: 60,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: 8,
+  },
+  promptAdminRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  promptAdminBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  promptAdminBtnText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   pickHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, marginBottom: 8, gap: 12, paddingHorizontal: 16,
   },
@@ -2130,6 +2288,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  scorePillLabel: {
+    color: theme.colors.vibeGreen,
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 2,
   },
   reviewBanner: {
     paddingHorizontal: 20,

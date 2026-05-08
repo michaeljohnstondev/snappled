@@ -285,19 +285,29 @@ export const gameService = {
 
       // Tally votes
       const votes = data.votes || {};
-      const rankings = data.submissions
+      const sorted = data.submissions
         .map(sub => ({
           uid: sub.uid,
           votes: (votes[sub.uid] || []).length,
         }))
         .sort((a, b) => b.votes - a.votes);
 
-      // Award points: 1st=5, 2nd=3, 3rd=1
+      // Olympic-style tie placement — tied players share the higher placement,
+      // next placement skips the tied count. Tied at 1st with 2 players →
+      // both get placement 1, next player gets placement 3.
+      let currentPlacement = 1;
+      const withPlacement = sorted.map((r, i, arr) => {
+        if (i > 0 && arr[i - 1].votes !== r.votes) {
+          currentPlacement = i + 1;
+        }
+        return { ...r, placement: currentPlacement };
+      });
+
+      // Award points by placement (tied players get the same points).
       const pointValues = [5, 3, 1, 0, 0, 0];
-      const roundResult = rankings.map((r, i) => ({
+      const roundResult = withPlacement.map(r => ({
         ...r,
-        pointsEarned: pointValues[i] || 0,
-        placement: i + 1,
+        pointsEarned: pointValues[r.placement - 1] || 0,
       }));
 
       // Update player totals
@@ -321,18 +331,17 @@ export const gameService = {
         updatedAt: serverTimestamp(),
       });
 
-      // Track wins on the snapple itself. A "win" = the snapple submitted by
-      // the player at placement 1 for this round. Tie-breaks fall to whichever
-      // submission sort put first — we don't double-count.
-      const winnerUid = roundResult.find(r => r.placement === 1)?.uid;
-      if (winnerUid) {
-        const winningSubmission = (data.submissions || []).find(s => s.uid === winnerUid);
+      // Track wins on every snapple at placement 1 — ties get gamesWon
+      // credit for all tied snapples.
+      const winnerUids = roundResult.filter(r => r.placement === 1).map(r => r.uid);
+      winnerUids.forEach(uid => {
+        const winningSubmission = (data.submissions || []).find(s => s.uid === uid);
         if (winningSubmission?.snappleId) {
           updateDoc(doc(db, SNAPPLES_COLLECTION, winningSubmission.snappleId), {
             gamesWon: increment(1),
           }).catch(() => {});
         }
-      }
+      });
 
       return { success: true, roundResult, isLastRound };
     } catch (error) {
@@ -368,6 +377,58 @@ export const gameService = {
 
   // Transition from REVIEW to PICKING — host calls this when reviewDeadline
   // elapses (or when host taps "Start Round" early).
+  // Admin-only: edit the active round's prompt text in place. All clients see
+  // the new text immediately via onSnapshot. Doesn't reset submissions or
+  // votes — the user just retypes the prompt for whatever's already happening.
+  async editRoundPrompt(gameId, roundIndex, newText) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      const gameDoc = await getDoc(gameRef);
+      if (!gameDoc.exists()) return { success: false, error: 'Game not found' };
+      const data = gameDoc.data();
+      const newPrompts = [...(data.prompts || [])];
+      newPrompts[roundIndex] = newText;
+      await updateDoc(gameRef, { prompts: newPrompts, updatedAt: serverTimestamp() });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] editRoundPrompt error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Admin-only: throw out the current round's prompt, pull a fresh one from
+  // the pool, and restart the round (clears submissions + votes, snaps phase
+  // back to PICKING with a new pickDeadline). Useful when an inappropriate
+  // or busted prompt makes it live mid-game.
+  async replaceAndRestartRound(gameId, roundIndex) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      const gameDoc = await getDoc(gameRef);
+      if (!gameDoc.exists()) return { success: false, error: 'Game not found' };
+      const data = gameDoc.data();
+
+      // Pull one fresh prompt — same source as game start (least-used random).
+      const fresh = await this.getGamePrompts(1);
+      const newPrompt = (fresh && fresh[0]) || 'Make something cool';
+
+      const newPrompts = [...(data.prompts || [])];
+      newPrompts[roundIndex] = newPrompt;
+
+      await updateDoc(gameRef, {
+        prompts: newPrompts,
+        phase: GAME_PHASES.PICKING,
+        submissions: [],
+        votes: {},
+        pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true, newPrompt };
+    } catch (error) {
+      console.error('[GameService] replaceAndRestartRound error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   async startPicking(gameId) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
@@ -468,11 +529,17 @@ export const gameService = {
   calculateRewards(players) {
     const sorted = [...players].sort((a, b) => b.points - a.points);
     const rewards = [50, 30, 15, 5, 0, 0];
-    return sorted.map((p, i) => ({
-      ...p,
-      placement: i + 1,
-      coinsEarned: rewards[i] || 0,
-    }));
+    let currentPlacement = 1;
+    return sorted.map((p, i, arr) => {
+      if (i > 0 && arr[i - 1].points !== p.points) {
+        currentPlacement = i + 1;
+      }
+      return {
+        ...p,
+        placement: currentPlacement,
+        coinsEarned: rewards[currentPlacement - 1] || 0,
+      };
+    });
   },
 
   // Listen to game changes in real-time
