@@ -557,11 +557,6 @@ function RoundResultsReveal({
               <Text style={styles.resultPlacement}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
                 <Text style={styles.resultName}>@{p.username}</Text>
-                {playerSub && (
-                  <Text style={styles.resultCard} numberOfLines={1}>
-                    Played: {playerSub.prompt || playerSub.creatorUsername || 'a snapple'}
-                  </Text>
-                )}
               </View>
               <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
                 +{earned}
@@ -1329,11 +1324,10 @@ export default function GameScreen({ navigation }) {
               label="Custom"
               onPress={() => showAlert(
                 'Custom Game',
-                'Find an open game or create your own?',
+                'Create your own or find an open game.',
                 [
-                  { text: 'Cancel' },
-                  { text: 'Find Game', onPress: handleFindGame },
                   { text: 'Create Game', onPress: handleCreateGame },
+                  { text: 'Find Game', onPress: handleFindGame },
                 ],
               )}
               variant="toggle"
@@ -1612,10 +1606,6 @@ export default function GameScreen({ navigation }) {
             <View style={styles.previewOverlay}>
               <View style={styles.previewCard}>
                 <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
-
-                <View style={styles.previewInfo}>
-                  <Text style={styles.previewPromptLabel}>{previewCard.prompt}</Text>
-                </View>
 
                 {previewCard._isWaiting && (
                   <CreatorActionRow
