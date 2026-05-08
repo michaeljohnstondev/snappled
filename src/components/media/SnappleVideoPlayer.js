@@ -1,9 +1,11 @@
 import React, { useImperativeHandle, forwardRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useCachedVideoUri } from '../../services/videoCache';
 
 const SnappleVideoPlayer = forwardRef(({ snapple, style }, ref) => {
-  const player = useVideoPlayer(snapple?.videoUrl || null, (player) => {
+  const cachedUri = useCachedVideoUri(snapple?.videoUrl || null);
+  const player = useVideoPlayer(cachedUri, (player) => {
     player.loop = true;
     player.muted = !!snapple?.muted;
     player.play();

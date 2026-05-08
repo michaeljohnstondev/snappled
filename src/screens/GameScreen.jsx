@@ -10,6 +10,7 @@ import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
+import { prefetchVideo, useCachedVideoUri } from '../services/videoCache';
 import { gameService, GAME_PHASES } from '../services/gameService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
@@ -45,7 +46,8 @@ const CardThumbnailDelayed = React.memo(function CardThumbnailDelayed({ videoUrl
 });
 
 const CardThumbnail = React.memo(function CardThumbnail({ videoUrl }) {
-  const player = useVideoPlayer(videoUrl, (p) => {
+  const cachedUri = useCachedVideoUri(videoUrl);
+  const player = useVideoPlayer(cachedUri, (p) => {
     p.loop = false;
     p.muted = true;
     p.pause();
@@ -64,7 +66,8 @@ const CardThumbnail = React.memo(function CardThumbnail({ videoUrl }) {
 
 // ── Preview player for hand cards ──
 function PreviewPlayer({ videoUrl, muted = false }) {
-  const player = useVideoPlayer(videoUrl, (p) => {
+  const cachedUri = useCachedVideoUri(videoUrl);
+  const player = useVideoPlayer(cachedUri, (p) => {
     p.loop = true;
     p.muted = muted;
     p.play();
@@ -336,7 +339,7 @@ const creatorRowStyles = StyleSheet.create({
 // has its own animated values so multi-winner ties can shrink to their own
 // scoreboard rows independently. Layout is flex-row inside spotlightOverlay,
 // so ties land side-by-side automatically; we only animate scale/opacity/Y.
-function WinnerSpotlightCard({ submission, player, isTie, anim }) {
+function WinnerSpotlightCard({ submission, player, isTie, anim, voters }) {
   return (
     <Animated.View
       style={[
@@ -355,9 +358,14 @@ function WinnerSpotlightCard({ submission, player, isTie, anim }) {
       </View>
       <View style={styles.spotlightLabel}>
         <Text style={styles.spotlightWinnerLabel}>{isTie ? 'TIE' : 'WINNER'}</Text>
-        <Text style={styles.spotlightPlayer}>@{player?.username || '?'}</Text>
+        <Text style={styles.spotlightPlayer}>{player?.username || '?'}</Text>
         {submission?.creatorUsername && submission.creatorUsername !== player?.username && (
           <Text style={styles.spotlightCreator}>by @{submission.creatorUsername}</Text>
+        )}
+        {voters && voters.length > 0 && (
+          <Text style={styles.spotlightVoters} numberOfLines={1}>
+            voted by {voters.join(', ')}
+          </Text>
         )}
       </View>
     </Animated.View>
@@ -370,10 +378,18 @@ function WinnerSpotlightCard({ submission, player, isTie, anim }) {
 // are an overlay on top. During shrink each winner card scales down and
 // translates toward its actual row in the scoreboard.
 function RoundResultsReveal({
-  submissions, rankings, players, prompt,
+  submissions, rankings, players, votes, prompt,
   currentRound, totalRounds, timer,
   isHost, onNextRound, onShare,
 }) {
+  // Resolve voter names for a given submission so the reveal can show who
+  // voted for whom. Unknown uids fall back to their first 4 chars.
+  const votersFor = (subUid) => {
+    const voterIds = votes?.[subUid] || [];
+    return voterIds
+      .map(vid => players?.find(p => p.uid === vid)?.username || vid?.slice(0, 4))
+      .filter(Boolean);
+  };
   const winners = (rankings || []).filter(r => r.placement === 1);
   const winnerUids = useRef(new Set(winners.map(w => w.uid))).current;
   // 1 winner → 1.5x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
@@ -582,7 +598,7 @@ function RoundResultsReveal({
             >
               <Text style={styles.resultPlacement}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
-                <Text style={styles.resultName}>@{p.username}</Text>
+                <Text style={styles.resultName}>{p.username}</Text>
               </View>
               <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
                 +{earned}
@@ -649,6 +665,13 @@ function RoundResultsReveal({
                       <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
                     </View>
                   </View>
+                  {/* Voter labels reveal who voted for whom during the
+                      reveal stage. Hidden during shrink/scoreboard. */}
+                  {(stage === 'reveal' || stage === 'spotlight') && votersFor(item.uid).length > 0 && (
+                    <Text style={styles.voterLabel} numberOfLines={1}>
+                      {votersFor(item.uid).join(', ')}
+                    </Text>
+                  )}
                 </Animated.View>
               );
             }}
@@ -668,6 +691,7 @@ function RoundResultsReveal({
                     player={player}
                     isTie={winners.length > 1}
                     anim={anim}
+                    voters={votersFor(w.uid)}
                   />
                 );
               })}
@@ -726,6 +750,23 @@ export default function GameScreen({ navigation }) {
   useEffect(() => {
     if (!gameId) lastBotScheduleRoundRef.current = null;
   }, [gameId]);
+
+  // Incremental video prefetch — concurrent (forEach without await), so
+  // every new video starts downloading immediately. By the time we need
+  // them in voting / reveal, they're cached.
+  useEffect(() => {
+    (game?.submissions || []).forEach(s => {
+      if (s?.videoUrl) prefetchVideo(s.videoUrl);
+    });
+  }, [game?.submissions?.length]);
+
+  // Same for the user's own hand: as soon as a hand is drawn (or refreshed
+  // after a played card swap), prefetch all 6 cards in parallel.
+  useEffect(() => {
+    hand.forEach(card => {
+      if (card?.videoUrl) prefetchVideo(card.videoUrl);
+    });
+  }, [hand]);
 
   // Reset per-round state for EVERY player whenever the round number changes.
   // Host-only handleNextRound also resets these, but guests never call it so
@@ -1422,7 +1463,7 @@ export default function GameScreen({ navigation }) {
                 <View style={styles.playerAvatar}>
                   <Text style={styles.playerAvatarText}>{p.username.charAt(0).toUpperCase()}</Text>
                 </View>
-                <Text style={styles.playerName}>@{p.username}</Text>
+                <Text style={styles.playerName}>{p.username}</Text>
                 {p.uid === game.hostId && <Text style={styles.hostBadge}>HOST</Text>}
               </View>
             ))}
@@ -1783,7 +1824,7 @@ export default function GameScreen({ navigation }) {
         const winningSub = game.submissions.find(s => s.uid === winnerUid);
         const videoUrl = winningSub?.videoUrl || '';
         await Share.share({
-          message: `"${sharePrompt}" 🎬\n\nCheck out this round on Snappled!\n\n${videoUrl ? videoUrl + '\n\n' : ''}${sortedPlayers.map((p, i) => `#${i+1} @${p.username}`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
+          message: `"${sharePrompt}" 🎬\n\nCheck out this round on Snappled!\n\n${videoUrl ? videoUrl + '\n\n' : ''}${sortedPlayers.map((p, i) => `#${i+1} ${p.username}`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
         });
       } catch (e) {}
     };
@@ -1792,6 +1833,7 @@ export default function GameScreen({ navigation }) {
         submissions={game.submissions}
         rankings={lastRoundResult?.rankings || []}
         players={game.players}
+        votes={game.votes || {}}
         prompt={game.prompts[game.currentRound - 1] || ''}
         currentRound={game.currentRound}
         totalRounds={game.totalRounds}
@@ -1819,7 +1861,7 @@ export default function GameScreen({ navigation }) {
           {rewards.map((p, i) => (
             <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
               <Text style={styles.resultPlacement}>#{p.placement}</Text>
-              <Text style={styles.resultName}>@{p.username}</Text>
+              <Text style={styles.resultName}>{p.username}</Text>
               <Text style={styles.resultTotal}>{p.points} pts</Text>
             </View>
           ))}
@@ -1832,7 +1874,7 @@ export default function GameScreen({ navigation }) {
                 const winner = rewards[0];
                 const winningSub = game.submissions.find(s => s.uid === winner?.uid);
                 await Share.share({
-                  message: `🏆 Game Over on Snappled!\n\nWinner: @${winner?.username}\n${winningSub?.videoUrl ? winningSub.videoUrl + '\n\n' : '\n'}${rewards.map(p => `#${p.placement} @${p.username} — ${p.points} pts`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
+                  message: `🏆 Game Over on Snappled!\n\nWinner: ${winner?.username}\n${winningSub?.videoUrl ? winningSub.videoUrl + '\n\n' : '\n'}${rewards.map(p => `#${p.placement} ${p.username} — ${p.points} pts`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
                 });
               } catch (e) {}
             }}>
@@ -2075,6 +2117,19 @@ const styles = StyleSheet.create({
   spotlightCreator: {
     color: theme.colors.textSecondary,
     fontSize: 10,
+  },
+  spotlightVoters: {
+    color: theme.colors.vibeBlue,
+    fontSize: 9,
+    marginTop: 3,
+    fontStyle: 'italic',
+  },
+  voterLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 9,
+    textAlign: 'center',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   reviewBanner: {
     paddingHorizontal: 20,
