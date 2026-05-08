@@ -75,6 +75,10 @@ export const snappleService = {
         // Reviver perk: floats this snapple to the top of its prompt's grid
         // until this timestamp, then sorts normally. Null if no boost.
         boostedUntil: snappleData.boostedUntil || null,
+
+        // Creator preference: when true, players hear silence on this
+        // snapple. Useful for visual-only content (graffiti, art, etc.).
+        muted: !!snappleData.muted,
         
         // Pricing
         basePrice: 10, // Starting price in coins

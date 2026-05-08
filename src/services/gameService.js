@@ -211,6 +211,7 @@ export const gameService = {
           prompt: snapple.prompt,
           creatorId: snapple.creatorId || null,
           creatorUsername: snapple.creatorUsername || 'anonymous',
+          muted: !!snapple.muted,
         }),
         updatedAt: serverTimestamp(),
       });

@@ -25,6 +25,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const { showSuccess, showError, showConfirm, showToast } = useModal();
   const { flyRewards } = useRewardClaim();
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -42,6 +43,11 @@ export default function VideoPreviewScreen({ route, navigation }) {
     player.muted = false;
     player.play(); // Start playing immediately
   });
+
+  // Sync mute toggle to the player.
+  useEffect(() => {
+    if (player) player.muted = isMuted;
+  }, [isMuted, player]);
 
   // Animated style for horizontal flip - only for front camera
   const animatedStyle = useAnimatedStyle(() => {
@@ -180,6 +186,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
         prompt: submitPrompt.text || 'Snapple video',
         category: submitPrompt.category || 'general',
         boostedUntil,
+        muted: isMuted,
       });
 
       if (snappleResult.success) {
@@ -362,11 +369,20 @@ export default function VideoPreviewScreen({ route, navigation }) {
 
       {/* Transparent Overlay for Controls */}
       <Pressable style={styles.overlay} onPress={handleScreenTap}>
-        {/* Close Button */}
+        {/* Close + Mute Buttons */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>
             <View style={styles.controlButton}>
               <Text style={styles.closeText}>✕</Text>
+            </View>
+          </Pressable>
+          <Pressable onPress={(e) => { e.stopPropagation?.(); setIsMuted(m => !m); }} style={styles.muteButton}>
+            <View style={styles.controlButton}>
+              <Ionicons
+                name={isMuted ? 'volume-mute' : 'volume-high'}
+                size={20}
+                color="white"
+              />
             </View>
           </Pressable>
         </View>
@@ -701,11 +717,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     left: 20,
+    right: 20,
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   closeButton: {
+    width: 44,
+    height: 44,
+  },
+  muteButton: {
     width: 44,
     height: 44,
   },

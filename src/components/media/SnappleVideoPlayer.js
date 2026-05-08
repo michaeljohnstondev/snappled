@@ -5,7 +5,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 const SnappleVideoPlayer = forwardRef(({ snapple, style }, ref) => {
   const player = useVideoPlayer(snapple?.videoUrl || null, (player) => {
     player.loop = true;
-    player.muted = false;
+    player.muted = !!snapple?.muted;
     player.play();
   });
 

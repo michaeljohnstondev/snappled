@@ -61,10 +61,10 @@ function CardThumbnail({ videoUrl }) {
 }
 
 // ── Preview player for hand cards ──
-function PreviewPlayer({ videoUrl }) {
+function PreviewPlayer({ videoUrl, muted = false }) {
   const player = useVideoPlayer(videoUrl, (p) => {
     p.loop = true;
-    p.muted = false;
+    p.muted = muted;
     p.play();
   });
   return (
@@ -84,7 +84,7 @@ function SwipeCard({ submission, onSwipeRight, onSwipeLeft, onBuy, onReport, onP
   const [paused, setPaused] = useState(false);
   const player = useVideoPlayer(submission.videoUrl, (p) => {
     p.loop = true;
-    p.muted = false;
+    p.muted = !!submission.muted;
     p.play();
   });
 
@@ -349,7 +349,7 @@ function WinnerSpotlightCard({ submission, player, isTie, anim }) {
       ]}
     >
       <View style={StyleSheet.absoluteFill}>
-        <PreviewPlayer videoUrl={submission?.videoUrl} />
+        <PreviewPlayer videoUrl={submission?.videoUrl} muted={!!submission?.muted} />
       </View>
       <View style={styles.spotlightLabel}>
         <Text style={styles.spotlightWinnerLabel}>{isTie ? 'TIE' : 'WINNER'}</Text>
@@ -1600,7 +1600,7 @@ export default function GameScreen({ navigation }) {
           <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewCard(null)}>
             <View style={styles.previewOverlay}>
               <View style={styles.previewCard}>
-                <PreviewPlayer videoUrl={previewCard.videoUrl} />
+                <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
 
                 <View style={styles.previewInfo}>
                   <Text style={styles.previewPromptLabel}>{previewCard.prompt}</Text>
@@ -1702,7 +1702,7 @@ export default function GameScreen({ navigation }) {
           <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewCard(null)}>
             <View style={styles.previewOverlay}>
               <View style={styles.previewCard}>
-                <PreviewPlayer videoUrl={previewCard.videoUrl} />
+                <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
 
                 <CreatorActionRow
                   submission={previewCard}

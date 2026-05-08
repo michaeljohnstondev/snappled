@@ -160,5 +160,14 @@ service cloud.firestore {
       allow create, update: if request.auth != null;
       allow delete: if false;
     }
+
+    // Banned prompt texts — admin-curated permaban list. Read by anyone
+    // authenticated (so summonPrompt can check before creating). Write
+    // open to authenticated users for now; admin gating happens client
+    // side via the AdminScreen util.
+    match /bannedPromptTexts/{textKey} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null;
+    }
   }
 }
