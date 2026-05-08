@@ -704,6 +704,20 @@ export default function GameScreen({ navigation }) {
     if (!gameId) lastBotScheduleRoundRef.current = null;
   }, [gameId]);
 
+  // Reset per-round state for EVERY player whenever the round number changes.
+  // Host-only handleNextRound also resets these, but guests never call it so
+  // their hasVoted / selectedCard / favoriteCard would carry over between
+  // rounds — leading to a stale "vote submitted" green check and ghost
+  // selected borders. This effect fires on every client.
+  useEffect(() => {
+    if (!gameId || !game?.currentRound) return;
+    setSelectedCard(null);
+    setCurrentVoteIndex(0);
+    setFavoriteCard(null);
+    setHasVoted(false);
+    setMulliganMode(false);
+  }, [gameId, game?.currentRound]);
+
   // Hide the bottom tab bar whenever the user is inside an active game so the
   // game UI gets full-screen real estate. setOptions targets THIS screen's
   // descriptor (which is what CustomTabBar reads via descriptors[focused.key]),
@@ -780,7 +794,7 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.PICKING) {
-      setTimer(45);
+      setTimer(30);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -910,12 +924,10 @@ export default function GameScreen({ navigation }) {
     return source.filter(s => !playedCardIds.includes(s.id));
   };
 
-  // Schedule a bot pick with a random 15-40s delay so the round doesn't end
-  // instantly and other players have time to load each submission's video
-  // and watch the placeholder fill animations. Spread is wider so multiple
-  // bots don't all land at once.
+  // Schedule a bot pick with a random 10-25s delay. Wide enough that bots
+  // don't all land at once, narrow enough that the round doesn't drag.
   const scheduleBotPick = (gid, botUid) => {
-    const delay = 15000 + Math.floor(Math.random() * 25000);
+    const delay = 10000 + Math.floor(Math.random() * 15000);
     setTimeout(() => {
       const pool = allSnapples;
       if (!pool.length) return;
