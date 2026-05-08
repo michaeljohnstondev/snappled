@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import {
   Camera,
   useCameraDevice,
+  useCameraDevices,
   useCameraPermission,
   useMicrophonePermission,
 } from 'react-native-vision-camera';
@@ -31,20 +32,29 @@ export default function BasicCameraView({
   // preview surface from sticking around behind other screens after nav.
   const isFocused = useIsFocused();
 
-  // Request a virtual device that combines ultra-wide + main + telephoto on
-  // back, so minZoom drops to ~0.5x (instead of being clamped to the main
-  // wide's 1.0x). On phones without an ultra-wide lens, vision-camera falls
-  // back to whatever's available — minZoom just stays at 1.0.
-  const device = useCameraDevice(
-    facing === 'front' ? 'front' : 'back',
-    facing === 'front'
-      ? undefined
-      : { physicalDevices: ['ultra-wide-camera', 'wide-angle-camera', 'telephoto-camera'] },
-  );
+  // Default useCameraDevice('back') returns a single device whose minZoom
+  // is often clamped to the main wide's 1.0x — pinch-out can't go below
+  // that. Enumerate all devices and pick the back-facing one with the
+  // lowest minZoom, which on phones with an ultra-wide lens gives us 0.5x.
+  // Falls back to default useCameraDevice if the enumeration is empty.
+  const allDevices = useCameraDevices();
+  const fallbackDevice = useCameraDevice(facing === 'front' ? 'front' : 'back');
+  const device = (() => {
+    if (!allDevices || allDevices.length === 0) return fallbackDevice;
+    const wantedPosition = facing === 'front' ? 'front' : 'back';
+    const positionMatches = allDevices.filter(d => d?.position === wantedPosition);
+    if (positionMatches.length === 0) return fallbackDevice;
+    // Pick the one with the lowest minZoom — that's the widest-FOV lens.
+    return positionMatches.reduce(
+      (best, d) => (d.minZoom < (best?.minZoom ?? Infinity) ? d : best),
+      null,
+    ) || fallbackDevice;
+  })();
 
   // Pinch-to-zoom: zoom is a shared value clamped between device.minZoom and device.maxZoom.
   // pinchStart captures the zoom level at gesture begin so scaling is relative, not absolute.
-  const zoom = useSharedValue(device?.neutralZoom ?? 1);
+  // Start at minZoom (widest FOV) so it matches the phone's native camera default.
+  const zoom = useSharedValue(device?.minZoom ?? 1);
   const pinchStart = useSharedValue(1);
 
   const minZoom = device?.minZoom ?? 1;
@@ -59,7 +69,28 @@ export default function BasicCameraView({
       zoom.value = Math.min(Math.max(next, minZoom), maxZoom);
     });
 
+  // Pick the format with the widest field of view — single-lens phones (like
+  // Pixel 3) often expose multiple formats with different FOVs, and the
+  // vision-camera default leans tighter than the native camera. This gets
+  // back the peripheral pixels.
+  const widestFormat = (() => {
+    if (!device?.formats?.length) return undefined;
+    return device.formats.reduce(
+      (best, f) => ((f.fieldOfView || 0) > (best?.fieldOfView || 0) ? f : best),
+      null,
+    );
+  })();
+
   const animatedProps = useAnimatedProps(() => ({ zoom: zoom.value }));
+
+  // useSharedValue initializes once, but device.minZoom isn't ready on the
+  // very first render. Sync it once the device is loaded so we actually
+  // start at the widest available FOV.
+  useEffect(() => {
+    if (device?.minZoom != null) {
+      zoom.value = device.minZoom;
+    }
+  }, [device?.minZoom]);
 
   useEffect(() => {
     if (!cameraPermission) requestCameraPermission().catch(() => {});
@@ -122,6 +153,7 @@ export default function BasicCameraView({
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
             device={device}
+            format={widestFormat}
             isActive={true}
             video={true}
             audio={true}
