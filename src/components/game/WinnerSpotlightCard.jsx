@@ -32,9 +32,16 @@ export default function WinnerSpotlightCard({ submission, player, isTie, anim, v
         <Text style={styles.winnerLabel}>{isTie ? 'TIE' : 'WINNER'}</Text>
         <Text style={styles.player}>{player?.username || '?'}</Text>
         {voters && voters.length > 0 && (
-          <Text style={styles.voters} numberOfLines={1}>
-            voted by {voters.join(', ')}
-          </Text>
+          <View style={styles.voterChipRow}>
+            {voters.map((v, i) => (
+              <View
+                key={`${v.uid}-${i}`}
+                style={[styles.voterChip, { borderColor: v.color }]}
+              >
+                <Text style={styles.voterChipText} numberOfLines={1}>{v.name}</Text>
+              </View>
+            ))}
+          </View>
         )}
       </View>
     </Animated.View>
@@ -81,10 +88,23 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 10,
   },
-  voters: {
-    color: theme.colors.vibeBlue,
-    fontSize: 9,
-    marginTop: 3,
-    fontStyle: 'italic',
+  voterChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  voterChip: {
+    borderWidth: 2,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  voterChipText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

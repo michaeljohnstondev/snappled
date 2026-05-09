@@ -34,18 +34,76 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // each player's row Y in screen coords. The reveal grid + winner spotlight
 // are an overlay on top. During shrink each winner card scales down and
 // translates toward its actual row in the scoreboard.
+// Palette assigned to non-self players in voter-order. Self always shows
+// in vibeGreen so the user can spot their own vote at a glance.
+const VOTER_PALETTE = [
+  theme.colors.vibeBlue,
+  theme.colors.vibeCyan,
+  theme.colors.vibePurple,
+  theme.colors.vibePink,
+  theme.colors.vibeYellow,
+  theme.colors.vibeOrange,
+  theme.colors.vibeAqua,
+  theme.colors.vibeTeal,
+];
+
+// Segmented aura rendered around a card — one stripe per voter, in their
+// assigned color. Stripes wrap each side of the card so the colors are
+// visible regardless of orientation. If no voters, just renders children.
+function VoteAura({ voters, thickness = 3, radius = 10, children }) {
+  if (!voters || voters.length === 0) return children;
+  const colors = voters.map(v => v.color);
+  return (
+    <View style={{ padding: thickness, borderRadius: radius + thickness, overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: thickness, flexDirection: 'row' }}>
+        {colors.map((c, i) => <View key={`t-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
+      </View>
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: thickness, flexDirection: 'row' }}>
+        {colors.map((c, i) => <View key={`b-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
+      </View>
+      <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: thickness, flexDirection: 'column' }}>
+        {colors.map((c, i) => <View key={`l-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
+      </View>
+      <View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: thickness, flexDirection: 'column' }}>
+        {colors.map((c, i) => <View key={`r-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
+      </View>
+      {children}
+    </View>
+  );
+}
+
 function RoundResultsReveal({
   submissions, rankings, players, votes, prompt,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare,
+  isHost, onNextRound, onShare, selfUid,
 }) {
-  // Resolve voter names for a given submission so the reveal can show who
-  // voted for whom. Unknown uids fall back to their first 4 chars.
+  // Per-player color assignment. Self locks to vibeGreen, others get a
+  // palette color in player-order so the same person stays the same color
+  // across all cards' auras + voter-name chips.
+  const playerColors = React.useMemo(() => {
+    const map = new Map();
+    let i = 0;
+    (players || []).forEach(p => {
+      if (p.uid === selfUid) {
+        map.set(p.uid, theme.colors.vibeGreen);
+      } else {
+        map.set(p.uid, VOTER_PALETTE[i % VOTER_PALETTE.length]);
+        i++;
+      }
+    });
+    return map;
+  }, [players, selfUid]);
+
+  // Resolve voters for a submission as { name, color, isMe } objects so
+  // both aura stripes and name chips can render in the same colors.
   const votersFor = (subUid) => {
     const voterIds = votes?.[subUid] || [];
-    return voterIds
-      .map(vid => players?.find(p => p.uid === vid)?.username || vid?.slice(0, 4))
-      .filter(Boolean);
+    return voterIds.map(vid => ({
+      uid: vid,
+      name: players?.find(p => p.uid === vid)?.username || vid?.slice(0, 4),
+      color: playerColors.get(vid) || theme.colors.textSecondary,
+      isMe: vid === selfUid,
+    }));
   };
   const winners = (rankings || []).filter(r => r.placement === 1);
   const winnerUids = useRef(new Set(winners.map(w => w.uid))).current;
@@ -385,25 +443,41 @@ function RoundResultsReveal({
                     ],
                   }}
                 >
-                  <View style={styles.handCard}>
-                    <View style={styles.handCardVideo}>
-                      <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
-                    </View>
-                  </View>
-                  {/* Voter + score labels reveal who voted for whom and how
-                      many points it scored. Hidden during shrink/scoreboard. */}
-                  {(stage === 'reveal' || stage === 'spotlight') && (() => {
-                    const voters = votersFor(item.uid);
+                  {/* Card with a segmented vote-aura around it — one
+                      stripe per voter in their assigned color. Voters
+                      are surfaced as colored-border name chips below. */}
+                  {(() => {
+                    const voters = stage === 'reveal' || stage === 'spotlight'
+                      ? votersFor(item.uid)
+                      : [];
                     const ranking = (rankings || []).find(r => r.uid === item.uid);
                     const pts = ranking?.pointsEarned || 0;
                     const placement = ranking?.placement;
-                    if (voters.length === 0 && pts === 0) return null;
                     return (
                       <>
+                        <VoteAura voters={voters} thickness={3} radius={10}>
+                          <View style={styles.handCard}>
+                            <View style={styles.handCardVideo}>
+                              <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
+                            </View>
+                          </View>
+                        </VoteAura>
                         {voters.length > 0 && (
-                          <Text style={styles.voterLabel} numberOfLines={1}>
-                            {voters.join(', ')}
-                          </Text>
+                          <View style={styles.voterChipRow}>
+                            {voters.map((v, i) => (
+                              <View
+                                key={`${v.uid}-${i}`}
+                                style={[styles.voterChip, { borderColor: v.color }]}
+                              >
+                                <Text
+                                  style={[styles.voterChipText, v.isMe && styles.voterChipTextMe]}
+                                  numberOfLines={1}
+                                >
+                                  {v.name}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
                         )}
                         {pts > 0 && (
                           <Text style={styles.scorePillLabel} numberOfLines={1}>
@@ -1550,6 +1624,7 @@ export default function GameScreen({ navigation }) {
         totalRounds={game.totalRounds}
         timer={timer}
         isHost={isHost}
+        selfUid={user?.uid}
         onNextRound={handleNextRound}
         onShare={handleShareRound}
       />
@@ -1919,6 +1994,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  voterChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 3,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  voterChip: {
+    borderWidth: 2,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  voterChipText: {
+    color: 'white',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  voterChipTextMe: {
+    color: theme.colors.vibeGreen,
   },
   scorePillLabel: {
     color: theme.colors.vibeGreen,
