@@ -357,7 +357,7 @@ export default function PromptInfoOverlay({
       onRequestClose={onClose}
     >
       <LinearGradient
-        colors={theme.colors.backgroundGradient}
+        colors={theme.colors.modalGradient}
         style={styles.overlay}
       >
         <ScrollView

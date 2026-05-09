@@ -6,6 +6,9 @@ const theme = {
     backgroundGradient: ['#001020', '#001840', '#002060'],
     buttonGradient: ['#00c6ff', '#0072ff'],
     royalPurpleGradient: ['#4B0082', '#0066FF', '#4B0082', '#0066FF', '#4B0082'],
+    // Modal background — deeper than backgroundGradient, with a vibeBlue
+    // glow corner so overlay modals don't read as plain dark slabs.
+    modalGradient: ['#0A0420', '#1A0840', '#06182E', '#001020'],
 
     textPrimary: '#FFFFFF',
     textSecondary: '#778DA9',

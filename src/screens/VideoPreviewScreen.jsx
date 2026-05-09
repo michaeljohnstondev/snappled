@@ -49,6 +49,20 @@ export default function VideoPreviewScreen({ route, navigation }) {
     if (player) player.muted = isMuted;
   }, [isMuted, player]);
 
+  // Auto-pause the recorded preview while the prompt picker modal is open
+  // (resume on close). Keeps the user's eyes on the picker without a
+  // looping clip distracting underneath.
+  useEffect(() => {
+    if (!player) return;
+    if (showPromptPicker) {
+      try { player.pause(); } catch (e) {}
+      setIsPlaying(false);
+    } else {
+      try { player.play(); } catch (e) {}
+      setIsPlaying(true);
+    }
+  }, [showPromptPicker, player]);
+
   // Animated style for horizontal flip - only for front camera
   const animatedStyle = useAnimatedStyle(() => {
     const scaleValue = cameraFacing === 'front' ? -1 : 1;
