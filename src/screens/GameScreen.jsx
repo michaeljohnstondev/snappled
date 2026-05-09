@@ -227,6 +227,19 @@ export default function GameScreen({ navigation }) {
   // again — leaving picking stuck.
   const lastBotScheduleDeadlineRef = useRef(null);
 
+  // Tracks every pending bot setTimeout (picks + votes) so we can cancel
+  // them when the phase changes. Without this, a bot pick scheduled for
+  // round 1 with a 7s delay could fire late — landing as a stale
+  // submission in round 2 and inflating the snapple count for that round.
+  const pendingBotTimeoutsRef = useRef([]);
+  const cancelPendingBots = () => {
+    pendingBotTimeoutsRef.current.forEach(id => clearTimeout(id));
+    pendingBotTimeoutsRef.current = [];
+  };
+  useEffect(() => {
+    cancelPendingBots();
+  }, [game?.phase, game?.currentRound]);
+
   const hasDeck = mySnapples.length >= 6;
 
   // Schedule bot picks once per pickDeadline when PICKING is active —
@@ -273,10 +286,11 @@ export default function GameScreen({ navigation }) {
       const eligible = allSubs.filter(s => s.uid !== bot.uid);
       if (eligible.length === 0) return;
       const delay = 3000 + Math.floor(Math.random() * 9000);
-      setTimeout(() => {
+      const tid = setTimeout(() => {
         const target = eligible[Math.floor(Math.random() * eligible.length)];
         gameService.castVote(gameId, bot.uid, target.uid).catch(() => {});
       }, delay);
+      pendingBotTimeoutsRef.current.push(tid);
     });
   }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid, isPractice]);
 
@@ -411,10 +425,12 @@ export default function GameScreen({ navigation }) {
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            // Auto-submit random card if time runs out
-            if (!game.submissions.some(s => s.uid === user.uid) && hand.length > 0) {
-              const randomCard = hand[Math.floor(Math.random() * hand.length)];
-              handlePickCard(randomCard);
+            // No autopick — players who don't pick simply skip the round.
+            // Host force-advances to voting when the timer expires so AFK
+            // players don't stall the round. (Add isRanked branch back
+            // here once ranked exists — there autopick is fair game.)
+            if (game.hostId === user?.uid) {
+              gameService.startVoting(gameId);
             }
             return 0;
           }
@@ -426,20 +442,15 @@ export default function GameScreen({ navigation }) {
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
-            // Auto-pick random if they haven't voted. The all-voted
-            // detection in subscribeToGame handles the eventual finishRound
-            // after a 10s wait. Bots auto-vote via the VOTING phase
-            // scheduler, no need to kick them here.
-            if (!hasVoted) {
-              const votable = game.submissions.filter(s => s.uid !== user.uid);
-              if (votable.length > 0) {
-                const random = votable[Math.floor(Math.random() * votable.length)];
-                setFavoriteCard(random);
-                gameService.castVote(gameId, user.uid, random.uid);
-                setHasVoted(true);
-              }
-            }
             clearInterval(timerRef.current);
+            // No auto-vote either. Host force-advances to results so the
+            // round doesn't stall on AFK voters. Same scheduling guard as
+            // the all-voted path so we don't double-fire finishRound.
+            if (game.hostId === user?.uid &&
+                finishScheduledRoundRef.current !== game.currentRound) {
+              finishScheduledRoundRef.current = game.currentRound;
+              setTimeout(() => gameService.finishRound(gameId), 1000);
+            }
             return 0;
           }
           return prev - 1;
@@ -566,9 +577,13 @@ export default function GameScreen({ navigation }) {
         gameService.submitPick(gid, botUid, botSnapple).catch(() => {});
         return;
       }
-      if (retriesLeft > 0) setTimeout(() => tryPick(retriesLeft - 1), 1000);
+      if (retriesLeft > 0) {
+        const rid = setTimeout(() => tryPick(retriesLeft - 1), 1000);
+        pendingBotTimeoutsRef.current.push(rid);
+      }
     };
-    setTimeout(() => tryPick(20), delay);
+    const tid = setTimeout(() => tryPick(20), delay);
+    pendingBotTimeoutsRef.current.push(tid);
   };
 
   const handleCreateGame = async () => {
@@ -1391,7 +1406,7 @@ export default function GameScreen({ navigation }) {
 
   // Final results
   if (game.phase === GAME_PHASES.FINAL_RESULTS) {
-    return <FinalResultsPhase game={game} onDone={handleFinish} />;
+    return <FinalResultsPhase game={game} selfUid={user?.uid} onDone={handleFinish} />;
   }
 
   return null;

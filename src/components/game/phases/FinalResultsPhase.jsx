@@ -10,11 +10,38 @@ import VibeButton from '../../ui/VibeButton';
 import { gameService } from '../../../services/gameService';
 import theme from '../../../theme/themes';
 
+// Same palette as the voting wait screen + round-results scoreboard so
+// player colors stay consistent across all three.
+const VOTER_PALETTE = [
+  theme.colors.vibeBlue,
+  theme.colors.vibeCyan,
+  theme.colors.vibePurple,
+  theme.colors.vibePink,
+  theme.colors.vibeYellow,
+  theme.colors.vibeOrange,
+  theme.colors.vibeAqua,
+  theme.colors.vibeTeal,
+];
+
 // Renders the final placement scoreboard. handleFinish closes out the
 // game (reward claim, navigation back to lobby, etc.) — passed in as
 // onDone since that side of the game lifecycle stays in GameScreen.
-export default function FinalResultsPhase({ game, onDone }) {
+export default function FinalResultsPhase({ game, selfUid, onDone }) {
   const rewards = gameService.calculateRewards(game.players);
+
+  // Per-player color map — self locks to vibeGreen, others cycle through
+  // the palette in players-array order so the colors line up with what
+  // they saw on the voting wait + round-results scoreboards.
+  const playerColors = new Map();
+  let pi = 0;
+  (game.players || []).forEach(p => {
+    if (p.uid === selfUid) {
+      playerColors.set(p.uid, theme.colors.vibeGreen);
+    } else {
+      playerColors.set(p.uid, VOTER_PALETTE[pi % VOTER_PALETTE.length]);
+      pi++;
+    }
+  });
 
   // Build a multi-line share string with winner + full leaderboard +
   // the winning snapple's video URL if present.
@@ -37,13 +64,26 @@ export default function FinalResultsPhase({ game, onDone }) {
       </View>
 
       <View style={styles.content}>
-        {rewards.map((p, i) => (
-          <View key={p.uid} style={[styles.row, i === 0 && styles.rowFirst]}>
-            <Text style={styles.placement}>#{p.placement}</Text>
-            <Text style={styles.name}>{p.username}</Text>
-            <Text style={styles.total}>{p.points} pts</Text>
-          </View>
-        ))}
+        {rewards.map((p, i) => {
+          const color = playerColors.get(p.uid) || theme.colors.textSecondary;
+          const isMe = p.uid === selfUid;
+          return (
+            <View
+              key={p.uid}
+              style={[
+                styles.row,
+                i === 0 && styles.rowFirst,
+                { borderLeftWidth: 6, borderLeftColor: color },
+              ]}
+            >
+              <Text style={styles.placement}>#{p.placement}</Text>
+              <Text style={[styles.name, isMe && { color: theme.colors.vibeGreen }]}>
+                {p.username}{isMe ? ' (you)' : ''}
+              </Text>
+              <Text style={styles.total}>{p.points} pts</Text>
+            </View>
+          );
+        })}
 
         <View style={styles.actions}>
           <VibeButton label="Done" onPress={onDone} />
