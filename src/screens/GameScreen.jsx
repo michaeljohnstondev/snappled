@@ -56,8 +56,9 @@ const VOTER_PALETTE = [
 function RoundResultsReveal({
   rankings, players, prompt,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare, selfUid,
+  isHost, onNextRound, onShare, onEndGame, selfUid,
 }) {
+  const isInfinite = totalRounds === 0;
   // earnedByUid lookup so the row can show +N this round.
   const earnedByUid = {};
   (rankings || []).forEach(r => { earnedByUid[r.uid] = r.pointsEarned || 0; });
@@ -172,6 +173,15 @@ function RoundResultsReveal({
             ) : (
               <Text style={styles.waitingText}>Next round in {timer}s...</Text>
             )}
+            {/* Infinite games: host can wrap up the marathon when ready. */}
+            {isHost && isInfinite && (
+              <VibeButton
+                label="End Game"
+                onPress={onEndGame}
+                color="red"
+                variant="toggle"
+              />
+            )}
             <Pressable style={styles.shareResultsBtn} onPress={onShare}>
               <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
               <Text style={styles.shareResultsText}>Share Round</Text>
@@ -218,6 +228,9 @@ export default function GameScreen({ navigation }) {
   // When true, tapping a card in the hand replaces it instead of previewing.
   const [mulliganMode, setMulliganMode] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
+  // Round count for newly-created games (practice + custom). Adjustable
+  // on the no-game choice screen via the rounds picker.
+  const [selectedRounds, setSelectedRounds] = useState(5);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
   // pickDeadline we last scheduled bot picks against — guards against
@@ -296,6 +309,35 @@ export default function GameScreen({ navigation }) {
 
   useEffect(() => {
     if (!gameId) lastBotVoteScheduleRoundRef.current = null;
+  }, [gameId]);
+
+  // Schedule bot ready-ups when REVIEW (warmup) starts. Each bot rolls a
+  // random 2-6s delay before flipping itself ready, so the auto-start
+  // feels like real players acknowledging at their own pace. Same
+  // cancellable-timeouts pattern as bot picks/votes — a stale ready
+  // landing in the next round would harmlessly set a bot already-ready
+  // again, but cancelling keeps things tidy.
+  const lastBotReadyScheduleRef = useRef(null);
+  useEffect(() => {
+    if (!gameId || !game) return;
+    if (game.phase !== GAME_PHASES.REVIEW) return;
+    if (game.hostId !== user?.uid) return;
+    const reviewKey = `${game.currentRound}-${game.reviewDeadline || ''}`;
+    if (lastBotReadyScheduleRef.current === reviewKey) return;
+    lastBotReadyScheduleRef.current = reviewKey;
+
+    const botPlayers = (game.players || []).filter(p => p.uid?.startsWith('bot_'));
+    botPlayers.forEach(bot => {
+      const delay = 2000 + Math.floor(Math.random() * 4000);
+      const tid = setTimeout(() => {
+        gameService.setPlayerReady(gameId, bot.uid, true).catch(() => {});
+      }, delay);
+      pendingBotTimeoutsRef.current.push(tid);
+    });
+  }, [gameId, game?.phase, game?.currentRound, game?.reviewDeadline, game?.hostId, user?.uid]);
+
+  useEffect(() => {
+    if (!gameId) lastBotReadyScheduleRef.current = null;
   }, [gameId]);
 
   // Incremental video prefetch — concurrent (forEach without await), so
@@ -492,6 +534,17 @@ export default function GameScreen({ navigation }) {
       unsubscribeRef.current = gameService.subscribeToGame(gameId, (gameData) => {
         setGame(gameData);
 
+        // Auto-advance: when everyone in REVIEW has hit Ready, the host
+        // force-starts PICKING. The 60s warmup timer is the fallback.
+        if (gameData.phase === GAME_PHASES.REVIEW && gameData.hostId === user?.uid) {
+          const ready = gameData.ready || {};
+          const allReady = (gameData.players || []).length > 0 &&
+            (gameData.players || []).every(p => ready[p.uid]);
+          if (allReady) {
+            gameService.startPicking(gameId);
+          }
+        }
+
         // Auto-advance: if all players submitted, move to voting
         if (gameData.phase === GAME_PHASES.PICKING) {
           const allSubmitted = gameData.players.every(p =>
@@ -590,7 +643,7 @@ export default function GameScreen({ navigation }) {
     setIsLoading(true);
     try {
       const username = user?.username || user?.email?.split('@')[0] || 'Player';
-      const result = await gameService.createGame(user.uid, username);
+      const result = await gameService.createGame(user.uid, username, selectedRounds);
       if (result.success) {
         setGameId(result.gameId);
       } else {
@@ -635,7 +688,11 @@ export default function GameScreen({ navigation }) {
 
   const handleStartGame = async () => {
     try {
-      const prompts = await gameService.getGamePrompts(gameService.ROUNDS_PER_GAME);
+      // For infinite games (totalRounds === 0), seed with a 25-prompt
+      // buffer; nextRound refills when running low.
+      const totalRounds = game?.totalRounds ?? gameService.ROUNDS_PER_GAME;
+      const fetchCount = totalRounds === 0 ? 25 : totalRounds;
+      const prompts = await gameService.getGamePrompts(fetchCount);
       const result = await gameService.startGame(gameId, user.uid, prompts);
       if (result.success) {
         const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
@@ -655,7 +712,7 @@ export default function GameScreen({ navigation }) {
     setUseRandomCards(true);
     try {
       const username = user?.username || user?.email?.split('@')[0] || 'Player';
-      const createResult = await gameService.createGame(user.uid, username);
+      const createResult = await gameService.createGame(user.uid, username, selectedRounds);
       if (!createResult.success) {
         showError('Error', createResult.error);
         return;
@@ -668,8 +725,9 @@ export default function GameScreen({ navigation }) {
         await gameService.joinGame(createResult.gameId, `bot_${name}`, name);
       }
 
-      // Start immediately
-      const prompts = await gameService.getGamePrompts(gameService.ROUNDS_PER_GAME);
+      // Start immediately. Infinite games seed a 25-prompt buffer.
+      const fetchCount = selectedRounds === 0 ? 25 : selectedRounds;
+      const prompts = await gameService.getGamePrompts(fetchCount);
 
       await gameService.startGame(createResult.gameId, user.uid, prompts);
 
@@ -1015,6 +1073,31 @@ export default function GameScreen({ navigation }) {
             </View>
           )}
 
+          {/* Rounds picker — applies to practice + custom games. ∞ stores
+              totalRounds=0 (host ends manually from the scoreboard). */}
+          <View style={styles.roundsPicker}>
+            <Text style={styles.roundsPickerLabel}>ROUNDS</Text>
+            <View style={styles.roundsPickerOptions}>
+              {[5, 10, 25, 0].map(n => (
+                <Pressable
+                  key={n}
+                  style={[
+                    styles.roundsOption,
+                    selectedRounds === n && styles.roundsOptionActive,
+                  ]}
+                  onPress={() => setSelectedRounds(n)}
+                >
+                  <Text style={[
+                    styles.roundsOptionText,
+                    selectedRounds === n && styles.roundsOptionTextActive,
+                  ]}>
+                    {n === 0 ? '∞' : n}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           <View style={styles.lobbyButtons}>
             <VibeButton
               label="Ranked"
@@ -1081,11 +1164,13 @@ export default function GameScreen({ navigation }) {
     return (
       <WarmupPhase
         hand={hand}
-        isHost={game.hostId === user.uid}
         timer={timer}
+        readyMap={game.ready || {}}
+        players={game.players || []}
+        selfUid={user?.uid}
         onLeave={handleLeaveGame}
         onPreviewCard={(card) => setPreviewCard(card)}
-        onStartRound={() => gameService.startPicking(gameId)}
+        onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
       />
     );
   }
@@ -1400,6 +1485,7 @@ export default function GameScreen({ navigation }) {
         selfUid={user?.uid}
         onNextRound={handleNextRound}
         onShare={handleShareRound}
+        onEndGame={() => gameService.endGameEarly(gameId)}
       />
     );
   }
@@ -1470,6 +1556,42 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
   },
   deckOptionTextActive: {
+    color: theme.colors.vibeBlue,
+  },
+  roundsPicker: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  roundsPickerLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  roundsPickerOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  roundsOption: {
+    width: 40,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+  },
+  roundsOptionActive: {
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,198,255,0.12)',
+  },
+  roundsOptionText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  roundsOptionTextActive: {
     color: theme.colors.vibeBlue,
   },
   spectateBanner: {

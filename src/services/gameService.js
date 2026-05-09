@@ -74,14 +74,17 @@ export const GAME_PHASES = {
 
 export const gameService = {
   // Create a new game lobby
-  async createGame(hostId, hostUsername) {
+  async createGame(hostId, hostUsername, totalRounds = ROUNDS_PER_GAME) {
     try {
       const gameRef = doc(collection(db, GAMES_COLLECTION));
+      // totalRounds: 0 = infinite (host ends manually), 1-50 = fixed.
+      const raw = Number(totalRounds);
+      const safeRounds = raw === 0 ? 0 : Math.max(1, Math.min(50, raw || ROUNDS_PER_GAME));
       const gameDoc = {
         hostId,
         phase: GAME_PHASES.LOBBY,
         currentRound: 0,
-        totalRounds: ROUNDS_PER_GAME,
+        totalRounds: safeRounds,
         players: [{
           uid: hostId,
           username: hostUsername,
@@ -181,12 +184,20 @@ export const gameService = {
       if (data.hostId !== hostId) return { success: false, error: 'Only host can start' };
       if (data.players.length < 2) return { success: false, error: 'Need at least 2 players' };
 
+      // For finite games, slice the supplied prompts to totalRounds. For
+      // infinite (totalRounds === 0), keep the full pre-fetched buffer
+      // — the caller pre-fetches a healthy chunk and nextRound refills
+      // when the buffer runs low.
+      const rounds = data.totalRounds === 0
+        ? prompts.length
+        : Math.max(1, Math.min(50, data.totalRounds || ROUNDS_PER_GAME));
       await updateDoc(gameRef, {
         phase: GAME_PHASES.REVIEW,
         currentRound: 1,
-        prompts: prompts.slice(0, ROUNDS_PER_GAME),
+        prompts: prompts.slice(0, rounds),
         submissions: [],
         votes: {},
+        ready: {}, // fresh ready map for the warmup screen
         reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
@@ -310,7 +321,11 @@ export const gameService = {
         };
       });
 
-      const isLastRound = data.currentRound >= data.totalRounds;
+      // totalRounds === 0 means infinite — game keeps cycling rounds
+      // until host taps End Game. Otherwise end naturally on the last
+      // round.
+      const isLastRound = data.totalRounds > 0 &&
+        data.currentRound >= data.totalRounds;
 
       await updateDoc(gameRef, {
         phase: isLastRound ? GAME_PHASES.FINAL_RESULTS : GAME_PHASES.ROUND_RESULTS,
@@ -350,9 +365,26 @@ export const gameService = {
       const gameDoc = await getDoc(gameRef);
       const data = gameDoc.data();
 
+      // For infinite games (totalRounds === 0), refill the prompt buffer
+      // when we're within 3 rounds of running out. Best-effort — if the
+      // fetch fails the round still advances and the prompt-text falls
+      // back to the placeholder.
+      let nextPrompts = data.prompts || [];
+      if (data.totalRounds === 0) {
+        const used = data.currentRound; // about-to-become next round
+        const remaining = nextPrompts.length - used;
+        if (remaining < 3) {
+          try {
+            const fresh = await this.getGamePrompts(10);
+            nextPrompts = [...nextPrompts, ...(fresh || [])];
+          } catch (e) {}
+        }
+      }
+
       await updateDoc(gameRef, {
         phase: GAME_PHASES.PICKING,
         currentRound: data.currentRound + 1,
+        prompts: nextPrompts,
         submissions: [],
         votes: {},
         pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
@@ -362,6 +394,21 @@ export const gameService = {
       return { success: true };
     } catch (error) {
       console.error('[GameService] Error advancing round:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Host-only: end an infinite game early. Snaps phase to FINAL_RESULTS.
+  async endGameEarly(gameId) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        phase: GAME_PHASES.FINAL_RESULTS,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error ending game early:', error);
       return { success: false, error: error.message };
     }
   },
@@ -416,6 +463,24 @@ export const gameService = {
       return { success: true, newPrompt };
     } catch (error) {
       console.error('[GameService] replaceAndRestartRound error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Mark a single player as ready/not-ready on the warmup screen.
+  // Stored as game.ready = { [uid]: true } so we can set/clear individual
+  // entries via the dot-path syntax. Used by WarmupPhase + bot scheduler
+  // to gate the REVIEW → PICKING transition.
+  async setPlayerReady(gameId, uid, isReady) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        [`ready.${uid}`]: !!isReady,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error setting player ready:', error);
       return { success: false, error: error.message };
     }
   },

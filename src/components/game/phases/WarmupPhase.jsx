@@ -1,26 +1,33 @@
 // Warmup phase (a.k.a. REVIEW) — shows the prompt + the user's drawn hand
-// before picking starts so players can scout. Auto-advances to PICKING
-// when the timer runs out; host can also start early.
+// before picking starts. Players hit the Ready button when they're set;
+// host force-advances to PICKING when everyone's ready or the timer hits 0.
 
 import React from 'react';
 import { View, Text, Pressable, FlatList, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
-import { CardThumbnailDelayed } from '../CardThumbnail';
+import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Renders the warmup grid. State (hand) and handlers come from GameScreen.
+// Renders the warmup grid + ready controls. State (hand, ready map)
+// and handlers come from GameScreen.
 export default function WarmupPhase({
   hand,
-  isHost,
   timer,
+  readyMap,
+  players,
+  selfUid,
   onLeave,
   onPreviewCard,
-  onStartRound,
+  onToggleReady,
 }) {
+  const isReady = !!readyMap?.[selfUid];
+  const readyCount = (players || []).filter(p => readyMap?.[p.uid]).length;
+  const totalCount = (players || []).length;
+
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
@@ -39,24 +46,27 @@ export default function WarmupPhase({
         numColumns={3}
         contentContainerStyle={[styles.handContainer, { paddingTop: 16 }]}
         columnWrapperStyle={styles.handRow}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <Pressable
             style={styles.handCard}
             onPress={() => onPreviewCard({ ...item, _isWaiting: true })}
           >
             <View style={styles.handCardVideo}>
-              <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
+              {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
             </View>
           </Pressable>
         )}
       />
 
       <View style={styles.footer}>
-        {isHost ? (
-          <VibeButton label="Start Round" onPress={onStartRound} />
-        ) : (
-          <Text style={styles.waitingText}>Waiting for host... {timer}s</Text>
-        )}
+        <Text style={styles.readyCount}>
+          {readyCount} of {totalCount} ready · auto-start in {timer}s
+        </Text>
+        <VibeButton
+          label={isReady ? "Ready! ✓" : "Ready Up"}
+          onPress={() => onToggleReady(!isReady)}
+          color={isReady ? "green" : "blue"}
+        />
       </View>
     </LinearGradient>
   );
@@ -102,8 +112,11 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     paddingBottom: 24,
+    gap: 10,
   },
-  waitingText: {
-    color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12,
+  readyCount: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
