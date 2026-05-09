@@ -22,6 +22,9 @@ import VoteAuraCard from '../components/game/VoteAuraCard';
 import CreatorActionRow from '../components/game/CreatorActionRow';
 import WinnerSpotlightCard from '../components/game/WinnerSpotlightCard';
 import LobbyPhase from '../components/game/phases/LobbyPhase';
+import WarmupPhase from '../components/game/phases/WarmupPhase';
+import FinalResultsPhase from '../components/game/phases/FinalResultsPhase';
+import PickingPhase from '../components/game/phases/PickingPhase';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -528,6 +531,20 @@ export default function GameScreen({ navigation }) {
     setPreviewCard(null);
   }, [gameId, game?.currentRound]);
 
+  // Draw a hand when warmup or picking begins and the hand is empty. Was
+  // previously done with setState during render which racked up extra
+  // renders and risked infinite-loop edge cases. Effect-based version
+  // fires once per phase entry.
+  useEffect(() => {
+    if (!game?.phase) return;
+    const inDrawingPhase =
+      game.phase === GAME_PHASES.REVIEW || game.phase === GAME_PHASES.PICKING;
+    if (!inDrawingPhase) return;
+    if (hand.length > 0) return;
+    if (mySnapples.length === 0 && allSnapples.length === 0) return;
+    setHand(gameService.drawHand(getHandSnapples(), allSnapples));
+  }, [game?.phase, game?.currentRound, mySnapples.length, allSnapples.length, hand.length]);
+
   // Hide the bottom tab bar whenever the user is inside an active game so the
   // game UI gets full-screen real estate. setOptions targets THIS screen's
   // descriptor (which is what CustomTabBar reads via descriptors[focused.key]),
@@ -876,6 +893,47 @@ export default function GameScreen({ navigation }) {
       showError('Error', 'Failed to submit pick');
       setSelectedCard(null);
     }
+  };
+
+  // Mulligan swap — replaces a hand card with a random unplayed snapple
+  // from the user's deck and decrements their inventory. Used inline by
+  // PickingPhase via the onMulliganSwap prop.
+  const handleMulliganSwap = async (card) => {
+    const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
+    if (remaining.length === 0) {
+      showAlert('No Cards', 'No more cards to draw from your deck');
+      setMulliganMode(false);
+      return;
+    }
+    const newCard = remaining[Math.floor(Math.random() * remaining.length)];
+    setHand(prev => prev.map(h => (h.id === card.id ? newCard : h)));
+    setMulliganMode(false);
+    try {
+      const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
+      const { db: mDb } = await import('../services/firebase');
+      await mUpdate(mDoc(mDb, 'users', user.uid), {
+        'inventory.mulligans': mInc(-1),
+      });
+    } catch (e) {}
+    showToast('reward', 'Mulligan!', 'Card swapped');
+  };
+
+  // Admin: replace the current round's prompt with a fresh one from the
+  // pool and restart the picking phase. Used by Delete button on banner
+  // and the modal's Replace & Restart action.
+  const handleDeletePrompt = async () => {
+    setIsEditingPrompt(false);
+    const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
+    if (!result?.success) showError('Error', result?.error || 'Failed to replace prompt');
+  };
+
+  // Admin: save the edited prompt text in place (no round restart).
+  const handleSavePrompt = async () => {
+    const text = editPromptText.trim();
+    if (!text) return;
+    setIsEditingPrompt(false);
+    const result = await gameService.editRoundPrompt(gameId, game.currentRound - 1, text);
+    if (!result?.success) showError('Error', result?.error || 'Failed to save prompt');
   };
 
   const [favoriteCard, setFavoriteCard] = useState(null);
@@ -1232,322 +1290,56 @@ export default function GameScreen({ navigation }) {
   // players can scout. Auto-advances to PICKING when the timer runs out;
   // host can also start early.
   if (game.phase === GAME_PHASES.REVIEW) {
-    const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
-    const isHost = game.hostId === user.uid;
-
-    // Draw the round's hand now so players can see it during review.
-    if (hand.length === 0 && (mySnapples.length > 0 || allSnapples.length > 0)) {
-      setHand(gameService.drawHand(getHandSnapples(), allSnapples));
-    }
-
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={handleLeaveGame}>
-            <View style={styles.backBg}>
-              <Ionicons name="close" size={18} color="white" />
-            </View>
-          </Pressable>
-          <Text style={styles.headerTitle}>Warmup</Text>
-          <Text style={styles.timerText}>{timer}s</Text>
-        </View>
-
-        <FlatList
-          data={hand}
-          keyExtractor={(item, idx) => item?.id || `hand-${idx}`}
-          numColumns={3}
-          contentContainerStyle={[styles.handContainer, { paddingTop: 16 }]}
-          columnWrapperStyle={styles.handRow}
-          renderItem={({ item, index }) => (
-            <Pressable
-              style={styles.handCard}
-              onPress={() => setPreviewCard({ ...item, _isWaiting: true })}
-            >
-              <View style={styles.handCardVideo}>
-                <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
-              </View>
-            </Pressable>
-          )}
-        />
-
-        <View style={styles.reviewFooter}>
-          {isHost ? (
-            <VibeButton label="Start Round" onPress={() => gameService.startPicking(gameId)} />
-          ) : (
-            <Text style={styles.waitingText}>Waiting for host... {timer}s</Text>
-          )}
-        </View>
-      </LinearGradient>
+      <WarmupPhase
+        hand={hand}
+        isHost={game.hostId === user.uid}
+        timer={timer}
+        onLeave={handleLeaveGame}
+        onPreviewCard={(card) => setPreviewCard(card)}
+        onStartRound={() => gameService.startPicking(gameId)}
+      />
     );
   }
 
   // Picking phase — choose a card from your hand
   if (game.phase === GAME_PHASES.PICKING) {
-    const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
-    const alreadyPicked = game.submissions.some(s => s.uid === user.uid);
-
-    // Draw hand if empty
-    if (hand.length === 0 && mySnapples.length > 0) {
-      setHand(gameService.drawHand(mySnapples, allSnapples));
-    }
-
-    if (hand.length === 0) {
-      return (
-        <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-          <View style={styles.loadingHand}>
-            <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
-            <Text style={styles.loadingHandText}>Drawing your hand...</Text>
-          </View>
-        </LinearGradient>
-      );
-    }
-
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={handleLeaveGame}>
-            <View style={styles.backBg}>
-              <Ionicons name="close" size={18} color="white" />
-            </View>
-          </Pressable>
-          <Text style={styles.headerTitle}>Picking</Text>
-          <Text style={styles.timerText}>{timer}s</Text>
-        </View>
-
-        {/* Prompt */}
-        <View style={styles.promptBanner}>
-          <Text style={styles.promptText}>{currentPrompt}</Text>
-          {isAdmin && (
-            <View style={styles.promptAdminRow}>
-              <Pressable
-                style={styles.promptAdminBtn}
-                onPress={() => {
-                  setEditPromptText(currentPrompt);
-                  setIsEditingPrompt(true);
-                }}
-              >
-                <Text style={styles.promptAdminBtnText}>Edit</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.promptAdminBtn, { borderColor: theme.colors.vibeRed }]}
-                onPress={async () => {
-                  const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
-                  if (!result?.success) showError('Error', result?.error || 'Failed to replace prompt');
-                }}
-              >
-                <Text style={[styles.promptAdminBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-
-        {alreadyPicked ? (
-          // After the user submits their pick — show THEIR pick prominently
-          // up top so they remember what they played, then a clear "X of Y
-          // picked" header and a player-status list. We deliberately do NOT
-          // show what other players picked here — voting comes next and
-          // should stay anonymous, so the only signals are name + status.
-          (() => {
-            const myPick = (game.submissions || []).find(s => s.uid === user.uid);
-            const submittedCount = (game.submissions || []).length;
-            const totalCount = (game.players || []).length;
-            return (
-              <ScrollView
-                style={styles.pickedWaitWrap}
-                contentContainerStyle={styles.pickedWaitContent}
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.yourPickSection}>
-                  <Text style={styles.yourPickLabel}>YOUR PICK</Text>
-                  <View style={styles.yourPickCard}>
-                    {myPick?.videoUrl ? (
-                      <SnappleThumbnailImg videoUrl={myPick.videoUrl} />
-                    ) : null}
-                  </View>
-                </View>
-
-                <Text style={styles.pickProgressText}>
-                  {submittedCount} of {totalCount} picked
-                </Text>
-
-                <View style={styles.playerStatusList}>
-                  {(game.players || []).map(p => {
-                    const picked = (game.submissions || []).some(s => s.uid === p.uid);
-                    const isMe = p.uid === user.uid;
-                    return (
-                      <View key={p.uid} style={styles.playerStatusRow}>
-                        <Ionicons
-                          name={picked ? 'checkmark-circle' : 'time-outline'}
-                          size={18}
-                          color={picked ? theme.colors.vibeGreen : theme.colors.textSecondary}
-                        />
-                        <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
-                          {p.username}{isMe ? ' (you)' : ''}
-                        </Text>
-                        <Text style={[styles.playerStatusLabel, picked && styles.playerStatusLabelDone]}>
-                          {picked ? 'picked' : 'picking...'}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-            );
-          })()
-        ) : (
-          <>
-            <Text style={styles.pickInstruction}>
-              {mulliganMode ? 'Tap a card to replace it' : ''}
-            </Text>
-            <FlatList
-              data={hand}
-              keyExtractor={(item, i) => item?.id || `hand-${i}`}
-              numColumns={3}
-              columnWrapperStyle={styles.handRow}
-              contentContainerStyle={styles.handContainer}
-              renderItem={({ item, index }) => (
-                <Pressable
-                  style={[
-                    styles.handCard,
-                    selectedCard?.id === item.id && styles.handCardSelected,
-                    mulliganMode && styles.handCardMulligan,
-                  ]}
-                  onPress={async () => {
-                    if (mulliganMode) {
-                      // Swap this card for one from the unused pool — no confirm.
-                      const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
-                      if (remaining.length === 0) {
-                        showAlert('No Cards', 'No more cards to draw from your deck');
-                        setMulliganMode(false);
-                        return;
-                      }
-                      const newCard = remaining[Math.floor(Math.random() * remaining.length)];
-                      setHand(prev => prev.map(h => h.id === item.id ? newCard : h));
-                      setMulliganMode(false);
-                      try {
-                        const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
-                        const { db: mDb } = await import('../services/firebase');
-                        await mUpdate(mDoc(mDb, 'users', user.uid), {
-                          'inventory.mulligans': mInc(-1),
-                        });
-                      } catch (e) {}
-                      showToast('reward', 'Mulligan!', 'Card swapped');
-                    } else {
-                      setPreviewCard(item);
-                    }
-                  }}
-                >
-                  <View style={styles.handCardVideo}>
-                    {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
-                  </View>
-                </Pressable>
-              )}
-            />
-            {(user?.inventory?.mulligans || 0) > 0 && (
-              <Pressable
-                style={[styles.mulliganBtnBottom, mulliganMode && styles.mulliganBtnBottomActive]}
-                onPress={() => setMulliganMode(prev => !prev)}
-              >
-                <Ionicons
-                  name={mulliganMode ? 'close' : 'refresh'}
-                  size={16}
-                  color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
-                />
-                <Text style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}>
-                  {mulliganMode ? 'Cancel' : `Mulligan (${user?.inventory?.mulligans || 0})`}
-                </Text>
-              </Pressable>
-            )}
-          </>
-        )}
-
-        {/* Card Preview Modal */}
-        {previewCard && (
-          <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewCard(null)}>
-            <View style={styles.previewOverlay}>
-              <View style={styles.previewCard}>
-                <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
-
-                {previewCard._isWaiting && (
-                  <CreatorActionRow
-                    submission={previewCard}
-                    currentUser={user}
-                    ownedSnappleIds={userCurrency.ownedSnapples || []}
-                    showToast={showToast}
-                    showError={showError}
-                  />
-                )}
-
-                <View style={styles.previewButtons}>
-                  <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
-                    <Text style={styles.previewCancelText}>Back</Text>
-                  </Pressable>
-                  {!previewCard._isWaiting && (
-                    <Pressable style={styles.previewPlay} onPress={() => {
-                      handlePickCard(previewCard);
-                      setPreviewCard(null);
-                    }}>
-                      <Text style={styles.previewPlayText}>Play This Card</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            </View>
-          </Modal>
-        )}
-
-        {/* Admin: edit / replace the round's prompt mid-game */}
-        {isEditingPrompt && (
-          <Modal visible transparent animationType="fade" onRequestClose={() => setIsEditingPrompt(false)}>
-            <Pressable style={styles.previewOverlay} onPress={() => setIsEditingPrompt(false)}>
-              <Pressable
-                style={styles.editPromptCard}
-                onPress={() => {}}
-              >
-                <Text style={styles.editPromptTitle}>Edit Round Prompt</Text>
-                <TextInput
-                  value={editPromptText}
-                  onChangeText={setEditPromptText}
-                  style={styles.editPromptInput}
-                  multiline
-                  placeholder="New prompt text..."
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                />
-                <View style={styles.editPromptButtons}>
-                  <Pressable
-                    style={[styles.editPromptBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
-                    onPress={() => setIsEditingPrompt(false)}
-                  >
-                    <Text style={styles.editPromptBtnText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.editPromptBtn, { borderColor: theme.colors.vibeRed }]}
-                    onPress={async () => {
-                      const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
-                      setIsEditingPrompt(false);
-                      if (!result.success) showError('Error', result.error || 'Failed to replace prompt');
-                    }}
-                  >
-                    <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeRed }]}>Replace & Restart</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.editPromptBtn, { borderColor: theme.colors.vibeBlue }]}
-                    onPress={async () => {
-                      const text = editPromptText.trim();
-                      if (!text) return;
-                      const result = await gameService.editRoundPrompt(gameId, game.currentRound - 1, text);
-                      setIsEditingPrompt(false);
-                      if (!result.success) showError('Error', result.error || 'Failed to save prompt');
-                    }}
-                  >
-                    <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeBlue }]}>Save</Text>
-                  </Pressable>
-                </View>
-              </Pressable>
-            </Pressable>
-          </Modal>
-        )}
-      </LinearGradient>
+      <PickingPhase
+        game={game}
+        gameId={gameId}
+        user={user}
+        userCurrency={userCurrency}
+        hand={hand}
+        isAdmin={isAdmin}
+        isHost={game.hostId === user.uid}
+        isPractice={isPractice}
+        timer={timer}
+        selectedCard={selectedCard}
+        previewCard={previewCard}
+        mulliganMode={mulliganMode}
+        isEditingPrompt={isEditingPrompt}
+        editPromptText={editPromptText}
+        showToast={showToast}
+        showError={showError}
+        onLeave={handleLeaveGame}
+        onPreviewCard={(card) => setPreviewCard(card)}
+        onClosePreview={() => setPreviewCard(null)}
+        onPickCard={(card) => {
+          handlePickCard(card);
+          setPreviewCard(null);
+        }}
+        onMulliganToggle={() => setMulliganMode(prev => !prev)}
+        onMulliganSwap={handleMulliganSwap}
+        onEditPromptOpen={(promptText) => {
+          setEditPromptText(promptText);
+          setIsEditingPrompt(true);
+        }}
+        onEditPromptClose={() => setIsEditingPrompt(false)}
+        onEditPromptTextChange={setEditPromptText}
+        onEditPromptSave={handleSavePrompt}
+        onDeletePrompt={handleDeletePrompt}
+      />
     );
   }
 
@@ -1750,44 +1542,7 @@ export default function GameScreen({ navigation }) {
 
   // Final results
   if (game.phase === GAME_PHASES.FINAL_RESULTS) {
-    const rewards = gameService.calculateRewards(game.players);
-
-    return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.header}>
-          <View style={{ width: 36 }} />
-          <Text style={styles.headerTitle}>Final Results</Text>
-          <View style={{ width: 36 }} />
-        </View>
-
-        <View style={styles.resultsContent}>
-          {rewards.map((p, i) => (
-            <View key={p.uid} style={[styles.resultRow, i === 0 && styles.resultRowFirst]}>
-              <Text style={styles.resultPlacement}>#{p.placement}</Text>
-              <Text style={styles.resultName}>{p.username}</Text>
-              <Text style={styles.resultTotal}>{p.points} pts</Text>
-            </View>
-          ))}
-
-          <View style={styles.resultsActions}>
-            <VibeButton label="Done" onPress={handleFinish} />
-            <Pressable style={styles.shareResultsBtn} onPress={async () => {
-              try {
-                const { Share } = require('react-native');
-                const winner = rewards[0];
-                const winningSub = game.submissions.find(s => s.uid === winner?.uid);
-                await Share.share({
-                  message: `🏆 Game Over on Snappled!\n\nWinner: ${winner?.username}\n${winningSub?.videoUrl ? winningSub.videoUrl + '\n\n' : '\n'}${rewards.map(p => `#${p.placement} ${p.username} — ${p.points} pts`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
-                });
-              } catch (e) {}
-            }}>
-              <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
-              <Text style={styles.shareResultsText}>Share</Text>
-            </Pressable>
-          </View>
-        </View>
-      </LinearGradient>
-    );
+    return <FinalResultsPhase game={game} onDone={handleFinish} />;
   }
 
   return null;
