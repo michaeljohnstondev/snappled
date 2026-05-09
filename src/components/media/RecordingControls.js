@@ -43,11 +43,17 @@ export default function RecordingControls({
         setCanStopManually(true);
       }
 
-      // Auto-stop at max duration - let camera complete naturally
+      // Auto-stop at max duration. Vision-camera does NOT honor a
+      // maxDuration option in its startRecording call, so the JS timer
+      // is what enforces the cap — we have to actively stop the camera
+      // here. Comment in earlier version claimed the camera would
+      // auto-complete; that was wrong and let snapples run past 10s.
       if (newTime >= (maxDuration || 10)) {
-        // Don't manually stop - let the camera recording complete naturally
-        // The camera should auto-complete when maxDuration is reached
         stopTimer();
+        if (isRecordingRef.current && cameraRef?.stopRecording) {
+          isRecordingRef.current = false;
+          try { cameraRef.stopRecording(); } catch (e) {}
+        }
       }
     }, 100);
   }
