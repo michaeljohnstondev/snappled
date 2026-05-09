@@ -1606,53 +1606,9 @@ export default function GameScreen({ navigation }) {
           <Text style={styles.timerText}>{timer}s</Text>
         </View>
 
-        {/* Prompt — admin gets inline Edit + Delete buttons (Delete pulls a
-            fresh prompt and restarts the round). */}
+        {/* Prompt */}
         <View style={styles.promptBanner}>
-          {isEditingPrompt ? (
-            <TextInput
-              style={styles.editPromptInput}
-              value={editPromptText}
-              onChangeText={setEditPromptText}
-              multiline
-              autoFocus
-            />
-          ) : (
-            <Text style={styles.promptText}>{currentPrompt}</Text>
-          )}
-          {isAdmin && (
-            <View style={styles.promptAdminRow}>
-              <Pressable
-                style={styles.promptAdminBtn}
-                onPress={async () => {
-                  if (isEditingPrompt) {
-                    const text = editPromptText.trim();
-                    if (text && text !== currentPrompt) {
-                      const r = await gameService.editRoundPrompt(gameId, game.currentRound - 1, text);
-                      if (!r.success) showError('Error', r.error || 'Failed to save');
-                    }
-                    setIsEditingPrompt(false);
-                  } else {
-                    setEditPromptText(currentPrompt);
-                    setIsEditingPrompt(true);
-                  }
-                }}
-              >
-                <Text style={styles.promptAdminBtnText}>{isEditingPrompt ? 'Save' : 'Edit'}</Text>
-              </Pressable>
-              {!isEditingPrompt && (
-                <Pressable
-                  style={[styles.promptAdminBtn, { borderColor: theme.colors.vibeRed }]}
-                  onPress={async () => {
-                    const r = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
-                    if (!r.success) showError('Error', r.error || 'Failed to replace prompt');
-                  }}
-                >
-                  <Text style={[styles.promptAdminBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
+          <Text style={styles.promptText}>{currentPrompt}</Text>
         </View>
 
         {alreadyPicked ? (
