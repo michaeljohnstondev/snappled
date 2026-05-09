@@ -932,10 +932,10 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.ROUND_RESULTS) {
-      // Reveal animation runs ~12.6s, then user gets ~10 seconds with the
-      // scoreboard before host auto-advances. Gives time for rank-swap
-      // animation to settle and people to read the board.
-      setTimer(22);
+      // Reveal animation runs ~12.6s, then user gets ~20 seconds with the
+      // scoreboard before host auto-advances. Bumped from 10s on user
+      // request — tied placements + score swaps need time to read.
+      setTimer(32);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -1634,38 +1634,57 @@ export default function GameScreen({ navigation }) {
         </View>
 
         {alreadyPicked ? (
-          <>
-            <FlatList
-              // Show one slot per OTHER player, in submission-arrival order to
-              // keep things anonymous. Self is excluded — the user knows what
-              // they played.
-              data={(() => {
-                const otherCount = Math.max(0, (game.players?.length || 0) - 1);
-                const otherSubmissions = (game.submissions || []).filter(s => s.uid !== user.uid);
-                return Array.from({ length: otherCount }).map((_, i) => otherSubmissions[i] || null);
-              })()}
-              keyExtractor={(_, i) => `slot-${i}`}
-              numColumns={3}
-              columnWrapperStyle={styles.handRow}
-              contentContainerStyle={styles.handContainer}
-              renderItem={({ item, index }) => (
-                <Pressable
-                  style={[styles.handCard, !item && styles.handCardEmpty]}
-                  onPress={item ? () => setPreviewCard({ ...item, _isWaiting: true }) : undefined}
-                >
-                  {item ? (
-                    <View style={styles.handCardVideo}>
-                      <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 50} />
-                    </View>
-                  ) : (
-                    <View style={[styles.handCardVideo, styles.handCardEmptyInner]}>
-                      <Ionicons name="time-outline" size={22} color="rgba(255,255,255,0.25)" />
-                    </View>
+          // After the user submits their pick — show THEIR pick prominently
+          // up top so they remember what they played, then a clear "X of Y
+          // picked" header and a player-status list. We deliberately do NOT
+          // show what other players picked here — voting comes next and
+          // should stay anonymous, so the only signals are name + status.
+          (() => {
+            const myPick = (game.submissions || []).find(s => s.uid === user.uid);
+            const submittedCount = (game.submissions || []).length;
+            const totalCount = (game.players || []).length;
+            return (
+              <View style={styles.pickedWaitWrap}>
+                <View style={styles.yourPickSection}>
+                  <Text style={styles.yourPickLabel}>YOUR PICK</Text>
+                  <View style={styles.yourPickCard}>
+                    {myPick?.videoUrl ? (
+                      <SnappleThumbnailImg videoUrl={myPick.videoUrl} />
+                    ) : null}
+                  </View>
+                  {!!myPick?.creatorUsername && (
+                    <Text style={styles.yourPickCreator}>by @{myPick.creatorUsername}</Text>
                   )}
-                </Pressable>
-              )}
-            />
-          </>
+                </View>
+
+                <Text style={styles.pickProgressText}>
+                  {submittedCount} of {totalCount} picked
+                </Text>
+
+                <View style={styles.playerStatusList}>
+                  {(game.players || []).map(p => {
+                    const picked = (game.submissions || []).some(s => s.uid === p.uid);
+                    const isMe = p.uid === user.uid;
+                    return (
+                      <View key={p.uid} style={styles.playerStatusRow}>
+                        <Ionicons
+                          name={picked ? 'checkmark-circle' : 'time-outline'}
+                          size={18}
+                          color={picked ? theme.colors.vibeGreen : theme.colors.textSecondary}
+                        />
+                        <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
+                          {p.username}{isMe ? ' (you)' : ''}
+                        </Text>
+                        <Text style={[styles.playerStatusLabel, picked && styles.playerStatusLabelDone]}>
+                          {picked ? 'picked' : 'picking...'}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })()
         ) : (
           <>
             <Text style={styles.pickInstruction}>
@@ -2179,6 +2198,74 @@ const styles = StyleSheet.create({
   },
   pickInstruction: {
     color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
+  },
+  pickedWaitWrap: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  yourPickSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  yourPickLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  yourPickCard: {
+    width: 130,
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: theme.colors.vibeGreen,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  yourPickCreator: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    marginTop: 6,
+  },
+  pickProgressText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  playerStatusList: {
+    gap: 6,
+  },
+  playerStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  playerStatusName: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  playerStatusNameMe: {
+    color: theme.colors.vibeBlue,
+  },
+  playerStatusLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+  },
+  playerStatusLabelDone: {
+    color: theme.colors.vibeGreen,
+    fontWeight: 'bold',
   },
   mulliganBtnBottom: {
     flexDirection: 'row',
