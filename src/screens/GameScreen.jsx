@@ -20,7 +20,6 @@ import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
 import PreviewPlayer from '../components/game/PreviewPlayer';
 import VoteAuraCard from '../components/game/VoteAuraCard';
 import CreatorActionRow from '../components/game/CreatorActionRow';
-import WinnerSpotlightCard from '../components/game/WinnerSpotlightCard';
 import LobbyPhase from '../components/game/phases/LobbyPhase';
 import WarmupPhase from '../components/game/phases/WarmupPhase';
 import FinalResultsPhase from '../components/game/phases/FinalResultsPhase';
@@ -50,78 +49,26 @@ const VOTER_PALETTE = [
 // Segmented aura rendered around a card — one stripe per voter, in their
 // assigned color. Stripes wrap each side of the card so the colors are
 // visible regardless of orientation. If no voters, just renders children.
-function VoteAura({ voters, thickness = 3, radius = 10, children }) {
-  if (!voters || voters.length === 0) return children;
-  const colors = voters.map(v => v.color);
-  return (
-    <View style={{ padding: thickness, borderRadius: radius + thickness, overflow: 'hidden' }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: thickness, flexDirection: 'row' }}>
-        {colors.map((c, i) => <View key={`t-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
-      </View>
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: thickness, flexDirection: 'row' }}>
-        {colors.map((c, i) => <View key={`b-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
-      </View>
-      <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: thickness, flexDirection: 'column' }}>
-        {colors.map((c, i) => <View key={`l-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
-      </View>
-      <View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: thickness, flexDirection: 'column' }}>
-        {colors.map((c, i) => <View key={`r-${i}`} style={{ flex: 1, backgroundColor: c }} />)}
-      </View>
-      {children}
-    </View>
-  );
-}
-
+// ── Round results — scoreboard only. The reveal/spotlight phases were
+// removed because the energy now lives on the voting wait screen
+// (vote auras pulse in as votes land). This component shows the
+// scoreboard with a tick-up score animation + Reanimated row swaps.
 function RoundResultsReveal({
-  submissions, rankings, players, votes, prompt,
+  rankings, players, prompt,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare, selfUid,
+  isHost, onNextRound, onShare,
 }) {
-  // Per-player color assignment. Self locks to vibeGreen, others get a
-  // palette color in player-order so the same person stays the same color
-  // across all cards' auras + voter-name chips.
-  const playerColors = React.useMemo(() => {
-    const map = new Map();
-    let i = 0;
-    (players || []).forEach(p => {
-      if (p.uid === selfUid) {
-        map.set(p.uid, theme.colors.vibeGreen);
-      } else {
-        map.set(p.uid, VOTER_PALETTE[i % VOTER_PALETTE.length]);
-        i++;
-      }
-    });
-    return map;
-  }, [players, selfUid]);
-
-  // Resolve voters for a submission as { name, color, isMe } objects so
-  // both aura stripes and name chips can render in the same colors.
-  const votersFor = (subUid) => {
-    const voterIds = votes?.[subUid] || [];
-    return voterIds.map(vid => ({
-      uid: vid,
-      name: players?.find(p => p.uid === vid)?.username || vid?.slice(0, 4),
-      color: playerColors.get(vid) || theme.colors.textSecondary,
-      isMe: vid === selfUid,
-    }));
-  };
-  const winners = (rankings || []).filter(r => r.placement === 1);
-  const winnerUids = useRef(new Set(winners.map(w => w.uid))).current;
-  // 1 winner → 1.5x. 2-tie → 1.2x side-by-side. 3+ tie → 0.9x to fit.
-  const winnerTargetScale = winners.length === 1 ? 1.5 : winners.length === 2 ? 1.2 : 0.9;
-
   // earnedByUid lookup so the row can show +N this round.
   const earnedByUid = {};
   (rankings || []).forEach(r => { earnedByUid[r.uid] = r.pointsEarned || 0; });
 
-  // Displayed points per player — start at "before this round" total. Tick up
-  // to the post-round total when stage hits shrink. Sorting is driven by these
-  // displayed values so rank swaps happen mid-animation.
+  // Displayed points start at "before this round" total, then tick up to
+  // post-round total over ~1s on mount. orderedPlayers sort uses these
+  // displayed values so rank swaps animate via Reanimated LinearTransition.
   const [displayedPoints, setDisplayedPoints] = useState(() =>
     Object.fromEntries(
       (players || []).map(p => {
-        const ranking = (rankings || []).find(r => r.uid === p.uid);
-        const earned = ranking?.pointsEarned || 0;
+        const earned = earnedByUid[p.uid] || 0;
         return [p.uid, Math.max(0, p.points - earned)];
       })
     )
@@ -133,197 +80,17 @@ function RoundResultsReveal({
     return bPts - aPts;
   });
 
-  const [stage, setStage] = useState('reveal');
-  const losersOpacity = useRef(new Animated.Value(1)).current;
-  const losersScale = useRef(new Animated.Value(1)).current;
-  const overlayBgOpacity = useRef(new Animated.Value(1)).current;
-  const scoreboardOpacity = useRef(new Animated.Value(0.15)).current;
-  // Drives the per-card jiggle during the reveal stage.
-  const wobble = useRef(new Animated.Value(0)).current;
-
-  // Per-winner animated values. Map to support 2+ way ties cleanly. Spread
-  // is handled by flex layout in spotlightOverlay (row direction with gap).
-  const winnerAnimsRef = useRef(new Map());
-  winners.forEach((w) => {
-    if (!winnerAnimsRef.current.has(w.uid)) {
-      winnerAnimsRef.current.set(w.uid, {
-        scale: new Animated.Value(0.6),
-        opacity: new Animated.Value(0),
-        translateY: new Animated.Value(0),
-      });
-    }
-  });
-
-  // Row screen Y positions, populated as scoreboard rows mount.
-  const rowScreenYsRef = useRef({});
-  const rowRefs = useRef({});
-  const handleRowRef = (uid) => (ref) => {
-    rowRefs.current[uid] = ref;
-    if (ref) {
-      setTimeout(() => {
-        ref.measureInWindow?.((x, y, w, h) => {
-          rowScreenYsRef.current[uid] = y + h / 2;
-        });
-      }, 80);
-    }
-  };
-
-  // Random card wobble — instead of every card jiggling in sync, one
-  // random card wobbles, pause ~3-5s, then a different one. Feels alive
-  // without being chaotic. Initial 1.8s delay keeps the first beat calm.
-  const [wobbleIdx, setWobbleIdx] = useState(null);
+  // Tick up displayed points to actual on mount. Triggers row swaps.
   useEffect(() => {
-    if (stage !== 'reveal') return;
-    let timeoutId;
-    const trigger = () => {
-      const len = (submissions || []).length;
-      if (len === 0) {
-        timeoutId = setTimeout(trigger, 2000);
-        return;
-      }
-      const idx = Math.floor(Math.random() * len);
-      setWobbleIdx(idx);
-      Animated.sequence([
-        Animated.timing(wobble, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.timing(wobble, { toValue: -1, duration: 440, useNativeDriver: true }),
-        Animated.timing(wobble, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start(() => {
-        setWobbleIdx(null);
-        timeoutId = setTimeout(trigger, 3000 + Math.random() * 2000);
-      });
-    };
-    timeoutId = setTimeout(trigger, 1800);
-    return () => clearTimeout(timeoutId);
-  }, [stage, submissions?.length]);
-
-  // Random card pulse — same idea but on a different cadence and offset
-  // so the wobble + pulse never fire simultaneously on the same beat.
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-  const [pulseIdx, setPulseIdx] = useState(null);
-  useEffect(() => {
-    if (stage !== 'reveal') return;
-    let timeoutId;
-    const trigger = () => {
-      const len = (submissions || []).length;
-      if (len === 0) {
-        timeoutId = setTimeout(trigger, 2000);
-        return;
-      }
-      const idx = Math.floor(Math.random() * len);
-      setPulseIdx(idx);
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0, duration: 320, useNativeDriver: true }),
-      ]).start(() => {
-        setPulseIdx(null);
-        timeoutId = setTimeout(trigger, 4000 + Math.random() * 2500);
-      });
-    };
-    timeoutId = setTimeout(trigger, 2600);
-    return () => clearTimeout(timeoutId);
-  }, [stage, submissions?.length]);
-
-  // Refs so we can clear timers if the user taps the spotlight to skip ahead.
-  const t2Ref = useRef(null);
-  const t3Ref = useRef(null);
-
-  // Run shrink animations. fastMode=true fires when the user taps to skip —
-  // shorter durations so the dismiss feels snappy.
-  const runShrinkAnims = (fastMode) => {
-    const screenH = Dimensions.get('window').height;
-    const centerY = screenH / 2;
-    const dur = fastMode ? 350 : 800;
-    const overlayDur = fastMode ? 350 : 700;
-    const sbDur = fastMode ? 300 : 600;
-    const anims = [
-      Animated.timing(overlayBgOpacity, { toValue: 0, duration: overlayDur, useNativeDriver: true }),
-      Animated.timing(scoreboardOpacity, { toValue: 1, duration: sbDur, useNativeDriver: true }),
-    ];
-    winners.forEach(w => {
-      const a = winnerAnimsRef.current.get(w.uid);
-      if (!a) return; // guard against missing anim entry on tie reveal
-      const targetY = rowScreenYsRef.current[w.uid];
-      const translateY = (targetY != null ? (targetY - centerY) : -260);
-      anims.push(
-        Animated.timing(a.scale, { toValue: 0.15, duration: dur, useNativeDriver: true }),
-        Animated.timing(a.translateY, { toValue: translateY, duration: dur, useNativeDriver: true }),
-        Animated.timing(a.opacity, { toValue: 0, duration: dur, useNativeDriver: true }),
-      );
-    });
-    try {
-      Animated.parallel(anims).start();
-    } catch (e) {
-      console.error('[RoundResults] runShrinkAnims failed:', e);
-    }
-  };
-
-  // Tap on the spotlight area → skip ahead to scoreboard, faster shrink.
-  const handleSpotlightTap = () => {
-    if (stage !== 'spotlight') return;
-    if (t2Ref.current) clearTimeout(t2Ref.current);
-    if (t3Ref.current) clearTimeout(t3Ref.current);
-    setStage('shrink');
-    runShrinkAnims(true);
-    t3Ref.current = setTimeout(() => setStage('scoreboard'), 400);
-  };
-
-  useEffect(() => {
-    const t1 = setTimeout(() => {
-      setStage('spotlight');
-      const anims = [
-        // Losers fully fade and shrink — out of sight by spotlight peak.
-        Animated.timing(losersOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
-        Animated.timing(losersScale, { toValue: 0.5, duration: 600, useNativeDriver: true }),
-        Animated.timing(scoreboardOpacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ];
-      winners.forEach(w => {
-        const a = winnerAnimsRef.current.get(w.uid);
-        if (!a) return; // guard against missing anim entry on tie reveal
-        anims.push(
-          Animated.spring(a.scale, { toValue: winnerTargetScale, tension: 60, friction: 8, useNativeDriver: true }),
-          Animated.timing(a.opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-        );
-      });
-      try {
-        Animated.parallel(anims).start();
-      } catch (e) {
-        console.error('[RoundResults] spotlight anim failed:', e);
-      }
-    }, 2800);
-
-    t2Ref.current = setTimeout(() => {
-      setStage('shrink');
-      runShrinkAnims(false);
-    }, 11800);
-    // Bumped from 12600 to 13000 so the shrink animation has a small buffer
-    // to fully settle before the overlay (and its video players) unmount —
-    // simultaneous unmount of multiple expo-video instances on tie reveal
-    // was a suspect in the crash.
-    t3Ref.current = setTimeout(() => setStage('scoreboard'), 13000);
-    return () => {
-      clearTimeout(t1);
-      if (t2Ref.current) clearTimeout(t2Ref.current);
-      if (t3Ref.current) clearTimeout(t3Ref.current);
-    };
-  }, []);
-
-  const showWinnerOverlay = stage === 'spotlight' || stage === 'shrink';
-  const showOverlay = stage !== 'scoreboard';
-
-  // Tick displayed points up to actual when shrink starts; the orderedPlayers
-  // sort below is driven by displayedPoints, so reanimated LinearTransition
-  // animates the row swap whenever someone overtakes another player mid-tick.
-  useEffect(() => {
-    if (stage !== 'shrink') return;
     const targets = {};
-    (players || []).forEach(p => { targets[p.uid] = p.points; });
+    (players || []).forEach(p => { targets[p.uid] = p.points || 0; });
     const startVals = { ...displayedPoints };
-    const duration = 2200;
-    const steps = 24;
-    let i = 0;
+    const duration = 1200;
+    const steps = 40;
+    let step = 0;
     const id = setInterval(() => {
-      i += 1;
-      const t = Math.min(i / steps, 1);
+      step++;
+      const t = step / steps;
       const next = {};
       (players || []).forEach(p => {
         const start = startVals[p.uid] ?? 0;
@@ -334,39 +101,32 @@ function RoundResultsReveal({
       if (t >= 1) clearInterval(id);
     }, duration / steps);
     return () => clearInterval(id);
-  }, [stage]);
+  }, []);
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
         <View style={{ width: 36 }} />
         <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
-        <Text style={styles.timerText}>{stage === 'scoreboard' ? `${timer}s` : ''}</Text>
+        <Text style={styles.timerText}>{}</Text>
       </View>
 
       <View style={styles.promptBanner}>
         <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
       </View>
 
-      {/* BASE LAYER: scoreboard. Visible behind the overlay during reveal so
-          the user sees where the winner card ultimately lands. Rows are
-          ordered by displayedPoints so they swap mid-tick when ranks
-          change; reanimated LinearTransition animates the swap. Wrapped
-          in a ScrollView so 6-8 player games can scroll past the fold. */}
-      <Animated.View style={[styles.resultsContent, { opacity: scoreboardOpacity }]}>
+      <Animated.View style={[styles.resultsContent]}>
         <ScrollView
           contentContainerStyle={styles.resultsScrollContent}
           showsVerticalScrollIndicator={false}
         >
           {orderedPlayers.map((p, i) => {
             const earned = earnedByUid[p.uid] || 0;
-            const playerSub = (submissions || []).find(s => s.uid === p.uid);
             const displayed = displayedPoints[p.uid] ?? p.points;
             return (
               <Reanimated.View
                 key={p.uid}
                 layout={LinearTransition.springify().damping(12).stiffness(90)}
-                ref={handleRowRef(p.uid)}
                 collapsable={false}
                 style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
               >
@@ -382,138 +142,19 @@ function RoundResultsReveal({
             );
           })}
 
-          {stage === 'scoreboard' && (
-            <View style={styles.resultsActions}>
-              {isHost ? (
-                <VibeButton label="Next Round" onPress={onNextRound} />
-              ) : (
-                <Text style={styles.waitingText}>Next round in {timer}s...</Text>
-              )}
-              <Pressable style={styles.shareResultsBtn} onPress={onShare}>
-                <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
-                <Text style={styles.shareResultsText}>Share Round</Text>
-              </Pressable>
-            </View>
-          )}
+          <View style={styles.resultsActions}>
+            {isHost ? (
+              <VibeButton label="Next Round" onPress={onNextRound} />
+            ) : (
+              <Text style={styles.waitingText}>Next round in {timer}s...</Text>
+            )}
+            <Pressable style={styles.shareResultsBtn} onPress={onShare}>
+              <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
+              <Text style={styles.shareResultsText}>Share Round</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </Animated.View>
-
-      {/* OVERLAY: card grid + winner spotlight. Fades out during shrink. */}
-      {showOverlay && (
-        <Animated.View
-          // Outer overlay no longer blocks all touches — spotlight is tappable
-          // (skip-ahead). Loser grid below sets its own pointerEvents="none".
-          style={[StyleSheet.absoluteFill, { opacity: overlayBgOpacity }]}
-        >
-          {/* Spacer to roughly match header + prompt banner heights so the
-              grid sits where it would on the picking/voting screens. */}
-          <View style={{ height: 120 }} />
-          <FlatList
-            data={submissions || []}
-            keyExtractor={(item, i) => item?.snappleId || `sub-${i}`}
-            numColumns={3}
-            columnWrapperStyle={styles.handRow}
-            contentContainerStyle={styles.handContainer}
-            scrollEnabled={false}
-            pointerEvents="none"
-            renderItem={({ item, index }) => {
-              // Only the wobble-target card rotates; only the pulse-target
-              // card scales. Everyone else sits still, so the grid feels
-              // alive but not seizure-inducing.
-              const wobbleMag = ((index * 7) % 5) + 4;
-              const cardRotate = wobble.interpolate({
-                inputRange: [-1, 0, 1],
-                outputRange: [`-${wobbleMag}deg`, '0deg', `${wobbleMag}deg`],
-              });
-              const cardPulse = pulseAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 1.12],
-              });
-              const inReveal = stage === 'reveal';
-              const isWobbleTarget = inReveal && wobbleIdx === index;
-              const isPulseTarget = inReveal && pulseIdx === index;
-              return (
-                <Animated.View
-                  style={{
-                    opacity: losersOpacity,
-                    transform: [
-                      { scale: losersScale },
-                      ...(isWobbleTarget ? [{ rotate: cardRotate }] : []),
-                      ...(isPulseTarget ? [{ scale: cardPulse }] : []),
-                    ],
-                  }}
-                >
-                  {/* Card with a segmented vote-aura around it — one
-                      stripe per voter in their assigned color. Voters
-                      are surfaced as colored-border name chips below. */}
-                  {(() => {
-                    const voters = stage === 'reveal' || stage === 'spotlight'
-                      ? votersFor(item.uid)
-                      : [];
-                    const ranking = (rankings || []).find(r => r.uid === item.uid);
-                    const pts = ranking?.pointsEarned || 0;
-                    const placement = ranking?.placement;
-                    return (
-                      <>
-                        <VoteAura voters={voters} thickness={3} radius={10}>
-                          <View style={styles.handCard}>
-                            <View style={styles.handCardVideo}>
-                              <CardThumbnailDelayed videoUrl={item.videoUrl} delay={index * 80} />
-                            </View>
-                          </View>
-                        </VoteAura>
-                        {voters.length > 0 && (
-                          <View style={styles.voterChipRow}>
-                            {voters.map((v, i) => (
-                              <View
-                                key={`${v.uid}-${i}`}
-                                style={[styles.voterChip, { borderColor: v.color }]}
-                              >
-                                <Text
-                                  style={[styles.voterChipText, v.isMe && styles.voterChipTextMe]}
-                                  numberOfLines={1}
-                                >
-                                  {v.name}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
-                        {pts > 0 && (
-                          <Text style={styles.scorePillLabel} numberOfLines={1}>
-                            #{placement} · +{pts} pts
-                          </Text>
-                        )}
-                      </>
-                    );
-                  })()}
-                </Animated.View>
-              );
-            }}
-          />
-
-          {showWinnerOverlay && (
-            <Pressable style={styles.spotlightOverlay} onPress={handleSpotlightTap}>
-              {winners.map(w => {
-                const sub = (submissions || []).find(s => s.uid === w.uid);
-                const player = (players || []).find(p => p.uid === w.uid);
-                const anim = winnerAnimsRef.current.get(w.uid);
-                if (!anim) return null;
-                return (
-                  <WinnerSpotlightCard
-                    key={w.uid}
-                    submission={sub}
-                    player={player}
-                    isTie={winners.length > 1}
-                    anim={anim}
-                    voters={votersFor(w.uid)}
-                  />
-                );
-              })}
-            </Pressable>
-          )}
-        </Animated.View>
-      )}
     </LinearGradient>
   );
 }
@@ -579,6 +220,37 @@ export default function GameScreen({ navigation }) {
   // Reset the bot-schedule guard when leaving a game.
   useEffect(() => {
     if (!gameId) lastBotScheduleDeadlineRef.current = null;
+  }, [gameId]);
+
+  // Schedule bot votes when VOTING starts (practice mode only). Each bot
+  // gets a random 3-12s delay so the auras populate gradually instead of
+  // all firing at once — simulates real players picking favorites at
+  // their own pace. Dedupe key is currentRound since voting fires once
+  // per round.
+  const lastBotVoteScheduleRoundRef = useRef(null);
+  useEffect(() => {
+    if (!gameId || !game) return;
+    if (game.phase !== GAME_PHASES.VOTING) return;
+    if (game.hostId !== user?.uid) return;
+    if (!isPractice) return;
+    if (lastBotVoteScheduleRoundRef.current === game.currentRound) return;
+    lastBotVoteScheduleRoundRef.current = game.currentRound;
+
+    const botPlayers = (game.players || []).filter(p => p.uid?.startsWith('bot_'));
+    const votableSubs = (game.submissions || []).filter(s => !s.uid.startsWith('bot_'));
+    if (votableSubs.length === 0) return;
+
+    botPlayers.forEach(bot => {
+      const delay = 3000 + Math.floor(Math.random() * 9000);
+      setTimeout(() => {
+        const target = votableSubs[Math.floor(Math.random() * votableSubs.length)];
+        gameService.castVote(gameId, bot.uid, target.uid).catch(() => {});
+      }, delay);
+    });
+  }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid, isPractice]);
+
+  useEffect(() => {
+    if (!gameId) lastBotVoteScheduleRoundRef.current = null;
   }, [gameId]);
 
   // Incremental video prefetch — concurrent (forEach without await), so
@@ -725,7 +397,8 @@ export default function GameScreen({ navigation }) {
           if (prev <= 1) {
             // Auto-pick random if they haven't voted. The all-voted
             // detection in subscribeToGame handles the eventual finishRound
-            // after a 10s wait — no need to fire it here too.
+            // after a 10s wait. Bots auto-vote via the VOTING phase
+            // scheduler, no need to kick them here.
             if (!hasVoted) {
               const votable = game.submissions.filter(s => s.uid !== user.uid);
               if (votable.length > 0) {
@@ -733,16 +406,6 @@ export default function GameScreen({ navigation }) {
                 setFavoriteCard(random);
                 gameService.castVote(gameId, user.uid, random.uid);
                 setHasVoted(true);
-                if (game.hostId === user.uid && isPractice) {
-                  const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-                  const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
-                  botPlayers.forEach(bot => {
-                    if (nonBotSubmissions.length > 0) {
-                      const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
-                      gameService.castVote(gameId, bot.uid, randomSub.uid);
-                    }
-                  });
-                }
               }
             }
             clearInterval(timerRef.current);
@@ -1033,26 +696,15 @@ export default function GameScreen({ navigation }) {
     if (!game || !favoriteCard || hasVoted) return;
 
     // Submit vote first; only mark hasVoted on success so a network failure
-    // doesn't lock the user into a fake "submitted" state.
+    // doesn't lock the user into a fake "submitted" state. Bot votes are
+    // scheduled separately by the phase=VOTING effect with random delays
+    // so the auras pulse in over a few seconds instead of all at once.
     const result = await gameService.castVote(gameId, user.uid, favoriteCard.uid);
     if (!result?.success) {
       showError('Vote Failed', result?.error || 'Could not submit vote — try again.');
       return;
     }
     setHasVoted(true);
-
-    // If host in practice, kick bot votes too. The actual finishRound is
-    // scheduled in subscribeToGame once all-voted is detected (10s after).
-    if (game.hostId === user.uid && isPractice) {
-      const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-      const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
-      botPlayers.forEach(bot => {
-        if (nonBotSubmissions.length > 0) {
-          const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
-          gameService.castVote(gameId, bot.uid, randomSub.uid);
-        }
-      });
-    }
   };
 
   const handleNextRound = async () => {
@@ -1463,45 +1115,56 @@ export default function GameScreen({ navigation }) {
         </View>
 
         {hasVoted ? (
-          // Vote-submitted wait screen — replaces the lone green checkmark
-          // with: YOUR VOTE thumbnail + creator credit, current standings
-          // with per-player voted/voting status, and the full snapple grid
-          // (anonymous, tap to re-watch). Mirrors the post-pick screen.
+          // Vote-submitted wait screen — unified grid of all snapples,
+          // each card same size with a multi-color vote aura around its
+          // video and colored-border name chips below. Auras populate as
+          // bots/players cast votes (see scheduleBotVote effect). Self
+          // always renders in vibeGreen so the user can spot their own
+          // pick by the green stripe in its aura.
           (() => {
             const votedUids = new Set(Object.values(game.votes || {}).flat());
             const sortedPlayers = [...(game.players || [])].sort(
               (a, b) => (b.points || 0) - (a.points || 0)
             );
+
+            // Per-player color map: self → vibeGreen, others cycle through
+            // VOTER_PALETTE in players-array order.
+            const playerColors = new Map();
+            let paletteIdx = 0;
+            (game.players || []).forEach(p => {
+              if (p.uid === user?.uid) {
+                playerColors.set(p.uid, theme.colors.vibeGreen);
+              } else {
+                playerColors.set(p.uid, VOTER_PALETTE[paletteIdx % VOTER_PALETTE.length]);
+                paletteIdx++;
+              }
+            });
+
+            const buildVoters = (subUid) => {
+              const ids = (game.votes?.[subUid] || []);
+              return ids.map(vid => ({
+                uid: vid,
+                name: (game.players || []).find(p => p.uid === vid)?.username || vid?.slice(0, 4),
+                color: playerColors.get(vid) || theme.colors.textSecondary,
+                isMe: vid === user?.uid,
+              }));
+            };
+
             return (
               <ScrollView
                 style={styles.pickedWaitWrap}
                 contentContainerStyle={styles.pickedWaitContent}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Top row: YOUR VOTE thumbnail flanked by the auras grid so
-                    the user's eyes stay on the videos as votes pulse in. */}
-                <View style={styles.voteTopRow}>
-                  <View style={styles.yourVoteCol}>
-                    <Text style={styles.yourPickLabel}>YOUR VOTE</Text>
-                    <View style={styles.yourPickCard}>
-                      {favoriteCard?.videoUrl ? (
-                        <SnappleThumbnailImg videoUrl={favoriteCard.videoUrl} />
-                      ) : null}
-                    </View>
-                  </View>
-                  <View style={styles.allSnapplesGridInline}>
-                    {(game.submissions || []).map((sub, i) => {
-                      const auraCount = (game.votes?.[sub.uid] || []).length;
-                      return (
-                        <VoteAuraCard
-                          key={sub.snappleId || `sub-${i}`}
-                          submission={sub}
-                          voteCount={auraCount}
-                          onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
-                        />
-                      );
-                    })}
-                  </View>
+                <View style={styles.allSnapplesGrid}>
+                  {(game.submissions || []).map((sub, i) => (
+                    <VoteAuraCard
+                      key={sub.snappleId || `sub-${i}`}
+                      submission={sub}
+                      voters={buildVoters(sub.uid)}
+                      onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
+                    />
+                  ))}
                 </View>
 
                 <Text style={styles.pickProgressText}>
@@ -1615,16 +1278,13 @@ export default function GameScreen({ navigation }) {
     };
     return (
       <RoundResultsReveal
-        submissions={game.submissions}
         rankings={lastRoundResult?.rankings || []}
         players={game.players}
-        votes={game.votes || {}}
         prompt={game.prompts[game.currentRound - 1] || ''}
         currentRound={game.currentRound}
         totalRounds={game.totalRounds}
         timer={timer}
         isHost={isHost}
-        selfUid={user?.uid}
         onNextRound={handleNextRound}
         onShare={handleShareRound}
       />
