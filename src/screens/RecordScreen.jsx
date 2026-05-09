@@ -2,11 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, Pressable, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BasicCameraView from '../components/media/BasicCameraView';
 import RecordingControls from '../components/media/RecordingControls';
-import VibeButton from '../components/ui/VibeButton';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -17,7 +16,6 @@ export default function RecordScreen({ route }) {
   const [cameraRef, setCameraRef] = useState(null);
   const [facing, setFacing] = useState('back');
   const [isRecording, setIsRecording] = useState(false);
-  const [recordedVideo, setRecordedVideo] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showPrompt, setShowPrompt] = useState(!!route.params?.prompt);
@@ -25,9 +23,9 @@ export default function RecordScreen({ route }) {
   
   const maxDuration = 10; // 10 second max for Snapples
   const { prompt } = route.params || {};
-  const promptText = prompt?.text || "Free record — pick a prompt for your snapple after recording";
+  const promptText = prompt?.text || '';
 
-  // Auto-hide prompt after 5 seconds
+  // Auto-hide the prompt banner after 5s (only visible if a prompt was passed).
   useEffect(() => {
     if (showPrompt) {
       const timer = setTimeout(() => {
@@ -36,6 +34,21 @@ export default function RecordScreen({ route }) {
       return () => clearTimeout(timer);
     }
   }, [showPrompt]);
+
+  // Reset to a clean camera-ready state whenever this screen gains focus
+  // (e.g. user hits Retake on VideoPreview and navigates back). Without
+  // this the previous recording's success overlay stays mounted and the
+  // user has to dismiss it before they can record again.
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsRecording(false);
+      setRecordingTime(0);
+      setShowPrompt(!!route.params?.prompt);
+      setCameraKey(prev => prev + 1);
+      setCameraReady(false);
+      setCameraRef(null);
+    }, [route.params?.prompt])
+  );
 
   function handleOverlayTouch() {
     setShowPrompt(false); // Any touch on overlay dismisses prompt
@@ -69,42 +82,21 @@ export default function RecordScreen({ route }) {
   }
 
   function handleRecordingComplete(video, finalTime) {
-    console.log('[RecordScreen] Recording completed:', video, 'Time:', finalTime);
-    console.log('[RecordScreen] Video URI:', video?.uri);
     setIsRecording(false);
-    setRecordedVideo(video);
     setRecordingTime(finalTime || 0);
-    
-    // Navigate to preview screen immediately
-    if (video && video.uri) {
-      console.log('[RecordScreen] Navigating to VideoPreview...');
+    if (video?.uri) {
       navigation.navigate('VideoPreview', {
         recordedVideo: video,
         cameraFacing: facing,
         prompt,
       });
     } else {
-      console.log('[RecordScreen] No video or URI to navigate with');
+      Alert.alert('Recording Failed', 'No video file was produced. Try again.');
     }
   }
 
   function handleRecordingTimeUpdate(time) {
     setRecordingTime(time);
-  }
-
-  function handleContinueWithVideo(video) {
-    // For now, just go back to home screen
-    // TODO: Navigate to proper submission flow
-    navigation.popToTop();
-  }
-
-  function handlePreviewVideo(video) {
-    // Navigate to video preview screen
-    navigation.navigate('VideoPreview', {
-      recordedVideo: video,
-      cameraFacing: facing,
-      prompt,
-    });
   }
 
   function toggleCamera() {
@@ -118,8 +110,8 @@ export default function RecordScreen({ route }) {
         'Are you sure you want to stop recording and go back?',
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Stop & Go Back', 
+          {
+            text: 'Stop & Go Back',
             style: 'destructive',
             onPress: () => navigation.goBack()
           }
@@ -131,28 +123,10 @@ export default function RecordScreen({ route }) {
   }
 
   function handleCameraReset() {
-    console.log('[RecordScreen] Resetting camera');
     setCameraRef(null);
     setCameraReady(false);
     setIsRecording(false);
-    setRecordedVideo(null);
     setRecordingTime(0);
-  }
-
-  function handleRecordAgain() {
-    console.log('[RecordScreen] Record again - resetting all states');
-    // Reset all states to initial values - clean slate
-    setIsRecording(false);
-    setRecordedVideo(null); // This should hide the success overlay
-    setRecordingTime(0);
-    setShowPrompt(false); // Stay clean — no overlay on record-again
-    
-    // Force camera component to remount by changing its key
-    setCameraKey(prev => prev + 1);
-    setCameraReady(false);
-    setCameraRef(null);
-    
-    console.log('[RecordScreen] States reset - camera will remount');
   }
 
   return (
@@ -174,44 +148,6 @@ export default function RecordScreen({ route }) {
           <View style={styles.recordingIndicator}>
             <View style={styles.recordingDot} />
             <Text style={styles.recordingText}>REC</Text>
-          </View>
-        )}
-
-        {/* Success Overlay */}
-        {recordedVideo && (
-          <View style={styles.successOverlay}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.6)']}
-              style={styles.successContent}
-            >
-              <Text style={styles.successIcon}>✓</Text>
-              <Text style={styles.successTitle}>Video Recorded!</Text>
-              <Text style={styles.successSubtitle}>
-                {recordingTime >= maxDuration 
-                  ? "Maximum time reached" 
-                  : "Recording complete"}
-              </Text>
-              
-              <View style={styles.successButtons}>
-                {recordingTime < maxDuration && (
-                  <VibeButton
-                    label="Record Again"
-                    onPress={handleRecordAgain}
-                    style={styles.recordMoreButton}
-                  />
-                )}
-                <VibeButton
-                  label="Preview Video"
-                  onPress={() => handlePreviewVideo(recordedVideo)}
-                  style={styles.previewButton}
-                />
-                <VibeButton
-                  label="Go Home"
-                  onPress={() => navigation.popToTop()}
-                  style={styles.homeButton}
-                />
-              </View>
-            </LinearGradient>
           </View>
         )}
 
@@ -357,74 +293,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: theme.fontWeights.bold,
   },
-  successOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 20,
-  },
-  successContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  successTitle: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: theme.fontWeights.bold,
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  successSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  successButtons: {
-    flexDirection: 'column',
-    width: '100%',
-  },
-  recordMoreButton: {
-    marginBottom: 12,
-    backgroundColor: 'rgba(0, 255, 255, 0.08)',
-  },
-  previewButton: {
-    backgroundColor: 'rgba(0, 255, 255, 0.08)',
-  },
-  homeButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginTop: 12,
-  },
-  bottomControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 32,
-    paddingBottom: 48,
-    alignItems: 'center',
-  },
   closeText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  flipText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  disabledText: {
-    color: '#666',
-  },
-  successIcon: {
-    color: theme.colors.vibeGreen,
-    fontSize: 48,
     fontWeight: 'bold',
   },
   overlayContainer: {
