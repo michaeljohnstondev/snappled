@@ -1609,6 +1609,28 @@ export default function GameScreen({ navigation }) {
         {/* Prompt */}
         <View style={styles.promptBanner}>
           <Text style={styles.promptText}>{currentPrompt}</Text>
+          {isAdmin && (
+            <View style={styles.promptAdminRow}>
+              <Pressable
+                style={styles.promptAdminBtn}
+                onPress={() => {
+                  setEditPromptText(currentPrompt);
+                  setIsEditingPrompt(true);
+                }}
+              >
+                <Text style={styles.promptAdminBtnText}>Edit</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.promptAdminBtn, { borderColor: theme.colors.vibeRed }]}
+                onPress={async () => {
+                  const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
+                  if (!result?.success) showError('Error', result?.error || 'Failed to replace prompt');
+                }}
+              >
+                <Text style={[styles.promptAdminBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
 
         {alreadyPicked ? (
@@ -1747,9 +1769,9 @@ export default function GameScreen({ navigation }) {
         )}
 
         {/* Admin: edit / replace the round's prompt mid-game */}
-        {editingPrompt && (
-          <Modal visible transparent animationType="fade" onRequestClose={() => setEditingPrompt(false)}>
-            <Pressable style={styles.previewOverlay} onPress={() => setEditingPrompt(false)}>
+        {isEditingPrompt && (
+          <Modal visible transparent animationType="fade" onRequestClose={() => setIsEditingPrompt(false)}>
+            <Pressable style={styles.previewOverlay} onPress={() => setIsEditingPrompt(false)}>
               <Pressable
                 style={styles.editPromptCard}
                 onPress={() => {}}
@@ -1766,7 +1788,7 @@ export default function GameScreen({ navigation }) {
                 <View style={styles.editPromptButtons}>
                   <Pressable
                     style={[styles.editPromptBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
-                    onPress={() => setEditingPrompt(false)}
+                    onPress={() => setIsEditingPrompt(false)}
                   >
                     <Text style={styles.editPromptBtnText}>Cancel</Text>
                   </Pressable>
@@ -1774,7 +1796,7 @@ export default function GameScreen({ navigation }) {
                     style={[styles.editPromptBtn, { borderColor: theme.colors.vibeRed }]}
                     onPress={async () => {
                       const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
-                      setEditingPrompt(false);
+                      setIsEditingPrompt(false);
                       if (!result.success) showError('Error', result.error || 'Failed to replace prompt');
                     }}
                   >
@@ -1786,7 +1808,7 @@ export default function GameScreen({ navigation }) {
                       const text = editPromptText.trim();
                       if (!text) return;
                       const result = await gameService.editRoundPrompt(gameId, game.currentRound - 1, text);
-                      setEditingPrompt(false);
+                      setIsEditingPrompt(false);
                       if (!result.success) showError('Error', result.error || 'Failed to save prompt');
                     }}
                   >
@@ -2112,6 +2134,43 @@ const styles = StyleSheet.create({
   },
   promptAdminBtnText: {
     color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  editPromptCard: {
+    width: '85%',
+    backgroundColor: '#0A1A2A',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    padding: 20,
+  },
+  editPromptTitle: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: 1.5,
+  },
+  editPromptButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 16,
+  },
+  editPromptBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+  },
+  editPromptBtnText: {
+    color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
   },

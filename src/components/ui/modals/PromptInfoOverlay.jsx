@@ -386,7 +386,7 @@ export default function PromptInfoOverlay({
               )}
             </LinearGradient>
             {isAdmin && (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={styles.adminBtnRow}>
                 <Pressable
                   style={styles.editPromptBtn}
                   onPress={async () => {
@@ -649,14 +649,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
-  editPromptBtn: {
+  adminBtnRow: {
     position: "absolute",
     top: 8,
     right: 8,
+    flexDirection: "row",
+    gap: 8,
+  },
+  editPromptBtn: {
     backgroundColor: "rgba(0,0,0,0.5)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.vibeBlue,
   },
   editPromptBtnText: {
     color: theme.colors.vibeBlue,
