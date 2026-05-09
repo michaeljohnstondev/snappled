@@ -31,9 +31,6 @@ export default function WinnerSpotlightCard({ submission, player, isTie, anim, v
       <View style={styles.label}>
         <Text style={styles.winnerLabel}>{isTie ? 'TIE' : 'WINNER'}</Text>
         <Text style={styles.player}>{player?.username || '?'}</Text>
-        {submission?.creatorUsername && submission.creatorUsername !== player?.username && (
-          <Text style={styles.creator}>by @{submission.creatorUsername}</Text>
-        )}
         {voters && voters.length > 0 && (
           <Text style={styles.voters} numberOfLines={1}>
             voted by {voters.join(', ')}

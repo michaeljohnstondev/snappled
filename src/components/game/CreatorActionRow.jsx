@@ -71,11 +71,12 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
     } finally { setBusy(false); }
   };
 
+  // Creator name hidden in-phase per user request — all snapples are
+  // currently the user's own anyway, so showing "by @me" everywhere is
+  // confusing. Will return once the pool is more diverse.
   return (
     <View style={styles.wrap}>
-      <Text style={styles.creator} numberOfLines={1}>
-        by @{submission?.creatorUsername || 'anonymous'}
-      </Text>
+      <View style={{ flex: 1 }} />
       {!isMine && creatorId && (
         <View style={styles.actions}>
           <Pressable

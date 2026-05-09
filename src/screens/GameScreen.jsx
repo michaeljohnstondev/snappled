@@ -21,6 +21,7 @@ import PreviewPlayer from '../components/game/PreviewPlayer';
 import VoteAuraCard from '../components/game/VoteAuraCard';
 import CreatorActionRow from '../components/game/CreatorActionRow';
 import WinnerSpotlightCard from '../components/game/WinnerSpotlightCard';
+import LobbyPhase from '../components/game/phases/LobbyPhase';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -1215,54 +1216,15 @@ export default function GameScreen({ navigation }) {
 
   // Lobby — waiting for players
   if (game.phase === GAME_PHASES.LOBBY) {
-    const isHost = game.hostId === user.uid;
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={handleLeaveGame}>
-            <View style={styles.backBg}>
-              <Ionicons name="arrow-back" size={20} color="white" />
-            </View>
-          </Pressable>
-          <Text style={styles.headerTitle}>Lobby</Text>
-          <View style={{ width: 36 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.lobbyContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.lobbyTitle}>Waiting for Players</Text>
-          <Text style={styles.lobbySubtitle}>{game.players.length}/{gameService.MAX_PLAYERS} players</Text>
-
-          <View style={styles.playerList}>
-            {game.players.map((p, i) => (
-              <View key={p.uid} style={styles.playerRow}>
-                <View style={styles.playerAvatar}>
-                  <Text style={styles.playerAvatarText}>{p.username.charAt(0).toUpperCase()}</Text>
-                </View>
-                <Text style={styles.playerName}>{p.username}</Text>
-                {p.uid === game.hostId && <Text style={styles.hostBadge}>HOST</Text>}
-              </View>
-            ))}
-          </View>
-
-          {isHost && (
-            <View style={styles.lobbyButtons}>
-              {game.players.length < gameService.MAX_PLAYERS && (
-                <VibeButton label="+ Add Bot" onPress={handleAddBot} variant="toggle" color="cyan" />
-              )}
-              {game.players.length >= 2 ? (
-                <VibeButton label="Start Game" onPress={handleStartGame} />
-              ) : (
-                <Text style={styles.waitingText}>Need at least 2 players to start</Text>
-              )}
-            </View>
-          )}
-
-          <Text style={styles.gameCode}>Game ID: {gameId.slice(0, 6).toUpperCase()}</Text>
-        </ScrollView>
-      </LinearGradient>
+      <LobbyPhase
+        game={game}
+        gameId={gameId}
+        isHost={game.hostId === user.uid}
+        onLeave={handleLeaveGame}
+        onAddBot={handleAddBot}
+        onStartGame={handleStartGame}
+      />
     );
   }
 
@@ -1402,9 +1364,6 @@ export default function GameScreen({ navigation }) {
                       <SnappleThumbnailImg videoUrl={myPick.videoUrl} />
                     ) : null}
                   </View>
-                  {!!myPick?.creatorUsername && (
-                    <Text style={styles.yourPickCreator}>by @{myPick.creatorUsername}</Text>
-                  )}
                 </View>
 
                 <Text style={styles.pickProgressText}>
@@ -1637,16 +1596,30 @@ export default function GameScreen({ navigation }) {
                 contentContainerStyle={styles.pickedWaitContent}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.yourPickSection}>
-                  <Text style={styles.yourPickLabel}>YOUR VOTE</Text>
-                  <View style={styles.yourPickCard}>
-                    {favoriteCard?.videoUrl ? (
-                      <SnappleThumbnailImg videoUrl={favoriteCard.videoUrl} />
-                    ) : null}
+                {/* Top row: YOUR VOTE thumbnail flanked by the auras grid so
+                    the user's eyes stay on the videos as votes pulse in. */}
+                <View style={styles.voteTopRow}>
+                  <View style={styles.yourVoteCol}>
+                    <Text style={styles.yourPickLabel}>YOUR VOTE</Text>
+                    <View style={styles.yourPickCard}>
+                      {favoriteCard?.videoUrl ? (
+                        <SnappleThumbnailImg videoUrl={favoriteCard.videoUrl} />
+                      ) : null}
+                    </View>
                   </View>
-                  {!!favoriteCard?.creatorUsername && (
-                    <Text style={styles.yourPickCreator}>by @{favoriteCard.creatorUsername}</Text>
-                  )}
+                  <View style={styles.allSnapplesGridInline}>
+                    {(game.submissions || []).map((sub, i) => {
+                      const auraCount = (game.votes?.[sub.uid] || []).length;
+                      return (
+                        <VoteAuraCard
+                          key={sub.snappleId || `sub-${i}`}
+                          submission={sub}
+                          voteCount={auraCount}
+                          onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
+                        />
+                      );
+                    })}
+                  </View>
                 </View>
 
                 <Text style={styles.pickProgressText}>
@@ -1672,21 +1645,6 @@ export default function GameScreen({ navigation }) {
                           {voted ? 'voted' : 'voting...'}
                         </Text>
                       </View>
-                    );
-                  })}
-                </View>
-
-                <Text style={styles.allSnapplesLabel}>ALL SNAPPLES</Text>
-                <View style={styles.allSnapplesGrid}>
-                  {(game.submissions || []).map((sub, i) => {
-                    const auraCount = (game.votes?.[sub.uid] || []).length;
-                    return (
-                      <VoteAuraCard
-                        key={sub.snappleId || `sub-${i}`}
-                        submission={sub}
-                        voteCount={auraCount}
-                        onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
-                      />
                     );
                   })}
                 </View>
@@ -1916,25 +1874,6 @@ const styles = StyleSheet.create({
   warningText: {
     color: theme.colors.vibeRed, fontSize: 13, textAlign: 'center', marginTop: 8,
   },
-  playerList: { width: '100%', gap: 12, marginTop: 16 },
-  playerRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 12,
-    borderWidth: 2, borderColor: theme.colors.vibeBlue,
-  },
-  playerAvatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(0,198,255,0.1)',
-    borderWidth: 2, borderColor: theme.colors.vibeBlue,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  playerAvatarText: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
-  playerName: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },
-  hostBadge: {
-    color: theme.colors.vibeYellow, fontSize: 10, fontWeight: 'bold',
-    backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
-  },
-  gameCode: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 16 },
   waitingText: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   // Picking
   promptBanner: {
@@ -2111,6 +2050,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 8,
+  },
+  // Vote-wait top row: YOUR VOTE on the left, aura grid wrapping on the
+  // right. Pulls all videos up next to the user's pick so eyes don't have
+  // to drag down past stats to watch the action.
+  voteTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 16,
+  },
+  yourVoteCol: {
+    alignItems: 'center',
+  },
+  allSnapplesGridInline: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignContent: 'flex-start',
+    gap: 4,
   },
   mulliganBtnBottom: {
     flexDirection: 'row',

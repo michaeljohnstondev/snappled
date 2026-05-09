@@ -249,26 +249,17 @@ export const gameService = {
     }
   },
 
-  // Cast a vote (swipe right)
+  // Cast a vote — uses arrayUnion so concurrent vote casts (host + bots in
+  // practice mode all firing in the same tick) don't lose each other's
+  // writes. The previous read-modify-write pattern raced and dropped votes,
+  // which left allVoted detection stuck in the wait screen.
   async castVote(gameId, voterId, submissionUid) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
-      const gameDoc = await getDoc(gameRef);
-      const data = gameDoc.data();
-
-      const votes = data.votes || {};
-      if (!votes[submissionUid]) {
-        votes[submissionUid] = [];
-      }
-      if (!votes[submissionUid].includes(voterId)) {
-        votes[submissionUid].push(voterId);
-      }
-
       await updateDoc(gameRef, {
-        votes,
+        [`votes.${submissionUid}`]: arrayUnion(voterId),
         updatedAt: serverTimestamp(),
       });
-
       return { success: true };
     } catch (error) {
       console.error('[GameService] Error casting vote:', error);
