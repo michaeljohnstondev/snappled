@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList, Dimensions,
-  ActivityIndicator, Animated, PanResponder, Modal, TextInput,
+  ActivityIndicator, Animated, PanResponder, Modal, TextInput, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -453,19 +453,27 @@ function RoundResultsReveal({
     }
   };
 
-  // Card wobble loop — runs through the reveal stage so cards visibly tease
-  // before the winner reveal. Stops when we leave reveal.
+  // Card wobble loop — held still for the first ~1.8s of the reveal so
+  // players can scan all cards quietly, then jiggles to build tension into
+  // the spotlight (which fires at 2.8s). User asked for the delay so the
+  // initial entry doesn't feel chaotic.
   useEffect(() => {
     if (stage !== 'reveal') return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(wobble, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.timing(wobble, { toValue: -1, duration: 440, useNativeDriver: true }),
-        Animated.timing(wobble, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
+    let loop;
+    const delay = setTimeout(() => {
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(wobble, { toValue: 1, duration: 220, useNativeDriver: true }),
+          Animated.timing(wobble, { toValue: -1, duration: 440, useNativeDriver: true }),
+          Animated.timing(wobble, { toValue: 0, duration: 220, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+    }, 1800);
+    return () => {
+      clearTimeout(delay);
+      if (loop) loop.stop();
+    };
   }, [stage]);
 
   // Refs so we can clear timers if the user taps the spotlight to skip ahead.
@@ -486,6 +494,7 @@ function RoundResultsReveal({
     ];
     winners.forEach(w => {
       const a = winnerAnimsRef.current.get(w.uid);
+      if (!a) return; // guard against missing anim entry on tie reveal
       const targetY = rowScreenYsRef.current[w.uid];
       const translateY = (targetY != null ? (targetY - centerY) : -260);
       anims.push(
@@ -518,6 +527,7 @@ function RoundResultsReveal({
       ];
       winners.forEach(w => {
         const a = winnerAnimsRef.current.get(w.uid);
+        if (!a) return; // guard against missing anim entry on tie reveal
         anims.push(
           Animated.spring(a.scale, { toValue: winnerTargetScale, tension: 60, friction: 8, useNativeDriver: true }),
           Animated.timing(a.opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -582,45 +592,51 @@ function RoundResultsReveal({
       {/* BASE LAYER: scoreboard. Visible behind the overlay during reveal so
           the user sees where the winner card ultimately lands. Rows are
           ordered by displayedPoints so they swap mid-tick when ranks
-          change; reanimated LinearTransition animates the swap. */}
+          change; reanimated LinearTransition animates the swap. Wrapped
+          in a ScrollView so 6-8 player games can scroll past the fold. */}
       <Animated.View style={[styles.resultsContent, { opacity: scoreboardOpacity }]}>
-        {orderedPlayers.map((p, i) => {
-          const earned = earnedByUid[p.uid] || 0;
-          const playerSub = (submissions || []).find(s => s.uid === p.uid);
-          const displayed = displayedPoints[p.uid] ?? p.points;
-          return (
-            <Reanimated.View
-              key={p.uid}
-              layout={LinearTransition.springify().damping(12).stiffness(90)}
-              ref={handleRowRef(p.uid)}
-              collapsable={false}
-              style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
-            >
-              <Text style={styles.resultPlacement}>#{i + 1}</Text>
-              <View style={styles.resultInfo}>
-                <Text style={styles.resultName}>{p.username}</Text>
-              </View>
-              <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
-                +{earned}
-              </Text>
-              <Text style={styles.resultTotal}>{displayed} pts</Text>
-            </Reanimated.View>
-          );
-        })}
+        <ScrollView
+          contentContainerStyle={styles.resultsScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {orderedPlayers.map((p, i) => {
+            const earned = earnedByUid[p.uid] || 0;
+            const playerSub = (submissions || []).find(s => s.uid === p.uid);
+            const displayed = displayedPoints[p.uid] ?? p.points;
+            return (
+              <Reanimated.View
+                key={p.uid}
+                layout={LinearTransition.springify().damping(12).stiffness(90)}
+                ref={handleRowRef(p.uid)}
+                collapsable={false}
+                style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
+              >
+                <Text style={styles.resultPlacement}>#{i + 1}</Text>
+                <View style={styles.resultInfo}>
+                  <Text style={styles.resultName}>{p.username}</Text>
+                </View>
+                <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
+                  +{earned}
+                </Text>
+                <Text style={styles.resultTotal}>{displayed} pts</Text>
+              </Reanimated.View>
+            );
+          })}
 
-        {stage === 'scoreboard' && (
-          <View style={styles.resultsActions}>
-            {isHost ? (
-              <VibeButton label="Next Round" onPress={onNextRound} />
-            ) : (
-              <Text style={styles.waitingText}>Next round in {timer}s...</Text>
-            )}
-            <Pressable style={styles.shareResultsBtn} onPress={onShare}>
-              <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
-              <Text style={styles.shareResultsText}>Share Round</Text>
-            </Pressable>
-          </View>
-        )}
+          {stage === 'scoreboard' && (
+            <View style={styles.resultsActions}>
+              {isHost ? (
+                <VibeButton label="Next Round" onPress={onNextRound} />
+              ) : (
+                <Text style={styles.waitingText}>Next round in {timer}s...</Text>
+              )}
+              <Pressable style={styles.shareResultsBtn} onPress={onShare}>
+                <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
+                <Text style={styles.shareResultsText}>Share Round</Text>
+              </Pressable>
+            </View>
+          )}
+        </ScrollView>
       </Animated.View>
 
       {/* OVERLAY: card grid + winner spotlight. Fades out during shrink. */}
@@ -1485,7 +1501,10 @@ export default function GameScreen({ navigation }) {
           <View style={{ width: 36 }} />
         </View>
 
-        <View style={styles.lobbyContent}>
+        <ScrollView
+          contentContainerStyle={styles.lobbyContent}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.lobbyTitle}>Waiting for Players</Text>
           <Text style={styles.lobbySubtitle}>{game.players.length}/{gameService.MAX_PLAYERS} players</Text>
 
@@ -1515,7 +1534,7 @@ export default function GameScreen({ navigation }) {
           )}
 
           <Text style={styles.gameCode}>Game ID: {gameId.slice(0, 6).toUpperCase()}</Text>
-        </View>
+        </ScrollView>
       </LinearGradient>
     );
   }
@@ -1644,7 +1663,11 @@ export default function GameScreen({ navigation }) {
             const submittedCount = (game.submissions || []).length;
             const totalCount = (game.players || []).length;
             return (
-              <View style={styles.pickedWaitWrap}>
+              <ScrollView
+                style={styles.pickedWaitWrap}
+                contentContainerStyle={styles.pickedWaitContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.yourPickSection}>
                   <Text style={styles.yourPickLabel}>YOUR PICK</Text>
                   <View style={styles.yourPickCard}>
@@ -1682,7 +1705,7 @@ export default function GameScreen({ navigation }) {
                     );
                   })}
                 </View>
-              </View>
+              </ScrollView>
             );
           })()
         ) : (
@@ -1872,9 +1895,75 @@ export default function GameScreen({ navigation }) {
         </View>
 
         {hasVoted ? (
-          <View style={styles.centerContent}>
-            <Ionicons name="checkmark-circle" size={48} color={theme.colors.vibeGreen} />
-          </View>
+          // Vote-submitted wait screen — replaces the lone green checkmark
+          // with: YOUR VOTE thumbnail + creator credit, current standings
+          // with per-player voted/voting status, and the full snapple grid
+          // (anonymous, tap to re-watch). Mirrors the post-pick screen.
+          (() => {
+            const votedUids = new Set(Object.values(game.votes || {}).flat());
+            const sortedPlayers = [...(game.players || [])].sort(
+              (a, b) => (b.points || 0) - (a.points || 0)
+            );
+            return (
+              <ScrollView
+                style={styles.pickedWaitWrap}
+                contentContainerStyle={styles.pickedWaitContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.yourPickSection}>
+                  <Text style={styles.yourPickLabel}>YOUR VOTE</Text>
+                  <View style={styles.yourPickCard}>
+                    {favoriteCard?.videoUrl ? (
+                      <SnappleThumbnailImg videoUrl={favoriteCard.videoUrl} />
+                    ) : null}
+                  </View>
+                  {!!favoriteCard?.creatorUsername && (
+                    <Text style={styles.yourPickCreator}>by @{favoriteCard.creatorUsername}</Text>
+                  )}
+                </View>
+
+                <Text style={styles.pickProgressText}>
+                  {votedUids.size} of {(game.players || []).length} voted
+                </Text>
+
+                <View style={styles.playerStatusList}>
+                  {sortedPlayers.map(p => {
+                    const voted = votedUids.has(p.uid);
+                    const isMe = p.uid === user.uid;
+                    return (
+                      <View key={p.uid} style={styles.playerStatusRow}>
+                        <Ionicons
+                          name={voted ? 'checkmark-circle' : 'time-outline'}
+                          size={18}
+                          color={voted ? theme.colors.vibeGreen : theme.colors.textSecondary}
+                        />
+                        <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
+                          {p.username}{isMe ? ' (you)' : ''}
+                        </Text>
+                        <Text style={styles.playerStatusScore}>{p.points || 0} pts</Text>
+                        <Text style={[styles.playerStatusLabel, voted && styles.playerStatusLabelDone]}>
+                          {voted ? 'voted' : 'voting...'}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.allSnapplesLabel}>ALL SNAPPLES</Text>
+                <View style={styles.allSnapplesGrid}>
+                  {(game.submissions || []).map((sub, i) => (
+                    <Pressable
+                      key={sub.snappleId || `sub-${i}`}
+                      style={styles.allSnapplesCard}
+                      onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
+                    >
+                      {sub.videoUrl ? <SnappleThumbnailImg videoUrl={sub.videoUrl} /> : null}
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            );
+          })()
         ) : (
           <>
             <FlatList
@@ -1921,12 +2010,14 @@ export default function GameScreen({ navigation }) {
                   <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
                     <Text style={styles.previewCancelText}>Back</Text>
                   </Pressable>
-                  <Pressable style={styles.previewPlay} onPress={() => {
-                    setFavoriteCard(previewCard);
-                    setPreviewCard(null);
-                  }}>
-                    <Text style={styles.previewPlayText}>Pick as Favorite</Text>
-                  </Pressable>
+                  {!hasVoted && (
+                    <Pressable style={styles.previewPlay} onPress={() => {
+                      setFavoriteCard(previewCard);
+                      setPreviewCard(null);
+                    }}>
+                      <Text style={styles.previewPlayText}>Pick as Favorite</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             </View>
@@ -2047,7 +2138,7 @@ const styles = StyleSheet.create({
   },
   // Lobby
   lobbyContent: {
-    flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingBottom: 80, gap: 16,
+    flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingTop: 16, paddingBottom: 80, gap: 16,
   },
   lobbyTitle: {
     color: theme.colors.vibeBlue, fontSize: 32, fontWeight: theme.fontWeights.bold,
@@ -2202,7 +2293,10 @@ const styles = StyleSheet.create({
   pickedWaitWrap: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  pickedWaitContent: {
     paddingTop: 8,
+    paddingBottom: 40,
   },
   yourPickSection: {
     alignItems: 'center',
@@ -2266,6 +2360,37 @@ const styles = StyleSheet.create({
   playerStatusLabelDone: {
     color: theme.colors.vibeGreen,
     fontWeight: 'bold',
+  },
+  playerStatusScore: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    minWidth: 50,
+    textAlign: 'right',
+  },
+  allSnapplesLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginTop: 18,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  allSnapplesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  allSnapplesCard: {
+    width: 80,
+    height: 110,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   mulliganBtnBottom: {
     flexDirection: 'row',
@@ -2629,6 +2754,7 @@ const styles = StyleSheet.create({
   voteCounter: { color: theme.colors.textSecondary, fontSize: 14 },
   // Results
   resultsContent: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  resultsScrollContent: { paddingBottom: 40 },
   resultRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
