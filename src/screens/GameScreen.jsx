@@ -464,6 +464,10 @@ export default function GameScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [mySnapples, setMySnapples] = useState([]);
   const [allSnapples, setAllSnapples] = useState([]);
+  // Mirror allSnapples in a ref so async schedulers (bot picks, retries)
+  // always see the latest pool without stale-closure problems.
+  const allSnapplesRef = useRef([]);
+  useEffect(() => { allSnapplesRef.current = allSnapples; }, [allSnapples]);
   const [useRandomCards, setUseRandomCards] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
   const [isSpectating, setIsSpectating] = useState(false);
@@ -476,27 +480,31 @@ export default function GameScreen({ navigation }) {
   const [mulliganMode, setMulliganMode] = useState(false);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
-  // Round number we last scheduled bot picks for — guards against multiple
-  // schedules per round if the phase effect re-runs.
-  const lastBotScheduleRoundRef = useRef(null);
+  // pickDeadline we last scheduled bot picks against — guards against
+  // duplicate schedules. Switched from currentRound because admin's
+  // Replace & Restart keeps the same round but stamps a new pickDeadline,
+  // so the old guard would skip rescheduling and bots would never pick
+  // again — leaving picking stuck.
+  const lastBotScheduleDeadlineRef = useRef(null);
 
   const hasDeck = mySnapples.length >= 6;
 
-  // Schedule bot picks once per round when PICKING starts — bots fire on
-  // randomized 10-15s delays so the round doesn't slam shut.
+  // Schedule bot picks once per pickDeadline when PICKING is active —
+  // bots fire on randomized 4-8s delays so the round doesn't slam shut.
   useEffect(() => {
     if (!gameId || !game) return;
     if (game.phase !== GAME_PHASES.PICKING) return;
     if (game.hostId !== user?.uid) return;
-    if (lastBotScheduleRoundRef.current === game.currentRound) return;
-    lastBotScheduleRoundRef.current = game.currentRound;
+    if (!game.pickDeadline) return;
+    if (lastBotScheduleDeadlineRef.current === game.pickDeadline) return;
+    lastBotScheduleDeadlineRef.current = game.pickDeadline;
     const botPlayers = (game.players || []).filter(p => p.uid?.startsWith('bot_'));
     botPlayers.forEach(bot => scheduleBotPick(gameId, bot.uid));
-  }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid]);
+  }, [gameId, game?.phase, game?.pickDeadline, game?.hostId, user?.uid]);
 
   // Reset the bot-schedule guard when leaving a game.
   useEffect(() => {
-    if (!gameId) lastBotScheduleRoundRef.current = null;
+    if (!gameId) lastBotScheduleDeadlineRef.current = null;
   }, [gameId]);
 
   // Incremental video prefetch — concurrent (forEach without await), so
@@ -776,15 +784,23 @@ export default function GameScreen({ navigation }) {
     return source.filter(s => !playedCardIds.includes(s.id));
   };
 
-  // Schedule a bot pick with a random 4-8s delay.
+  // Schedule a bot pick with a random 4-8s delay. Reads allSnapples via a
+  // ref so the snapshot is always current (the setTimeout closure used to
+  // capture an empty array on slow Firestore loads and silently bail,
+  // which froze picking until the user timer expired). If the pool is
+  // still empty when the delay fires, retry every 1s up to 20s.
   const scheduleBotPick = (gid, botUid) => {
     const delay = 4000 + Math.floor(Math.random() * 4000);
-    setTimeout(() => {
-      const pool = allSnapples;
-      if (!pool.length) return;
-      const botSnapple = pool[Math.floor(Math.random() * pool.length)];
-      gameService.submitPick(gid, botUid, botSnapple).catch(() => {});
-    }, delay);
+    const tryPick = (retriesLeft) => {
+      const pool = allSnapplesRef.current;
+      if (pool && pool.length) {
+        const botSnapple = pool[Math.floor(Math.random() * pool.length)];
+        gameService.submitPick(gid, botUid, botSnapple).catch(() => {});
+        return;
+      }
+      if (retriesLeft > 0) setTimeout(() => tryPick(retriesLeft - 1), 1000);
+    };
+    setTimeout(() => tryPick(20), delay);
   };
 
   const handleCreateGame = async () => {
