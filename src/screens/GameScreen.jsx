@@ -56,11 +56,27 @@ const VOTER_PALETTE = [
 function RoundResultsReveal({
   rankings, players, prompt,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare,
+  isHost, onNextRound, onShare, selfUid,
 }) {
   // earnedByUid lookup so the row can show +N this round.
   const earnedByUid = {};
   (rankings || []).forEach(r => { earnedByUid[r.uid] = r.pointsEarned || 0; });
+
+  // Per-player color — same scheme as the voting wait screen so the
+  // colored row borders match the auras the user just saw.
+  const playerColors = React.useMemo(() => {
+    const map = new Map();
+    let i = 0;
+    (players || []).forEach(p => {
+      if (p.uid === selfUid) {
+        map.set(p.uid, theme.colors.vibeGreen);
+      } else {
+        map.set(p.uid, VOTER_PALETTE[i % VOTER_PALETTE.length]);
+        i++;
+      }
+    });
+    return map;
+  }, [players, selfUid]);
 
   // Displayed points start at "before this round" total, then tick up to
   // post-round total over ~1s on mount. orderedPlayers sort uses these
@@ -123,16 +139,24 @@ function RoundResultsReveal({
           {orderedPlayers.map((p, i) => {
             const earned = earnedByUid[p.uid] || 0;
             const displayed = displayedPoints[p.uid] ?? p.points;
+            const color = playerColors.get(p.uid) || theme.colors.textSecondary;
+            const isMe = p.uid === selfUid;
             return (
               <Reanimated.View
                 key={p.uid}
                 layout={LinearTransition.springify().damping(12).stiffness(90)}
                 collapsable={false}
-                style={[styles.resultRow, i === 0 && styles.resultRowFirst]}
+                style={[
+                  styles.resultRow,
+                  i === 0 && styles.resultRowFirst,
+                  { borderLeftWidth: 5, borderLeftColor: color },
+                ]}
               >
                 <Text style={styles.resultPlacement}>#{i + 1}</Text>
                 <View style={styles.resultInfo}>
-                  <Text style={styles.resultName}>{p.username}</Text>
+                  <Text style={[styles.resultName, isMe && { color: theme.colors.vibeGreen }]}>
+                    {p.username}{isMe ? ' (you)' : ''}
+                  </Text>
                 </View>
                 <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
                   +{earned}
@@ -193,6 +217,7 @@ export default function GameScreen({ navigation }) {
   const [playedCardIds, setPlayedCardIds] = useState([]);
   // When true, tapping a card in the hand replaces it instead of previewing.
   const [mulliganMode, setMulliganMode] = useState(false);
+  const [showScoreboard, setShowScoreboard] = useState(false);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
   // pickDeadline we last scheduled bot picks against — guards against
@@ -237,13 +262,19 @@ export default function GameScreen({ navigation }) {
     lastBotVoteScheduleRoundRef.current = game.currentRound;
 
     const botPlayers = (game.players || []).filter(p => p.uid?.startsWith('bot_'));
-    const votableSubs = (game.submissions || []).filter(s => !s.uid.startsWith('bot_'));
-    if (votableSubs.length === 0) return;
+    const allSubs = game.submissions || [];
+    if (allSubs.length === 0) return;
 
     botPlayers.forEach(bot => {
+      // Each bot can vote for anyone except themselves. Previously this
+      // filtered to non-bot submissions, but in practice games the user
+      // is usually the only human — so all bots ended up voting for the
+      // same one card.
+      const eligible = allSubs.filter(s => s.uid !== bot.uid);
+      if (eligible.length === 0) return;
       const delay = 3000 + Math.floor(Math.random() * 9000);
       setTimeout(() => {
-        const target = votableSubs[Math.floor(Math.random() * votableSubs.length)];
+        const target = eligible[Math.floor(Math.random() * eligible.length)];
         gameService.castVote(gameId, bot.uid, target.uid).catch(() => {});
       }, delay);
     });
@@ -1167,31 +1198,45 @@ export default function GameScreen({ navigation }) {
                   ))}
                 </View>
 
-                <Text style={styles.pickProgressText}>
-                  {votedUids.size} of {(game.players || []).length} voted
-                </Text>
+                {/* Scoreboard button — opens a modal with the full
+                    standings + per-player colors. Replaces the inline
+                    list so the wait screen stays focused on the auras. */}
+                <Pressable
+                  style={styles.scoreboardBtn}
+                  onPress={() => setShowScoreboard(true)}
+                >
+                  <Ionicons name="trophy" size={16} color={theme.colors.vibeBlue} />
+                  <Text style={styles.scoreboardBtnText}>Scoreboard</Text>
+                </Pressable>
 
-                <View style={styles.playerStatusList}>
-                  {sortedPlayers.map(p => {
-                    const voted = votedUids.has(p.uid);
-                    const isMe = p.uid === user.uid;
+                {/* Waiting-on row at the bottom — compact, lists the
+                    names of players still voting in their colors. */}
+                <View style={styles.waitingOnRow}>
+                  <Text style={styles.waitingOnLabel}>
+                    {votedUids.size} of {(game.players || []).length} voted
+                  </Text>
+                  {(() => {
+                    const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
+                    if (pending.length === 0) {
+                      return <Text style={styles.waitingOnAllIn}>All votes in!</Text>;
+                    }
                     return (
-                      <View key={p.uid} style={styles.playerStatusRow}>
-                        <Ionicons
-                          name={voted ? 'checkmark-circle' : 'time-outline'}
-                          size={18}
-                          color={voted ? theme.colors.vibeGreen : theme.colors.textSecondary}
-                        />
-                        <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
-                          {p.username}{isMe ? ' (you)' : ''}
-                        </Text>
-                        <Text style={styles.playerStatusScore}>{p.points || 0} pts</Text>
-                        <Text style={[styles.playerStatusLabel, voted && styles.playerStatusLabelDone]}>
-                          {voted ? 'voted' : 'voting...'}
-                        </Text>
+                      <View style={styles.waitingOnNames}>
+                        <Text style={styles.waitingOnPrefix}>Waiting on </Text>
+                        {pending.map((p, idx) => (
+                          <Text
+                            key={p.uid}
+                            style={[
+                              styles.waitingOnName,
+                              { color: playerColors.get(p.uid) || theme.colors.textSecondary },
+                            ]}
+                          >
+                            {p.username}{idx < pending.length - 1 ? ', ' : ''}
+                          </Text>
+                        ))}
                       </View>
                     );
-                  })}
+                  })()}
                 </View>
               </ScrollView>
             );
@@ -1255,6 +1300,58 @@ export default function GameScreen({ navigation }) {
             </View>
           </Modal>
         )}
+
+        {/* Scoreboard modal — opens from the wait-screen Scoreboard
+            button. Shows the current standings sorted by score, with a
+            colored left-bar matching each player's vote color. Voted
+            status shows a checkmark. */}
+        {showScoreboard && (() => {
+          const votedUidsSb = new Set(Object.values(game.votes || {}).flat());
+          const scoreboardPlayers = [...(game.players || [])].sort(
+            (a, b) => (b.points || 0) - (a.points || 0)
+          );
+          const colorsSb = new Map();
+          let pi = 0;
+          (game.players || []).forEach(p => {
+            if (p.uid === user?.uid) {
+              colorsSb.set(p.uid, theme.colors.vibeGreen);
+            } else {
+              colorsSb.set(p.uid, VOTER_PALETTE[pi % VOTER_PALETTE.length]);
+              pi++;
+            }
+          });
+          return (
+            <Modal visible transparent animationType="fade" onRequestClose={() => setShowScoreboard(false)}>
+              <Pressable style={styles.scoreboardOverlay} onPress={() => setShowScoreboard(false)}>
+                <Pressable style={styles.scoreboardCard} onPress={() => {}}>
+                  <Text style={styles.scoreboardTitle}>SCOREBOARD</Text>
+                  {scoreboardPlayers.map((p, i) => {
+                    const color = colorsSb.get(p.uid) || theme.colors.textSecondary;
+                    const voted = votedUidsSb.has(p.uid);
+                    const isMe = p.uid === user?.uid;
+                    return (
+                      <View key={p.uid} style={[styles.scoreboardRow, { borderLeftColor: color }]}>
+                        <Text style={styles.scoreboardPlace}>#{i + 1}</Text>
+                        <Text style={[styles.scoreboardName, isMe && { color: theme.colors.vibeGreen }]} numberOfLines={1}>
+                          {p.username}{isMe ? ' (you)' : ''}
+                        </Text>
+                        <Text style={styles.scoreboardPts}>{p.points || 0} pts</Text>
+                        <Ionicons
+                          name={voted ? 'checkmark-circle' : 'time-outline'}
+                          size={16}
+                          color={voted ? theme.colors.vibeGreen : theme.colors.textSecondary}
+                        />
+                      </View>
+                    );
+                  })}
+                  <Pressable style={styles.scoreboardClose} onPress={() => setShowScoreboard(false)}>
+                    <Text style={styles.scoreboardCloseText}>Close</Text>
+                  </Pressable>
+                </Pressable>
+              </Pressable>
+            </Modal>
+          );
+        })()}
       </LinearGradient>
     );
   }
@@ -1285,6 +1382,7 @@ export default function GameScreen({ navigation }) {
         totalRounds={game.totalRounds}
         timer={timer}
         isHost={isHost}
+        selfUid={user?.uid}
         onNextRound={handleNextRound}
         onShare={handleShareRound}
       />
@@ -1541,6 +1639,126 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     minWidth: 50,
     textAlign: 'right',
+  },
+  // Scoreboard button — small pill on the voting wait screen that opens
+  // the full standings modal.
+  scoreboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,198,255,0.1)',
+  },
+  scoreboardBtnText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 13,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  // "Waiting on …" row at the bottom of the voting wait screen.
+  waitingOnRow: {
+    marginTop: 16,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  waitingOnLabel: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  waitingOnAllIn: {
+    color: theme.colors.vibeGreen,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  waitingOnNames: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  waitingOnPrefix: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+  },
+  waitingOnName: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  // Scoreboard modal
+  scoreboardOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  scoreboardCard: {
+    width: '100%',
+    backgroundColor: '#0A1A2A',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    padding: 20,
+  },
+  scoreboardTitle: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    letterSpacing: 2,
+    marginBottom: 14,
+  },
+  scoreboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderLeftWidth: 5,
+    marginBottom: 6,
+  },
+  scoreboardPlace: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    width: 28,
+  },
+  scoreboardName: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  scoreboardPts: {
+    color: theme.colors.vibeBlue,
+    fontSize: 13,
+    fontWeight: 'bold',
+    minWidth: 50,
+    textAlign: 'right',
+  },
+  scoreboardClose: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  scoreboardCloseText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
   allSnapplesLabel: {
     color: theme.colors.vibeBlue,

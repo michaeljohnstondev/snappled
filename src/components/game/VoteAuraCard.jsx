@@ -5,7 +5,7 @@
 // ramps up as more people pile on.
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
+import { View, Pressable, Animated, StyleSheet } from 'react-native';
 import SnappleThumbnailImg from '../ui/SnappleThumbnail';
 import theme from '../../theme/themes';
 
@@ -85,25 +85,6 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, onPr
         )}
       </View>
 
-      {/* Voter chips — colored-border name pills. Compact so a 3-vote card
-          still fits in the grid row. */}
-      {hasVoters && (
-        <View style={styles.chipRow}>
-          {voters.map((v, i) => (
-            <View
-              key={`${v.uid}-${i}`}
-              style={[styles.chip, { borderColor: v.color }]}
-            >
-              <Text
-                style={[styles.chipText, v.isMe && styles.chipTextMe]}
-                numberOfLines={1}
-              >
-                {v.name}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
     </Pressable>
   );
 });
@@ -160,29 +141,5 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 3,
-    marginTop: 4,
-    width: 100,
-  },
-  chip: {
-    borderWidth: 2,
-    borderRadius: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  chipText: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: 'bold',
-    maxWidth: 50,
-  },
-  chipTextMe: {
-    color: theme.colors.vibeGreen,
   },
 });
