@@ -72,16 +72,32 @@ function MainTabs() {
   );
 }
 
+// Top-level error boundary — surfaces the actual error message + first lines
+// of the component stack on the screen so we can diagnose crashes without
+// needing to wire up remote logging.
 class ErrorBoundary extends React.Component {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error, info) { console.error('[ErrorBoundary]', error, info); }
+  state = { hasError: false, error: null, info: null };
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) {
+    console.error('[ErrorBoundary]', error, info);
+    this.setState({ info });
+  }
   render() {
     if (this.state.hasError) {
+      const msg = this.state.error?.message || String(this.state.error || 'Unknown error');
+      const stack = (this.state.error?.stack || '').split('\n').slice(0, 6).join('\n');
+      const compStack = (this.state.info?.componentStack || '').split('\n').slice(0, 6).join('\n');
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#001020' }}>
-          <Text style={{ color: '#00C6FF', fontSize: 16, marginBottom: 16 }}>Something went wrong</Text>
-          <Text style={{ color: '#778DA9', fontSize: 14 }} onPress={() => this.setState({ hasError: false })}>
+        <View style={{ flex: 1, padding: 16, justifyContent: 'center', backgroundColor: '#001020' }}>
+          <Text style={{ color: '#00C6FF', fontSize: 16, marginBottom: 12, textAlign: 'center' }}>Something went wrong</Text>
+          <Text selectable style={{ color: '#FF4D6D', fontSize: 12, marginBottom: 10 }}>{msg}</Text>
+          {!!stack && (
+            <Text selectable style={{ color: '#778DA9', fontSize: 10, marginBottom: 10 }}>{stack}</Text>
+          )}
+          {!!compStack && (
+            <Text selectable style={{ color: '#778DA9', fontSize: 10, marginBottom: 12 }}>{compStack}</Text>
+          )}
+          <Text style={{ color: '#00C6FF', fontSize: 14, textAlign: 'center' }} onPress={() => this.setState({ hasError: false, error: null, info: null })}>
             Tap to retry
           </Text>
         </View>
