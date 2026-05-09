@@ -1,376 +1,29 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList, Dimensions,
-  ActivityIndicator, Animated, PanResponder, Modal, TextInput, ScrollView,
+  ActivityIndicator, Animated, Modal, TextInput, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
-import { prefetchVideo, useCachedVideoUri } from '../services/videoCache';
+import { prefetchVideo } from '../services/videoCache';
 import { gameService, GAME_PHASES } from '../services/gameService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
 import VibeButton from '../components/ui/VibeButton';
 import AppLayout from '../components/ui/layout/AppLayout';
+import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
+import PreviewPlayer from '../components/game/PreviewPlayer';
+import VoteAuraCard from '../components/game/VoteAuraCard';
+import CreatorActionRow from '../components/game/CreatorActionRow';
+import WinnerSpotlightCard from '../components/game/WinnerSpotlightCard';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-// ── Thumbnail for hand cards (with delayed mount) ──
-// React.memo'd so the warmup grid doesn't re-mount its players on every
-// 1-second timer tick — same hand should keep its loaded thumbnails.
-const CardThumbnailDelayed = React.memo(function CardThumbnailDelayed({ videoUrl, delay = 0 }) {
-  const [mounted, setMounted] = useState(delay === 0);
-
-  useEffect(() => {
-    if (delay > 0) {
-      const t = setTimeout(() => setMounted(true), delay);
-      return () => clearTimeout(t);
-    }
-  }, []);
-
-  if (!mounted) {
-    return (
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,198,255,0.05)', justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="small" color={theme.colors.vibeBlue} />
-      </View>
-    );
-  }
-
-  return <CardThumbnail videoUrl={videoUrl} />;
-});
-
-const CardThumbnail = React.memo(function CardThumbnail({ videoUrl }) {
-  const cachedUri = useCachedVideoUri(videoUrl);
-  const player = useVideoPlayer(cachedUri, (p) => {
-    p.loop = false;
-    p.muted = true;
-    p.pause();
-  });
-  return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="cover"
-      fullscreenOptions={{ enabled: false }}
-      showsPlaybackControls={false}
-      nativeControls={false}
-    />
-  );
-});
-
-// ── Preview player for hand cards ──
-function PreviewPlayer({ videoUrl, muted = false }) {
-  const cachedUri = useCachedVideoUri(videoUrl);
-  const player = useVideoPlayer(cachedUri, (p) => {
-    p.loop = true;
-    p.muted = muted;
-    p.play();
-  });
-  return (
-    <VideoView
-      player={player}
-      style={StyleSheet.absoluteFill}
-      contentFit="cover"
-      fullscreenOptions={{ enabled: false }}
-      showsPlaybackControls={false}
-      nativeControls={false}
-    />
-  );
-}
-
-// ── Swipeable video card ──
-function SwipeCard({ submission, onSwipeRight, onSwipeLeft, onBuy, onReport, onProfilePress }) {
-  const [paused, setPaused] = useState(false);
-  const player = useVideoPlayer(submission.videoUrl, (p) => {
-    p.loop = true;
-    p.muted = !!submission.muted;
-    p.play();
-  });
-
-  const pan = useRef(new Animated.ValueXY()).current;
-
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, g) => {
-      pan.x.setValue(g.dx);
-    },
-    onPanResponderRelease: (_, g) => {
-      if (Math.abs(g.dx) < 5 && Math.abs(g.dy) < 5) {
-        // Tap — toggle pause
-        if (paused) { player.play(); setPaused(false); }
-        else { player.pause(); setPaused(true); }
-        return;
-      }
-      if (g.dx > 50 || (g.dx > 20 && g.vx > 0.5)) {
-        Animated.timing(pan.x, { toValue: screenWidth, duration: 200, useNativeDriver: false })
-          .start(() => {
-            onSwipeRight();
-            pan.setValue({ x: 0, y: 0 });
-          });
-      } else if (g.dx < -50 || (g.dx < -20 && g.vx < -0.5)) {
-        Animated.timing(pan.x, { toValue: -screenWidth, duration: 200, useNativeDriver: false })
-          .start(() => {
-            onSwipeLeft();
-            pan.setValue({ x: 0, y: 0 });
-          });
-      } else {
-        Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
-      }
-    },
-  })).current;
-
-  const rotate = pan.x.interpolate({
-    inputRange: [-screenWidth, 0, screenWidth],
-    outputRange: ['-15deg', '0deg', '15deg'],
-  });
-
-  return (
-    <Animated.View
-      {...panResponder.panHandlers}
-
-      style={[
-        styles.swipeCard,
-        { transform: [{ translateX: pan.x }, { rotate }] },
-      ]}
-    >
-      <View pointerEvents="none" style={styles.swipeVideo}>
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          fullscreenOptions={{ enabled: false }}
-          showsPlaybackControls={false}
-          nativeControls={false}
-        />
-        {paused && (
-          <View style={styles.pausedOverlay}>
-            <Ionicons name="play" size={40} color="white" />
-          </View>
-        )}
-      </View>
-      {/* Labels */}
-      <Animated.View style={[styles.swipeLabel, styles.swipeLabelRight, {
-        opacity: pan.x.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' }),
-      }]}>
-        <Text style={styles.swipeLabelText}>VOTE</Text>
-      </Animated.View>
-      <Animated.View style={[styles.swipeLabel, styles.swipeLabelLeft, {
-        opacity: pan.x.interpolate({ inputRange: [-80, 0], outputRange: [1, 0], extrapolate: 'clamp' }),
-      }]}>
-        <Text style={styles.swipeLabelText}>SKIP</Text>
-      </Animated.View>
-
-      {/* Bottom info */}
-      <View style={styles.swipeInfo}>
-        <Pressable onPress={() => onProfilePress?.(submission.uid)}>
-          <Text style={styles.swipeCreator}>@{submission.creatorUsername}</Text>
-        </Pressable>
-        <View style={styles.swipeActions}>
-          {onBuy && (
-            <Pressable style={styles.swipeBuyBtn} onPress={() => onBuy(submission)}>
-              <Ionicons name="diamond" size={14} color={theme.colors.vibeBlue} />
-              <Text style={styles.swipeBuyText}>Buy</Text>
-            </Pressable>
-          )}
-          {onReport && (
-            <Pressable style={styles.swipeReportBtn} onPress={() => onReport(submission)}>
-              <Ionicons name="flag" size={14} color={theme.colors.textSecondary} />
-            </Pressable>
-          )}
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ── Creator action row for preview modals ──
-// Shows the snapple's creator and instant follow/wishlist/buy buttons. Skips
-// the action row entirely for the user's own snapples since those don't make
-// sense as targets.
-function CreatorActionRow({ submission, currentUser, ownedSnappleIds, showToast, showError }) {
-  const snappleId = submission?.snappleId || submission?.id;
-  const creatorId = submission?.creatorId;
-  const isMine = creatorId && creatorId === currentUser?.uid;
-
-  const [following, setFollowing] = useState(false);
-  const [wishlisted, setWishlisted] = useState(false);
-  const [owned, setOwned] = useState(!!snappleId && (ownedSnappleIds || []).includes(snappleId));
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!currentUser?.uid || !creatorId || isMine) return;
-    userService.isFollowing(currentUser.uid, creatorId)
-      .then(setFollowing)
-      .catch(() => {});
-  }, [currentUser?.uid, creatorId, isMine]);
-
-  const handleFollow = async () => {
-    if (busy || !creatorId || isMine) return;
-    setBusy(true);
-    try {
-      const r = await userService.toggleFollow(currentUser.uid, creatorId);
-      if (r.success) setFollowing(r.isFollowing);
-    } finally { setBusy(false); }
-  };
-
-  const handleWishlist = async () => {
-    if (busy || !snappleId || isMine) return;
-    setBusy(true);
-    try {
-      if (wishlisted) {
-        await snappleService.removeFromWishlist(snappleId, currentUser.uid);
-        setWishlisted(false);
-      } else {
-        await snappleService.addToWishlist(snappleId, currentUser.uid);
-        setWishlisted(true);
-        showToast?.('reward', 'Added to Wishlist', `@${submission?.creatorUsername || ''}`);
-      }
-    } finally { setBusy(false); }
-  };
-
-  const handleBuy = async () => {
-    if (busy || !snappleId || isMine || owned) return;
-    setBusy(true);
-    try {
-      const r = await snappleService.purchaseSnapple(snappleId, currentUser.uid);
-      if (r?.success) {
-        setOwned(true);
-        showToast?.('reward', 'Purchased!', `Snapple added to your collection`);
-      } else {
-        showError?.('Purchase Failed', r?.error || 'Something went wrong');
-      }
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <View style={creatorRowStyles.wrap}>
-      <Text style={creatorRowStyles.creator} numberOfLines={1}>
-        by @{submission?.creatorUsername || 'anonymous'}
-      </Text>
-      {!isMine && creatorId && (
-        <View style={creatorRowStyles.actions}>
-          <Pressable
-            style={[creatorRowStyles.btn, following && creatorRowStyles.btnActive]}
-            onPress={handleFollow}
-            disabled={busy}
-          >
-            <Ionicons
-              name={following ? 'person' : 'person-add'}
-              size={13}
-              color={following ? theme.colors.vibeBlue : 'white'}
-            />
-          </Pressable>
-          <Pressable
-            style={[creatorRowStyles.btn, wishlisted && creatorRowStyles.btnActive]}
-            onPress={handleWishlist}
-            disabled={busy}
-          >
-            <Ionicons
-              name={wishlisted ? 'heart' : 'heart-outline'}
-              size={13}
-              color={wishlisted ? theme.colors.vibeRed : 'white'}
-            />
-          </Pressable>
-          <Pressable
-            style={[creatorRowStyles.btn, owned && creatorRowStyles.btnActive, { paddingHorizontal: 10 }]}
-            onPress={handleBuy}
-            disabled={busy || owned}
-          >
-            <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
-            <Text style={creatorRowStyles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
-}
-
-const creatorRowStyles = StyleSheet.create({
-  wrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  creator: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    flexShrink: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  btnActive: {
-    borderColor: theme.colors.vibeBlue,
-    backgroundColor: 'rgba(0,198,255,0.12)',
-  },
-  btnText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-});
-
-// Spotlight card for a winner — plays the snapple video on loop. Each winner
-// has its own animated values so multi-winner ties can shrink to their own
-// scoreboard rows independently. Layout is flex-row inside spotlightOverlay,
-// so ties land side-by-side automatically; we only animate scale/opacity/Y.
-function WinnerSpotlightCard({ submission, player, isTie, anim, voters }) {
-  return (
-    <Animated.View
-      style={[
-        styles.spotlightCard,
-        {
-          opacity: anim.opacity,
-          transform: [
-            { translateY: anim.translateY },
-            { scale: anim.scale },
-          ],
-        },
-      ]}
-    >
-      <View style={StyleSheet.absoluteFill}>
-        <PreviewPlayer videoUrl={submission?.videoUrl} muted={!!submission?.muted} />
-      </View>
-      <View style={styles.spotlightLabel}>
-        <Text style={styles.spotlightWinnerLabel}>{isTie ? 'TIE' : 'WINNER'}</Text>
-        <Text style={styles.spotlightPlayer}>{player?.username || '?'}</Text>
-        {submission?.creatorUsername && submission.creatorUsername !== player?.username && (
-          <Text style={styles.spotlightCreator}>by @{submission.creatorUsername}</Text>
-        )}
-        {voters && voters.length > 0 && (
-          <Text style={styles.spotlightVoters} numberOfLines={1}>
-            voted by {voters.join(', ')}
-          </Text>
-        )}
-      </View>
-    </Animated.View>
-  );
-}
 
 // ── Round results reveal — staged animation: grid → spotlight → shrink → scoreboard ──
 // Layout: scoreboard is the base layer (always rendered) so we can measure
@@ -453,28 +106,60 @@ function RoundResultsReveal({
     }
   };
 
-  // Card wobble loop — held still for the first ~1.8s of the reveal so
-  // players can scan all cards quietly, then jiggles to build tension into
-  // the spotlight (which fires at 2.8s). User asked for the delay so the
-  // initial entry doesn't feel chaotic.
+  // Random card wobble — instead of every card jiggling in sync, one
+  // random card wobbles, pause ~3-5s, then a different one. Feels alive
+  // without being chaotic. Initial 1.8s delay keeps the first beat calm.
+  const [wobbleIdx, setWobbleIdx] = useState(null);
   useEffect(() => {
     if (stage !== 'reveal') return;
-    let loop;
-    const delay = setTimeout(() => {
-      loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(wobble, { toValue: 1, duration: 220, useNativeDriver: true }),
-          Animated.timing(wobble, { toValue: -1, duration: 440, useNativeDriver: true }),
-          Animated.timing(wobble, { toValue: 0, duration: 220, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-    }, 1800);
-    return () => {
-      clearTimeout(delay);
-      if (loop) loop.stop();
+    let timeoutId;
+    const trigger = () => {
+      const len = (submissions || []).length;
+      if (len === 0) {
+        timeoutId = setTimeout(trigger, 2000);
+        return;
+      }
+      const idx = Math.floor(Math.random() * len);
+      setWobbleIdx(idx);
+      Animated.sequence([
+        Animated.timing(wobble, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.timing(wobble, { toValue: -1, duration: 440, useNativeDriver: true }),
+        Animated.timing(wobble, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(() => {
+        setWobbleIdx(null);
+        timeoutId = setTimeout(trigger, 3000 + Math.random() * 2000);
+      });
     };
-  }, [stage]);
+    timeoutId = setTimeout(trigger, 1800);
+    return () => clearTimeout(timeoutId);
+  }, [stage, submissions?.length]);
+
+  // Random card pulse — same idea but on a different cadence and offset
+  // so the wobble + pulse never fire simultaneously on the same beat.
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const [pulseIdx, setPulseIdx] = useState(null);
+  useEffect(() => {
+    if (stage !== 'reveal') return;
+    let timeoutId;
+    const trigger = () => {
+      const len = (submissions || []).length;
+      if (len === 0) {
+        timeoutId = setTimeout(trigger, 2000);
+        return;
+      }
+      const idx = Math.floor(Math.random() * len);
+      setPulseIdx(idx);
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 320, useNativeDriver: true }),
+      ]).start(() => {
+        setPulseIdx(null);
+        timeoutId = setTimeout(trigger, 4000 + Math.random() * 2500);
+      });
+    };
+    timeoutId = setTimeout(trigger, 2600);
+    return () => clearTimeout(timeoutId);
+  }, [stage, submissions?.length]);
 
   // Refs so we can clear timers if the user taps the spotlight to skip ahead.
   const t2Ref = useRef(null);
@@ -503,7 +188,11 @@ function RoundResultsReveal({
         Animated.timing(a.opacity, { toValue: 0, duration: dur, useNativeDriver: true }),
       );
     });
-    Animated.parallel(anims).start();
+    try {
+      Animated.parallel(anims).start();
+    } catch (e) {
+      console.error('[RoundResults] runShrinkAnims failed:', e);
+    }
   };
 
   // Tap on the spotlight area → skip ahead to scoreboard, faster shrink.
@@ -533,14 +222,22 @@ function RoundResultsReveal({
           Animated.timing(a.opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         );
       });
-      Animated.parallel(anims).start();
+      try {
+        Animated.parallel(anims).start();
+      } catch (e) {
+        console.error('[RoundResults] spotlight anim failed:', e);
+      }
     }, 2800);
 
     t2Ref.current = setTimeout(() => {
       setStage('shrink');
       runShrinkAnims(false);
     }, 11800);
-    t3Ref.current = setTimeout(() => setStage('scoreboard'), 12600);
+    // Bumped from 12600 to 13000 so the shrink animation has a small buffer
+    // to fully settle before the overlay (and its video players) unmount —
+    // simultaneous unmount of multiple expo-video instances on tie reveal
+    // was a suspect in the crash.
+    t3Ref.current = setTimeout(() => setStage('scoreboard'), 13000);
     return () => {
       clearTimeout(t1);
       if (t2Ref.current) clearTimeout(t2Ref.current);
@@ -658,21 +355,29 @@ function RoundResultsReveal({
             scrollEnabled={false}
             pointerEvents="none"
             renderItem={({ item, index }) => {
-              // Per-card rotation magnitude — gives the wobble varied energy
-              // so the grid doesn't look mechanically synced.
-              const wobbleMag = ((index * 7) % 5) + 2;
+              // Only the wobble-target card rotates; only the pulse-target
+              // card scales. Everyone else sits still, so the grid feels
+              // alive but not seizure-inducing.
+              const wobbleMag = ((index * 7) % 5) + 4;
               const cardRotate = wobble.interpolate({
                 inputRange: [-1, 0, 1],
                 outputRange: [`-${wobbleMag}deg`, '0deg', `${wobbleMag}deg`],
               });
+              const cardPulse = pulseAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 1.12],
+              });
               const inReveal = stage === 'reveal';
+              const isWobbleTarget = inReveal && wobbleIdx === index;
+              const isPulseTarget = inReveal && pulseIdx === index;
               return (
                 <Animated.View
                   style={{
                     opacity: losersOpacity,
                     transform: [
                       { scale: losersScale },
-                      ...(inReveal ? [{ rotate: cardRotate }] : []),
+                      ...(isWobbleTarget ? [{ rotate: cardRotate }] : []),
+                      ...(isPulseTarget ? [{ scale: cardPulse }] : []),
                     ],
                   }}
                 >
@@ -918,7 +623,9 @@ export default function GameScreen({ navigation }) {
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
-            // Auto-pick random if they haven't voted
+            // Auto-pick random if they haven't voted. The all-voted
+            // detection in subscribeToGame handles the eventual finishRound
+            // after a 10s wait — no need to fire it here too.
             if (!hasVoted) {
               const votable = game.submissions.filter(s => s.uid !== user.uid);
               if (votable.length > 0) {
@@ -926,18 +633,15 @@ export default function GameScreen({ navigation }) {
                 setFavoriteCard(random);
                 gameService.castVote(gameId, user.uid, random.uid);
                 setHasVoted(true);
-                if (game.hostId === user.uid) {
-                  if (isPractice) {
-                    const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-                    const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
-                    botPlayers.forEach(bot => {
-                      if (nonBotSubmissions.length > 0) {
-                        const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
-                        gameService.castVote(gameId, bot.uid, randomSub.uid);
-                      }
-                    });
-                  }
-                  setTimeout(() => gameService.finishRound(gameId), 500);
+                if (game.hostId === user.uid && isPractice) {
+                  const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
+                  const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
+                  botPlayers.forEach(bot => {
+                    if (nonBotSubmissions.length > 0) {
+                      const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
+                      gameService.castVote(gameId, bot.uid, randomSub.uid);
+                    }
+                  });
                 }
               }
             }
@@ -948,10 +652,10 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.ROUND_RESULTS) {
-      // Reveal animation runs ~12.6s, then user gets ~20 seconds with the
-      // scoreboard before host auto-advances. Bumped from 10s on user
-      // request — tied placements + score swaps need time to read.
-      setTimer(32);
+      // Reveal animation runs ~12.6s, then user gets ~25 seconds with the
+      // scoreboard before host auto-advances. Bumped per user request to
+      // give breathing room for ties + score swap animations.
+      setTimer(37);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
@@ -972,6 +676,11 @@ export default function GameScreen({ navigation }) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [game?.phase, game?.currentRound]);
 
+  // Tracks whether finishRound has been scheduled this voting round so the
+  // host doesn't double-fire the transition when multiple game-doc updates
+  // come in during the 10s countdown.
+  const finishScheduledRoundRef = useRef(null);
+
   // Subscribe to game updates
   useEffect(() => {
     if (gameId) {
@@ -985,6 +694,26 @@ export default function GameScreen({ navigation }) {
           );
           if (allSubmitted && gameData.hostId === user?.uid) {
             gameService.startVoting(gameId);
+          }
+        }
+
+        // Auto-advance: when all players have voted, host schedules
+        // finishRound after 10s — gives everyone a beat to watch the
+        // aura-pulse wait screen instead of jumping straight to results.
+        if (gameData.phase === GAME_PHASES.VOTING && gameData.hostId === user?.uid) {
+          const votedUids = new Set(Object.values(gameData.votes || {}).flat());
+          const allVoted = (gameData.players || []).every(p => votedUids.has(p.uid));
+          if (allVoted && finishScheduledRoundRef.current !== gameData.currentRound) {
+            finishScheduledRoundRef.current = gameData.currentRound;
+            setTimeout(() => gameService.finishRound(gameId), 10000);
+          }
+        }
+
+        // Reset the guard once the round results phase clears so the next
+        // round's vote-complete detection fires fresh.
+        if (gameData.phase !== GAME_PHASES.VOTING) {
+          if (finishScheduledRoundRef.current && finishScheduledRoundRef.current !== gameData.currentRound) {
+            finishScheduledRoundRef.current = null;
           }
         }
       });
@@ -1163,19 +892,17 @@ export default function GameScreen({ navigation }) {
     }
     setHasVoted(true);
 
-    // If host, handle bot votes and finish round
-    if (game.hostId === user.uid) {
-      if (isPractice) {
-        const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
-        const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
-        botPlayers.forEach(bot => {
-          if (nonBotSubmissions.length > 0) {
-            const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
-            gameService.castVote(gameId, bot.uid, randomSub.uid);
-          }
-        });
-      }
-      setTimeout(() => gameService.finishRound(gameId), isPractice ? 500 : 0);
+    // If host in practice, kick bot votes too. The actual finishRound is
+    // scheduled in subscribeToGame once all-voted is detected (10s after).
+    if (game.hostId === user.uid && isPractice) {
+      const botPlayers = (game?.players || []).filter(p => p.uid?.startsWith('bot_'));
+      const nonBotSubmissions = game.submissions.filter(s => !s.uid.startsWith('bot_'));
+      botPlayers.forEach(bot => {
+        if (nonBotSubmissions.length > 0) {
+          const randomSub = nonBotSubmissions[Math.floor(Math.random() * nonBotSubmissions.length)];
+          gameService.castVote(gameId, bot.uid, randomSub.uid);
+        }
+      });
     }
   };
 
@@ -1951,15 +1678,17 @@ export default function GameScreen({ navigation }) {
 
                 <Text style={styles.allSnapplesLabel}>ALL SNAPPLES</Text>
                 <View style={styles.allSnapplesGrid}>
-                  {(game.submissions || []).map((sub, i) => (
-                    <Pressable
-                      key={sub.snappleId || `sub-${i}`}
-                      style={styles.allSnapplesCard}
-                      onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
-                    >
-                      {sub.videoUrl ? <SnappleThumbnailImg videoUrl={sub.videoUrl} /> : null}
-                    </Pressable>
-                  ))}
+                  {(game.submissions || []).map((sub, i) => {
+                    const auraCount = (game.votes?.[sub.uid] || []).length;
+                    return (
+                      <VoteAuraCard
+                        key={sub.snappleId || `sub-${i}`}
+                        submission={sub}
+                        voteCount={auraCount}
+                        onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
+                      />
+                    );
+                  })}
                 </View>
               </ScrollView>
             );
@@ -2383,15 +2112,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  allSnapplesCard: {
-    width: 80,
-    height: 110,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
   mulliganBtnBottom: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2463,51 +2183,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-  },
-  spotlightCard: {
-    width: 150,
-    aspectRatio: 9 / 16,
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: theme.colors.vibeBlue,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    shadowColor: theme.colors.vibeBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 24,
-    elevation: 16,
-  },
-  spotlightLabel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    alignItems: 'center',
-  },
-  spotlightWinnerLabel: {
-    color: theme.colors.vibeBlue,
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 1.5,
-  },
-  spotlightPlayer: {
-    color: 'white',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  spotlightCreator: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
-  },
-  spotlightVoters: {
-    color: theme.colors.vibeBlue,
-    fontSize: 9,
-    marginTop: 3,
-    fontStyle: 'italic',
   },
   voterLabel: {
     color: theme.colors.textSecondary,
@@ -2647,63 +2322,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-  },
-  // Voting
-  swipeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  swipeCard: {
-    width: screenWidth - 48, height: screenHeight * 0.55, borderRadius: 16, overflow: 'hidden',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue, backgroundColor: '#000',
-  },
-  swipeVideo: { flex: 1 },
-  swipeLabel: {
-    position: 'absolute', top: 24, paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 8, borderWidth: 3,
-  },
-  swipeLabelRight: {
-    right: 16, borderColor: theme.colors.vibeGreen, backgroundColor: 'rgba(0,255,65,0.2)',
-  },
-  swipeLabelLeft: {
-    left: 16, borderColor: theme.colors.vibeRed, backgroundColor: 'rgba(255,68,68,0.2)',
-  },
-  swipeLabelText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  swipeInfo: {
-    position: 'absolute', bottom: 16, left: 16, right: 16,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  swipeCreator: {
-    color: 'white', fontSize: 14, fontWeight: 'bold',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  pausedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  swipeActions: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-  },
-  swipeBuyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 12, borderWidth: 1, borderColor: theme.colors.vibeBlue,
-  },
-  swipeBuyText: {
-    color: theme.colors.vibeBlue, fontSize: 12, fontWeight: 'bold',
-  },
-  swipeReportBtn: {
-    backgroundColor: 'rgba(0,0,0,0.5)', padding: 6,
-    borderRadius: 12,
-  },
-  replayOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  replayButton: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: theme.colors.vibeBlue,
   },
   // Card preview modal
   previewOverlay: {
