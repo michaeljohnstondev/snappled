@@ -19,7 +19,9 @@ export default function LobbyPhase({
   onLeave,
   onAddBot,
   onStartGame,
+  onSetRounds,
 }) {
+  const totalRounds = game?.totalRounds ?? 5;
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
@@ -52,6 +54,33 @@ export default function LobbyPhase({
             </View>
           ))}
         </View>
+
+        {/* Rounds picker — host-only. ∞ stores totalRounds=0 (host
+            ends manually from the round-results scoreboard). Visible to
+            everyone, but only the host can change it. */}
+        {isHost && (
+          <View style={styles.roundsPicker}>
+            <Text style={styles.roundsLabel}>ROUNDS</Text>
+            <View style={styles.roundsOptions}>
+              {[5, 10, 25, 0].map(n => (
+                <Pressable
+                  key={n}
+                  style={[styles.roundsOption, totalRounds === n && styles.roundsOptionActive]}
+                  onPress={() => onSetRounds?.(n)}
+                >
+                  <Text style={[styles.roundsOptionText, totalRounds === n && styles.roundsOptionTextActive]}>
+                    {n === 0 ? '∞' : n}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+        {!isHost && (
+          <Text style={styles.roundsReadonly}>
+            {totalRounds === 0 ? 'Game ends when host calls it' : `${totalRounds} rounds`}
+          </Text>
+        )}
 
         {isHost && (
           <View style={styles.buttons}>
@@ -145,4 +174,46 @@ const styles = StyleSheet.create({
   buttons: { width: '100%', gap: 12, marginTop: 16 },
   waiting: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   gameCode: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 16 },
+  roundsPicker: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  roundsLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  roundsOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  roundsOption: {
+    width: 40,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+  },
+  roundsOptionActive: {
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,198,255,0.12)',
+  },
+  roundsOptionText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  roundsOptionTextActive: {
+    color: theme.colors.vibeBlue,
+  },
+  roundsReadonly: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    marginTop: 16,
+    fontStyle: 'italic',
+  },
 });

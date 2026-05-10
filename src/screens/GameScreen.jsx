@@ -1082,7 +1082,6 @@ export default function GameScreen({ navigation }) {
         <View style={styles.lobbyContent}>
           <Ionicons name="game-controller" size={64} color={theme.colors.vibeBlue} />
           <Text style={styles.lobbyTitle}>Snappled</Text>
-          <Text style={styles.lobbySubtitle}>Pick your best snapple for each prompt. Swipe to vote!</Text>
 
           {/* Deck choice */}
           {hasDeck && (
@@ -1101,31 +1100,6 @@ export default function GameScreen({ navigation }) {
               </Pressable>
             </View>
           )}
-
-          {/* Rounds picker — applies to practice + custom games. ∞ stores
-              totalRounds=0 (host ends manually from the scoreboard). */}
-          <View style={styles.roundsPicker}>
-            <Text style={styles.roundsPickerLabel}>ROUNDS</Text>
-            <View style={styles.roundsPickerOptions}>
-              {[5, 10, 25, 0].map(n => (
-                <Pressable
-                  key={n}
-                  style={[
-                    styles.roundsOption,
-                    selectedRounds === n && styles.roundsOptionActive,
-                  ]}
-                  onPress={() => setSelectedRounds(n)}
-                >
-                  <Text style={[
-                    styles.roundsOptionText,
-                    selectedRounds === n && styles.roundsOptionTextActive,
-                  ]}>
-                    {n === 0 ? '∞' : n}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
 
           <View style={styles.lobbyButtons}>
             <VibeButton
@@ -1182,6 +1156,7 @@ export default function GameScreen({ navigation }) {
         onLeave={handleLeaveGame}
         onAddBot={handleAddBot}
         onStartGame={handleStartGame}
+        onSetRounds={(n) => gameService.setTotalRounds(gameId, n)}
       />
     );
   }
@@ -1359,9 +1334,7 @@ export default function GameScreen({ navigation }) {
                   </Text>
                   {(() => {
                     const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
-                    if (pending.length === 0) {
-                      return <Text style={styles.waitingOnAllIn}>All votes in!</Text>;
-                    }
+                    if (pending.length === 0) return null;
                     return (
                       <View style={styles.waitingOnNames}>
                         <Text style={styles.waitingOnPrefix}>Waiting on </Text>

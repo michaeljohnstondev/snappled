@@ -467,6 +467,24 @@ export const gameService = {
     }
   },
 
+  // Host-only: change the round count from the lobby. Validated to the
+  // same range as createGame (0 = infinite, 1-50 fixed).
+  async setTotalRounds(gameId, totalRounds) {
+    try {
+      const raw = Number(totalRounds);
+      const safe = raw === 0 ? 0 : Math.max(1, Math.min(50, raw || ROUNDS_PER_GAME));
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        totalRounds: safe,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error setting totalRounds:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // Mark a single player as ready/not-ready on the warmup screen.
   // Stored as game.ready = { [uid]: true } so we can set/clear individual
   // entries via the dot-path syntax. Used by WarmupPhase + bot scheduler
