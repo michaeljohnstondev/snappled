@@ -128,7 +128,7 @@ export default function PickingPhase({
                         color={picked ? theme.colors.vibeGreen : theme.colors.textSecondary}
                       />
                       <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
-                        {p.username}{isMe ? ' (you)' : ''}
+                        {p.username}
                       </Text>
                       <Text style={[styles.playerStatusLabel, picked && styles.playerStatusLabelDone]}>
                         {picked ? 'picked' : 'picking...'}

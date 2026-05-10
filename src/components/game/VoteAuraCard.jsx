@@ -5,12 +5,15 @@
 // ramps up as more people pile on.
 
 import React, { useEffect, useRef } from 'react';
-import { View, Pressable, Animated, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import SnappleThumbnailImg from '../ui/SnappleThumbnail';
 import theme from '../../theme/themes';
 
 // voters: [{ uid, name, color, isMe }, ...] in vote-arrival order
-const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, onPress }) {
+// picker (optional): { name, color, isMe, opacity? } — when present,
+//   renders the picker's name below the card. Pass an Animated.Value
+//   as opacity to fade it in (e.g. when all-voted lands).
+const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, picker, onPress }) {
   const pulse = useRef(new Animated.Value(0)).current;
   const prevCountRef = useRef(voters?.length || 0);
 
@@ -85,6 +88,18 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, onPr
         )}
       </View>
 
+      {picker && (
+        <Animated.Text
+          style={[
+            styles.pickerName,
+            { color: picker.color, opacity: picker.opacity ?? 1 },
+            picker.isMe && styles.pickerNameMe,
+          ]}
+          numberOfLines={1}
+        >
+          {picker.name}
+        </Animated.Text>
+      )}
     </Pressable>
   );
 });
@@ -141,5 +156,15 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
+  },
+  pickerName: {
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: 'center',
+    fontWeight: '600',
+    width: 100,
+  },
+  pickerNameMe: {
+    fontWeight: 'bold',
   },
 });

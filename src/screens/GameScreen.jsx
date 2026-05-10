@@ -46,6 +46,47 @@ const VOTER_PALETTE = [
   theme.colors.vibeTeal,
 ];
 
+// Voting-wait snapples grid. Renders VoteAuraCards and, once all-voted
+// flips true, fades all picker names in together below the cards. Owns
+// a single shared Animated.Value so the fade survives re-renders during
+// the 10s post-all-voted wait.
+function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, allVotedIn, onPressCard }) {
+  const nameOpacity = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (!allVotedIn) return;
+    Animated.timing(nameOpacity, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [allVotedIn]);
+
+  return (
+    <View style={styles.allSnapplesGrid}>
+      {(submissions || []).map((sub, i) => {
+        const player = (players || []).find(p => p.uid === sub.uid);
+        const color = playerColors.get(sub.uid) || theme.colors.textSecondary;
+        const isMe = sub.uid === selfUid;
+        const picker = allVotedIn && player ? {
+          name: player.username,
+          color,
+          isMe,
+          opacity: nameOpacity,
+        } : null;
+        return (
+          <VoteAuraCard
+            key={sub.snappleId || `sub-${i}`}
+            submission={sub}
+            voters={voters(sub.uid)}
+            picker={picker}
+            onPress={() => onPressCard(sub)}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 // Segmented aura rendered around a card — one stripe per voter, in their
 // assigned color. Stripes wrap each side of the card so the colors are
 // visible regardless of orientation. If no voters, just renders children.
@@ -80,21 +121,8 @@ function RoundResultsReveal({
   const earnedByUid = {};
   (rankings || []).forEach(r => { earnedByUid[r.uid] = r.pointsEarned || 0; });
 
-  // Sort the snapples grid by round placement so the round winner sits
-  // top-left. Falls back to submissions order if rankings missing.
-  const orderedSubmissions = React.useMemo(() => {
-    const subs = [...(submissions || [])];
-    if (!rankings || rankings.length === 0) return subs;
-    return subs.sort((a, b) => {
-      const ra = rankings.find(r => r.uid === a.uid);
-      const rb = rankings.find(r => r.uid === b.uid);
-      return (ra?.placement || 99) - (rb?.placement || 99);
-    });
-  }, [submissions, rankings]);
-
   // Displayed points start at "before this round" total; tick up to
-  // post-round total over ~1.2s after a 1s delay so the user sees the
-  // round-winner reveal first, then the totals catch up.
+  // post-round total over ~1.2s on mount.
   const [displayedPoints, setDisplayedPoints] = useState(() =>
     Object.fromEntries(
       (players || []).map(p => {
@@ -111,50 +139,26 @@ function RoundResultsReveal({
   });
 
   useEffect(() => {
-    let intervalId;
-    const tickStart = setTimeout(() => {
-      const targets = {};
-      (players || []).forEach(p => { targets[p.uid] = p.points || 0; });
-      const startVals = { ...displayedPoints };
-      const duration = 1200;
-      const steps = 40;
-      let step = 0;
-      intervalId = setInterval(() => {
-        step++;
-        const t = step / steps;
-        const next = {};
-        (players || []).forEach(p => {
-          const start = startVals[p.uid] ?? 0;
-          const target = targets[p.uid] ?? 0;
-          next[p.uid] = Math.round(start + (target - start) * t);
-        });
-        setDisplayedPoints(next);
-        if (t >= 1) clearInterval(intervalId);
-      }, duration / steps);
-    }, 1000);
-    return () => {
-      clearTimeout(tickStart);
-      if (intervalId) clearInterval(intervalId);
-    };
+    const targets = {};
+    (players || []).forEach(p => { targets[p.uid] = p.points || 0; });
+    const startVals = { ...displayedPoints };
+    const duration = 1200;
+    const steps = 40;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const t = step / steps;
+      const next = {};
+      (players || []).forEach(p => {
+        const start = startVals[p.uid] ?? 0;
+        const target = targets[p.uid] ?? 0;
+        next[p.uid] = Math.round(start + (target - start) * t);
+      });
+      setDisplayedPoints(next);
+      if (t >= 1) clearInterval(id);
+    }, duration / steps);
+    return () => clearInterval(id);
   }, []);
-
-  // Picker-name fade-in — staggered 350ms each so the eye lands on
-  // each card before the next reveals.
-  const nameAnims = React.useMemo(
-    () => orderedSubmissions.map(() => new Animated.Value(0)),
-    [orderedSubmissions.length]
-  );
-  useEffect(() => {
-    const seq = nameAnims.map((a, i) =>
-      Animated.timing(a, {
-        toValue: 1,
-        duration: 350,
-        delay: i * 350,
-        useNativeDriver: true,
-      })
-    );
-    Animated.parallel(seq).start();
-  }, [nameAnims]);
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
@@ -169,51 +173,8 @@ function RoundResultsReveal({
           <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
         </View>
 
-        {/* Snapples grid — sorted by round placement, picker name +
-            color underneath, round winner gets gold treatment. */}
-        <View style={styles.revealGrid}>
-          {orderedSubmissions.map((sub, idx) => {
-            const player = (players || []).find(p => p.uid === sub.uid);
-            const color = playerColors.get(sub.uid) || theme.colors.textSecondary;
-            const isMe = sub.uid === selfUid;
-            const ranking = (rankings || []).find(r => r.uid === sub.uid);
-            const earned = ranking?.pointsEarned || 0;
-            const isRoundWinner = ranking?.placement === 1 && earned > 0;
-            const nameOpacity = nameAnims[idx] || 1;
-            return (
-              <View key={sub.snappleId || sub.uid} style={styles.revealCardWrap}>
-                <View
-                  style={[
-                    styles.revealCard,
-                    { borderColor: isRoundWinner ? theme.colors.vibeYellow : color },
-                    isRoundWinner && styles.revealCardWinner,
-                  ]}
-                >
-                  {sub.videoUrl ? <SnappleThumbnailImg videoUrl={sub.videoUrl} /> : null}
-                  {isRoundWinner && (
-                    <View style={styles.revealWinnerBadge}>
-                      <Text style={styles.revealWinnerText}>🏆 +{earned}</Text>
-                    </View>
-                  )}
-                  {!isRoundWinner && earned > 0 && (
-                    <View style={styles.revealPtsBadge}>
-                      <Text style={styles.revealPtsText}>+{earned}</Text>
-                    </View>
-                  )}
-                </View>
-                <Animated.Text
-                  style={[styles.revealPicker, { color, opacity: nameOpacity }, isMe && { fontWeight: 'bold' }]}
-                  numberOfLines={1}
-                >
-                  {player?.username || '?'}{isMe ? ' (you)' : ''}
-                </Animated.Text>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Standings — totals tick up after the snapple reveal. */}
-        <Text style={styles.standingsLabel}>STANDINGS</Text>
+        {/* Standings — picker reveal already happened on the voting
+            wait screen; this is just the leaderboard. */}
         {orderedPlayers.map((p, i) => {
           const earned = earnedByUid[p.uid] || 0;
           const displayed = displayedPoints[p.uid] ?? p.points;
@@ -229,7 +190,7 @@ function RoundResultsReveal({
               <Text style={styles.resultPlacement}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
                 <Text style={[styles.resultName, isMe && { color: theme.colors.vibeGreen }]}>
-                  {p.username}{isMe ? ' (you)' : ''}
+                  {p.username}
                 </Text>
               </View>
               <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
@@ -629,7 +590,9 @@ export default function GameScreen({ navigation }) {
           const allVoted = (gameData.players || []).every(p => votedUids.has(p.uid));
           if (allVoted && finishScheduledRoundRef.current !== gameData.currentRound) {
             finishScheduledRoundRef.current = gameData.currentRound;
-            setTimeout(() => gameService.finishRound(gameId), 10000);
+            // 15s wait — the picker names fade in here. Need enough room
+            // for an 8-player game to read every name comfortably.
+            setTimeout(() => gameService.finishRound(gameId), 15000);
           }
         }
 
@@ -1353,16 +1316,15 @@ export default function GameScreen({ navigation }) {
                 contentContainerStyle={styles.pickedWaitContent}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.allSnapplesGrid}>
-                  {(game.submissions || []).map((sub, i) => (
-                    <VoteAuraCard
-                      key={sub.snappleId || `sub-${i}`}
-                      submission={sub}
-                      voters={buildVoters(sub.uid)}
-                      onPress={() => setPreviewCard({ ...sub, _isVoting: true })}
-                    />
-                  ))}
-                </View>
+                <VotingWaitGrid
+                  submissions={game.submissions || []}
+                  voters={buildVoters}
+                  players={game.players || []}
+                  playerColors={playerColors}
+                  selfUid={user?.uid}
+                  allVotedIn={votedUids.size === (game.players || []).length && (game.players || []).length > 0}
+                  onPressCard={(sub) => setPreviewCard({ ...sub, _isVoting: true })}
+                />
 
                 {/* Scoreboard button — opens a modal with the full
                     standings + per-player colors. Replaces the inline
@@ -1513,7 +1475,7 @@ export default function GameScreen({ navigation }) {
                       <View key={p.uid} style={[styles.scoreboardRow, { borderLeftColor: color }]}>
                         <Text style={styles.scoreboardPlace}>#{i + 1}</Text>
                         <Text style={[styles.scoreboardName, isMe && { color: theme.colors.vibeGreen }]} numberOfLines={1}>
-                          {p.username}{isMe ? ' (you)' : ''}
+                          {p.username}
                         </Text>
                         <Text style={styles.scoreboardPts}>{p.points || 0} pts</Text>
                         <Ionicons

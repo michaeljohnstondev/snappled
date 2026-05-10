@@ -77,7 +77,7 @@ export default function FinalResultsPhase({ game, selfUid, onDone }) {
             >
               <Text style={styles.placement}>#{p.placement}</Text>
               <Text style={[styles.name, isMe && { color: theme.colors.vibeGreen }]}>
-                {p.username}{isMe ? ' (you)' : ''}
+                {p.username}
               </Text>
               <Text style={styles.total}>{p.points} pts</Text>
             </View>
