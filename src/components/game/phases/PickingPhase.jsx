@@ -151,6 +151,7 @@ export default function PickingPhase({
             numColumns={3}
             columnWrapperStyle={styles.handRow}
             contentContainerStyle={styles.handContainer}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <Pressable
                 style={[

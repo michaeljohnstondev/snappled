@@ -1394,6 +1394,7 @@ export default function GameScreen({ navigation }) {
               numColumns={3}
               columnWrapperStyle={styles.handRow}
               contentContainerStyle={styles.handContainer}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <Pressable
                   style={[styles.handCard, favoriteCard?.uid === item.uid && styles.handCardSelected]}

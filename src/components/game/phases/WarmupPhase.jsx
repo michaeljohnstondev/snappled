@@ -49,6 +49,7 @@ export default function WarmupPhase({
         numColumns={3}
         contentContainerStyle={[styles.handContainer, { paddingTop: 16 }]}
         columnWrapperStyle={styles.handRow}
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <Pressable
             style={styles.handCard}
