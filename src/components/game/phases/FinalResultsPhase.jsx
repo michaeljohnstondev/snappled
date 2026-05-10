@@ -72,7 +72,6 @@ export default function FinalResultsPhase({ game, selfUid, onDone }) {
               key={p.uid}
               style={[
                 styles.row,
-                i === 0 && styles.rowFirst,
                 { borderLeftWidth: 6, borderLeftColor: color },
               ]}
             >
@@ -119,10 +118,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 8,
-  },
-  rowFirst: {
-    borderColor: theme.colors.vibeYellow, borderWidth: 3,
-    backgroundColor: 'rgba(255,215,0,0.1)',
   },
   placement: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
   name: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },
