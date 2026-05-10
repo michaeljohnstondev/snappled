@@ -304,17 +304,16 @@ export default function GameScreen({ navigation }) {
     if (!gameId) lastBotScheduleDeadlineRef.current = null;
   }, [gameId]);
 
-  // Schedule bot votes when VOTING starts (practice mode only). Each bot
-  // gets a random 3-12s delay so the auras populate gradually instead of
-  // all firing at once — simulates real players picking favorites at
-  // their own pace. Dedupe key is currentRound since voting fires once
+  // Schedule bot votes when VOTING starts. Fires for any game with bot
+  // players (practice OR custom-with-added-bots). Each bot gets a
+  // random 3-12s delay so auras populate gradually instead of all
+  // firing at once. Dedupe key is currentRound since voting fires once
   // per round.
   const lastBotVoteScheduleRoundRef = useRef(null);
   useEffect(() => {
     if (!gameId || !game) return;
     if (game.phase !== GAME_PHASES.VOTING) return;
     if (game.hostId !== user?.uid) return;
-    if (!isPractice) return;
     if (lastBotVoteScheduleRoundRef.current === game.currentRound) return;
     lastBotVoteScheduleRoundRef.current = game.currentRound;
 
@@ -336,7 +335,7 @@ export default function GameScreen({ navigation }) {
       }, delay);
       pendingBotTimeoutsRef.current.push(tid);
     });
-  }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid, isPractice]);
+  }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid]);
 
   useEffect(() => {
     if (!gameId) lastBotVoteScheduleRoundRef.current = null;
