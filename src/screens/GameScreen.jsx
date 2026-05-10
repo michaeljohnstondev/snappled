@@ -403,6 +403,13 @@ export default function GameScreen({ navigation }) {
     setPreviewCard(null);
   }, [gameId, game?.currentRound]);
 
+  // Close any open preview modal whenever the phase changes — otherwise
+  // a preview opened on warmup could leak into picking, picking into
+  // voting, etc. when the timer expires and force-advances mid-preview.
+  useEffect(() => {
+    setPreviewCard(null);
+  }, [game?.phase]);
+
   // Draw a hand when warmup or picking begins and the hand is empty. Was
   // previously done with setState during render which racked up extra
   // renders and risked infinite-loop edge cases. Effect-based version
@@ -650,8 +657,21 @@ export default function GameScreen({ navigation }) {
     }
   };
 
+  // Hand-draw pool. Until the user has 100+ of their own snapples, we
+  // always mix in the community pool so games never feel like the same
+  // 6 cards every round. After 100 they have enough variety on their
+  // own. Random-cards toggle still forces pure community.
   const getHandSnapples = () => {
-    const source = useRandomCards ? allSnapples : mySnapples;
+    let source;
+    if (useRandomCards) {
+      source = allSnapples;
+    } else if (mySnapples.length >= 100) {
+      source = mySnapples;
+    } else {
+      const ownIds = new Set(mySnapples.map(s => s.id));
+      const community = allSnapples.filter(s => !ownIds.has(s.id));
+      source = [...mySnapples, ...community];
+    }
     if (playedCardIds.length === 0) return source;
     return source.filter(s => !playedCardIds.includes(s.id));
   };
@@ -1184,8 +1204,10 @@ export default function GameScreen({ navigation }) {
         readyMap={game.ready || {}}
         players={game.players || []}
         selfUid={user?.uid}
+        previewCard={previewCard}
         onLeave={handleLeaveGame}
         onPreviewCard={(card) => setPreviewCard(card)}
+        onClosePreview={() => setPreviewCard(null)}
         onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
       />
     );
@@ -1297,55 +1319,30 @@ export default function GameScreen({ navigation }) {
               }));
             };
 
+            const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
             return (
-              <ScrollView
-                style={styles.pickedWaitWrap}
-                contentContainerStyle={styles.pickedWaitContent}
-                showsVerticalScrollIndicator={false}
-              >
-                <VotingWaitGrid
-                  submissions={game.submissions || []}
-                  voters={buildVoters}
-                  players={game.players || []}
-                  playerColors={playerColors}
-                  selfUid={user?.uid}
-                  allVotedIn={votedUids.size === (game.players || []).length && (game.players || []).length > 0}
-                  onPressCard={(sub) => setPreviewCard({ ...sub, _isVoting: true })}
-                />
+              <View style={styles.pickedWaitWrap}>
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={styles.pickedWaitContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <VotingWaitGrid
+                    submissions={game.submissions || []}
+                    voters={buildVoters}
+                    players={game.players || []}
+                    playerColors={playerColors}
+                    selfUid={user?.uid}
+                    allVotedIn={votedUids.size === (game.players || []).length && (game.players || []).length > 0}
+                    onPressCard={(sub) => setPreviewCard({ ...sub, _isVoting: true })}
+                  />
+                </ScrollView>
 
-                {/* Bottom action row: hamburger (scoreboard) on the
-                    left, X-of-Y voted in the middle, host-only skip
-                    arrow on the right. Compact one-line layout. */}
-                <View style={styles.waitingActionRow}>
-                  <Pressable
-                    style={styles.iconBtn}
-                    onPress={() => setShowScoreboard(true)}
-                  >
-                    <Ionicons name="menu" size={22} color={theme.colors.vibeBlue} />
-                  </Pressable>
-                  <Text style={styles.waitingOnLabel}>
-                    {votedUids.size} of {(game.players || []).length} voted
-                  </Text>
-                  {game.hostId === user?.uid ? (
-                    <Pressable
-                      style={styles.iconBtn}
-                      onPress={() => {
-                        finishScheduledRoundRef.current = game.currentRound;
-                        gameService.finishRound(gameId).catch(() => {});
-                      }}
-                    >
-                      <Ionicons name="arrow-forward" size={22} color={theme.colors.vibeBlue} />
-                    </Pressable>
-                  ) : (
-                    <View style={{ width: 40, height: 40 }} />
-                  )}
-                </View>
-
-                {/* Names of players still voting, in their colors. */}
-                {(() => {
-                  const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
-                  if (pending.length === 0) return null;
-                  return (
+                {/* Pinned footer — outside the ScrollView so it stays
+                    anchored to the bottom regardless of how many
+                    snapples are in the grid. */}
+                <View style={styles.waitingFooter}>
+                  {pending.length > 0 && (
                     <View style={styles.waitingOnNames}>
                       <Text style={styles.waitingOnPrefix}>Waiting on </Text>
                       {pending.map((p, idx) => (
@@ -1360,9 +1357,33 @@ export default function GameScreen({ navigation }) {
                         </Text>
                       ))}
                     </View>
-                  );
-                })()}
-              </ScrollView>
+                  )}
+                  <View style={styles.waitingActionRow}>
+                    <Pressable
+                      style={styles.iconBtn}
+                      onPress={() => setShowScoreboard(true)}
+                    >
+                      <Ionicons name="menu" size={22} color={theme.colors.vibeBlue} />
+                    </Pressable>
+                    <Text style={styles.waitingOnLabel}>
+                      {votedUids.size} of {(game.players || []).length} voted
+                    </Text>
+                    {game.hostId === user?.uid ? (
+                      <Pressable
+                        style={styles.iconBtn}
+                        onPress={() => {
+                          finishScheduledRoundRef.current = game.currentRound;
+                          gameService.finishRound(gameId).catch(() => {});
+                        }}
+                      >
+                        <Ionicons name="arrow-forward" size={22} color={theme.colors.vibeBlue} />
+                      </Pressable>
+                    ) : (
+                      <View style={{ width: 40, height: 40 }} />
+                    )}
+                  </View>
+                </View>
+              </View>
             );
           })()
         ) : (
@@ -1726,11 +1747,11 @@ const styles = StyleSheet.create({
   },
   pickedWaitWrap: {
     flex: 1,
-    paddingHorizontal: 20,
   },
   pickedWaitContent: {
+    paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 40,
+    paddingBottom: 16,
   },
   yourPickSection: {
     alignItems: 'center',
@@ -1911,11 +1932,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   // "Waiting on …" row at the bottom of the voting wait screen.
+  // Pinned footer — sits below the scrolling snapples grid so the
+  // hamburger / count / skip arrow stay anchored even when the grid
+  // overflows. Includes the "Waiting on …" line above the action row.
+  waitingFooter: {
+    paddingTop: 8,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   // Bottom action row on the voting wait screen — hamburger + count
   // + skip arrow on a single line. iconBtn doubles as a spacer when
   // the host's skip arrow shouldn't render (to keep the count centered).
   waitingActionRow: {
-    marginTop: 16,
+    marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -2319,6 +2350,12 @@ const styles = StyleSheet.create({
   previewCancel: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.7)', borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    // Match the previewCard's rounded inner corners so the fill reaches
+    // the video's edge instead of stopping short inside the rounded
+    // mask. Right corner only matters when Cancel is rendered alone
+    // (e.g. when hasVoted hides the Pick button).
+    borderBottomLeftRadius: 13,
+    borderBottomRightRadius: 13,
   },
   previewCancelText: {
     color: theme.colors.textSecondary, fontSize: 14, fontWeight: theme.fontWeights.semiBold,
@@ -2326,6 +2363,8 @@ const styles = StyleSheet.create({
   previewPlay: {
     flex: 2, justifyContent: 'center', alignItems: 'center',
     backgroundColor: 'rgba(0, 198, 255, 0.2)',
+    // Match the previewCard's bottom-right rounded corner.
+    borderBottomRightRadius: 13,
   },
   previewPlayText: {
     color: theme.colors.vibeBlue, fontSize: 16, fontWeight: theme.fontWeights.bold,

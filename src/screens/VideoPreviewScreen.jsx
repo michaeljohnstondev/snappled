@@ -29,9 +29,10 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Prompt selection (for free-record mode)
+  // Prompt selection (for free-record mode). Picker no longer auto-opens
+  // on free record — the user can tap the Prompts button when ready.
   const [prompt, setPrompt] = useState(initialPrompt || null);
-  const [showPromptPicker, setShowPromptPicker] = useState(!initialPrompt);
+  const [showPromptPicker, setShowPromptPicker] = useState(false);
   const [activePrompts, setActivePrompts] = useState([]);
   const [creatingPrompt, setCreatingPrompt] = useState(false);
   const [newPromptText, setNewPromptText] = useState('');

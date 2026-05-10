@@ -3,11 +3,12 @@
 // host force-advances to PICKING when everyone's ready or the timer hits 0.
 
 import React from 'react';
-import { View, Text, Pressable, FlatList, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, FlatList, Modal, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
+import PreviewPlayer from '../PreviewPlayer';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -20,8 +21,10 @@ export default function WarmupPhase({
   readyMap,
   players,
   selfUid,
+  previewCard,
   onLeave,
   onPreviewCard,
+  onClosePreview,
   onToggleReady,
 }) {
   const isReady = !!readyMap?.[selfUid];
@@ -68,6 +71,22 @@ export default function WarmupPhase({
           color={isReady ? "green" : "blue"}
         />
       </View>
+
+      {/* Preview modal — tap a card on the grid to watch it during
+          warmup. View-only here (no Play / Pick action — picking
+          hasn't started yet). */}
+      {previewCard && (
+        <Modal visible transparent animationType="fade" onRequestClose={onClosePreview}>
+          <View style={styles.previewOverlay}>
+            <View style={styles.previewCard}>
+              <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
+              <Pressable style={styles.previewBack} onPress={onClosePreview}>
+                <Text style={styles.previewBackText}>Back</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
     </LinearGradient>
   );
 }
@@ -119,4 +138,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  previewOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
+  },
+  previewCard: {
+    width: '100%', aspectRatio: 9 / 16,
+    borderRadius: 16, overflow: 'hidden',
+    borderWidth: 3, borderColor: theme.colors.vibeBlue, backgroundColor: '#000',
+  },
+  previewBack: {
+    position: 'absolute', bottom: 16, left: 16,
+    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  previewBackText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
 });
