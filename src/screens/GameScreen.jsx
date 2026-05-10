@@ -54,11 +54,39 @@ const VOTER_PALETTE = [
 // (vote auras pulse in as votes land). This component shows the
 // scoreboard with a tick-up score animation + Reanimated row swaps.
 function RoundResultsReveal({
-  rankings, players, prompt,
+  rankings, players, prompt, submissions,
   currentRound, totalRounds, timer,
   isHost, onNextRound, onShare, onEndGame, selfUid,
 }) {
   const isInfinite = totalRounds === 0;
+  // Two-stage view: a 5s "reveal" showing each snapple with its picker's
+  // name + color attached, then the scoreboard. Replaces the elaborate
+  // animated reveal of the old design with something quick and readable.
+  const [stage, setStage] = useState('reveal');
+  useEffect(() => {
+    const id = setTimeout(() => setStage('scoreboard'), 5000);
+    return () => clearTimeout(id);
+  }, []);
+
+  // One Animated.Value per submission for the picker-name fade-in. The
+  // names stagger in over the reveal window — adds drama and lets the
+  // user's eye land on each card before the next reveals.
+  const nameAnims = React.useMemo(
+    () => (submissions || []).map(() => new Animated.Value(0)),
+    [submissions?.length]
+  );
+  useEffect(() => {
+    if (stage !== 'reveal') return;
+    const seq = nameAnims.map((a, i) =>
+      Animated.timing(a, {
+        toValue: 1,
+        duration: 350,
+        delay: i * 350,
+        useNativeDriver: true,
+      })
+    );
+    Animated.parallel(seq).start();
+  }, [stage, nameAnims]);
   // earnedByUid lookup so the row can show +N this round.
   const earnedByUid = {};
   (rankings || []).forEach(r => { earnedByUid[r.uid] = r.pointsEarned || 0; });
@@ -97,8 +125,10 @@ function RoundResultsReveal({
     return bPts - aPts;
   });
 
-  // Tick up displayed points to actual on mount. Triggers row swaps.
+  // Tick up displayed points to actual when the scoreboard stage starts
+  // (after the 5s reveal). Triggers row swaps via Reanimated layout.
   useEffect(() => {
+    if (stage !== 'scoreboard') return;
     const targets = {};
     (players || []).forEach(p => { targets[p.uid] = p.points || 0; });
     const startVals = { ...displayedPoints };
@@ -118,7 +148,73 @@ function RoundResultsReveal({
       if (t >= 1) clearInterval(id);
     }, duration / steps);
     return () => clearInterval(id);
-  }, []);
+  }, [stage]);
+
+  // Reveal stage — grid of submissions with the picker's name + color
+  // shown beneath each thumbnail. Anonymous voting is over, this is
+  // where you find out who played what.
+  if (stage === 'reveal') {
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <View style={styles.header}>
+          <View style={{ width: 36 }} />
+          <Text style={styles.headerTitle}>Round {currentRound}</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        <View style={styles.promptBanner}>
+          <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
+        </View>
+
+        <View style={styles.revealGrid}>
+          {(submissions || []).map((sub, idx) => {
+            const player = (players || []).find(p => p.uid === sub.uid);
+            const color = playerColors.get(sub.uid) || theme.colors.textSecondary;
+            const isMe = sub.uid === selfUid;
+            const ranking = (rankings || []).find(r => r.uid === sub.uid);
+            const earned = ranking?.pointsEarned || 0;
+            const isRoundWinner = ranking?.placement === 1 && earned > 0;
+            const nameOpacity = nameAnims[idx] || 1;
+            return (
+              <View key={sub.snappleId || sub.uid} style={styles.revealCardWrap}>
+                <View
+                  style={[
+                    styles.revealCard,
+                    { borderColor: isRoundWinner ? theme.colors.vibeYellow : color },
+                    isRoundWinner && styles.revealCardWinner,
+                  ]}
+                >
+                  {sub.videoUrl ? <SnappleThumbnailImg videoUrl={sub.videoUrl} /> : null}
+                  {/* Round-winner crown + earned points badge sit on top of
+                      the thumbnail. Other placements just get the +pts. */}
+                  {isRoundWinner && (
+                    <View style={styles.revealWinnerBadge}>
+                      <Text style={styles.revealWinnerText}>🏆 +{earned}</Text>
+                    </View>
+                  )}
+                  {!isRoundWinner && earned > 0 && (
+                    <View style={styles.revealPtsBadge}>
+                      <Text style={styles.revealPtsText}>+{earned}</Text>
+                    </View>
+                  )}
+                </View>
+                <Animated.Text
+                  style={[
+                    styles.revealPicker,
+                    { color, opacity: nameOpacity },
+                    isMe && { fontWeight: 'bold' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {player?.username || '?'}{isMe ? ' (you)' : ''}
+                </Animated.Text>
+              </View>
+            );
+          })}
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
@@ -1309,6 +1405,20 @@ export default function GameScreen({ navigation }) {
                   <Text style={styles.scoreboardBtnText}>Scoreboard</Text>
                 </Pressable>
 
+                {/* Host-only skip — fires finishRound immediately if the
+                    wait is dragging (e.g. a bot vote got stuck). */}
+                {game.hostId === user?.uid && (
+                  <Pressable
+                    style={styles.skipWaitBtn}
+                    onPress={() => {
+                      finishScheduledRoundRef.current = game.currentRound;
+                      gameService.finishRound(gameId).catch(() => {});
+                    }}
+                  >
+                    <Text style={styles.skipWaitText}>Skip Wait →</Text>
+                  </Pressable>
+                )}
+
                 {/* Waiting-on row at the bottom — compact, lists the
                     names of players still voting in their colors. */}
                 <View style={styles.waitingOnRow}>
@@ -1477,6 +1587,7 @@ export default function GameScreen({ navigation }) {
       <RoundResultsReveal
         rankings={lastRoundResult?.rankings || []}
         players={game.players}
+        submissions={game.submissions || []}
         prompt={game.prompts[game.currentRound - 1] || ''}
         currentRound={game.currentRound}
         totalRounds={game.totalRounds}
@@ -1798,6 +1909,83 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  // Host-only "Skip Wait" — bypasses the 10s post-vote pause when bots
+  // get hung up. Subtle styling so it doesn't compete with Scoreboard.
+  skipWaitBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  skipWaitText: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  // 5s reveal stage on round results — grid of submissions with picker
+  // names + colors underneath.
+  revealGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    gap: 8,
+  },
+  revealCardWrap: {
+    width: 100,
+    alignItems: 'center',
+    margin: 4,
+  },
+  revealCard: {
+    width: 100,
+    aspectRatio: 9 / 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 3,
+    backgroundColor: '#000',
+  },
+  revealCardWinner: {
+    borderWidth: 4,
+    shadowColor: theme.colors.vibeYellow,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  revealWinnerBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+  },
+  revealWinnerText: {
+    color: theme.colors.vibeYellow,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  revealPtsBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 6,
+  },
+  revealPtsText: {
+    color: theme.colors.vibeGreen,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  revealPicker: {
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: 'center',
   },
   // "Waiting on …" row at the bottom of the voting wait screen.
   waitingOnRow: {
