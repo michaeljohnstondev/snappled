@@ -35,15 +35,19 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // translates toward its actual row in the scoreboard.
 // Palette assigned to non-self players in voter-order. Self always shows
 // in vibeGreen so the user can spot their own vote at a glance.
+// Distinct colors only — vibeCyan/Aqua/Teal were near-duplicates of
+// vibeBlue and made adjacent players hard to tell apart. Replaced with
+// vibeTurquoise (clearly different green-blue), vibeRed, and
+// vibeRoyalBlue for spread.
 const VOTER_PALETTE = [
   theme.colors.vibeBlue,
-  theme.colors.vibeCyan,
   theme.colors.vibePurple,
   theme.colors.vibePink,
   theme.colors.vibeYellow,
   theme.colors.vibeOrange,
-  theme.colors.vibeAqua,
-  theme.colors.vibeTeal,
+  theme.colors.vibeRed,
+  theme.colors.vibeTurquoise,
+  theme.colors.vibeRoyalBlue,
 ];
 
 // Voting-wait snapples grid. Renders VoteAuraCards and, once all-voted
@@ -169,12 +173,8 @@ function RoundResultsReveal({
       </View>
 
       <ScrollView contentContainerStyle={styles.resultsScrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.promptBanner}>
-          <Text style={styles.promptText} numberOfLines={2}>{prompt}</Text>
-        </View>
-
-        {/* Standings — picker reveal already happened on the voting
-            wait screen; this is just the leaderboard. */}
+        {/* Standings — picker reveal + prompt already shown on the
+            voting wait screen; this is just the leaderboard. */}
         {orderedPlayers.map((p, i) => {
           const earned = earnedByUid[p.uid] || 0;
           const displayed = displayedPoints[p.uid] ?? p.points;
@@ -185,7 +185,7 @@ function RoundResultsReveal({
               key={p.uid}
               layout={LinearTransition.springify().damping(12).stiffness(90)}
               collapsable={false}
-              style={[styles.resultRow, i === 0 && styles.resultRowFirst, { borderLeftWidth: 5, borderLeftColor: color }]}
+              style={[styles.resultRow, { borderLeftWidth: 5, borderLeftColor: color }]}
             >
               <Text style={styles.resultPlacement}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
@@ -2348,10 +2348,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 8,
-  },
-  resultRowFirst: {
-    borderColor: theme.colors.vibeYellow, borderWidth: 3,
-    backgroundColor: 'rgba(255,215,0,0.1)',
   },
   resultPlacement: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
   resultInfo: { flex: 1 },
