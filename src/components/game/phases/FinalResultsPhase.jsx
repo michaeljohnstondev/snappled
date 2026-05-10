@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 8,
+    marginBottom: 8,
   },
   placement: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
   name: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },

@@ -74,12 +74,14 @@ export const GAME_PHASES = {
 
 export const gameService = {
   // Create a new game lobby
-  async createGame(hostId, hostUsername, totalRounds = ROUNDS_PER_GAME) {
+  async createGame(hostId, hostUsername, targetPoints = 25) {
     try {
       const gameRef = doc(collection(db, GAMES_COLLECTION));
-      // totalRounds: 0 = infinite (host ends manually), 1-50 = fixed.
-      const raw = Number(totalRounds);
-      const safeRounds = raw === 0 ? 0 : Math.max(1, Math.min(50, raw || ROUNDS_PER_GAME));
+      // Stored as totalRounds for backward compat — semantically it's now
+      // the play-to TARGET POINTS. 0 = infinite (host ends manually),
+      // 1-200 = fixed target.
+      const raw = Number(targetPoints);
+      const safeRounds = raw === 0 ? 0 : Math.max(1, Math.min(200, raw || 25));
       const gameDoc = {
         hostId,
         phase: GAME_PHASES.LOBBY,
@@ -184,17 +186,13 @@ export const gameService = {
       if (data.hostId !== hostId) return { success: false, error: 'Only host can start' };
       if (data.players.length < 2) return { success: false, error: 'Need at least 2 players' };
 
-      // For finite games, slice the supplied prompts to totalRounds. For
-      // infinite (totalRounds === 0), keep the full pre-fetched buffer
-      // — the caller pre-fetches a healthy chunk and nextRound refills
-      // when the buffer runs low.
-      const rounds = data.totalRounds === 0
-        ? prompts.length
-        : Math.max(1, Math.min(50, data.totalRounds || ROUNDS_PER_GAME));
+      // Game length is now driven by play-to TARGET POINTS, not round
+      // count, so we can't pre-slice. Just store the full buffer the
+      // caller fetched — nextRound refills when it runs low.
       await updateDoc(gameRef, {
         phase: GAME_PHASES.REVIEW,
         currentRound: 1,
-        prompts: prompts.slice(0, rounds),
+        prompts: prompts,
         submissions: [],
         votes: {},
         ready: {}, // fresh ready map for the warmup screen
@@ -305,11 +303,12 @@ export const gameService = {
         return { ...r, placement: currentPlacement };
       });
 
-      // Award points by placement (tied players get the same points).
-      const pointValues = [5, 3, 1, 0, 0, 0];
+      // Vote-based scoring: 1 vote = 1 point. Best card always wins by
+      // exactly the margin people voted by. Placement is still computed
+      // for round-winner highlighting.
       const roundResult = withPlacement.map(r => ({
         ...r,
-        pointsEarned: pointValues[r.placement - 1] || 0,
+        pointsEarned: r.votes,
       }));
 
       // Update player totals
@@ -321,11 +320,12 @@ export const gameService = {
         };
       });
 
-      // totalRounds === 0 means infinite — game keeps cycling rounds
-      // until host taps End Game. Otherwise end naturally on the last
-      // round.
-      const isLastRound = data.totalRounds > 0 &&
-        data.currentRound >= data.totalRounds;
+      // Field reused: data.totalRounds is now the play-to TARGET POINTS.
+      // 0 = infinite (host ends manually). Otherwise the game ends as
+      // soon as any player crosses the target this round.
+      const target = data.totalRounds;
+      const topScore = updatedPlayers.reduce((m, p) => Math.max(m, p.points || 0), 0);
+      const isLastRound = target > 0 && topScore >= target;
 
       await updateDoc(gameRef, {
         phase: isLastRound ? GAME_PHASES.FINAL_RESULTS : GAME_PHASES.ROUND_RESULTS,
@@ -365,20 +365,19 @@ export const gameService = {
       const gameDoc = await getDoc(gameRef);
       const data = gameDoc.data();
 
-      // For infinite games (totalRounds === 0), refill the prompt buffer
-      // when we're within 3 rounds of running out. Best-effort — if the
-      // fetch fails the round still advances and the prompt-text falls
-      // back to the placeholder.
+      // Refill the prompt buffer when we're within 3 rounds of running
+      // out. Vote-based scoring means game length is variable in any
+      // mode (could blow past the original buffer), so we always check.
+      // Best-effort — if the fetch fails the round still advances and
+      // the prompt-text falls back to the placeholder.
       let nextPrompts = data.prompts || [];
-      if (data.totalRounds === 0) {
-        const used = data.currentRound; // about-to-become next round
-        const remaining = nextPrompts.length - used;
-        if (remaining < 3) {
-          try {
-            const fresh = await this.getGamePrompts(10);
-            nextPrompts = [...nextPrompts, ...(fresh || [])];
-          } catch (e) {}
-        }
+      const used = data.currentRound; // about-to-become next round
+      const remaining = nextPrompts.length - used;
+      if (remaining < 3) {
+        try {
+          const fresh = await this.getGamePrompts(10);
+          nextPrompts = [...nextPrompts, ...(fresh || [])];
+        } catch (e) {}
       }
 
       await updateDoc(gameRef, {
@@ -467,12 +466,13 @@ export const gameService = {
     }
   },
 
-  // Host-only: change the round count from the lobby. Validated to the
-  // same range as createGame (0 = infinite, 1-50 fixed).
-  async setTotalRounds(gameId, totalRounds) {
+  // Host-only: change the play-to target from the lobby. Field stored
+  // as `totalRounds` for backward compat but semantically targetPoints.
+  // 0 = infinite, 1-200 = fixed target.
+  async setTotalRounds(gameId, targetPoints) {
     try {
-      const raw = Number(totalRounds);
-      const safe = raw === 0 ? 0 : Math.max(1, Math.min(50, raw || ROUNDS_PER_GAME));
+      const raw = Number(targetPoints);
+      const safe = raw === 0 ? 0 : Math.max(1, Math.min(200, raw || 25));
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
       await updateDoc(gameRef, {
         totalRounds: safe,

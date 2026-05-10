@@ -55,14 +55,15 @@ export default function LobbyPhase({
           ))}
         </View>
 
-        {/* Rounds picker — host-only. ∞ stores totalRounds=0 (host
-            ends manually from the round-results scoreboard). Visible to
-            everyone, but only the host can change it. */}
+        {/* Play-to target picker — host-only. ∞ stores totalRounds=0
+            (host ends manually from the scoreboard). Field is named
+            `totalRounds` for backward compat but it's the score target
+            now: first player to N points wins. */}
         {isHost && (
           <View style={styles.roundsPicker}>
-            <Text style={styles.roundsLabel}>ROUNDS</Text>
+            <Text style={styles.roundsLabel}>PLAY TO</Text>
             <View style={styles.roundsOptions}>
-              {[5, 10, 25, 0].map(n => (
+              {[25, 50, 100, 0].map(n => (
                 <Pressable
                   key={n}
                   style={[styles.roundsOption, totalRounds === n && styles.roundsOptionActive]}
@@ -78,7 +79,7 @@ export default function LobbyPhase({
         )}
         {!isHost && (
           <Text style={styles.roundsReadonly}>
-            {totalRounds === 0 ? 'Game ends when host calls it' : `${totalRounds} rounds`}
+            {totalRounds === 0 ? 'Game ends when host calls it' : `Play to ${totalRounds} pts`}
           </Text>
         )}
 

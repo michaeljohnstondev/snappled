@@ -257,7 +257,9 @@ export default function GameScreen({ navigation }) {
   const [showScoreboard, setShowScoreboard] = useState(false);
   // Round count for newly-created games (practice + custom). Adjustable
   // on the no-game choice screen via the rounds picker.
-  const [selectedRounds, setSelectedRounds] = useState(5);
+  // Default play-to target points (was rounds count). Lobby picker for
+  // custom games can change it; practice uses this value at create time.
+  const [selectedRounds, setSelectedRounds] = useState(25);
   const timerRef = useRef(null);
   const unsubscribeRef = useRef(null);
   // pickDeadline we last scheduled bot picks against — guards against
@@ -717,11 +719,10 @@ export default function GameScreen({ navigation }) {
 
   const handleStartGame = async () => {
     try {
-      // For infinite games (totalRounds === 0), seed with a 25-prompt
-      // buffer; nextRound refills when running low.
-      const totalRounds = game?.totalRounds ?? gameService.ROUNDS_PER_GAME;
-      const fetchCount = totalRounds === 0 ? 25 : totalRounds;
-      const prompts = await gameService.getGamePrompts(fetchCount);
+      // Game length is now driven by play-to target points, not round
+      // count, so we always seed a 25-prompt buffer; nextRound refills
+      // if the game runs longer.
+      const prompts = await gameService.getGamePrompts(25);
       const result = await gameService.startGame(gameId, user.uid, prompts);
       if (result.success) {
         const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
@@ -754,9 +755,9 @@ export default function GameScreen({ navigation }) {
         await gameService.joinGame(createResult.gameId, `bot_${name}`, name);
       }
 
-      // Start immediately. Infinite games seed a 25-prompt buffer.
-      const fetchCount = selectedRounds === 0 ? 25 : selectedRounds;
-      const prompts = await gameService.getGamePrompts(fetchCount);
+      // Start immediately. Always seed a 25-prompt buffer regardless
+      // of target since game length is variable in vote-scoring mode.
+      const prompts = await gameService.getGamePrompts(25);
 
       await gameService.startGame(createResult.gameId, user.uid, prompts);
 
@@ -2320,7 +2321,7 @@ const styles = StyleSheet.create({
   resultRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 8,
+    marginBottom: 8,
   },
   resultPlacement: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
   resultInfo: { flex: 1 },

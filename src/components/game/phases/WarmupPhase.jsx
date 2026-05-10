@@ -60,7 +60,7 @@ export default function WarmupPhase({
 
       <View style={styles.footer}>
         <Text style={styles.readyCount}>
-          {readyCount} of {totalCount} ready · auto-start in {timer}s
+          {readyCount} of {totalCount} ready
         </Text>
         <VibeButton
           label={isReady ? "Ready! ✓" : "Ready Up"}
