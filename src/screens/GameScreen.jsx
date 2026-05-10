@@ -193,9 +193,11 @@ function RoundResultsReveal({
                   {p.username}
                 </Text>
               </View>
-              <Text style={[styles.resultRoundPts, earned > 0 && styles.resultRoundPtsEarned]}>
-                +{earned}
-              </Text>
+              {earned > 0 && (
+                <Text style={[styles.resultRoundPts, styles.resultRoundPtsEarned]}>
+                  +{earned}
+                </Text>
+              )}
               <Text style={styles.resultTotal}>{displayed} pts</Text>
             </Reanimated.View>
           );
@@ -552,6 +554,20 @@ export default function GameScreen({ navigation }) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [game?.phase, game?.currentRound]);
 
+  // When all votes are in during VOTING, snap the visible timer down to
+  // 5s so the on-screen countdown matches the actual time-to-finish
+  // (instead of running a separate hidden setTimeout that desynced the
+  // visible 30s timer and made results land while the timer still
+  // showed seconds left).
+  useEffect(() => {
+    if (game?.phase !== GAME_PHASES.VOTING) return;
+    const votedUids = new Set(Object.values(game.votes || {}).flat());
+    const allVoted = (game.players || []).every(p => votedUids.has(p.uid));
+    if (allVoted) {
+      setTimer(prev => Math.min(prev, 5));
+    }
+  }, [game?.phase, game?.votes]);
+
   // Tracks whether finishRound has been scheduled this voting round so the
   // host doesn't double-fire the transition when multiple game-doc updates
   // come in during the 10s countdown.
@@ -584,19 +600,12 @@ export default function GameScreen({ navigation }) {
           }
         }
 
-        // Auto-advance: when all players have voted, host schedules
-        // finishRound after 10s — gives everyone a beat to watch the
-        // aura-pulse wait screen instead of jumping straight to results.
-        if (gameData.phase === GAME_PHASES.VOTING && gameData.hostId === user?.uid) {
-          const votedUids = new Set(Object.values(gameData.votes || {}).flat());
-          const allVoted = (gameData.players || []).every(p => votedUids.has(p.uid));
-          if (allVoted && finishScheduledRoundRef.current !== gameData.currentRound) {
-            finishScheduledRoundRef.current = gameData.currentRound;
-            // 15s wait — the picker names fade in here. Need enough room
-            // for an 8-player game to read every name comfortably.
-            setTimeout(() => gameService.finishRound(gameId), 15000);
-          }
-        }
+        // All-voted handling lives in the timer-snap effect now (drops
+        // the visible 30s countdown to 5s when everyone's in). The
+        // host-side finishRound fires from the timer-hits-zero path so
+        // the on-screen countdown matches the actual transition. No
+        // separate setTimeout here — that desynced the visible timer
+        // and the user saw results land before the timer hit 0.
 
         // Reset the guard once the round results phase clears so the next
         // round's vote-complete detection fires fresh.
@@ -750,7 +759,9 @@ export default function GameScreen({ navigation }) {
       setGameId(createResult.gameId);
 
       // Add fake bot players
-      const botNames = ['SnapBot', 'VibeMaster', 'CardShark', 'PromptKing', 'NoFilter', 'BigVibe'];
+      // 5 bots + the user = 6 players total. Caps the picking-grid at
+      // two rows of 3 cards — no awkward third row.
+      const botNames = ['SnapBot', 'VibeMaster', 'CardShark', 'PromptKing', 'NoFilter'];
       for (const name of botNames) {
         await gameService.joinGame(createResult.gameId, `bot_${name}`, name);
       }
@@ -1302,58 +1313,55 @@ export default function GameScreen({ navigation }) {
                   onPressCard={(sub) => setPreviewCard({ ...sub, _isVoting: true })}
                 />
 
-                {/* Scoreboard button — opens a modal with the full
-                    standings + per-player colors. Replaces the inline
-                    list so the wait screen stays focused on the auras. */}
-                <Pressable
-                  style={styles.scoreboardBtn}
-                  onPress={() => setShowScoreboard(true)}
-                >
-                  <Ionicons name="trophy" size={16} color={theme.colors.vibeBlue} />
-                  <Text style={styles.scoreboardBtnText}>Scoreboard</Text>
-                </Pressable>
-
-                {/* Host-only skip — fires finishRound immediately if the
-                    wait is dragging (e.g. a bot vote got stuck). */}
-                {game.hostId === user?.uid && (
+                {/* Bottom action row: hamburger (scoreboard) on the
+                    left, X-of-Y voted in the middle, host-only skip
+                    arrow on the right. Compact one-line layout. */}
+                <View style={styles.waitingActionRow}>
                   <Pressable
-                    style={styles.skipWaitBtn}
-                    onPress={() => {
-                      finishScheduledRoundRef.current = game.currentRound;
-                      gameService.finishRound(gameId).catch(() => {});
-                    }}
+                    style={styles.iconBtn}
+                    onPress={() => setShowScoreboard(true)}
                   >
-                    <Text style={styles.skipWaitText}>Skip Wait →</Text>
+                    <Ionicons name="menu" size={22} color={theme.colors.vibeBlue} />
                   </Pressable>
-                )}
-
-                {/* Waiting-on row at the bottom — compact, lists the
-                    names of players still voting in their colors. */}
-                <View style={styles.waitingOnRow}>
                   <Text style={styles.waitingOnLabel}>
                     {votedUids.size} of {(game.players || []).length} voted
                   </Text>
-                  {(() => {
-                    const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
-                    if (pending.length === 0) return null;
-                    return (
-                      <View style={styles.waitingOnNames}>
-                        <Text style={styles.waitingOnPrefix}>Waiting on </Text>
-                        {pending.map((p, idx) => (
-                          <Text
-                            key={p.uid}
-                            style={[
-                              styles.waitingOnName,
-                              { color: playerColors.get(p.uid) || theme.colors.textSecondary },
-                            ]}
-                          >
-                            {p.username}{idx < pending.length - 1 ? ', ' : ''}
-                          </Text>
-                        ))}
-                      </View>
-                    );
-                  })()}
+                  {game.hostId === user?.uid ? (
+                    <Pressable
+                      style={styles.iconBtn}
+                      onPress={() => {
+                        finishScheduledRoundRef.current = game.currentRound;
+                        gameService.finishRound(gameId).catch(() => {});
+                      }}
+                    >
+                      <Ionicons name="arrow-forward" size={22} color={theme.colors.vibeBlue} />
+                    </Pressable>
+                  ) : (
+                    <View style={{ width: 40, height: 40 }} />
+                  )}
                 </View>
+
+                {/* Names of players still voting, in their colors. */}
+                {(() => {
+                  const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
+                  if (pending.length === 0) return null;
+                  return (
+                    <View style={styles.waitingOnNames}>
+                      <Text style={styles.waitingOnPrefix}>Waiting on </Text>
+                      {pending.map((p, idx) => (
+                        <Text
+                          key={p.uid}
+                          style={[
+                            styles.waitingOnName,
+                            { color: playerColors.get(p.uid) || theme.colors.textSecondary },
+                          ]}
+                        >
+                          {p.username}{idx < pending.length - 1 ? ', ' : ''}
+                        </Text>
+                      ))}
+                    </View>
+                  );
+                })()}
               </ScrollView>
             );
           })()
@@ -1903,16 +1911,30 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   // "Waiting on …" row at the bottom of the voting wait screen.
-  waitingOnRow: {
+  // Bottom action row on the voting wait screen — hamburger + count
+  // + skip arrow on a single line. iconBtn doubles as a spacer when
+  // the host's skip arrow shouldn't render (to keep the count centered).
+  waitingActionRow: {
     marginTop: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,198,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,198,255,0.4)',
   },
   waitingOnLabel: {
     color: 'white',
     fontSize: 13,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   waitingOnAllIn: {
     color: theme.colors.vibeGreen,
