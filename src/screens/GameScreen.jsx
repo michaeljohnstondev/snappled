@@ -779,7 +779,9 @@ export default function GameScreen({ navigation }) {
   const handlePractice = async () => {
     setIsLoading(true);
     setIsPractice(true);
-    setUseRandomCards(true);
+    // Note: no longer force useRandomCards true here. Practice uses the
+    // same always-mix pool (mySnapples + community) so the user's own
+    // snapples show up in their hand alongside community cards.
     try {
       const username = user?.username || user?.email?.split('@')[0] || 'Player';
       const createResult = await gameService.createGame(user.uid, username, selectedRounds);
