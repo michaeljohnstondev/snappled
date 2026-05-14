@@ -765,8 +765,9 @@ export default function GameScreen({ navigation }) {
       const prompts = await gameService.getGamePrompts(25);
       const result = await gameService.startGame(gameId, user.uid, prompts);
       if (result.success) {
-        const drawnHand = gameService.drawHand(getHandSnapples(), allSnapples);
-        setHand(drawnHand);
+        // Hand is drawn by the phase-change effect once PICKING starts,
+        // using the mixed pool from getHandSnapples(). Drawing here too
+        // would race the effect and swap the visible cards mid-warmup.
         // Bots are scheduled by a phase-change effect once PICKING starts.
       } else {
         showError('Error', result.error);
@@ -805,9 +806,11 @@ export default function GameScreen({ navigation }) {
 
       await gameService.startGame(createResult.gameId, user.uid, prompts);
 
+      // Hand is drawn by the phase-change effect once PICKING starts,
+      // using the mixed pool from getHandSnapples(). Drawing here too
+      // would race the effect and the visible cards would swap during
+      // warmup (community-only set X → mixed-pool set Y).
       // Bots are scheduled by a phase-change effect once PICKING starts.
-      const drawnHand = gameService.drawHand(allSnapples, allSnapples);
-      setHand(drawnHand);
     } catch (error) {
       showError('Error', 'Failed to start practice');
     } finally {
