@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Reanimated, { LinearTransition } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
@@ -433,11 +434,22 @@ export default function GameScreen({ navigation }) {
     return () => navigation.setOptions({ tabBarStyle: undefined });
   }, [navigation, gameId, game]);
 
-  // Load snapples + check for active game
+  // Load snapples + check for active game on mount.
   useEffect(() => {
     loadSnapples();
     checkActiveGame();
   }, []);
+
+  // Refetch snapples whenever GameScreen gains focus (e.g. user just
+  // recorded a new one and came back). Without this, the deck stays
+  // frozen at whatever was loaded the first time the screen mounted —
+  // so new snapples never appeared in subsequent games. Skips while
+  // a game is active to avoid changing mySnapples mid-round.
+  useFocusEffect(
+    useCallback(() => {
+      if (!gameId) loadSnapples();
+    }, [gameId])
+  );
 
   const checkActiveGame = async () => {
     if (!user?.uid) return;

@@ -36,23 +36,36 @@ export default function DeckBuilderScreen({ navigation }) {
     loadData();
   }, []);
 
+  // Load every snapple this user actually owns. The previous version
+  // pulled from getActiveSnapples(200) (the latest-200 community pool)
+  // and filtered to "mine" — but anything older than that 200-doc
+  // window dropped off completely. We instead fetch the user's own
+  // creations directly + each individually-owned id, then merge and
+  // de-dupe so nothing gets cut off by recency.
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const result = await snappleService.getActiveSnapples(200);
-      if (result.success) {
-        const purchasedIds = userCurrency.ownedSnapples || [];
-        const discardedIds = userCurrency.discardedSnapples || [];
-        const mine = result.snapples.filter(
-          s => !discardedIds.includes(s.id) && (s.creatorId === user?.uid || purchasedIds.includes(s.id))
-        );
-        setOwnedSnapples(mine);
+      const purchasedIds = userCurrency.ownedSnapples || [];
+      const discardedIds = userCurrency.discardedSnapples || [];
 
-        const deckSnappleIds = userCurrency.ownedCards || [];
-        if (deckSnappleIds.length > 0) {
-          const deckItems = mine.filter(s => deckSnappleIds.includes(s.id));
-          setDeck(deckItems);
-        }
+      const created = await snappleService.getSnapplesByCreator(user?.uid, 200);
+      const ownedExtras = [];
+      for (const id of purchasedIds) {
+        try {
+          const r = await snappleService.getSnapple(id);
+          if (r?.success && r.snapple) ownedExtras.push(r.snapple);
+        } catch (e) {}
+      }
+
+      const merged = [...(created.snapples || []), ...ownedExtras];
+      const uniqueById = Array.from(new Map(merged.map(s => [s.id, s])).values());
+      const mine = uniqueById.filter(s => !discardedIds.includes(s.id));
+      setOwnedSnapples(mine);
+
+      const deckSnappleIds = userCurrency.ownedCards || [];
+      if (deckSnappleIds.length > 0) {
+        const deckItems = mine.filter(s => deckSnappleIds.includes(s.id));
+        setDeck(deckItems);
       }
     } catch (error) {
       console.error('[DeckBuilder] Error loading data:', error);
