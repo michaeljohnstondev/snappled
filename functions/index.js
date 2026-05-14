@@ -217,77 +217,56 @@ async function recycleOrDiscardPrompt(promptId, prompt) {
 // SNAPPLE PROMOTION (ported from legacy presnappleHandler)
 // ══════════════════════════════════════════════
 
-// When a prompt expires, promote the best snapples and cleanup the rest
+// When a prompt expires, snapples that nobody saved get fully deleted
+// (doc + video file + video metadata doc). Snapples with at least one
+// owner stay active and remain in the community pool — they're the
+// "kept" cards. Replaces the old promote/archive flow.
 async function promoteAndCleanupSnapples(promptId, prompt) {
   const snappleQuery = await db.collection('snapples')
     .where('promptId', '==', promptId)
-    .where('isActive', '==', true)
     .get();
 
   if (snappleQuery.empty) return;
 
-  const snapples = [];
-  snappleQuery.forEach(doc => {
-    snapples.push({ id: doc.id, ref: doc.ref, ...doc.data() });
-  });
-
-  // Find the best snapples (most liked + highest percentage)
-  const { mostLiked, highestPercentage } = findBestSnapples(snapples);
-
-  const batch = db.batch();
-  let promoted = 0;
+  const bucket = admin.storage().bucket();
+  let kept = 0;
   let deleted = 0;
   const rewardedAuthors = new Set();
 
-  for (const snapple of snapples) {
-    const isBought = (snapple.buyCount || 0) > 0;
-    const isWishlisted = (snapple.wishlistCount || 0) > 0;
-    const isMostLiked = mostLiked.includes(snapple.id);
-    const isHighestPct = highestPercentage.includes(snapple.id);
+  for (const docSnap of snappleQuery.docs) {
+    const data = docSnap.data();
+    const owners = data.owners || [];
 
-    // Check if anyone owns this snapple
-    const hasOwners = (snapple.owners || []).length > 0;
+    if (owners.length > 0) {
+      // Someone saved/bought it — keep it active and available.
+      kept++;
 
-    // Promotion criteria: owned, bought, wishlisted, most-liked, or highest-percentage
-    if (hasOwners || isBought || isWishlisted || isMostLiked || isHighestPct) {
-      // Promote — archive but keep
-      batch.update(snapple.ref, {
-        isActive: false,
-        promoted: true,
-        archivedAt: admin.firestore.FieldValue.serverTimestamp(),
-        archiveReason: 'prompt_expired_promoted',
-        promotionReason: isBought ? 'purchased' :
-          isWishlisted ? 'wishlisted' :
-          isMostLiked ? 'most_liked' : 'highest_percentage',
-      });
-      promoted++;
-
-      // Reward the creator with tickets (from legacy)
-      if (snapple.creatorId && !rewardedAuthors.has(snapple.creatorId)) {
-        rewardedAuthors.add(snapple.creatorId);
-        const userRef = db.collection('users').doc(snapple.creatorId);
-        batch.update(userRef, {
+      // Reward the creator with a ticket (once per cleanup run) for
+      // making something at least one player wanted to keep.
+      if (data.creatorId && !rewardedAuthors.has(data.creatorId)) {
+        rewardedAuthors.add(data.creatorId);
+        const userRef = db.collection('users').doc(data.creatorId);
+        await userRef.update({
           'resources.tokens': admin.firestore.FieldValue.increment(TICKET_REWARD),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        }).catch(() => {});
       }
-
-      // Extra ticket for most-liked creators
-      if (isMostLiked && snapple.creatorId) {
-        const userRef = db.collection('users').doc(snapple.creatorId);
-        batch.update(userRef, {
-          'resources.tokens': admin.firestore.FieldValue.increment(TICKET_REWARD),
-        });
-      }
-    } else {
-      // Not worthy — delete
-      batch.delete(snapple.ref);
-      deleted++;
+      continue;
     }
+
+    // No owners — delete doc, video file, and video metadata doc.
+    if (data.videoId && data.creatorId) {
+      const videoPath = `videos/${data.creatorId}/${data.videoId}.mp4`;
+      await bucket.file(videoPath).delete().catch(() => {});
+    }
+    if (data.videoId) {
+      await db.collection('videos').doc(data.videoId).delete().catch(() => {});
+    }
+    await docSnap.ref.delete().catch(() => {});
+    deleted++;
   }
 
-  await batch.commit();
-  console.log(`[Promote] Prompt ${promptId}: promoted ${promoted}, deleted ${deleted}, rewarded ${rewardedAuthors.size} creators`);
+  console.log(`[Cleanup] Prompt ${promptId}: kept ${kept}, deleted ${deleted}, rewarded ${rewardedAuthors.size} creators`);
 }
 
 // Find best snapples using dual criteria (from legacy presnappleHandler)
@@ -584,6 +563,37 @@ async function resetPool() {
 
 // ── Trigger: auto-fill when a live prompt is deleted ──
 // Uses a lock to prevent double-dipping with the hourly cron
+// When a snapple's owners array transitions to empty (last owner just
+// discarded), fully delete the snapple — doc, video file, and video
+// metadata. Mirrors the prompt-expire cleanup for the "Snap Chat"-style
+// deletion the user wants on last-owner removal.
+exports.onSnappleOwnersEmpty = functions.firestore
+  .document('snapples/{snappleId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    const beforeOwners = before.owners || [];
+    const afterOwners = after.owners || [];
+    if (beforeOwners.length === 0) return;
+    if (afterOwners.length > 0) return;
+
+    const snappleId = context.params.snappleId;
+    const bucket = admin.storage().bucket();
+    try {
+      if (after.videoId && after.creatorId) {
+        const videoPath = `videos/${after.creatorId}/${after.videoId}.mp4`;
+        await bucket.file(videoPath).delete().catch(() => {});
+      }
+      if (after.videoId) {
+        await db.collection('videos').doc(after.videoId).delete().catch(() => {});
+      }
+      await change.after.ref.delete().catch(() => {});
+      console.log(`[OwnersEmpty] Deleted orphan snapple ${snappleId}`);
+    } catch (error) {
+      console.error(`[OwnersEmpty] Failed to delete ${snappleId}:`, error);
+    }
+  });
+
 exports.onPromptDeleted = functions.firestore
   .document('activePrompts/{promptId}')
   .onDelete(async (snapshot, context) => {

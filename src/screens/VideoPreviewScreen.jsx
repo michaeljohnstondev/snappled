@@ -267,12 +267,33 @@ export default function VideoPreviewScreen({ route, navigation }) {
             );
           } catch (e) {}
         }
-        // Auto-add to creator's collection — they always own their own snapple.
-        // The snapple doc already has owners:[creatorId] from createSnapple.
-        const owned = [...(userCurrency.ownedSnapples || []), snappleResult.snappleId];
-        await updateUserCurrency({ ownedSnapples: owned });
-        showToast('reward', 'Snapple Saved', 'Added to your collection');
-        setTimeout(() => navigation.popToTop(), 800);
+        // Ask whether to keep this snapple in the user's collection.
+        // Confirm = stay as owner (current default + add to ownedSnapples).
+        // Cancel = arrayRemove from owners; the onSnappleOwnersEmpty
+        // Cloud Function trigger then deletes the snapple unless someone
+        // else has already bought/saved it.
+        const newSnappleId = snappleResult.snappleId;
+        showConfirm(
+          'Save to Collection?',
+          'Keep this snapple in your collection? If not, it disappears unless others save it.',
+          async () => {
+            const owned = [...(userCurrency.ownedSnapples || []), newSnappleId];
+            await updateUserCurrency({ ownedSnapples: owned });
+            showToast('reward', 'Snapple Saved', 'Added to your collection');
+            setTimeout(() => navigation.popToTop(), 800);
+          },
+          async () => {
+            try {
+              const { doc: docRef, updateDoc: update, arrayRemove: aRemove } = await import('firebase/firestore');
+              const { db: database } = await import('../services/firebase');
+              await update(docRef(database, 'snapples', newSnappleId), {
+                owners: aRemove(user.uid),
+              }).catch(() => {});
+            } catch (e) {}
+            showToast('info', 'Snapple Submitted', 'Not saved to collection');
+            setTimeout(() => navigation.popToTop(), 800);
+          },
+        );
       } else {
         showError('Error', snappleResult.error || 'Failed to create snapple');
       }

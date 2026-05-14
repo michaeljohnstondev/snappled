@@ -703,23 +703,39 @@ export default function AdminScreen({ navigation }) {
             }}
           />
           <UtilButton
-            label="Reactivate All Snapples"
-            desc="Set isActive=true and isBanned=false on every snapple. Use after Diagnose if too many are filtered out."
+            label="Reconcile Inactive Snapples"
+            desc="For every snapple with isActive=false: reactivate if it still has owners, fully delete (doc + video + metadata) if it doesn't. One-shot cleanup of legacy archives."
             color={theme.colors.vibeGreen}
             onPress={async () => {
               try {
                 const snap = await getDocs(query(collection(db, 'snapples'), limit(2000)));
-                let touched = 0;
+                let reactivated = 0;
+                let deleted = 0;
+                const { ref: sRef, deleteObject } = await import('firebase/storage');
+                const { storage } = await import('../services/firebase');
                 for (const d of snap.docs) {
                   const data = d.data();
-                  if (data.isActive === true && data.isBanned === false) continue;
-                  await updateDoc(doc(db, 'snapples', d.id), {
-                    isActive: true,
-                    isBanned: false,
-                  });
-                  touched++;
+                  if (data.isActive !== false) continue;
+                  const owners = data.owners || [];
+                  if (owners.length > 0) {
+                    await updateDoc(doc(db, 'snapples', d.id), {
+                      isActive: true,
+                      isBanned: false,
+                    });
+                    reactivated++;
+                  } else {
+                    if (data.videoId && data.creatorId) {
+                      const videoRef = sRef(storage, `videos/${data.creatorId}/${data.videoId}.mp4`);
+                      await deleteObject(videoRef).catch(() => {});
+                    }
+                    if (data.videoId) {
+                      await deleteDoc(doc(db, 'videos', data.videoId)).catch(() => {});
+                    }
+                    await deleteDoc(doc(db, 'snapples', d.id)).catch(() => {});
+                    deleted++;
+                  }
                 }
-                showAlert('Done', `Reactivated ${touched} snapples`);
+                showAlert('Done', `Reactivated ${reactivated}, deleted ${deleted}`);
               } catch (e) { showError('Error', e.message); }
             }}
           />
