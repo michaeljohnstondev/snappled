@@ -22,7 +22,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const { recordedVideo, cameraFacing } = route.params || {};
   const initialPrompt = route.params?.prompt;
   const { user, userCurrency, updateUserCurrency } = useAuth();
-  const { showSuccess, showError, showConfirm, showToast } = useModal();
+  const { showSuccess, showError, showConfirm, showAlert, showToast } = useModal();
   const { flyRewards } = useRewardClaim();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
@@ -205,94 +205,106 @@ export default function VideoPreviewScreen({ route, navigation }) {
       });
 
       if (snappleResult.success) {
-        // Award 75 XP for creating a snapple
+        // Award XP/achievements/participantCount once per promptId per
+        // user — recycled prompts (new promptId, same text) count as a
+        // fresh cycle and earn again. xpEarnedPrompts on the user doc
+        // tracks claimed promptIds so create-discard-create can't farm.
         try {
-          const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc, getDoc: xpGet } = await import('firebase/firestore');
+          const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc, getDoc: xpGet, arrayUnion: xpUnion } = await import('firebase/firestore');
           const { db: xpDb } = await import('../services/firebase');
 
           const beforeSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
           const beforeData = beforeSnap.data() || {};
-          const beforeXP = beforeData.profile?.experience || beforeData.profile?.xp || 0;
-          const beforeLevel = levelService.getLevelFromXP(beforeXP);
+          const earnedPrompts = beforeData.xpEarnedPrompts || [];
+          const alreadyEarned = submitPrompt?.id && earnedPrompts.includes(submitPrompt.id);
 
-          // Check XP boost
-          const boosts = beforeData.boosts || {};
-          const now = new Date().toISOString();
-          const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
+          if (!alreadyEarned) {
+            const beforeXP = beforeData.profile?.experience || beforeData.profile?.xp || 0;
+            const beforeLevel = levelService.getLevelFromXP(beforeXP);
 
-          // Fire-and-forget claim — XP only, no fly icons, just a bar tick.
-          // commit runs at the apex so the resource bar's XP/level bar moves
-          // in sync with the (very brief) overlay.
-          flyRewards({
-            rewards: { xp: xpAmount },
-            commit: async () => {
-              await xpUpdate(xpDoc(xpDb, 'users', user.uid), {
-                'profile.experience': xpInc(xpAmount),
-                'profile.xp': xpInc(xpAmount),
-                'stats.videosCreated': xpInc(1),
-              }).catch(() => {});
-            },
-          });
+            const boosts = beforeData.boosts || {};
+            const now = new Date().toISOString();
+            const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
 
-          const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
-          if (afterLevel > beforeLevel) {
-            setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1500);
+            flyRewards({
+              rewards: { xp: xpAmount },
+              commit: async () => {
+                const updates = {
+                  'profile.experience': xpInc(xpAmount),
+                  'profile.xp': xpInc(xpAmount),
+                  'stats.videosCreated': xpInc(1),
+                };
+                if (submitPrompt?.id) {
+                  updates.xpEarnedPrompts = xpUnion(submitPrompt.id);
+                }
+                await xpUpdate(xpDoc(xpDb, 'users', user.uid), updates).catch(() => {});
+              },
+            });
+
+            const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
+            if (afterLevel > beforeLevel) {
+              setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1500);
+            }
+
+            const afterSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
+            const stats = afterSnap.data()?.stats || {};
+            stats.level = afterLevel;
+            stats.trophies = afterSnap.data()?.resources?.trophies || 0;
+            const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+            newAchievements.forEach((a, i) => {
+              const rewards = [];
+              if (a.coins) rewards.push(`+${a.coins}c`);
+              if (a.xp) rewards.push(`+${a.xp}xp`);
+              setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3000 + i * 1500);
+            });
+
+            if (submitPrompt?.id) {
+              try {
+                const { doc: docRef, updateDoc: update, increment: inc } = await import('firebase/firestore');
+                const { db: database } = await import('../services/firebase');
+                await update(docRef(database, 'activePrompts', submitPrompt.id), {
+                  participantCount: inc(1),
+                }).catch(() =>
+                  update(docRef(database, 'snapplePrompts', submitPrompt.id), {
+                    participantCount: inc(1),
+                  }).catch(() => {})
+                );
+              } catch (e) {}
+            }
           }
-
-          // Check achievements
-          const afterSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
-          const stats = afterSnap.data()?.stats || {};
-          stats.level = afterLevel;
-          stats.trophies = afterSnap.data()?.resources?.trophies || 0;
-          const newAchievements = await achievementService.checkAndAward(user.uid, stats);
-          newAchievements.forEach((a, i) => {
-            const rewards = [];
-            if (a.coins) rewards.push(`+${a.coins}c`);
-            if (a.xp) rewards.push(`+${a.xp}xp`);
-            setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3000 + i * 1500);
-          });
         } catch (e) {}
 
-        // Increment participant count on the prompt
-        if (submitPrompt?.id) {
-          try {
-            const { doc: docRef, updateDoc: update, increment: inc } = await import('firebase/firestore');
-            const { db: database } = await import('../services/firebase');
-            await update(docRef(database, 'activePrompts', submitPrompt.id), {
-              participantCount: inc(1),
-            }).catch(() =>
-              update(docRef(database, 'snapplePrompts', submitPrompt.id), {
-                participantCount: inc(1),
-              }).catch(() => {})
-            );
-          } catch (e) {}
-        }
         // Ask whether to keep this snapple in the user's collection.
-        // Confirm = stay as owner (current default + add to ownedSnapples).
-        // Cancel = arrayRemove from owners; the onSnappleOwnersEmpty
-        // Cloud Function trigger then deletes the snapple unless someone
-        // else has already bought/saved it.
+        // Save = stays as owner + added to ownedSnapples. Discard =
+        // arrayRemove from owners; the onSnappleOwnersEmpty trigger
+        // deletes the snapple. Rewards already fired above (gated on
+        // promptId) so Discard doesn't undo XP — same as on real life
+        // when you tear up a draft, you still did the work.
         const newSnappleId = snappleResult.snappleId;
-        showConfirm(
-          'Save to Collection?',
-          'Keep this snapple in your collection? If not, it disappears unless others save it.',
-          async () => {
+        const onSave = async () => {
             const owned = [...(userCurrency.ownedSnapples || []), newSnappleId];
             await updateUserCurrency({ ownedSnapples: owned });
             showToast('reward', 'Snapple Saved', 'Added to your collection');
             setTimeout(() => navigation.popToTop(), 800);
-          },
-          async () => {
-            try {
-              const { doc: docRef, updateDoc: update, arrayRemove: aRemove } = await import('firebase/firestore');
-              const { db: database } = await import('../services/firebase');
-              await update(docRef(database, 'snapples', newSnappleId), {
-                owners: aRemove(user.uid),
-              }).catch(() => {});
-            } catch (e) {}
-            showToast('info', 'Snapple Submitted', 'Not saved to collection');
-            setTimeout(() => navigation.popToTop(), 800);
-          },
+        };
+        const onDiscard = async () => {
+          try {
+            const { doc: docRef, updateDoc: update, arrayRemove: aRemove } = await import('firebase/firestore');
+            const { db: database } = await import('../services/firebase');
+            await update(docRef(database, 'snapples', newSnappleId), {
+              owners: aRemove(user.uid),
+            }).catch(() => {});
+          } catch (e) {}
+          showToast('info', 'Snapple Discarded', 'Not saved to collection');
+          setTimeout(() => navigation.popToTop(), 800);
+        };
+        showAlert(
+          'Save this snapple?',
+          'Saved snapples stay in your collection. Discarded snapples disappear unless someone else saves them.',
+          [
+            { text: 'Discard', onPress: onDiscard },
+            { text: 'Save', onPress: onSave },
+          ],
         );
       } else {
         showError('Error', snappleResult.error || 'Failed to create snapple');
