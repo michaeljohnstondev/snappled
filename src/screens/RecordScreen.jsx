@@ -20,6 +20,9 @@ export default function RecordScreen({ route }) {
   const [recordingTime, setRecordingTime] = useState(0);
   const [showPrompt, setShowPrompt] = useState(!!route.params?.prompt);
   const [cameraKey, setCameraKey] = useState(0); // Force camera remount
+  // 3-2-1 countdown value reflected up from RecordingControls so we can
+  // paint a giant centered number over the camera preview.
+  const [countdown, setCountdown] = useState(0);
   
   const maxDuration = 10; // 10 second max for Snapples
   const { prompt } = route.params || {};
@@ -151,6 +154,15 @@ export default function RecordScreen({ route }) {
           </View>
         )}
 
+        {/* 3-2-1 countdown overlay — paints over the camera while
+            RecordingControls runs its pre-record countdown so the
+            ~1s vision-camera setup is masked by intentional UX. */}
+        {countdown > 0 && (
+          <View style={styles.countdownOverlay} pointerEvents="none">
+            <Text style={styles.countdownText}>{countdown}</Text>
+          </View>
+        )}
+
       {/* Overlay with All Controls */}
       <Pressable style={styles.overlayContainer} onPress={handleOverlayTouch}>
         {/* Top Controls */}
@@ -200,6 +212,7 @@ export default function RecordScreen({ route }) {
             onRecordingComplete={handleRecordingComplete}
             onRecordingTimeUpdate={handleRecordingTimeUpdate}
             onCameraReset={handleCameraReset}
+            onCountdownChange={setCountdown}
             maxDuration={10}
           />
         </View>
@@ -292,6 +305,24 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: theme.fontWeights.bold,
+  },
+  countdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  countdownText: {
+    color: 'white',
+    fontSize: 180,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
   },
   closeText: {
     color: 'white',

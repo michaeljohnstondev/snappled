@@ -12,22 +12,59 @@ export default function RecordingControls({
   onRecordingStop,
   onRecordingTimeUpdate,
   onCameraReset,
+  onCountdownChange,
   maxDuration = 10,
 }) {
   const [canStopManually, setCanStopManually] = useState(false);
+  // Countdown before recording starts. We fire the native start at the
+  // "1" tick so vision-camera's ~1s encoder setup overlaps the last
+  // countdown frame — by the time the overlay clears the camera is
+  // already capturing.
+  const [countdown, setCountdown] = useState(0);
 
   const timerRef = useRef(null);
   const recordingPromiseRef = useRef(null);
   const isRecordingRef = useRef(false);
   const recordingTimeRef = useRef(0);
+  const countdownTimeoutsRef = useRef([]);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      countdownTimeoutsRef.current.forEach((id) => clearTimeout(id));
+      countdownTimeoutsRef.current = [];
     };
   }, []);
+
+  // Mirror the countdown value out to the parent screen so it can render
+  // the big centered number overlay.
+  useEffect(() => {
+    onCountdownChange?.(countdown);
+  }, [countdown]);
+
+  // Run a 3-2-1 countdown and kick off the actual recording on the "1"
+  // tick so the native encoder finishes spinning up while the overlay
+  // is still visible. The recorded video then starts cleanly the
+  // instant the user sees the count clear.
+  function runCountdownThenRecord() {
+    if (countdown > 0) return;
+    setCountdown(3);
+    const t1 = setTimeout(() => setCountdown(2), 1000);
+    const t2 = setTimeout(() => {
+      setCountdown(1);
+      startRecording();
+    }, 2000);
+    const t3 = setTimeout(() => setCountdown(0), 3000);
+    countdownTimeoutsRef.current.push(t1, t2, t3);
+  }
+
+  function cancelCountdown() {
+    countdownTimeoutsRef.current.forEach((id) => clearTimeout(id));
+    countdownTimeoutsRef.current = [];
+    setCountdown(0);
+  }
 
   function startTimer(resetTime = true) {
     if (resetTime) {
@@ -171,8 +208,11 @@ export default function RecordingControls({
   function handleRecordButtonPress() {
     if (isRecording) {
       handleStopRecording();
+    } else if (countdown > 0) {
+      // Tap during countdown cancels it.
+      cancelCountdown();
     } else {
-      startRecording();
+      runCountdownThenRecord();
     }
   }
 
