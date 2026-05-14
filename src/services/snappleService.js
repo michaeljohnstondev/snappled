@@ -207,15 +207,18 @@ export const snappleService = {
     }
   },
 
-  // Returns the active community-pool snapples for the game-screen hand
-  // pool and bot picks. Avoids server-side orderBy so legacy docs missing
-  // a createdAt field still come back — Firestore silently drops them
-  // from orderBy queries, which was shrinking the bot pool to a tiny set.
-  async getActiveSnapples(limitCount = 20) {
+  // Returns active community-pool snapples for the game hand and bot
+  // picks. Pulls a wide net (no server-side orderBy, generous limit) so
+  // legacy docs missing createdAt and older docs alike are eligible —
+  // we want every active snapple in the collection, not just the most
+  // recent. Sorted by totalVotes desc so practice/bot picks lean toward
+  // crowd-favorite cards. Unpopular cards still get in until we exceed
+  // the limit budget.
+  async getActiveSnapples(limitCount = 200) {
     try {
       const q = query(
         collection(db, SNAPPLES_COLLECTION),
-        limit(limitCount * 2),
+        limit(2000),
       );
 
       const querySnapshot = await getDocs(q);
@@ -228,9 +231,7 @@ export const snappleService = {
         }
       });
 
-      // Client-side sort so docs missing createdAt fall to the bottom
-      // instead of getting dropped entirely.
-      snapples.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      snapples.sort((a, b) => (b.totalVotes || 0) - (a.totalVotes || 0));
 
       return { success: true, snapples: snapples.slice(0, limitCount) };
     } catch (error) {
