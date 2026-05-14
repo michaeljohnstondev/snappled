@@ -676,6 +676,54 @@ export default function AdminScreen({ navigation }) {
           />
           <BanPromptCard showAlert={showAlert} showError={showError} />
           <UtilButton
+            label="Diagnose Snapple Pool"
+            desc="Count docs in /snapples and report how many pass the active+notBanned filter that game-screen uses. Helps find why the bot pool is small."
+            color={theme.colors.vibeYellow}
+            onPress={async () => {
+              try {
+                const snap = await getDocs(query(collection(db, 'snapples'), limit(2000)));
+                let total = 0;
+                let active = 0;
+                let inactive = 0;
+                let banned = 0;
+                let missingActive = 0;
+                for (const d of snap.docs) {
+                  total++;
+                  const data = d.data();
+                  if (data.isActive === false) inactive++;
+                  if (data.isBanned === true) banned++;
+                  if (data.isActive === undefined) missingActive++;
+                  if (data.isActive !== false && data.isBanned !== true) active++;
+                }
+                showAlert(
+                  'Snapple Pool',
+                  `Total: ${total}\nPasses filter: ${active}\nisActive=false: ${inactive}\nisBanned=true: ${banned}\nisActive missing: ${missingActive}`,
+                );
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
+            label="Reactivate All Snapples"
+            desc="Set isActive=true and isBanned=false on every snapple. Use after Diagnose if too many are filtered out."
+            color={theme.colors.vibeGreen}
+            onPress={async () => {
+              try {
+                const snap = await getDocs(query(collection(db, 'snapples'), limit(2000)));
+                let touched = 0;
+                for (const d of snap.docs) {
+                  const data = d.data();
+                  if (data.isActive === true && data.isBanned === false) continue;
+                  await updateDoc(doc(db, 'snapples', d.id), {
+                    isActive: true,
+                    isBanned: false,
+                  });
+                  touched++;
+                }
+                showAlert('Done', `Reactivated ${touched} snapples`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
             label="Reset Snapple Game Stats"
             desc="Zero out gamesPlayed and gamesWon on every snapple. Use this when the pool is small enough that the same handful of snapples are getting boosted unfairly."
             color={theme.colors.vibeOrange}
