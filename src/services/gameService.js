@@ -540,7 +540,7 @@ export const gameService = {
 
       const candidates = [];
       snapshot.forEach(d => candidates.push({ id: d.id, text: d.data().text }));
-      const shuffled = candidates.sort(() => Math.random() - 0.5).slice(0, count);
+      const shuffled = this._shuffle(candidates).slice(0, count);
 
       // Increment usageCount for the selected prompts so next game prefers
       // others. Fire-and-forget — don't block on it.
@@ -580,17 +580,29 @@ export const gameService = {
     return { added, total: existing.size + added };
   },
 
-  // Draw a hand from deck
+  // Fisher-Yates shuffle — uniform random. The previous
+  // Array.sort(() => Math.random() - 0.5) is biased (V8's TimSort keeps
+  // elements close to their original index), which made the first 6 of
+  // the merged pool [...mySnapples, ...community] win the slot lottery
+  // way too often — the user kept seeing the same 6 every game.
+  _shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  // Draw a hand of `handSize` cards from the player's deck, padded with
+  // community snapples if their deck is too small.
   drawHand(ownedSnapples, allSnapples = [], handSize = HAND_SIZE) {
-    const shuffled = [...ownedSnapples].sort(() => Math.random() - 0.5);
+    const shuffled = this._shuffle(ownedSnapples);
     const hand = shuffled.slice(0, handSize);
 
-    // Pad with random community snapples if not enough
     if (hand.length < handSize && allSnapples.length > 0) {
       const handIds = new Set(hand.map(s => s.id));
-      const extras = allSnapples
-        .filter(s => !handIds.has(s.id))
-        .sort(() => Math.random() - 0.5);
+      const extras = this._shuffle(allSnapples.filter(s => !handIds.has(s.id)));
       while (hand.length < handSize && extras.length > 0) {
         hand.push(extras.pop());
       }

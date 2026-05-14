@@ -105,8 +105,14 @@ export default function BasicCameraView({
           reject(new Error('Camera not ready'));
           return;
         }
+        // H.265 (HEVC) + 3 Mbps gets ~75% smaller files than the raw
+        // iPhone default (~17 Mbps H.264) at visually-indistinguishable
+        // quality on a phone screen. Smaller uploads → smaller downloads
+        // → snapples actually load in time for the next round.
         cameraRef.current.startRecording({
           fileType: 'mp4',
+          videoCodec: 'h265',
+          videoBitRate: 3_000_000,
           onRecordingFinished: (video) => resolve({ uri: 'file://' + video.path }),
           onRecordingError: (err) => reject(err),
         });

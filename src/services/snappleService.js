@@ -144,7 +144,7 @@ export const snappleService = {
       const snapples = [];
       snap.forEach((d) => {
         const data = d.data();
-        if (data.isActive === true && data.isBanned !== true) {
+        if (data.isActive !== false && data.isBanned !== true) {
           snapples.push({ id: d.id, ...data });
         }
       });
@@ -184,7 +184,7 @@ export const snappleService = {
       const byId = new Map();
       results.forEach(snap => snap.forEach(d => {
         const data = d.data();
-        if (data.isActive === true && data.isBanned !== true) {
+        if (data.isActive !== false && data.isBanned !== true) {
           byId.set(d.id, { id: d.id, ...data });
         }
       }));
@@ -222,7 +222,7 @@ export const snappleService = {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         // Filter client-side to avoid index requirement
-        if (data.isActive === true && data.isBanned !== true) {
+        if (data.isActive !== false && data.isBanned !== true) {
           snapples.push({ id: doc.id, ...data });
         }
       });
@@ -250,7 +250,7 @@ export const snappleService = {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         // Filter client-side to avoid index requirement
-        if (data.isActive === true && data.isBanned !== true) {
+        if (data.isActive !== false && data.isBanned !== true) {
           snapples.push({ id: doc.id, ...data });
         }
       });
