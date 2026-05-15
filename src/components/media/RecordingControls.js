@@ -44,19 +44,20 @@ export default function RecordingControls({
     onCountdownChange?.(countdown);
   }, [countdown]);
 
-  // Run a 3-2-1 countdown and kick off the actual recording on the "1"
-  // tick so the native encoder finishes spinning up while the overlay
-  // is still visible. The recorded video then starts cleanly the
-  // instant the user sees the count clear.
+  // Run a 3-2-1 countdown and kick off the actual recording the moment
+  // the overlay clears. On fast devices the prior "start at 1" timing
+  // captured ~2s of pre-action footage; aligning the start with the
+  // overlay clear keeps the recorded video lined up with what the
+  // user sees as "GO".
   function runCountdownThenRecord() {
     if (countdown > 0) return;
     setCountdown(3);
     const t1 = setTimeout(() => setCountdown(2), 1000);
-    const t2 = setTimeout(() => {
-      setCountdown(1);
+    const t2 = setTimeout(() => setCountdown(1), 2000);
+    const t3 = setTimeout(() => {
+      setCountdown(0);
       startRecording();
-    }, 2000);
-    const t3 = setTimeout(() => setCountdown(0), 3000);
+    }, 3000);
     countdownTimeoutsRef.current.push(t1, t2, t3);
   }
 
