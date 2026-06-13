@@ -43,6 +43,15 @@ export default function SnappleOverlay({
     hasDisliked: false,
     hasPurchased: false
   });
+  // Local mirror of snapple.isPrivate so the lock badge and toggle UI
+  // update instantly when the creator flips it, without waiting for the
+  // parent to refetch.
+  const [isPrivate, setIsPrivate] = useState(!!snapple?.isPrivate);
+
+  // Sync local privacy when a different snapple opens
+  React.useEffect(() => {
+    setIsPrivate(!!snapple?.isPrivate);
+  }, [snapple?.id, snapple?.isPrivate]);
 
   // Reset metrics, load interactions, and track view when snapple changes
   React.useEffect(() => {
@@ -260,14 +269,19 @@ export default function SnappleOverlay({
             <Text style={styles.actionCount}>{formatCount(metrics.dislikes)}</Text>
           </View>
 
-          <View style={styles.actionGroup}>
-            <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
-              <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
-                <Ionicons name={userInteraction.hasPurchased ? "checkmark" : "diamond"} size={20} style={{ marginTop: 2 }} color={userInteraction.hasPurchased ? theme.colors.vibeGreen : theme.colors.vibeBlue} />
-              </View>
-            </Pressable>
-            <Text style={styles.actionCount}>{userInteraction.hasPurchased ? 'Owned' : `${metrics.currentPrice}`}</Text>
-          </View>
+          {/* Buy button — hidden entirely for private snapples since they
+              can't be purchased. The creator viewing their own private
+              snapple also doesn't see it. */}
+          {!isPrivate && (
+            <View style={styles.actionGroup}>
+              <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
+                <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
+                  <Ionicons name={userInteraction.hasPurchased ? "checkmark" : "diamond"} size={20} style={{ marginTop: 2 }} color={userInteraction.hasPurchased ? theme.colors.vibeGreen : theme.colors.vibeBlue} />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{userInteraction.hasPurchased ? 'Owned' : `${metrics.currentPrice}`}</Text>
+            </View>
+          )}
 
           <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={async () => {
@@ -340,6 +354,35 @@ export default function SnappleOverlay({
                 </View>
               </Pressable>
               <Text style={styles.actionCount}>Report</Text>
+            </View>
+          )}
+
+          {/* Creator-only: flip private ↔ public anytime. Private hides
+              the snapple from public feeds and disables buying; public
+              re-exposes it. Optimistic UI — flip first, persist after. */}
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={async () => {
+                  const next = !isPrivate;
+                  setIsPrivate(next);
+                  const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
+                  if (!result.success) {
+                    setIsPrivate(!next);
+                    showError('Error', result.error || 'Could not update privacy');
+                  }
+                }}
+              >
+                <View style={[styles.buttonBg, isPrivate && styles.activeBg]}>
+                  <Ionicons
+                    name={isPrivate ? 'lock-closed' : 'lock-open'}
+                    size={20}
+                    color={isPrivate ? theme.colors.vibeYellow : 'white'}
+                  />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
             </View>
           )}
 

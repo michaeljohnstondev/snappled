@@ -127,6 +127,16 @@ export default function SnappleGrid({
 
           {/* Engagement Indicator */}
           <View style={[styles.engagementIndicator, { backgroundColor: engagementColor }]} />
+
+          {/* Lock badge for private snapples — only the creator ever sees
+              their own private snapples here (queries filter them out
+              everywhere else), but flagging them visually helps the
+              creator find their drafts at a glance. */}
+          {item.isPrivate && (
+            <View style={styles.privateBadge}>
+              <Ionicons name="lock-closed" size={12} color="#fff" />
+            </View>
+          )}
         </View>
       </Pressable>
     );
@@ -275,6 +285,19 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  privateBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderWidth: 1.5,
+    borderColor: theme.colors.vibeYellow,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   creatorText: {
     color: 'white',

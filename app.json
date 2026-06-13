@@ -14,6 +14,7 @@
         "NSMicrophoneUsageDescription": "Snappled uses the microphone to record audio with your videos.",
         "NSPhotoLibraryUsageDescription": "Snappled lets you save your recorded snapples to your photo library.",
         "NSPhotoLibraryAddUsageDescription": "Snappled saves your recorded snapples to your photo library.",
+        "NSLocationWhenInUseUsageDescription": "Snappled does not collect your location. This permission is required because the camera SDK can attach location metadata to videos.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

@@ -26,6 +26,10 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const { flyRewards } = useRewardClaim();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  // Private snapples never appear in public feeds (prompt grid, trending,
+  // community game pool) and can't be purchased. The creator can still
+  // play them from their own owned hand and flip back to public later.
+  const [isPrivate, setIsPrivate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -202,6 +206,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
         category: submitPrompt.category || 'general',
         boostedUntil,
         muted: isMuted,
+        isPrivate,
       });
 
       if (snappleResult.success) {
@@ -424,15 +429,32 @@ export default function VideoPreviewScreen({ route, navigation }) {
               <Text style={styles.closeText}>✕</Text>
             </View>
           </Pressable>
-          <Pressable onPress={(e) => { e.stopPropagation?.(); setIsMuted(m => !m); }} style={styles.muteButton}>
-            <View style={styles.controlButton}>
-              <Ionicons
-                name={isMuted ? 'volume-mute' : 'volume-high'}
-                size={20}
-                color="white"
-              />
-            </View>
-          </Pressable>
+          <View style={styles.headerRight}>
+            {/* Private toggle: lock icon when on, open lock when off.
+                Private snapples stay off public feeds + the marketplace
+                but can still be played from the creator's own hand. */}
+            <Pressable
+              onPress={(e) => { e.stopPropagation?.(); setIsPrivate(p => !p); }}
+              style={styles.muteButton}
+            >
+              <View style={[styles.controlButton, isPrivate && styles.controlButtonActive]}>
+                <Ionicons
+                  name={isPrivate ? 'lock-closed' : 'lock-open'}
+                  size={18}
+                  color="white"
+                />
+              </View>
+            </Pressable>
+            <Pressable onPress={(e) => { e.stopPropagation?.(); setIsMuted(m => !m); }} style={styles.muteButton}>
+              <View style={styles.controlButton}>
+                <Ionicons
+                  name={isMuted ? 'volume-mute' : 'volume-high'}
+                  size={20}
+                  color="white"
+                />
+              </View>
+            </Pressable>
+          </View>
         </View>
 
         {/* Play Button - Only show when paused */}
@@ -778,6 +800,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   controlButton: {
     width: 44,
     height: 44,
@@ -787,6 +814,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     borderWidth: 3,
     borderColor: '#00C6FF',
+  },
+  controlButtonActive: {
+    backgroundColor: '#00C6FF',
   },
   playButton: {
     position: 'absolute',

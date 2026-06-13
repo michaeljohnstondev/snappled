@@ -1,8 +1,16 @@
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
+// snappleService.js
+// Firestore CRUD + community queries for the `snapples` collection.
+// Owns snapple lifecycle: create, fetch (per-creator / per-prompt /
+// trending / active pool), engagement (likes, dislikes, wishlist,
+// reports), and visibility (public vs. private). Public-feed queries
+// filter out `isPrivate === true` so private snapples only surface on
+// the creator's own profile and in their own owned-snapples hand.
+
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
   increment,
   serverTimestamp,
   collection,
@@ -79,7 +87,14 @@ export const snappleService = {
         // Creator preference: when true, players hear silence on this
         // snapple. Useful for visual-only content (graffiti, art, etc.).
         muted: !!snappleData.muted,
-        
+
+        // Visibility: when true, the snapple is hidden from public
+        // feeds (prompt grid, trending, marketplace, community game
+        // pool) and not purchasable. Only the creator sees it on their
+        // profile and can play it from their own owned hand. Toggleable
+        // post-create via setSnapplePrivacy().
+        isPrivate: !!snappleData.isPrivate,
+
         // Pricing
         basePrice: 10, // Starting price in coins
         currentPrice: 10,
@@ -184,7 +199,8 @@ export const snappleService = {
       const byId = new Map();
       results.forEach(snap => snap.forEach(d => {
         const data = d.data();
-        if (data.isActive !== false && data.isBanned !== true) {
+        // Private snapples never appear in public prompt grids.
+        if (data.isActive !== false && data.isBanned !== true && data.isPrivate !== true) {
           byId.set(d.id, { id: d.id, ...data });
         }
       }));
@@ -226,7 +242,10 @@ export const snappleService = {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.isActive !== false && data.isBanned !== true) {
+        // Private snapples are excluded from the community pool. The
+        // creator can still play their own privates through their
+        // ownedSnapples hand — drawHand() merges those in separately.
+        if (data.isActive !== false && data.isBanned !== true && data.isPrivate !== true) {
           snapples.push({ id: doc.id, ...data });
         }
       });
@@ -254,12 +273,14 @@ export const snappleService = {
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Filter client-side to avoid index requirement
-        if (data.isActive !== false && data.isBanned !== true) {
+        // Filter client-side to avoid index requirement. Private
+        // snapples are not eligible for the trending / marketplace
+        // surface since they can't be bought.
+        if (data.isActive !== false && data.isBanned !== true && data.isPrivate !== true) {
           snapples.push({ id: doc.id, ...data });
         }
       });
-      
+
       // Sort by engagement metrics and limit results
       snapples.sort((a, b) => {
         const aScore = (a.totalVotes || 0) + (a.buyCount || 0) * 2;
@@ -456,6 +477,33 @@ export const snappleService = {
         return { success: false, error: 'You already own this snapple' };
       }
       return { success: false, error: message };
+    }
+  },
+
+  // Toggle a snapple's public/private visibility. Only the creator can
+  // change it. Switching to private hides it from prompt feeds,
+  // trending, and the community game pool; switching to public exposes
+  // it again. Does NOT affect engagement stats or ownership.
+  async setSnapplePrivacy(snappleId, userId, isPrivate) {
+    try {
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const snappleDoc = await getDoc(snappleRef);
+
+      if (!snappleDoc.exists()) {
+        return { success: false, error: 'Snapple not found' };
+      }
+      if (snappleDoc.data().creatorId !== userId) {
+        return { success: false, error: 'Only the creator can change privacy' };
+      }
+
+      await updateDoc(snappleRef, {
+        isPrivate: !!isPrivate,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true, isPrivate: !!isPrivate };
+    } catch (error) {
+      console.error('Error toggling snapple privacy:', error);
+      return { success: false, error: 'Failed to update privacy' };
     }
   },
 

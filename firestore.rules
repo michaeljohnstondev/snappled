@@ -18,9 +18,17 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
-    // Snapples - anyone can read, creator creates, engagement updates allowed
+    // Snapples — public reads for non-private; private snapples are
+    // only readable by the creator (and by anyone in the owners list,
+    // though buys are gated client-side so owners stays just the
+    // creator). Defense in depth: queries already exclude isPrivate
+    // from public surfaces, this stops a direct getDoc bypass.
     match /snapples/{snappleId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        resource.data.isPrivate != true
+        || request.auth.uid == resource.data.creatorId
+        || request.auth.uid in resource.data.owners
+      );
       allow create: if request.auth != null;
       allow update: if request.auth != null;
       allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
