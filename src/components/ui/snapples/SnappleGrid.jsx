@@ -181,6 +181,13 @@ export default function SnappleGrid({
         refreshing={refreshing}
         onRefresh={onRefresh}
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+        // Virtualization tuning — keeps the number of concurrently
+        // mounted thumbnails small so a profile with 50 snapples
+        // doesn't kick off 50 native extractions on first render.
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews
       />
       <SortModal
         visible={showSortModal}

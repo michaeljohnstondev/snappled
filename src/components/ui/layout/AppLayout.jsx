@@ -7,6 +7,8 @@ import * as Updates from 'expo-updates';
 import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
 import TokenPromptModal from '../modals/TokenPromptModal';
+import UpdateBanner from '../UpdateBanner';
+import { useAppUpdate } from '../../../hooks/useAppUpdate';
 import theme from '../../../theme/themes';
 
 const APP_VERSION = Constants.expoConfig?.version || '?';
@@ -26,6 +28,10 @@ const UPDATE_TAG = Updates.updateId
 export default function AppLayout({ navigation, children, hideHeader = false }) {
   const { user, userCurrency } = useAuth();
   const [showTokenModal, setShowTokenModal] = useState(false);
+  // OTA: silently downloads new bundles on launch + foreground and
+  // surfaces a Restart banner the moment one is ready, so users never
+  // run stale JS for longer than a single session.
+  const { isUpdateReady, applyUpdate } = useAppUpdate();
 
   const userStats = {
     tokens: userCurrency.tokens || 0,
@@ -67,6 +73,8 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
       <Text style={styles.versionTag} pointerEvents="none">
         v{APP_VERSION} · {UPDATE_TAG}
       </Text>
+
+      <UpdateBanner visible={isUpdateReady} onRestart={applyUpdate} />
     </LinearGradient>
   );
 }
