@@ -692,6 +692,14 @@ exports.purchaseSnapple = functions.https.onCall(async (data, context) => {
     const userData = userDoc.data();
     const currentPrice = snapple.currentPrice || 10;
 
+    // Private snapples are off-market — only the creator's own copy,
+    // grandfathered owners from before it went private, and gameplay
+    // (which uses ownedSnapples directly, not purchase) get them. Hard
+    // server-side block in case a stale client tries to call this.
+    if (snapple.isPrivate === true) {
+      throw new functions.https.HttpsError('failed-precondition', 'This snapple is private');
+    }
+
     // Check coins
     const userCoins = userData?.resources?.coins || userData?.coins || 0;
     if (userCoins < currentPrice) {

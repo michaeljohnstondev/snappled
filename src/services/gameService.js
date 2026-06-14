@@ -221,6 +221,9 @@ export const gameService = {
           creatorId: snapple.creatorId || null,
           creatorUsername: snapple.creatorUsername || 'anonymous',
           muted: !!snapple.muted,
+          // Snapshot so CreatorActionRow can hide Buy/Wishlist on
+          // private snapples without an extra fetch per submission.
+          isPrivate: !!snapple.isPrivate,
         }),
         updatedAt: serverTimestamp(),
       });

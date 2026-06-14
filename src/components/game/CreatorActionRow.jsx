@@ -17,6 +17,10 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   const snappleId = submission?.snappleId || submission?.id;
   const creatorId = submission?.creatorId;
   const isMine = creatorId && creatorId === currentUser?.uid;
+  // Private snapples played in-game can be seen + voted on but never
+  // bought (and there's no point wishlisting something that can't be
+  // purchased). Hide both buttons when the creator played a private.
+  const isPrivate = submission?.isPrivate === true;
 
   const [following, setFollowing] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
@@ -90,25 +94,29 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
               color={following ? theme.colors.vibeBlue : 'white'}
             />
           </Pressable>
-          <Pressable
-            style={[styles.btn, wishlisted && styles.btnActive]}
-            onPress={handleWishlist}
-            disabled={busy}
-          >
-            <Ionicons
-              name={wishlisted ? 'heart' : 'heart-outline'}
-              size={13}
-              color={wishlisted ? theme.colors.vibeRed : 'white'}
-            />
-          </Pressable>
-          <Pressable
-            style={[styles.btn, owned && styles.btnActive, { paddingHorizontal: 10 }]}
-            onPress={handleBuy}
-            disabled={busy || owned}
-          >
-            <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
-            <Text style={styles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
-          </Pressable>
+          {!isPrivate && (
+            <Pressable
+              style={[styles.btn, wishlisted && styles.btnActive]}
+              onPress={handleWishlist}
+              disabled={busy}
+            >
+              <Ionicons
+                name={wishlisted ? 'heart' : 'heart-outline'}
+                size={13}
+                color={wishlisted ? theme.colors.vibeRed : 'white'}
+              />
+            </Pressable>
+          )}
+          {!isPrivate && (
+            <Pressable
+              style={[styles.btn, owned && styles.btnActive, { paddingHorizontal: 10 }]}
+              onPress={handleBuy}
+              disabled={busy || owned}
+            >
+              <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
+              <Text style={styles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
+            </Pressable>
+          )}
         </View>
       )}
     </View>

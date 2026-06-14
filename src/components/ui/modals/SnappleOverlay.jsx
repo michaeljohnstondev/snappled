@@ -383,11 +383,15 @@ export default function SnappleOverlay({
                   };
 
                   // Only warn when going PUBLIC → PRIVATE with buyers.
-                  // Public-bound flips never need a warning.
+                  // Public-bound flips never need a warning. Mentions
+                  // Delete as the alternative for creators whose real
+                  // intent is a full takedown, not just "no new buys".
                   if (next && buyerCount > 0) {
+                    const noun = buyerCount === 1 ? 'player' : 'players';
+                    const verb = buyerCount === 1 ? 'owns' : 'own';
                     showConfirm(
                       'Make Private?',
-                      `${buyerCount} player${buyerCount === 1 ? '' : 's'} already own${buyerCount === 1 ? 's' : ''} this. ${buyerCount === 1 ? 'They keep' : 'They keep'} their copy — going private just stops new buys and hides it from public feeds. Continue?`,
+                      `${buyerCount} ${noun} already ${verb} this. They'll keep their copy — going private just stops new buys and hides it from public feeds.\n\nWant to take it down entirely? Use Delete instead.`,
                       persistPrivacy
                     );
                   } else {
