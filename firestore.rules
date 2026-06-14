@@ -19,14 +19,18 @@ service cloud.firestore {
     }
 
     // Snapples — public reads for non-private; private snapples are
-    // only readable by the creator. Uses .get('isPrivate', false) so
-    // legacy docs missing the field behave as public (avoids a query-
-    // wide rejection from one bad doc — Firestore rules apply per-doc
-    // and a single failure rejects the whole result set).
+    // only readable by the creator OR a grandfathered buyer who
+    // already owned the snapple before it was flipped private (going
+    // private only blocks NEW buys; existing owners keep access).
+    // Uses .get(field, default) for both isPrivate and owners so a
+    // single legacy doc without those fields can't reject the whole
+    // query result set (Firestore rules apply per-doc and any single
+    // failure rejects the entire query).
     match /snapples/{snappleId} {
       allow read: if request.auth != null && (
         resource.data.get('isPrivate', false) != true
         || request.auth.uid == resource.data.creatorId
+        || request.auth.uid in resource.data.get('owners', [])
       );
       allow create: if request.auth != null;
       allow update: if request.auth != null;

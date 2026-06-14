@@ -358,19 +358,40 @@ export default function SnappleOverlay({
           )}
 
           {/* Creator-only: flip private ↔ public anytime. Private hides
-              the snapple from public feeds and disables buying; public
-              re-exposes it. Optimistic UI — flip first, persist after. */}
+              the snapple from public feeds and disables NEW buys; the
+              UI confirms first if there are existing buyers (they keep
+              their copy — see persistPrivacy / handlePrivacyToggle).
+              Optimistic UI: flip the icon first, persist after. */}
           {snapple.creatorId === user?.uid && (
             <View style={styles.actionGroup}>
               <Pressable
                 style={styles.actionButton}
-                onPress={async () => {
+                onPress={() => {
                   const next = !isPrivate;
-                  setIsPrivate(next);
-                  const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
-                  if (!result.success) {
-                    setIsPrivate(!next);
-                    showError('Error', result.error || 'Could not update privacy');
+                  // Owners always includes the creator; anyone else in
+                  // the array is a paying buyer who's grandfathered in.
+                  const buyerCount = (snapple.owners || [])
+                    .filter((id) => id !== snapple.creatorId).length;
+
+                  const persistPrivacy = async () => {
+                    setIsPrivate(next);
+                    const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
+                    if (!result.success) {
+                      setIsPrivate(!next);
+                      showError('Error', result.error || 'Could not update privacy');
+                    }
+                  };
+
+                  // Only warn when going PUBLIC → PRIVATE with buyers.
+                  // Public-bound flips never need a warning.
+                  if (next && buyerCount > 0) {
+                    showConfirm(
+                      'Make Private?',
+                      `${buyerCount} player${buyerCount === 1 ? '' : 's'} already own${buyerCount === 1 ? 's' : ''} this. ${buyerCount === 1 ? 'They keep' : 'They keep'} their copy — going private just stops new buys and hides it from public feeds. Continue?`,
+                      persistPrivacy
+                    );
+                  } else {
+                    persistPrivacy();
                   }
                 }}
               >
