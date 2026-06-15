@@ -480,6 +480,34 @@ export const snappleService = {
     }
   },
 
+  // Toggle a snapple's muted state. Only the creator can change it.
+  // Mute is a creator-side artistic call — applies to ALL playbacks
+  // (home, game, voting, owners' decks) since the muted field is read
+  // directly by players. No per-owner override. Doesn't affect any
+  // other state (visibility, ownership, stats).
+  async setSnappleMuted(snappleId, userId, muted) {
+    try {
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const snappleDoc = await getDoc(snappleRef);
+
+      if (!snappleDoc.exists()) {
+        return { success: false, error: 'Snapple not found' };
+      }
+      if (snappleDoc.data().creatorId !== userId) {
+        return { success: false, error: 'Only the creator can change mute' };
+      }
+
+      await updateDoc(snappleRef, {
+        muted: !!muted,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true, muted: !!muted };
+    } catch (error) {
+      console.error('Error toggling snapple muted:', error);
+      return { success: false, error: 'Failed to update mute' };
+    }
+  },
+
   // Toggle a snapple's public/private visibility. Only the creator can
   // change it. Switching to private hides it from prompt feeds,
   // trending, and the community game pool; switching to public exposes

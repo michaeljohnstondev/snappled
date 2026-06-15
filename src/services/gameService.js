@@ -68,6 +68,10 @@ export const GAME_PHASES = {
   REVIEW: 'review',
   PICKING: 'picking',
   VOTING: 'voting',
+  // Brief breather between voting and the scoreboard: highlights the
+  // round's winning card(s) and surfaces voter attribution so players
+  // can soak in who voted for whom before the scoreboard pops.
+  SCORING: 'scoring',
   ROUND_RESULTS: 'roundResults',
   FINAL_RESULTS: 'finalResults',
 };
@@ -323,15 +327,14 @@ export const gameService = {
         };
       });
 
-      // Field reused: data.totalRounds is now the play-to TARGET POINTS.
-      // 0 = infinite (host ends manually). Otherwise the game ends as
-      // soon as any player crosses the target this round.
-      const target = data.totalRounds;
-      const topScore = updatedPlayers.reduce((m, p) => Math.max(m, p.points || 0), 0);
-      const isLastRound = target > 0 && topScore >= target;
-
+      // Always land on SCORING first — gives players a beat to see who
+      // won this round + voter attribution before the scoreboard pops.
+      // enterRoundResults() advances SCORING → ROUND_RESULTS (or
+      // FINAL_RESULTS) once the SCORING timer elapses. Player totals
+      // are committed here so the SCORING screen can show per-card
+      // points-earned without re-tallying.
       await updateDoc(gameRef, {
-        phase: isLastRound ? GAME_PHASES.FINAL_RESULTS : GAME_PHASES.ROUND_RESULTS,
+        phase: GAME_PHASES.SCORING,
         players: updatedPlayers,
         roundResults: arrayUnion({
           round: data.currentRound,
@@ -352,9 +355,38 @@ export const gameService = {
         }
       });
 
+      const target = data.totalRounds;
+      const topScore = updatedPlayers.reduce((m, p) => Math.max(m, p.points || 0), 0);
+      const isLastRound = target > 0 && topScore >= target;
       return { success: true, roundResult, isLastRound };
     } catch (error) {
       console.error('[GameService] Error finishing round:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // SCORING → ROUND_RESULTS (or FINAL_RESULTS if the round pushed
+  // anyone over the target). Called by the host when the SCORING
+  // timer elapses. Re-derives isLastRound from current player totals
+  // since finishRound already committed them.
+  async enterRoundResults(gameId) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      const gameDoc = await getDoc(gameRef);
+      const data = gameDoc.data();
+      if (data.phase !== GAME_PHASES.SCORING) return { success: true, skipped: true };
+
+      const target = data.totalRounds;
+      const topScore = (data.players || []).reduce((m, p) => Math.max(m, p.points || 0), 0);
+      const isLastRound = target > 0 && topScore >= target;
+
+      await updateDoc(gameRef, {
+        phase: isLastRound ? GAME_PHASES.FINAL_RESULTS : GAME_PHASES.ROUND_RESULTS,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true, isLastRound };
+    } catch (error) {
+      console.error('[GameService] Error entering round results:', error);
       return { success: false, error: error.message };
     }
   },

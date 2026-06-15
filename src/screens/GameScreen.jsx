@@ -51,11 +51,56 @@ const VOTER_PALETTE = [
   theme.colors.vibeRoyalBlue,
 ];
 
+// Scoring-phase winner callout. Slides down from above on mount with a
+// soft fade so the moment feels announced rather than printed. Idempotent
+// — re-mounted each round when SCORING phase enters.
+function ScoringWinnerBanner({ isTie, names, votes }) {
+  const ty = React.useRef(new Animated.Value(-40)).current;
+  const op = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(ty, {
+        toValue: 0,
+        duration: 450,
+        delay: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(op, {
+        toValue: 1,
+        duration: 450,
+        delay: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+  return (
+    <Animated.View
+      style={[
+        scoringStyles.winnerBanner,
+        { opacity: op, transform: [{ translateY: ty }] },
+      ]}
+    >
+      <Text style={scoringStyles.winnerLabel}>
+        {isTie ? 'Round Winners (tied)' : 'Round Winner'}
+      </Text>
+      <Text style={scoringStyles.winnerNames}>
+        {names.map(n => `@${n}`).join(' · ')}
+      </Text>
+      <Text style={scoringStyles.winnerVotes}>
+        {votes} vote{votes === 1 ? '' : 's'}
+      </Text>
+    </Animated.View>
+  );
+}
+
 // Voting-wait snapples grid. Renders VoteAuraCards and, once all-voted
 // flips true, fades all picker names in together below the cards. Owns
 // a single shared Animated.Value so the fade survives re-renders during
 // the 10s post-all-voted wait.
-function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, allVotedIn, onPressCard }) {
+// Optional props:
+//   winnerUids (Set):    submission.uid values to crown (SCORING phase)
+//   pointsByUid (Map):   submission.uid → pointsEarned chip (SCORING phase)
+function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, allVotedIn, onPressCard, winnerUids, pointsByUid }) {
   const nameOpacity = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!allVotedIn) return;
@@ -85,6 +130,8 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
             voters={voters(sub.uid)}
             picker={picker}
             onPress={() => onPressCard(sub)}
+            isWinner={winnerUids ? winnerUids.has(sub.uid) : false}
+            pointsEarned={pointsByUid ? pointsByUid.get(sub.uid) : undefined}
           />
         );
       })}
@@ -458,7 +505,7 @@ export default function GameScreen({ navigation }) {
       const { db } = require('../services/firebase');
       const gamesQuery = q(
         col(db, 'games'),
-        where('phase', 'in', ['lobby', 'picking', 'voting', 'roundResults']),
+        where('phase', 'in', ['lobby', 'picking', 'voting', 'scoring', 'roundResults']),
         lim(5)
       );
       const snapshot = await getDocs(gamesQuery);
@@ -541,6 +588,23 @@ export default function GameScreen({ navigation }) {
                 finishScheduledRoundRef.current !== game.currentRound) {
               finishScheduledRoundRef.current = game.currentRound;
               setTimeout(() => gameService.finishRound(gameId), 1000);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (game?.phase === GAME_PHASES.SCORING) {
+      // Brief breather between voting and the scoreboard so players can
+      // see who won the round + voter attribution. Host auto-advances
+      // to ROUND_RESULTS (or FINAL_RESULTS) when the timer runs out.
+      setTimer(15);
+      timerRef.current = setInterval(() => {
+        setTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            if (game.hostId === user?.uid) {
+              gameService.enterRoundResults(gameId);
             }
             return 0;
           }
@@ -1518,6 +1582,102 @@ export default function GameScreen({ navigation }) {
     );
   }
 
+  // Scoring — breather between voting and the scoreboard. Reuses the
+  // voting-wait grid (cards + voter auras + picker names already
+  // visible at this point) but adds crowns on round-winning cards and
+  // a "+N" chip on each card showing the points it earned. Gives
+  // players time to see who voted for what before the scoreboard pops.
+  if (game.phase === GAME_PHASES.SCORING) {
+    const isHost = game.hostId === user?.uid;
+    const lastRoundResult = game.roundResults?.[game.roundResults.length - 1];
+    const rankings = lastRoundResult?.rankings || [];
+    const winnerUids = new Set(rankings.filter(r => r.placement === 1).map(r => r.uid));
+    const pointsByUid = new Map(rankings.map(r => [r.uid, r.pointsEarned || 0]));
+
+    // Per-player color map mirrors the voting wait so chip / aura
+    // colors stay consistent across the round.
+    const playerColors = new Map();
+    let paletteIdx = 0;
+    (game.players || []).forEach(p => {
+      if (p.uid === user?.uid) {
+        playerColors.set(p.uid, theme.colors.vibeGreen);
+      } else {
+        playerColors.set(p.uid, VOTER_PALETTE[paletteIdx % VOTER_PALETTE.length]);
+        paletteIdx++;
+      }
+    });
+
+    const buildVoters = (subUid) => {
+      const ids = (game.votes?.[subUid] || []);
+      return ids.map(vid => ({
+        uid: vid,
+        name: (game.players || []).find(p => p.uid === vid)?.username || vid?.slice(0, 4),
+        color: playerColors.get(vid) || theme.colors.textSecondary,
+        isMe: vid === user?.uid,
+      }));
+    };
+
+    const winnerNames = rankings
+      .filter(r => r.placement === 1)
+      .map(r => (game.players || []).find(p => p.uid === r.uid)?.username || 'Anon');
+    const topVotes = rankings.find(r => r.placement === 1)?.votes ?? 0;
+
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={handleLeaveGame}>
+            <View style={styles.backBg}>
+              <Ionicons name="close" size={18} color="white" />
+            </View>
+          </Pressable>
+          <Text style={styles.headerTitle}>Scoring</Text>
+          <Text style={styles.timerText}>{timer}s</Text>
+        </View>
+
+        <View style={styles.promptBanner}>
+          <Text style={styles.promptText}>{game.prompts[game.currentRound - 1]}</Text>
+        </View>
+
+        {winnerNames.length > 0 && topVotes > 0 && (
+          <ScoringWinnerBanner
+            isTie={winnerNames.length > 1}
+            names={winnerNames}
+            votes={topVotes}
+          />
+        )}
+
+        <View style={styles.pickedWaitWrap}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.pickedWaitContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <VotingWaitGrid
+              submissions={game.submissions || []}
+              voters={buildVoters}
+              players={game.players || []}
+              playerColors={playerColors}
+              selfUid={user?.uid}
+              allVotedIn={true}
+              onPressCard={() => {}}
+              winnerUids={winnerUids}
+              pointsByUid={pointsByUid}
+            />
+          </ScrollView>
+        </View>
+
+        {isHost && (
+          <Pressable
+            style={scoringStyles.skipBtn}
+            onPress={() => gameService.enterRoundResults(gameId)}
+          >
+            <Text style={scoringStyles.skipBtnText}>Show Scoreboard →</Text>
+          </Pressable>
+        )}
+      </LinearGradient>
+    );
+  }
+
   // Round results
   if (game.phase === GAME_PHASES.ROUND_RESULTS) {
     const isHost = game.hostId === user.uid;
@@ -1560,6 +1720,57 @@ export default function GameScreen({ navigation }) {
 
   return null;
 }
+
+// Scoring-phase chrome — banner above the grid + host skip button.
+// Kept separate from the main styles block so the SCORING render is
+// trivially deletable / movable later without grep-and-prune.
+const scoringStyles = StyleSheet.create({
+  winnerBanner: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+  },
+  winnerLabel: {
+    color: '#FFD700',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  winnerNames: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  winnerVotes: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  skipBtn: {
+    alignSelf: 'center',
+    marginBottom: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#00C6FF',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  skipBtnText: {
+    color: '#00C6FF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

@@ -47,11 +47,15 @@ export default function SnappleOverlay({
   // update instantly when the creator flips it, without waiting for the
   // parent to refetch.
   const [isPrivate, setIsPrivate] = useState(!!snapple?.isPrivate);
+  // Same pattern for the muted toggle. Creator-only; applies to all
+  // playbacks (home, game, voting, owners' decks).
+  const [muted, setMuted] = useState(!!snapple?.muted);
 
   // Sync local privacy when a different snapple opens
   React.useEffect(() => {
     setIsPrivate(!!snapple?.isPrivate);
-  }, [snapple?.id, snapple?.isPrivate]);
+    setMuted(!!snapple?.muted);
+  }, [snapple?.id, snapple?.isPrivate, snapple?.muted]);
 
   // Reset metrics, load interactions, and track view when snapple changes
   React.useEffect(() => {
@@ -408,6 +412,36 @@ export default function SnappleOverlay({
                 </View>
               </Pressable>
               <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
+            </View>
+          )}
+
+          {/* Creator-only: mute toggle. Applies to ALL playbacks across
+              the app (home, game, voting, owners' decks). Useful for
+              legacy uploads with background noise or for visual-only
+              cards. Optimistic flip, rollback on failure. */}
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={async () => {
+                  const next = !muted;
+                  setMuted(next);
+                  const result = await snappleService.setSnappleMuted(snapple.id, user.uid, next);
+                  if (!result.success) {
+                    setMuted(!next);
+                    showError('Error', result.error || 'Could not update mute');
+                  }
+                }}
+              >
+                <View style={[styles.buttonBg, muted && styles.activeBg]}>
+                  <Ionicons
+                    name={muted ? 'volume-mute' : 'volume-high'}
+                    size={20}
+                    color={muted ? theme.colors.vibeYellow : 'white'}
+                  />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{muted ? 'Muted' : 'Sound'}</Text>
             </View>
           )}
 
