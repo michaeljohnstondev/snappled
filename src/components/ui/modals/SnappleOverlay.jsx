@@ -241,6 +241,10 @@ export default function SnappleOverlay({
         <SnappleVideoPlayer
           ref={playerRef}
           snapple={snapple}
+          /* Drive mute live from the creator-only toggle's local state so
+             the speaker reacts instantly, before the parent re-fetches
+             the snapple doc. */
+          muted={muted}
           style={StyleSheet.absoluteFill}
         />
 
