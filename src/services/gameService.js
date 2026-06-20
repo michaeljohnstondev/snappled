@@ -365,6 +365,25 @@ export const gameService = {
     }
   },
 
+  // Broadcast that an admin just excluded a snapple from the pool so
+  // every client in the game can drop the card from any hand where the
+  // holder doesn't own it. The recentlyExcludedSnappleIds array on the
+  // game doc grows for the lifetime of the game; clients read it via
+  // their existing game subscription — no extra listeners needed.
+  async broadcastSnappleExclusion(gameId, snappleId) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        recentlyExcludedSnappleIds: arrayUnion(snappleId),
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error broadcasting exclusion:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // SCORING → ROUND_RESULTS (or FINAL_RESULTS if the round pushed
   // anyone over the target). Called by the host when the SCORING
   // timer elapses. Re-derives isLastRound from current player totals

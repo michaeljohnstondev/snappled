@@ -471,6 +471,61 @@ export default function GameScreen({ navigation }) {
     setHand(gameService.drawHand(getHandSnapples(), allSnapples));
   }, [game?.phase, game?.currentRound, mySnapples.length, allSnapples.length, hand.length]);
 
+  // Admin shadow-ban auto-replace. When an admin excludes a snapple
+  // mid-game, every client (admin + other players) gets the change via
+  // game.recentlyExcludedSnappleIds. Each client drops the excluded
+  // card from their own hand IF they don't own it, and pulls a fresh
+  // replacement from the community pool. Owners keep their copy.
+  useEffect(() => {
+    const excluded = game?.recentlyExcludedSnappleIds || [];
+    if (!excluded.length || !hand?.length) return;
+    const ownedSet = new Set(userCurrency.ownedSnapples || userCurrency.ownedCards || []);
+    const handIds = new Set((hand || []).map(h => h.id || h.snappleId).filter(Boolean));
+    const replacementPool = (allSnapples || []).filter(s =>
+      s?.id && !handIds.has(s.id) && !excluded.includes(s.id)
+    );
+    let poolIdx = 0;
+    let changed = false;
+    const next = (hand || []).map(card => {
+      const id = card?.id || card?.snappleId;
+      if (id && excluded.includes(id) && !ownedSet.has(id)) {
+        changed = true;
+        if (poolIdx < replacementPool.length) {
+          return replacementPool[poolIdx++];
+        }
+        return null; // No replacement available — drop the slot
+      }
+      return card;
+    }).filter(Boolean);
+    if (changed) setHand(next);
+  }, [game?.recentlyExcludedSnappleIds, allSnapples, userCurrency.ownedSnapples]);
+
+  // Admin-only: exclude a snapple from the bot/practice pool with a
+  // confirm dialog. Broadcasts to all players in the current game so
+  // their hands auto-drop the card (unless they own it). Shared by the
+  // in-game preview modals across all phases (warmup, picking, voting).
+  const handleExcludeFromPool = useCallback((snappleId) => {
+    if (!snappleId) return;
+    showConfirm(
+      'Exclude from Pool?',
+      'This card will stop showing up in bot picks and fresh hands. ' +
+      'Players who already own it keep it. Continue?',
+      async () => {
+        const r = await snappleService.setSnappleExcludeFromPool(
+          snappleId, user?.uid, true,
+        );
+        if (!r?.success) {
+          showError('Error', r?.error || 'Could not exclude');
+          return;
+        }
+        // Best-effort broadcast — service write already succeeded so
+        // the change is durable even if the broadcast fails.
+        try { await gameService.broadcastSnappleExclusion(gameId, snappleId); } catch (e) {}
+        showToast('info', 'Excluded from pool', "Bots won't draw this");
+      },
+    );
+  }, [user?.uid, gameId, showConfirm, showError, showToast]);
+
   // Hide the bottom tab bar whenever the user is inside an active game so the
   // game UI gets full-screen real estate. setOptions targets THIS screen's
   // descriptor (which is what CustomTabBar reads via descriptors[focused.key]),
@@ -1290,8 +1345,7 @@ export default function GameScreen({ navigation }) {
         onClosePreview={() => setPreviewCard(null)}
         onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
         isAdmin={isAdmin}
-        showToast={showToast}
-        showError={showError}
+        onExcludeFromPool={handleExcludeFromPool}
       />
     );
   }
@@ -1333,6 +1387,7 @@ export default function GameScreen({ navigation }) {
         onEditPromptTextChange={setEditPromptText}
         onEditPromptSave={handleSavePrompt}
         onDeletePrompt={handleDeletePrompt}
+        onExcludeFromPool={handleExcludeFromPool}
       />
     );
   }
@@ -1512,25 +1567,16 @@ export default function GameScreen({ navigation }) {
                   showError={showError}
                 />
 
-                {/* Admin nuke. One-shot: removes the snapple from the
-                    bot/practice pool immediately so the card stops
-                    landing in random hands. Doesn't delete or hide it —
-                    creator/owners can still use it. Re-include via the
-                    eye toggle in SnappleOverlay (prompt grid). */}
+                {/* Admin nuke. Asks for confirmation, then broadcasts
+                    the exclusion so every client's hand auto-drops the
+                    card (unless they own it). Re-include later via the
+                    eye toggle in SnappleOverlay. */}
                 {isAdmin && previewCard.snappleId && (
                   <Pressable
                     style={adminGameStyles.poolNukeBtn}
-                    onPress={async () => {
-                      const r = await snappleService.setSnappleExcludeFromPool(
-                        previewCard.snappleId,
-                        user.uid,
-                        true,
-                      );
-                      if (r?.success) {
-                        showToast?.('reward', 'Excluded from pool', 'Bots won\'t draw this');
-                      } else {
-                        showError?.('Error', r?.error || 'Could not exclude');
-                      }
+                    onPress={() => {
+                      handleExcludeFromPool(previewCard.snappleId);
+                      setPreviewCard(null);
                     }}
                   >
                     <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
@@ -2608,7 +2654,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
   },
   previewCard: {
-    width: screenWidth - 48, height: screenHeight * 0.6,
+    // Lock to the recorded video's native 9:16 aspect so the blue
+    // border wraps the actual video edges instead of leaving the
+    // VideoView's contentFit="cover" to crop to a mismatched box.
+    // maxHeight caps the box on tall/narrow screens so it never
+    // exceeds the modal area.
+    width: screenWidth - 48,
+    aspectRatio: 9 / 16,
+    maxHeight: screenHeight * 0.75,
     borderRadius: 16, overflow: 'hidden',
     borderWidth: 3, borderColor: theme.colors.vibeBlue, backgroundColor: '#000',
   },

@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewPlayer from '../PreviewPlayer';
-import { snappleService } from '../../../services/snappleService';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -28,8 +27,7 @@ export default function WarmupPhase({
   onClosePreview,
   onToggleReady,
   isAdmin,
-  showToast,
-  showError,
+  onExcludeFromPool,
 }) {
   const isReady = !!readyMap?.[selfUid];
   const readyCount = (players || []).filter(p => readyMap?.[p.uid]).length;
@@ -85,24 +83,15 @@ export default function WarmupPhase({
           <View style={styles.previewOverlay}>
             <View style={styles.previewCard}>
               <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
-              {/* Admin nuke — same as picking/voting preview. Removes
-                  the snapple from the bot/practice pool. Visible only
-                  to admins; no-op for normal players. */}
-              {isAdmin && (previewCard.id || previewCard.snappleId) && (
+              {/* Admin nuke — delegates to GameScreen so the exclusion
+                  confirms, broadcasts, and auto-replaces in everyone's
+                  hand who doesn't own the card. */}
+              {isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) && (
                 <Pressable
                   style={warmupAdminStyles.poolNukeBtn}
-                  onPress={async () => {
-                    const id = previewCard.snappleId || previewCard.id;
-                    const r = await snappleService.setSnappleExcludeFromPool(
-                      id,
-                      selfUid,
-                      true,
-                    );
-                    if (r?.success) {
-                      showToast?.('reward', 'Excluded from pool', 'Bots won\'t draw this');
-                    } else {
-                      showError?.('Error', r?.error || 'Could not exclude');
-                    }
+                  onPress={() => {
+                    onExcludeFromPool(previewCard.snappleId || previewCard.id);
+                    onClosePreview();
                   }}
                 >
                   <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
