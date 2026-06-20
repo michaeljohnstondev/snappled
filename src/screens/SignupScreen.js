@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Alert, ScrollView, Pressable, Platform } from 'react-native';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import VibeButton from '../components/ui/VibeButton';
 import VibeInput from '../components/ui/VibeInput';
 import theme from '../theme/themes';
 import { userService } from '../services/userService';
+import { signInWithGoogle, signInWithApple, ensureUserDocument } from '../services/googleAuthService';
 
 export default function SignupScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -14,6 +15,42 @@ export default function SignupScreen({ navigation }) {
     confirmPassword: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+
+  // Mirrors LoginScreen.handleSocialSignIn — Google / Apple → Firebase
+  // → ensureUserDocument. ensureUserDocument is idempotent so a user
+  // who already signed up with social can re-sign-in here without
+  // creating a second doc.
+  async function handleSocialSignIn(kind) {
+    const setLoading = kind === 'apple' ? setAppleLoading : setGoogleLoading;
+    setLoading(true);
+    let signedIn = false;
+    try {
+      const result =
+        kind === 'apple' ? await signInWithApple() : await signInWithGoogle();
+      signedIn = true;
+      const user = result.userCredential.user;
+      await ensureUserDocument(user, {
+        firstName: result.firstName || undefined,
+        lastName: result.lastName || undefined,
+        authProvider: kind,
+      });
+      navigation.navigate('Landing');
+    } catch (err) {
+      if (
+        err.code === 'SIGN_IN_CANCELLED' ||
+        err.code === '12501' ||
+        err.code === 'ERR_REQUEST_CANCELED' ||
+        err.code === 'ERR_CANCELED'
+      ) return;
+      console.log(`[SignupScreen] ${kind} sign-in failed`, err?.code, err?.message);
+      if (signedIn) return;
+      Alert.alert(`${kind === 'apple' ? 'Apple' : 'Google'} Sign-In Failed`, err?.message || 'Try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function updateFormData(field, value) {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -170,6 +207,38 @@ export default function SignupScreen({ navigation }) {
             disabled={isLoading}
           />
 
+          {/* Social sign-in. Apple first on iOS per App Store 4.8. */}
+          {Platform.OS === 'ios' && (
+            <Pressable
+              onPress={() => handleSocialSignIn('apple')}
+              disabled={isLoading || googleLoading || appleLoading}
+              style={({ pressed }) => [
+                styles.appleButton,
+                { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
+              ]}
+            >
+              <Text style={styles.appleLogo}></Text>
+              <Text style={styles.appleButtonText}>
+                {appleLoading ? 'Signing in...' : 'Sign up with Apple'}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() => handleSocialSignIn('google')}
+            disabled={isLoading || googleLoading || appleLoading}
+            style={({ pressed }) => [
+              styles.googleButton,
+              { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
+            ]}
+          >
+            <View style={styles.googleIconContainer}>
+              <Text style={styles.googleG}>G</Text>
+            </View>
+            <Text style={styles.googleButtonText}>
+              {googleLoading ? 'Signing in...' : 'Sign up with Google'}
+            </Text>
+          </Pressable>
+
           <View style={styles.loginPrompt}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <VibeButton
@@ -268,5 +337,57 @@ const styles = StyleSheet.create({
   backButton: {
     opacity: 0.7,
     marginTop: theme.sizes.spacing?.md || 16,
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 48,
+    backgroundColor: '#000000',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+  },
+  appleLogo: {
+    color: '#ffffff',
+    fontSize: 20,
+    marginRight: 10,
+    marginTop: -2,
+  },
+  appleButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 48,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+  },
+  googleIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleG: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4285F4',
+  },
+  googleButtonText: {
+    color: '#1f1f1f',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

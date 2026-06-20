@@ -2,13 +2,14 @@
   "expo": {
     "name": "Snappled",
     "slug": "snapple-park",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "scheme": "snappled",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.bigvibestudios.snappled",
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Snappled uses the camera so you can record video for prompts.",
         "NSMicrophoneUsageDescription": "Snappled uses the microphone to record audio with your videos.",
@@ -50,7 +51,14 @@
       "expo-video",
       "expo-font",
       "expo-web-browser",
-      "expo-image"
+      "expo-image",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.107855342657-26lrh6lcv0breonu2ffhkq19nbti8duo"
+        }
+      ],
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {
