@@ -61,6 +61,27 @@ export default function SnappleOverlay({
     setExcludeFromPool(!!snapple?.excludeFromPool);
   }, [snapple?.id, snapple?.isPrivate, snapple?.muted, snapple?.excludeFromPool]);
 
+  // Refetch the snapple on every open so local state reflects the
+  // LIVE Firestore doc, not whatever the parent grid cached on first
+  // mount. Without this, toggling mute/private/excludeFromPool here,
+  // closing, then reopening would revert the UI to the parent's stale
+  // value (most parents don't subscribe to per-snapple changes).
+  React.useEffect(() => {
+    if (!visible || !snapple?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await snappleService.getSnapple(snapple.id);
+        if (cancelled || !result?.success || !result.snapple) return;
+        const fresh = result.snapple;
+        setIsPrivate(!!fresh.isPrivate);
+        setMuted(!!fresh.muted);
+        setExcludeFromPool(!!fresh.excludeFromPool);
+      } catch (e) { /* non-fatal — prop-sync above already set defaults */ }
+    })();
+    return () => { cancelled = true; };
+  }, [visible, snapple?.id]);
+
   // ADMIN_UIDS gates the admin-only pool-exclusion toggle. Mirrors
   // the same list used in AdminScreen / GameScreen / UserMenu.
   const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
