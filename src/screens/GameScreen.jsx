@@ -1289,6 +1289,9 @@ export default function GameScreen({ navigation }) {
         onPreviewCard={(card) => setPreviewCard(card)}
         onClosePreview={() => setPreviewCard(null)}
         onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
+        isAdmin={isAdmin}
+        showToast={showToast}
+        showError={showError}
       />
     );
   }
@@ -1509,6 +1512,32 @@ export default function GameScreen({ navigation }) {
                   showError={showError}
                 />
 
+                {/* Admin nuke. One-shot: removes the snapple from the
+                    bot/practice pool immediately so the card stops
+                    landing in random hands. Doesn't delete or hide it —
+                    creator/owners can still use it. Re-include via the
+                    eye toggle in SnappleOverlay (prompt grid). */}
+                {isAdmin && previewCard.snappleId && (
+                  <Pressable
+                    style={adminGameStyles.poolNukeBtn}
+                    onPress={async () => {
+                      const r = await snappleService.setSnappleExcludeFromPool(
+                        previewCard.snappleId,
+                        user.uid,
+                        true,
+                      );
+                      if (r?.success) {
+                        showToast?.('reward', 'Excluded from pool', 'Bots won\'t draw this');
+                      } else {
+                        showError?.('Error', r?.error || 'Could not exclude');
+                      }
+                    }}
+                  >
+                    <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                    <Text style={adminGameStyles.poolNukeText}>Exclude from pool</Text>
+                  </Pressable>
+                )}
+
                 <View style={styles.previewButtons}>
                   <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
                     <Text style={styles.previewCancelText}>Back</Text>
@@ -1720,6 +1749,30 @@ export default function GameScreen({ navigation }) {
 
   return null;
 }
+
+// Admin nuke button styling for the in-game card preview modal.
+// Visually subdued + red so it can't be mistaken for a player action.
+const adminGameStyles = StyleSheet.create({
+  poolNukeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.5)',
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    marginTop: 8,
+  },
+  poolNukeText: {
+    color: '#FF4444',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});
 
 // Scoring-phase chrome — banner above the grid + host skip button.
 // Kept separate from the main styles block so the SCORING render is

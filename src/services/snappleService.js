@@ -95,6 +95,17 @@ export const snappleService = {
         // post-create via setSnapplePrivacy().
         isPrivate: !!snappleData.isPrivate,
 
+        // Admin quality gate. When true, the snapple is excluded from
+        // the automatic community pool used for BOT picks and for
+        // padding the hands of players whose own deck is too small
+        // (practice mode / no-deck players). It is STILL browsable,
+        // buyable, ownable, and playable from anyone's own deck — the
+        // creator and owners never lose access. Used by admins to keep
+        // low-quality cards out of the default-game experience until
+        // a strong "champion" pool exists. Toggleable via
+        // setSnappleExcludeFromPool() (admin-only check).
+        excludeFromPool: !!snappleData.excludeFromPool,
+
         // Pricing
         basePrice: 10, // Starting price in coins
         currentPrice: 10,
@@ -200,6 +211,9 @@ export const snappleService = {
       results.forEach(snap => snap.forEach(d => {
         const data = d.data();
         // Private snapples never appear in public prompt grids.
+        // (excludeFromPool is NOT checked here — that flag only gates
+        // the bot/practice pool in getActiveSnapples; cards stay
+        // browsable, ownable, and buyable from the prompt grid.)
         if (data.isActive !== false && data.isBanned !== true && data.isPrivate !== true) {
           byId.set(d.id, { id: d.id, ...data });
         }
@@ -242,10 +256,18 @@ export const snappleService = {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Private snapples are excluded from the community pool. The
-        // creator can still play their own privates through their
-        // ownedSnapples hand — drawHand() merges those in separately.
-        if (data.isActive !== false && data.isBanned !== true && data.isPrivate !== true) {
+        // Pool filters: private snapples (creator opted out of public
+        // visibility), and excludeFromPool snapples (admin quality gate
+        // — see schema comment in createSnapple). Both stay playable
+        // from the creator's / owner's own deck via drawHand-from-
+        // ownedSnapples; this filter only governs what BOTS draw and
+        // what pads the hands of players whose own deck is too small.
+        if (
+          data.isActive !== false &&
+          data.isBanned !== true &&
+          data.isPrivate !== true &&
+          data.excludeFromPool !== true
+        ) {
           snapples.push({ id: doc.id, ...data });
         }
       });
@@ -477,6 +499,35 @@ export const snappleService = {
         return { success: false, error: 'You already own this snapple' };
       }
       return { success: false, error: message };
+    }
+  },
+
+  // Admin-only: toggle whether this snapple is allowed in the
+  // bot/practice community pool (getActiveSnapples). Does not affect
+  // visibility on prompt grids, ownership, marketplace, or any other
+  // surface — purely a curation lever on the automatic-pool source.
+  // ADMIN_UIDS is hardcoded across screens for now (see AdminScreen,
+  // GameScreen, UserMenu) — keep this list in sync if it ever moves
+  // into a shared constants file.
+  async setSnappleExcludeFromPool(snappleId, userId, excludeFromPool) {
+    try {
+      const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
+      if (!ADMIN_UIDS.includes(userId)) {
+        return { success: false, error: 'Admin only' };
+      }
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const snappleDoc = await getDoc(snappleRef);
+      if (!snappleDoc.exists()) {
+        return { success: false, error: 'Snapple not found' };
+      }
+      await updateDoc(snappleRef, {
+        excludeFromPool: !!excludeFromPool,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true, excludeFromPool: !!excludeFromPool };
+    } catch (error) {
+      console.error('Error toggling excludeFromPool:', error);
+      return { success: false, error: 'Failed to update pool exclusion' };
     }
   },
 

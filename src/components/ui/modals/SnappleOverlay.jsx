@@ -50,12 +50,21 @@ export default function SnappleOverlay({
   // Same pattern for the muted toggle. Creator-only; applies to all
   // playbacks (home, game, voting, owners' decks).
   const [muted, setMuted] = useState(!!snapple?.muted);
+  // Admin-only mirror for the excludeFromPool flag. Snappy local
+  // toggle; the underlying service write is admin-gated.
+  const [excludeFromPool, setExcludeFromPool] = useState(!!snapple?.excludeFromPool);
 
   // Sync local privacy when a different snapple opens
   React.useEffect(() => {
     setIsPrivate(!!snapple?.isPrivate);
     setMuted(!!snapple?.muted);
-  }, [snapple?.id, snapple?.isPrivate, snapple?.muted]);
+    setExcludeFromPool(!!snapple?.excludeFromPool);
+  }, [snapple?.id, snapple?.isPrivate, snapple?.muted, snapple?.excludeFromPool]);
+
+  // ADMIN_UIDS gates the admin-only pool-exclusion toggle. Mirrors
+  // the same list used in AdminScreen / GameScreen / UserMenu.
+  const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
+  const isAdmin = ADMIN_UIDS.includes(user?.uid);
 
   // Reset metrics, load interactions, and track view when snapple changes
   React.useEffect(() => {
@@ -442,6 +451,43 @@ export default function SnappleOverlay({
                 </View>
               </Pressable>
               <Text style={styles.actionCount}>{muted ? 'Muted' : 'Sound'}</Text>
+            </View>
+          )}
+
+          {/* Admin-only: pool exclusion. When ON the snapple stops
+              showing up in bot picks and in the practice-mode hand
+              padding pool. Doesn't affect visibility / ownership /
+              marketplace / playability from any owner's own deck —
+              purely a quality lever on the auto-pool. Visible to
+              admins on any snapple, including snapples they didn't
+              create. */}
+          {isAdmin && (
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={async () => {
+                  const next = !excludeFromPool;
+                  setExcludeFromPool(next);
+                  const result = await snappleService.setSnappleExcludeFromPool(
+                    snapple.id,
+                    user.uid,
+                    next,
+                  );
+                  if (!result.success) {
+                    setExcludeFromPool(!next);
+                    showError('Error', result.error || 'Could not update pool exclusion');
+                  }
+                }}
+              >
+                <View style={[styles.buttonBg, excludeFromPool && styles.activeBg]}>
+                  <Ionicons
+                    name={excludeFromPool ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={excludeFromPool ? theme.colors.vibeRed : 'white'}
+                  />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{excludeFromPool ? 'Pool: Off' : 'Pool: On'}</Text>
             </View>
           )}
 

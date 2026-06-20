@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewPlayer from '../PreviewPlayer';
 import CreatorActionRow from '../CreatorActionRow';
+import { snappleService } from '../../../services/snappleService';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -204,6 +205,31 @@ export default function PickingPhase({
                   showError={showError}
                 />
               )}
+              {/* Admin nuke — removes from bot/practice pool. Mirrors
+                  the in-game voting preview button so admin can flag
+                  bad cards anywhere they appear, including their own
+                  hand during PICKING. */}
+              {isAdmin && (previewCard.id || previewCard.snappleId) && (
+                <Pressable
+                  style={pickingAdminStyles.poolNukeBtn}
+                  onPress={async () => {
+                    const id = previewCard.snappleId || previewCard.id;
+                    const r = await snappleService.setSnappleExcludeFromPool(
+                      id,
+                      user.uid,
+                      true,
+                    );
+                    if (r?.success) {
+                      showToast?.('reward', 'Excluded from pool', 'Bots won\'t draw this');
+                    } else {
+                      showError?.('Error', r?.error || 'Could not exclude');
+                    }
+                  }}
+                >
+                  <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                  <Text style={pickingAdminStyles.poolNukeText}>Exclude from pool</Text>
+                </Pressable>
+              )}
               <View style={styles.previewButtons}>
                 <Pressable style={styles.previewCancel} onPress={onClosePreview}>
                   <Text style={styles.previewCancelText}>Back</Text>
@@ -260,6 +286,30 @@ export default function PickingPhase({
     </LinearGradient>
   );
 }
+
+// Admin nuke styling for the in-hand card preview. Subdued + red so
+// it's clearly not a player action and never the easiest tap target.
+const pickingAdminStyles = StyleSheet.create({
+  poolNukeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.5)',
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    marginTop: 8,
+  },
+  poolNukeText: {
+    color: '#FF4444',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

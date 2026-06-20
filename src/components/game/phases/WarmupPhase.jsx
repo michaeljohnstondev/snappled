@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewPlayer from '../PreviewPlayer';
+import { snappleService } from '../../../services/snappleService';
 import theme from '../../../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -26,6 +27,9 @@ export default function WarmupPhase({
   onPreviewCard,
   onClosePreview,
   onToggleReady,
+  isAdmin,
+  showToast,
+  showError,
 }) {
   const isReady = !!readyMap?.[selfUid];
   const readyCount = (players || []).filter(p => readyMap?.[p.uid]).length;
@@ -81,6 +85,30 @@ export default function WarmupPhase({
           <View style={styles.previewOverlay}>
             <View style={styles.previewCard}>
               <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
+              {/* Admin nuke — same as picking/voting preview. Removes
+                  the snapple from the bot/practice pool. Visible only
+                  to admins; no-op for normal players. */}
+              {isAdmin && (previewCard.id || previewCard.snappleId) && (
+                <Pressable
+                  style={warmupAdminStyles.poolNukeBtn}
+                  onPress={async () => {
+                    const id = previewCard.snappleId || previewCard.id;
+                    const r = await snappleService.setSnappleExcludeFromPool(
+                      id,
+                      selfUid,
+                      true,
+                    );
+                    if (r?.success) {
+                      showToast?.('reward', 'Excluded from pool', 'Bots won\'t draw this');
+                    } else {
+                      showError?.('Error', r?.error || 'Could not exclude');
+                    }
+                  }}
+                >
+                  <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                  <Text style={warmupAdminStyles.poolNukeText}>Exclude from pool</Text>
+                </Pressable>
+              )}
               <Pressable style={styles.previewBack} onPress={onClosePreview}>
                 <Text style={styles.previewBackText}>Back</Text>
               </Pressable>
@@ -91,6 +119,30 @@ export default function WarmupPhase({
     </LinearGradient>
   );
 }
+
+// Admin nuke styling — matches the same button in PickingPhase and
+// the in-game voting preview so admins see one consistent affordance.
+const warmupAdminStyles = StyleSheet.create({
+  poolNukeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.5)',
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    marginTop: 8,
+  },
+  poolNukeText: {
+    color: '#FF4444',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
