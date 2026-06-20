@@ -87,7 +87,7 @@ function ScoringWinnerBanner({ isTie, names, votes }) {
         {names.map(n => `@${n}`).join(' · ')}
       </Text>
       <Text style={scoringStyles.winnerVotes}>
-        {votes} vote{votes === 1 ? '' : 's'}
+        {votes} vote{votes === 1 ? '' : 's'}{isTie ? ' each' : ''}
       </Text>
     </Animated.View>
   );
@@ -1699,26 +1699,42 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        {/* Compact header: smaller title, scoreboard icon next to the
+            timer so any player can peek standings without a bottom
+            button taking vertical space. */}
         <View style={styles.header}>
           <Pressable onPress={handleLeaveGame}>
             <View style={styles.backBg}>
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>Scoring</Text>
-          <Text style={styles.timerText}>{timer}s</Text>
+          <Text style={scoringStyles.headerTitleCompact}>Scoring</Text>
+          <View style={scoringStyles.headerRight}>
+            <Pressable
+              onPress={() => setShowScoreboard(true)}
+              hitSlop={8}
+              style={scoringStyles.scoreboardIcon}
+            >
+              <Ionicons name="podium" size={20} color={theme.colors.vibeBlue} />
+            </Pressable>
+            <Text style={styles.timerText}>{timer}s</Text>
+          </View>
         </View>
 
-        <View style={styles.promptBanner}>
-          <Text style={styles.promptText}>{game.prompts[game.currentRound - 1]}</Text>
-        </View>
-
-        {winnerNames.length > 0 && topVotes > 0 && (
+        {/* Winner banner takes the prompt's slot during SCORING — the
+            prompt has done its job (voting is over) and the winner is
+            now the focal point. Same vertical footprint as the prompt
+            banner so no layout shift. */}
+        {winnerNames.length > 0 && topVotes > 0 ? (
           <ScoringWinnerBanner
             isTie={winnerNames.length > 1}
             names={winnerNames}
             votes={topVotes}
           />
+        ) : (
+          <View style={styles.promptBanner}>
+            <Text style={styles.promptText}>{game.prompts[game.currentRound - 1]}</Text>
+          </View>
         )}
 
         <View style={styles.pickedWaitWrap}>
@@ -1741,14 +1757,39 @@ export default function GameScreen({ navigation }) {
           </ScrollView>
         </View>
 
-        {isHost && (
-          <Pressable
-            style={scoringStyles.skipBtn}
-            onPress={() => gameService.enterRoundResults(gameId)}
-          >
-            <Text style={scoringStyles.skipBtnText}>Show Scoreboard →</Text>
-          </Pressable>
-        )}
+        {/* Scoreboard modal — opened from the header podium icon.
+            Mirrors the VOTING phase's scoreboard so the look stays
+            consistent across phases. */}
+        {showScoreboard && (() => {
+          const scoreboardPlayers = [...(game.players || [])].sort(
+            (a, b) => (b.points || 0) - (a.points || 0)
+          );
+          return (
+            <Modal visible transparent animationType="fade" onRequestClose={() => setShowScoreboard(false)}>
+              <Pressable style={styles.scoreboardOverlay} onPress={() => setShowScoreboard(false)}>
+                <Pressable style={styles.scoreboardCard} onPress={() => {}}>
+                  <Text style={styles.scoreboardTitle}>SCOREBOARD</Text>
+                  {scoreboardPlayers.map((p, i) => {
+                    const color = playerColors.get(p.uid) || theme.colors.textSecondary;
+                    const isMe = p.uid === user?.uid;
+                    return (
+                      <View key={p.uid} style={[styles.scoreboardRow, { borderLeftColor: color }]}>
+                        <Text style={styles.scoreboardPlace}>#{i + 1}</Text>
+                        <Text style={[styles.scoreboardName, isMe && { color: theme.colors.vibeGreen }]} numberOfLines={1}>
+                          {p.username}
+                        </Text>
+                        <Text style={styles.scoreboardPts}>{p.points || 0} pts</Text>
+                      </View>
+                    );
+                  })}
+                  <Pressable style={styles.scoreboardClose} onPress={() => setShowScoreboard(false)}>
+                    <Text style={styles.scoreboardCloseText}>Close</Text>
+                  </Pressable>
+                </Pressable>
+              </Pressable>
+            </Modal>
+          );
+        })()}
       </LinearGradient>
     );
   }
@@ -1854,20 +1895,22 @@ const scoringStyles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  skipBtn: {
-    alignSelf: 'center',
-    marginBottom: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#00C6FF',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  skipBtnText: {
-    color: '#00C6FF',
-    fontSize: 13,
+  // Compact SCORING header — smaller title than the default so the
+  // scoreboard podium icon + timer fit comfortably on the right.
+  headerTitleCompact: {
+    color: theme.colors.vibeBlue,
+    fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scoreboardIcon: {
+    padding: 4,
   },
 });
 
