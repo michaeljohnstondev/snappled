@@ -9,6 +9,7 @@ import { db, functions } from '../services/firebase';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import VibeButton from '../components/ui/VibeButton';
+import PromptCurator from '../components/admin/PromptCurator';
 import theme from '../theme/themes';
 
 function UtilButton({ label, desc, color, onPress }) {
@@ -365,6 +366,7 @@ export default function AdminScreen({ navigation }) {
 
   const tabOptions = [
     { label: 'Prompts', value: 'prompts' },
+    { label: 'Curate', value: 'curate' },
     { label: 'Reports', value: 'reports' },
     { label: 'Users', value: 'users' },
     { label: 'Games', value: 'games' },
@@ -553,7 +555,7 @@ export default function AdminScreen({ navigation }) {
               onPress={() => {
                 setActiveTab(opt.value);
                 setMenuOpen(false);
-                if (opt.value !== 'create') loadTab();
+                if (opt.value !== 'create' && opt.value !== 'curate') loadTab();
               }}
             >
               <Text style={[styles.dropdownText, activeTab === opt.value && styles.dropdownTextActive]}>
@@ -564,7 +566,9 @@ export default function AdminScreen({ navigation }) {
         </View>
       )}
 
-      {activeTab === 'utils' ? (
+      {activeTab === 'curate' ? (
+        <PromptCurator />
+      ) : activeTab === 'utils' ? (
         <ScrollView style={styles.utilsSection} contentContainerStyle={{ paddingBottom: 40 }}>
           <UtilButton
             label="Force Rotation"
