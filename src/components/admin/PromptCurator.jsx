@@ -14,9 +14,9 @@ import {
   ActivityIndicator, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, useAnimatedGestureHandler,
+  useSharedValue, useAnimatedStyle,
   withSpring, withTiming, runOnJS,
 } from 'react-native-reanimated';
 import VibeButton from '../ui/VibeButton';
@@ -100,9 +100,15 @@ function EditPromptModal({ visible, initialText, onCancel, onSave }) {
 function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
   const tx = useSharedValue(0);
 
-  const gesture = useAnimatedGestureHandler({
-    onActive: (e) => { tx.value = e.translationX; },
-    onEnd: () => {
+  // Reanimated 4 dropped useAnimatedGestureHandler — use the new
+  // gesture-handler API. Gesture.Pan() runs on the UI thread; the
+  // shared value updates each frame, and the end callback animates the
+  // card off-screen + fires the JS-side handler via runOnJS.
+  const gesture = Gesture.Pan()
+    .onChange((e) => {
+      tx.value = e.translationX;
+    })
+    .onEnd(() => {
       if (tx.value < -SWIPE_THRESHOLD) {
         tx.value = withTiming(-SWIPE_OFF_SCREEN, { duration: 200 }, (done) => {
           if (done) runOnJS(onSwipeLeft)();
@@ -114,8 +120,7 @@ function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
       } else {
         tx.value = withSpring(0);
       }
-    },
-  });
+    });
 
   // Card tilts as it swipes — purely visual feedback. ~15deg at the
   // threshold, capped at 25deg if user keeps dragging.
@@ -139,7 +144,7 @@ function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
   }));
 
   return (
-    <PanGestureHandler onGestureEvent={gesture}>
+    <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.card, cardStyle]}>
         <Animated.View style={[styles.badgeDelete, deleteBadgeStyle]}>
           <Text style={styles.badgeDeleteText}>DELETE</Text>
@@ -154,7 +159,7 @@ function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
           <Text style={styles.cardHint}>tap to edit · swipe left to delete · swipe right to keep</Text>
         </Pressable>
       </Animated.View>
-    </PanGestureHandler>
+    </GestureDetector>
   );
 }
 
