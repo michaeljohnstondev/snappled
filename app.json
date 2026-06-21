@@ -58,7 +58,18 @@
           "iosUrlScheme": "com.googleusercontent.apps.107855342657-26lrh6lcv0breonu2ffhkq19nbti8duo"
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              { "name": "GoogleUtilities", "modular_headers": true },
+              { "name": "RecaptchaInterop", "modular_headers": true }
+            ]
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
