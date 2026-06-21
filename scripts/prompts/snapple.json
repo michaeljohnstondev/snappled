@@ -1,626 +1,335 @@
 [
-  {
-    "text": "10 seconds of your commute",
-    "category": "lifestyle"
-  },
-  {
-    "text": "A childhood memory in 10 seconds",
-    "category": "story"
-  },
-  {
-    "text": "A time you got caught doing something",
-    "category": "story"
-  },
-  {
-    "text": "Act out ordering food when you can't decide",
-    "category": "comedy"
-  },
-  {
-    "text": "Act out your last text message",
-    "category": "comedy"
-  },
-  {
-    "text": "Ask a stranger their hot take on anything",
-    "category": "interaction"
-  },
-  {
-    "text": "Ask someone near you to tell a joke",
-    "category": "social"
-  },
-  {
-    "text": "Ask someone what they'd do with a million dollars",
-    "category": "interaction"
-  },
-  {
-    "text": "Ask someone: what's the dumbest thing you've ever done?",
-    "category": "interaction"
-  },
-  {
-    "text": "Ask the nearest person to tell you a secret",
-    "category": "interaction"
-  },
-  {
-    "text": "Balance something on your head for 10 seconds",
-    "category": "challenge"
-  },
-  {
-    "text": "Beatbox for 10 seconds",
-    "category": "creative"
-  },
-  {
-    "text": "Burn!",
-    "category": "user"
-  },
-  {
-    "text": "Capture a moment of pure chaos",
-    "category": "environment"
-  },
-  {
-    "text": "Capture a moment of silence in a loud world",
-    "category": "mood"
-  },
-  {
-    "text": "Capture a perfect moment — you'll know it when you see it",
-    "category": "environment"
-  },
-  {
-    "text": "Capture someone in their element — work, hobby, anything",
-    "category": "others"
-  },
-  {
-    "text": "Capture something being built or created",
-    "category": "action"
-  },
-  {
-    "text": "Capture the energy of a crowd around you",
-    "category": "others"
-  },
-  {
-    "text": "Capture the energy of a party or gathering",
-    "category": "mood"
-  },
-  {
-    "text": "Capture the vibe of wherever you are — no words",
-    "category": "environment"
-  },
-  {
-    "text": "Catch someone singing when they think nobody's listening",
-    "category": "others"
-  },
-  {
-    "text": "Catch something behind your back",
-    "category": "challenge"
-  },
-  {
-    "text": "Catch your friend being dramatic about something minor",
-    "category": "others"
-  },
-  {
-    "text": "Catch your friend's genuine laugh",
-    "category": "others"
-  },
-  {
-    "text": "Cats or dogs? You have 10 seconds to convince us",
-    "category": "opinion"
-  },
-  {
-    "text": "Check your bank balance and react",
-    "category": "reactions"
-  },
-  {
-    "text": "Clubbing",
-    "category": "user"
-  },
-  {
-    "text": "Cook something in 10 seconds — GO",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Create a 10-second short film with no words",
-    "category": "creative"
-  },
-  {
-    "text": "Create a transition without editing",
-    "category": "creative"
-  },
-  {
-    "text": "Do your best trick shot",
-    "category": "challenge"
-  },
-  {
-    "text": "Don't blink for 10 seconds",
-    "category": "challenge"
-  },
-  {
-    "text": "Draw something blindfolded",
-    "category": "creative"
-  },
-  {
-    "text": "Duet this with your best friend",
-    "category": "social"
-  },
-  {
-    "text": "Film a chain reaction — dominos, bumps, anything",
-    "category": "action"
-  },
-  {
-    "text": "Film a debate between two friends",
-    "category": "interaction"
-  },
-  {
-    "text": "Film a stranger's act of kindness",
-    "category": "others"
-  },
-  {
-    "text": "Film someone doing something they're amazing at",
-    "category": "others"
-  },
-  {
-    "text": "Film someone doing their signature move",
-    "category": "others"
-  },
-  {
-    "text": "Film someone explaining their passion",
-    "category": "others"
-  },
-  {
-    "text": "Film someone's victory moment — big or small",
-    "category": "others"
-  },
-  {
-    "text": "Film something beautiful that most people walk past",
-    "category": "environment"
-  },
-  {
-    "text": "Film something falling in slow motion",
-    "category": "action"
-  },
-  {
-    "text": "Film something that's about to happen",
-    "category": "environment"
-  },
-  {
-    "text": "Film the chaos happening around you right now",
-    "category": "environment"
-  },
-  {
-    "text": "Film the transition from day to night or night to day",
-    "category": "mood"
-  },
-  {
-    "text": "Film two people competing at something random",
-    "category": "interaction"
-  },
-  {
-    "text": "Film what's outside your front door right now",
-    "category": "environment"
-  },
-  {
-    "text": "Film your city at night",
-    "category": "mood"
-  },
-  {
-    "text": "Genuine laughter",
-    "category": "user"
-  },
-  {
-    "text": "Get a stranger to say hi to the camera",
-    "category": "social"
-  },
-  {
-    "text": "Get someone to do their best impression of you",
-    "category": "interaction"
-  },
-  {
-    "text": "Get someone to rap about their day",
-    "category": "interaction"
-  },
-  {
-    "text": "Get someone to teach you something in 10 seconds",
-    "category": "interaction"
-  },
-  {
-    "text": "Golden hour selfie — make it cinematic",
-    "category": "vibes"
-  },
-  {
-    "text": "Hot take: pineapple on pizza — yes or no?",
-    "category": "opinion"
-  },
-  {
-    "text": "How many pushups in 10 seconds?",
-    "category": "challenge"
-  },
-  {
-    "text": "Is cereal a soup? Defend your answer",
-    "category": "opinion"
-  },
-  {
-    "text": "Make a snack in 10 seconds",
-    "category": "food"
-  },
-  {
-    "text": "Make art with whatever's in front of you",
-    "category": "creative"
-  },
-  {
-    "text": "Make music with household items",
-    "category": "creative"
-  },
-  {
-    "text": "Make something disappear",
-    "category": "skills"
-  },
-  {
-    "text": "Make the most satisfying video you can",
-    "category": "creative"
-  },
-  {
-    "text": "One thing you'd change about your city",
-    "category": "opinion"
-  },
-  {
-    "text": "Open your screen time and react",
-    "category": "reactions"
-  },
-  {
-    "text": "Phonomenal!",
-    "category": "user"
-  },
-  {
-    "text": "Play an instrument — any instrument",
-    "category": "skills"
-  },
-  {
-    "text": "Pretend you just saw a ghost",
-    "category": "comedy"
-  },
-  {
-    "text": "Pretend you just won the lottery",
-    "category": "comedy"
-  },
-  {
-    "text": "Pretend you're a news anchor reporting on your day",
-    "category": "comedy"
-  },
-  {
-    "text": "Rate your fridge out of 10",
-    "category": "food"
-  },
-  {
-    "text": "React to finding out school is cancelled",
-    "category": "comedy"
-  },
-  {
-    "text": "React to your camera roll's first photo",
-    "category": "reactions"
-  },
-  {
-    "text": "Read your last DM out loud and react",
-    "category": "reactions"
-  },
-  {
-    "text": "Record DAT stare",
-    "category": "user"
-  },
-  {
-    "text": "Record someone telling their best story",
-    "category": "others"
-  },
-  {
-    "text": "Record someone's answer to: what's your biggest flex?",
-    "category": "interaction"
-  },
-  {
-    "text": "Record someone's honest first reaction to tasting something",
-    "category": "others"
-  },
-  {
-    "text": "Record something spinning",
-    "category": "action"
-  },
-  {
-    "text": "Record the calm before the storm — literal or figurative",
-    "category": "mood"
-  },
-  {
-    "text": "Record the fastest thing near you",
-    "category": "action"
-  },
-  {
-    "text": "Record the most interesting thing within 10 feet of you",
-    "category": "environment"
-  },
-  {
-    "text": "Record the sounds around you for 10 seconds",
-    "category": "environment"
-  },
-  {
-    "text": "Record your crew's pre-game ritual",
-    "category": "others"
-  },
-  {
-    "text": "Record your friend's reaction to a surprise",
-    "category": "others"
-  },
-  {
-    "text": "Record your neighborhood's personality",
-    "category": "environment"
-  },
-  {
-    "text": "Record your parent or grandparent sharing wisdom",
-    "category": "others"
-  },
-  {
-    "text": "Reenact the last thing that made you laugh",
-    "category": "comedy"
-  },
-  {
-    "text": "Rizz at its finest",
-    "category": "general"
-  },
-  {
-    "text": "Say the alphabet backwards as fast as you can",
-    "category": "challenge"
-  },
-  {
-    "text": "Show off a skill you've been working on",
-    "category": "skills"
-  },
-  {
-    "text": "Show us what your friend does that annoys you",
-    "category": "social"
-  },
-  {
-    "text": "Show us your best camera trick",
-    "category": "creative"
-  },
-  {
-    "text": "Show us your friend group's inside joke",
-    "category": "social"
-  },
-  {
-    "text": "Show us your group chat energy IRL",
-    "category": "social"
-  },
-  {
-    "text": "Show us your hidden talent",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Show us your morning routine in 10 seconds",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Show us your vibe without words",
-    "category": "vibes"
-  },
-  {
-    "text": "Sing your name like an opera singer",
-    "category": "creative"
-  },
-  {
-    "text": "Speed draw your self portrait",
-    "category": "creative"
-  },
-  {
-    "text": "Speed run tying your shoes",
-    "category": "skills"
-  },
-  {
-    "text": "Speed solve something — anything",
-    "category": "challenge"
-  },
-  {
-    "text": "Spin 5 times and walk straight",
-    "category": "challenge"
-  },
-  {
-    "text": "Stack as many things as you can in 10 seconds",
-    "category": "challenge"
-  },
-  {
-    "text": "Sunday vibes",
-    "category": "user"
-  },
-  {
-    "text": "Tag someone and explain why they're the best",
-    "category": "social"
-  },
-  {
-    "text": "Tell us a joke in 10 seconds",
-    "category": "comedy"
-  },
-  {
-    "text": "Tell us a secret nobody knows",
-    "category": "story"
-  },
-  {
-    "text": "Tell us about your most embarrassing moment",
-    "category": "story"
-  },
-  {
-    "text": "The best decade for music — GO",
-    "category": "opinion"
-  },
-  {
-    "text": "The best food that exists — argue your case",
-    "category": "opinion"
-  },
-  {
-    "text": "The best thing you ate today",
-    "category": "food"
-  },
-  {
-    "text": "The craziest thing that happened to you this week",
-    "category": "story"
-  },
-  {
-    "text": "The grand entrance",
-    "category": "user"
-  },
-  {
-    "text": "The most beautiful thing near you right now",
-    "category": "vibes"
-  },
-  {
-    "text": "The sunset/sunrise from where you are",
-    "category": "vibes"
-  },
-  {
-    "text": "The view from your window right now",
-    "category": "lifestyle"
-  },
-  {
-    "text": "The weirdest dream you've ever had",
-    "category": "story"
-  },
-  {
-    "text": "The weirdest food combo that actually slaps",
-    "category": "food"
-  },
-  {
-    "text": "Touch your nose with your tongue",
-    "category": "challenge"
-  },
-  {
-    "text": "Uno Reverse",
-    "category": "admin"
-  },
-  {
-    "text": "Walk in slow motion with your best fit",
-    "category": "vibes"
-  },
-  {
-    "text": "What song is stuck in your head?",
-    "category": "opinion"
-  },
-  {
-    "text": "What would you rename your state/country?",
-    "category": "opinion"
-  },
-  {
-    "text": "What's in your fridge? Be honest",
-    "category": "lifestyle"
-  },
-  {
-    "text": "What's the most overrated movie?",
-    "category": "opinion"
-  },
-  {
-    "text": "Will wake up for snacks",
-    "category": "user"
-  },
-  {
-    "text": "Your aesthetic in 10 seconds",
-    "category": "vibes"
-  },
-  {
-    "text": "Your best celebrity impression",
-    "category": "comedy"
-  },
-  {
-    "text": "Your best handshake with someone",
-    "category": "social"
-  },
-  {
-    "text": "Your best impression of your parents",
-    "category": "comedy"
-  },
-  {
-    "text": "Your best pen spin or card trick",
-    "category": "skills"
-  },
-  {
-    "text": "Your best pickup line",
-    "category": "general"
-  },
-  {
-    "text": "Your best sports move in 10 seconds",
-    "category": "skills"
-  },
-  {
-    "text": "Your biggest flex — brag about it",
-    "category": "story"
-  },
-  {
-    "text": "Your coffee/drink order — make it",
-    "category": "food"
-  },
-  {
-    "text": "Your face when you check your bank account",
-    "category": "comedy"
-  },
-  {
-    "text": "Your face when your alarm goes off",
-    "category": "reactions"
-  },
-  {
-    "text": "Your fastest typing test — GO",
-    "category": "skills"
-  },
-  {
-    "text": "Your furry friend is doing what right now ?",
-    "category": "user"
-  },
-  {
-    "text": "Your most impressive catch",
-    "category": "skills"
-  },
-  {
-    "text": "Your most irrational fear — explain it",
-    "category": "story"
-  },
-  {
-    "text": "Your most prized possession",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Your most unpopular opinion",
-    "category": "opinion"
-  },
-  {
-    "text": "Your outfit of the day — spin for us",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Your pet doing something funny",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Your playlist energy as a video",
-    "category": "vibes"
-  },
-  {
-    "text": "Your reaction to your old photos",
-    "category": "reactions"
-  },
-  {
-    "text": "Your room tour in 10 seconds — GO",
-    "category": "vibes"
-  },
-  {
-    "text": "Your setup",
-    "category": "user"
-  },
-  {
-    "text": "Your signature dish — show it off",
-    "category": "food"
-  },
-  {
-    "text": "Your workspace right now — no cleaning allowed",
-    "category": "lifestyle"
-  },
-  {
-    "text": "Your worst cooking disaster",
-    "category": "story"
-  },
-  {
-    "text": "Your worst dance move",
-    "category": "comedy"
-  },
-  {
-    "text": "Your worst date story in 10 seconds",
-    "category": "story"
-  }
+  { "text": "10 seconds of chaos", "category": "environment" },
+  { "text": "A childhood memory", "category": "story" },
+  { "text": "A perfect moment", "category": "environment" },
+  { "text": "A stranger's hot take", "category": "interaction" },
+  { "text": "A stranger's secret", "category": "interaction" },
+  { "text": "Acceptable shower length", "category": "opinion" },
+  { "text": "Act out your last text", "category": "comedy" },
+  { "text": "Aesthetic gone wrong", "category": "vibes" },
+  { "text": "Algorithm bullseye", "category": "reactions" },
+  { "text": "An act of kindness", "category": "others" },
+  { "text": "Anniversary you forgot", "category": "story" },
+  { "text": "Annoying friend habit", "category": "social" },
+  { "text": "Art in the wild", "category": "environment" },
+  { "text": "Asking parents for money", "category": "comedy" },
+  { "text": "Auto-play victim", "category": "comedy" },
+  { "text": "Awkward wave", "category": "comedy" },
+  { "text": "Backwards alphabet, fast", "category": "challenge" },
+  { "text": "Balance something on your head", "category": "challenge" },
+  { "text": "Bank balance reaction", "category": "reactions" },
+  { "text": "Battery at 4%", "category": "reactions" },
+  { "text": "Beach or mountains", "category": "opinion" },
+  { "text": "Beatbox break", "category": "creative" },
+  { "text": "Begging your bank account", "category": "comedy" },
+  { "text": "Behind the back catch", "category": "challenge" },
+  { "text": "Best fake laugh", "category": "comedy" },
+  { "text": "Best fast food, ranked", "category": "opinion" },
+  { "text": "Best food, defend it", "category": "opinion" },
+  { "text": "Best generation, fight me", "category": "opinion" },
+  { "text": "Best handshake", "category": "social" },
+  { "text": "Best holiday, defend it", "category": "opinion" },
+  { "text": "Best impression of your parents", "category": "comedy" },
+  { "text": "Best meme of all time", "category": "opinion" },
+  { "text": "Best pen spin", "category": "skills" },
+  { "text": "Best pickup line", "category": "general" },
+  { "text": "Best pickup line that worked", "category": "story" },
+  { "text": "Best season, no wrong answer", "category": "opinion" },
+  { "text": "Best sports move", "category": "skills" },
+  { "text": "Best wingman of all time", "category": "story" },
+  { "text": "Biggest flex, brag", "category": "story" },
+  { "text": "Blindfold drawing", "category": "creative" },
+  { "text": "Brag, but make it embarrassing", "category": "comedy" },
+  { "text": "Burn!", "category": "user" },
+  { "text": "Camera roll's first photo", "category": "reactions" },
+  { "text": "Camera-off energy", "category": "comedy" },
+  { "text": "Cargo shorts in 2026", "category": "opinion" },
+  { "text": "Cats or dogs?", "category": "opinion" },
+  { "text": "Caught being dramatic", "category": "others" },
+  { "text": "Caught doing something", "category": "story" },
+  { "text": "Caught lurking", "category": "story" },
+  { "text": "Caught mid-laugh", "category": "others" },
+  { "text": "Caught singing alone", "category": "others" },
+  { "text": "Celebrity impression", "category": "comedy" },
+  { "text": "Cereal milk: drink or dump?", "category": "opinion" },
+  { "text": "Cereal: soup or not?", "category": "opinion" },
+  { "text": "Chain reaction", "category": "action" },
+  { "text": "Cheap thing you love", "category": "opinion" },
+  { "text": "Closed tab regret", "category": "reactions" },
+  { "text": "Closet flex", "category": "lifestyle" },
+  { "text": "Clubbing", "category": "user" },
+  { "text": "Coffee elitist energy", "category": "comedy" },
+  { "text": "Coffee order, make it", "category": "food" },
+  { "text": "Comfort show, no context", "category": "opinion" },
+  { "text": "Compliment a stranger", "category": "interaction" },
+  { "text": "Confess a microcrime", "category": "story" },
+  { "text": "Confess your toxic trait", "category": "story" },
+  { "text": "Conspiracy theory in 10s", "category": "comedy" },
+  { "text": "Coupon-clipping pride", "category": "comedy" },
+  { "text": "Crew's pre-game ritual", "category": "others" },
+  { "text": "Cringe at past you", "category": "reactions" },
+  { "text": "Crocs: defend or denounce", "category": "opinion" },
+  { "text": "Crushed but they don't know", "category": "story" },
+  { "text": "Dad joke setup", "category": "comedy" },
+  { "text": "Date green flag in 10s", "category": "story" },
+  { "text": "Date red flag in 10s", "category": "story" },
+  { "text": "Day to night transition", "category": "mood" },
+  { "text": "Dealbreaker, no context", "category": "story" },
+  { "text": "Defend your worst trait", "category": "comedy" },
+  { "text": "Detention story", "category": "story" },
+  { "text": "Don't blink", "category": "challenge" },
+  { "text": "Doomscroll face", "category": "reactions" },
+  { "text": "Drink order, make it", "category": "food" },
+  { "text": "Duet with your best friend", "category": "social" },
+  { "text": "Expensive thing you regret", "category": "story" },
+  { "text": "Explain your search history", "category": "comedy" },
+  { "text": "Eyebrow workout", "category": "comedy" },
+  { "text": "Fakest crying face", "category": "comedy" },
+  { "text": "Falling in slow-mo", "category": "action" },
+  { "text": "Fastest pushups in 10s", "category": "challenge" },
+  { "text": "Fastest thing near you", "category": "action" },
+  { "text": "Fastest typing test", "category": "skills" },
+  { "text": "Fit check, spin for us", "category": "lifestyle" },
+  { "text": "Free trial regret", "category": "story" },
+  { "text": "Friend debate, GO", "category": "interaction" },
+  { "text": "Friend group's green flag", "category": "social" },
+  { "text": "Friend group's inside joke", "category": "social" },
+  { "text": "Friend group's red flag", "category": "social" },
+  { "text": "Friend's reaction to a surprise", "category": "others" },
+  { "text": "Friend's signature move", "category": "others" },
+  { "text": "Furry friend doing what?", "category": "user" },
+  { "text": "Genuine laughter", "category": "user" },
+  { "text": "Ghosted moment", "category": "story" },
+  { "text": "Glow-up reveal", "category": "vibes" },
+  { "text": "Golden hour selfie", "category": "vibes" },
+  { "text": "Group chat IRL", "category": "social" },
+  { "text": "Group chat name lore", "category": "story" },
+  { "text": "Group chat unread count", "category": "reactions" },
+  { "text": "Group project carry", "category": "story" },
+  { "text": "Group's loudest member", "category": "social" },
+  { "text": "Group's quietest member", "category": "social" },
+  { "text": "Gym selfie energy", "category": "comedy" },
+  { "text": "Hidden talent", "category": "lifestyle" },
+  { "text": "Hottest condiment take", "category": "opinion" },
+  { "text": "How they'd spend a million", "category": "interaction" },
+  { "text": "Imitation of someone here", "category": "interaction" },
+  { "text": "Instrument moment", "category": "skills" },
+  { "text": "Irrational fear, explain", "category": "story" },
+  { "text": "Justify your last purchase", "category": "comedy" },
+  { "text": "Justify your screen time", "category": "comedy" },
+  { "text": "Karen energy, 10s", "category": "comedy" },
+  { "text": "Last DM, react", "category": "reactions" },
+  { "text": "Last impulse buy", "category": "reactions" },
+  { "text": "Last lie you told", "category": "story" },
+  { "text": "Last meme that got you", "category": "reactions" },
+  { "text": "Last receipt, react", "category": "reactions" },
+  { "text": "Last Reddit deep dive", "category": "story" },
+  { "text": "Last selfie, react", "category": "reactions" },
+  { "text": "Last text you regret", "category": "reactions" },
+  { "text": "Last thing that made you laugh", "category": "comedy" },
+  { "text": "Least likely to text back", "category": "social" },
+  { "text": "Lie convincingly for 10s", "category": "challenge" },
+  { "text": "Make something disappear", "category": "skills" },
+  { "text": "Make the silliest face", "category": "comedy" },
+  { "text": "Make this satisfying", "category": "creative" },
+  { "text": "Mom dance, GO", "category": "comedy" },
+  { "text": "Mom-saying-your-full-name face", "category": "comedy" },
+  { "text": "Money tip nobody asked for", "category": "opinion" },
+  { "text": "Morning routine, 10s", "category": "lifestyle" },
+  { "text": "Most awkward kiss", "category": "story" },
+  { "text": "Most beautiful thing nearby", "category": "vibes" },
+  { "text": "Most chaotic outfit ever", "category": "comedy" },
+  { "text": "Most cursed tab open RN", "category": "comedy" },
+  { "text": "Most dramatic faint", "category": "comedy" },
+  { "text": "Most embarrassing autocorrect", "category": "story" },
+  { "text": "Most embarrassing moment", "category": "story" },
+  { "text": "Most expensive mistake", "category": "story" },
+  { "text": "Most impressive catch", "category": "skills" },
+  { "text": "Most interesting thing within 10ft", "category": "environment" },
+  { "text": "Most likely to fake their own death", "category": "social" },
+  { "text": "Most likely to get arrested", "category": "social" },
+  { "text": "Most likely to ghost", "category": "social" },
+  { "text": "Most likely to start a podcast", "category": "social" },
+  { "text": "Most overrated celebrity", "category": "opinion" },
+  { "text": "Most overrated snack", "category": "opinion" },
+  { "text": "Most replayed song RN", "category": "opinion" },
+  { "text": "Music with household items", "category": "creative" },
+  { "text": "Narrate someone's outfit", "category": "comedy" },
+  { "text": "Neighborhood's personality", "category": "environment" },
+  { "text": "News anchor: your day", "category": "comedy" },
+  { "text": "No-words short film", "category": "creative" },
+  { "text": "Notification panic", "category": "reactions" },
+  { "text": "NPC moment", "category": "comedy" },
+  { "text": "Office snack drawer", "category": "lifestyle" },
+  { "text": "Old crush, react", "category": "reactions" },
+  { "text": "One thing to change about your city", "category": "opinion" },
+  { "text": "Open your DMs and react", "category": "reactions" },
+  { "text": "Opera singer your name", "category": "creative" },
+  { "text": "Outside your front door RN", "category": "environment" },
+  { "text": "Overrated movie", "category": "opinion" },
+  { "text": "Pet acting human", "category": "lifestyle" },
+  { "text": "Pet at the vet face", "category": "reactions" },
+  { "text": "Pet best moment", "category": "lifestyle" },
+  { "text": "Pet doing crime", "category": "lifestyle" },
+  { "text": "Pet ignoring you", "category": "lifestyle" },
+  { "text": "Pet judging you", "category": "lifestyle" },
+  { "text": "Pet stealing food", "category": "lifestyle" },
+  { "text": "Pet zoomies", "category": "lifestyle" },
+  { "text": "Pet's villain era", "category": "lifestyle" },
+  { "text": "Pets, jobs they'd have", "category": "interaction" },
+  { "text": "Phonomenal!", "category": "user" },
+  { "text": "Pineapple on pizza?", "category": "opinion" },
+  { "text": "Pizza topping that should be illegal", "category": "opinion" },
+  { "text": "Plant parent moment", "category": "lifestyle" },
+  { "text": "Power-rank your fridge", "category": "food" },
+  { "text": "Pretend to slip", "category": "comedy" },
+  { "text": "Pretend you saw a ghost", "category": "comedy" },
+  { "text": "Pretend you won the lottery", "category": "comedy" },
+  { "text": "Pretend you're a baby", "category": "comedy" },
+  { "text": "Pretend you're a cat", "category": "comedy" },
+  { "text": "Pretend you're a tourist", "category": "comedy" },
+  { "text": "Pretend you're being interviewed", "category": "comedy" },
+  { "text": "Productivity fail", "category": "comedy" },
+  { "text": "PTO countdown face", "category": "comedy" },
+  { "text": "Quiet quitting energy", "category": "comedy" },
+  { "text": "Ranch dressing rights", "category": "opinion" },
+  { "text": "Rap about your day", "category": "interaction" },
+  { "text": "React: school cancelled", "category": "comedy" },
+  { "text": "Reaction to old photos", "category": "reactions" },
+  { "text": "Read receipt drama", "category": "story" },
+  { "text": "Read your own bio out loud", "category": "comedy" },
+  { "text": "Record DAT stare", "category": "user" },
+  { "text": "Refund rage", "category": "comedy" },
+  { "text": "Rizz at its finest", "category": "general" },
+  { "text": "Room tour, 10s", "category": "vibes" },
+  { "text": "Run in slow-mo", "category": "challenge" },
+  { "text": "Saying no to brunch", "category": "comedy" },
+  { "text": "School lunch flashback", "category": "story" },
+  { "text": "Screen time, react", "category": "reactions" },
+  { "text": "Self-care fail", "category": "comedy" },
+  { "text": "Sent to the wrong chat", "category": "story" },
+  { "text": "Show us your worst quality", "category": "comedy" },
+  { "text": "Side hustle pitch in 10s", "category": "comedy" },
+  { "text": "Signature dish", "category": "food" },
+  { "text": "Skincare routine speedrun", "category": "lifestyle" },
+  { "text": "Sliding-into-DMs energy", "category": "comedy" },
+  { "text": "Snack in 10 seconds", "category": "food" },
+  { "text": "Someone amazing at their thing", "category": "others" },
+  { "text": "Someone explaining their passion", "category": "others" },
+  { "text": "Someone in their element", "category": "others" },
+  { "text": "Someone's biggest flex", "category": "interaction" },
+  { "text": "Someone's first taste reaction", "category": "others" },
+  { "text": "Someone's pre-game ritual", "category": "others" },
+  { "text": "Someone's victory moment", "category": "others" },
+  { "text": "Sounds around you, 10s", "category": "environment" },
+  { "text": "Speed draw your face", "category": "creative" },
+  { "text": "Speed-tie your shoes", "category": "skills" },
+  { "text": "Spin 5x, walk straight", "category": "challenge" },
+  { "text": "Splitting the check chaos", "category": "story" },
+  { "text": "Splurge of the week", "category": "story" },
+  { "text": "Sportscaster your snack", "category": "comedy" },
+  { "text": "Spotify shame song", "category": "comedy" },
+  { "text": "Spotify Wrapped face", "category": "reactions" },
+  { "text": "Stack as much as you can", "category": "challenge" },
+  { "text": "Stranger says hi", "category": "social" },
+  { "text": "Subscription you forgot", "category": "reactions" },
+  { "text": "Substitute teacher chaos", "category": "story" },
+  { "text": "Sunday reset chaos", "category": "comedy" },
+  { "text": "Sunday vibes", "category": "user" },
+  { "text": "Targeted ad nightmare", "category": "comedy" },
+  { "text": "Teacher you'll never forget", "category": "story" },
+  { "text": "Tell a joke", "category": "comedy" },
+  { "text": "Tell a lie, watch us guess", "category": "comedy" },
+  { "text": "Tell a secret", "category": "story" },
+  { "text": "Tell on yourself, 10s", "category": "story" },
+  { "text": "Tell us your week", "category": "story" },
+  { "text": "Texting hour cutoff", "category": "opinion" },
+  { "text": "The 'I'm in a meeting' lie", "category": "comedy" },
+  { "text": "The 'left on read' feeling", "category": "reactions" },
+  { "text": "The 'we need to talk' face", "category": "reactions" },
+  { "text": "The 'you up?' text face", "category": "reactions" },
+  { "text": "The best decade for music", "category": "opinion" },
+  { "text": "The chaos around you", "category": "environment" },
+  { "text": "The chaotic friend", "category": "social" },
+  { "text": "The compliment you don't deserve", "category": "comedy" },
+  { "text": "The designated photographer", "category": "social" },
+  { "text": "The DM you'll never send", "category": "story" },
+  { "text": "The drama starter", "category": "social" },
+  { "text": "The friend who plans nothing", "category": "social" },
+  { "text": "The grand entrance", "category": "user" },
+  { "text": "The HR-violation joke", "category": "comedy" },
+  { "text": "The hype man", "category": "social" },
+  { "text": "The lie you tell on first dates", "category": "story" },
+  { "text": "The mom friend", "category": "social" },
+  { "text": "The one we don't talk about", "category": "social" },
+  { "text": "The party you're at RN", "category": "mood" },
+  { "text": "The Slack you wish you sent", "category": "comedy" },
+  { "text": "The thing you do when nobody's watching", "category": "story" },
+  { "text": "The thing your mom wishes you'd stop", "category": "comedy" },
+  { "text": "The third wheel", "category": "social" },
+  { "text": "The vibe killer", "category": "social" },
+  { "text": "The vibe RN, no words", "category": "environment" },
+  { "text": "Their best story", "category": "others" },
+  { "text": "TikTok rabbit hole", "category": "story" },
+  { "text": "Tipping at every cafe?", "category": "opinion" },
+  { "text": "Toilet paper: over or under", "category": "opinion" },
+  { "text": "Touch your nose with your tongue", "category": "challenge" },
+  { "text": "Trick shot", "category": "challenge" },
+  { "text": "Try to wink without blinking", "category": "challenge" },
+  { "text": "Trying to flirt poorly", "category": "comedy" },
+  { "text": "Trying to look cool", "category": "comedy" },
+  { "text": "Two friends compete", "category": "interaction" },
+  { "text": "Uno Reverse", "category": "admin" },
+  { "text": "Unpopular opinion", "category": "opinion" },
+  { "text": "Venmo request stories", "category": "story" },
+  { "text": "Voicemail: yes or no?", "category": "opinion" },
+  { "text": "Wake up for snacks", "category": "user" },
+  { "text": "Weirdest dream", "category": "story" },
+  { "text": "Weirdest food combo", "category": "food" },
+  { "text": "What people misunderstand about you", "category": "story" },
+  { "text": "What you ate today", "category": "food" },
+  { "text": "What you tell people vs reality", "category": "comedy" },
+  { "text": "What's in your fridge", "category": "lifestyle" },
+  { "text": "Whatever you're amazing at", "category": "skills" },
+  { "text": "Who'd survive a horror movie", "category": "social" },
+  { "text": "Who's most likely to cry first", "category": "social" },
+  { "text": "Why you're single, 10s", "category": "comedy" },
+  { "text": "WiFi died mid-stream", "category": "reactions" },
+  { "text": "Wildest animal encounter", "category": "story" },
+  { "text": "Wisdom from your elders", "category": "others" },
+  { "text": "Worst advice you'd give", "category": "comedy" },
+  { "text": "Worst boss energy", "category": "comedy" },
+  { "text": "Worst breakup text", "category": "story" },
+  { "text": "Worst cooking disaster", "category": "story" },
+  { "text": "Worst coworker", "category": "story" },
+  { "text": "Worst dance move", "category": "comedy" },
+  { "text": "Worst date moment", "category": "story" },
+  { "text": "Worst date story", "category": "story" },
+  { "text": "Worst high-five", "category": "comedy" },
+  { "text": "Worst meeting energy", "category": "comedy" },
+  { "text": "Worst money decision", "category": "story" },
+  { "text": "Worst pickup line you got", "category": "story" },
+  { "text": "Worst piece of clothing", "category": "opinion" },
+  { "text": "Worst purchase RN", "category": "reactions" },
+  { "text": "Worst Tinder bio you've seen", "category": "story" },
+  { "text": "Your aesthetic, 10s", "category": "vibes" },
+  { "text": "Your bank account face", "category": "comedy" },
+  { "text": "Your city at night", "category": "mood" },
+  { "text": "Your commute", "category": "lifestyle" },
+  { "text": "Your last alarm face", "category": "reactions" },
+  { "text": "Your main character moment", "category": "vibes" },
+  { "text": "Your most prized possession", "category": "lifestyle" },
+  { "text": "Your most unhinged moment", "category": "story" },
+  { "text": "Your pet being chaotic", "category": "lifestyle" },
+  { "text": "Your playlist as a video", "category": "vibes" },
+  { "text": "Your red flag, openly", "category": "comedy" },
+  { "text": "Your rename for your country", "category": "opinion" },
+  { "text": "Your setup", "category": "user" },
+  { "text": "Your song stuck in your head", "category": "opinion" },
+  { "text": "Your type in 5 words", "category": "opinion" },
+  { "text": "Your view RN", "category": "lifestyle" },
+  { "text": "Your villain origin story", "category": "story" },
+  { "text": "Your worst habit on camera", "category": "comedy" },
+  { "text": "Your workspace, no cleaning", "category": "lifestyle" },
+  { "text": "YouTube history reveal", "category": "reactions" }
 ]

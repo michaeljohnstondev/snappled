@@ -16,12 +16,53 @@ import VibeInput from '../components/ui/VibeInput';
 import theme from '../theme/themes';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import { signInWithGoogle, signInWithApple, ensureUserDocument } from '../services/googleAuthService';
 
 export default function LandingScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Shared social sign-in handler. ensureUserDocument is idempotent
+  // so returning social-login users don't get a second user doc.
+  async function handleSocialSignIn(kind) {
+    const setLoading = kind === 'apple' ? setAppleLoading : setGoogleLoading;
+    setLoading(true);
+    let signedIn = false;
+    try {
+      const result =
+        kind === 'apple' ? await signInWithApple() : await signInWithGoogle();
+      signedIn = true;
+      const user = result.userCredential.user;
+      await ensureUserDocument(user, {
+        firstName: result.firstName || undefined,
+        lastName: result.lastName || undefined,
+        authProvider: kind,
+      });
+      // AuthContext will route the user to the main app on success.
+    } catch (err) {
+      // Swallow user-cancellation codes silently
+      if (
+        err.code === 'SIGN_IN_CANCELLED' ||
+        err.code === '12501' ||
+        err.code === 'ERR_REQUEST_CANCELED' ||
+        err.code === 'ERR_CANCELED'
+      ) return;
+      console.log(`[Screen:Landing] ${kind} sign-in failed`, err?.code, err?.message);
+      // If Firebase signed in but only the user-doc write failed,
+      // AuthContext still routes — suppress the toast.
+      if (signedIn) return;
+      Alert.alert(
+        `${kind === 'apple' ? 'Apple' : 'Google'} Sign-In Failed`,
+        err?.message || 'Try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const passwordInputRef = useRef(null);
@@ -193,12 +234,37 @@ export default function LandingScreen({ navigation }) {
               <View style={styles.dividerLine} />
             </View>
 
-            <VibeButton
-              label="Continue with Google"
-              onPress={() => Alert.alert('Coming Soon', 'Google Sign-In will be available in a future update.')}
-              variant="toggle"
-              color="blue"
-            />
+            {/* Apple Sign-In first on iOS per App Store guideline 4.8. */}
+            {Platform.OS === 'ios' && (
+              <Pressable
+                onPress={() => handleSocialSignIn('apple')}
+                disabled={isLoading || googleLoading || appleLoading}
+                style={({ pressed }) => [
+                  styles.appleButton,
+                  { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
+                ]}
+              >
+                <Text style={styles.appleLogo}></Text>
+                <Text style={styles.appleButtonText}>
+                  {appleLoading ? 'Signing in...' : 'Sign in with Apple'}
+                </Text>
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => handleSocialSignIn('google')}
+              disabled={isLoading || googleLoading || appleLoading}
+              style={({ pressed }) => [
+                styles.googleButton,
+                { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
+              ]}
+            >
+              <View style={styles.googleIconContainer}>
+                <Text style={styles.googleG}>G</Text>
+              </View>
+              <Text style={styles.googleButtonText}>
+                {googleLoading ? 'Signing in...' : 'Sign in with Google'}
+              </Text>
+            </Pressable>
 
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
@@ -317,5 +383,57 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.main,
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 48,
+    backgroundColor: '#000000',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+  },
+  appleLogo: {
+    color: '#ffffff',
+    fontSize: 20,
+    marginRight: 10,
+    marginTop: -2,
+  },
+  appleButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 48,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+  },
+  googleIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleG: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4285F4',
+  },
+  googleButtonText: {
+    color: '#1f1f1f',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
