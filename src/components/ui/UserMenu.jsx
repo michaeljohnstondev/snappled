@@ -1,34 +1,36 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
+import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
 
 const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 
+// Top-right user menu (profile / admin / sign out). Uses VibeAlerts
+// (showConfirm / showError from ModalContext) to keep the look
+// consistent with the rest of the app — native Alert.alert was the
+// outlier breaking the punk theme.
 export default function UserMenu({ visible, onClose, onProfilePress, onAdminPress, userId }) {
+  const { showConfirm, showError } = useModal();
+
+  // Confirm via VibeAlert, then sign the user out. AuthContext routes
+  // them back to LandingScreen automatically on auth state change.
   const handleLogout = () => {
-    Alert.alert(
+    showConfirm(
       'Sign Out',
       'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut(auth);
-              onClose();
-            } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            }
-          }
+      async () => {
+        try {
+          await signOut(auth);
+          onClose();
+        } catch (error) {
+          console.error('Error signing out:', error);
+          showError('Error', 'Failed to sign out. Please try again.');
         }
-      ]
+      },
     );
   };
 
