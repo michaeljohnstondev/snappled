@@ -1593,9 +1593,9 @@ export default function GameScreen({ navigation }) {
               )}
             />
             {favoriteCard && (
-              <Pressable style={styles.submitVoteBtn} onPress={handleSubmitVote}>
-                <Text style={styles.submitVoteText}>Submit Vote</Text>
-              </Pressable>
+              <View style={styles.submitVoteWrap}>
+                <VibeButton label="Submit Vote" onPress={handleSubmitVote} />
+              </View>
             )}
           </>
         )}
@@ -1610,7 +1610,7 @@ export default function GameScreen({ navigation }) {
             muted={!!previewCard.muted}
             onClose={() => setPreviewCard(null)}
             primaryLabel={hasVoted ? null : 'PICK AS FAVORITE'}
-            primaryIcon="heart"
+            primaryIcon={null}
             onPrimary={() => {
               setFavoriteCard(previewCard);
               setPreviewCard(null);
@@ -2714,21 +2714,9 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 10, padding: 3,
   },
-  submitVoteBtn: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 2,
-    borderColor: theme.colors.vibeBlue,
-    paddingVertical: 14,
+  submitVoteWrap: {
     paddingHorizontal: 32,
-    borderRadius: 12,
-    alignSelf: 'center',
     marginBottom: 16,
-  },
-  submitVoteText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 16,
-    fontWeight: theme.fontWeights.bold,
-    textAlign: 'center',
   },
   swipeHints: {
     flexDirection: 'row', justifyContent: 'space-between', width: '100%',
