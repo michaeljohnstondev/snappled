@@ -48,34 +48,52 @@ export async function prefetchVideo(url) {
   if (cached.has(url)) return cached.get(url);
   if (inFlight.has(url)) return inFlight.get(url);
 
-  await ensureCacheDir();
-  const localUri = `${CACHE_DIR}${urlToFilename(url)}`;
+  // Set inFlight BEFORE the first await so concurrent callers dedupe
+  // to a single download. Previous code awaited ensureCacheDir() first,
+  // which let a second call slip through and clobber the write.
+  const promise = (async () => {
+    await ensureCacheDir();
+    const localUri = `${CACHE_DIR}${urlToFilename(url)}`;
 
-  // If the file already exists from a previous session, register and bail.
-  try {
-    const info = await FileSystem.getInfoAsync(localUri);
-    if (info.exists && info.size > 0) {
-      cached.set(url, localUri);
-      notify(url, localUri);
-      return localUri;
-    }
-  } catch (e) {}
+    // If the file exists from a previous session, register and bail.
+    try {
+      const info = await FileSystem.getInfoAsync(localUri);
+      if (info.exists && info.size > 0) {
+        cached.set(url, localUri);
+        notify(url, localUri);
+        return localUri;
+      }
+    } catch (e) { /* fall through to download */ }
 
-  const promise = FileSystem.downloadAsync(url, localUri)
-    .then(res => {
+    try {
+      const res = await FileSystem.downloadAsync(url, localUri);
       cached.set(url, res.uri);
-      inFlight.delete(url);
       notify(url, res.uri);
       return res.uri;
-    })
-    .catch(err => {
-      inFlight.delete(url);
-      // Silent fallback to remote URL — no error log spam.
+    } catch (err) {
+      // Silent fallback to remote URL — video still streams, just no
+      // cache speedup. Don't set `cached` so a later attempt can retry.
       return url;
-    });
+    }
+  })().finally(() => inFlight.delete(url));
 
   inFlight.set(url, promise);
   return promise;
+}
+
+// Force-drop a URL from the cache and delete its file. Called by the
+// player when a "cached" file fails to open (corrupt download, missing
+// codec, etc.) so the next play attempt refetches from the network.
+export async function invalidateCachedVideo(url) {
+  if (!url) return;
+  cached.delete(url);
+  inFlight.delete(url);
+  try {
+    const localUri = `${CACHE_DIR}${urlToFilename(url)}`;
+    const info = await FileSystem.getInfoAsync(localUri);
+    if (info.exists) await FileSystem.deleteAsync(localUri, { idempotent: true });
+  } catch (e) { /* non-fatal */ }
+  notify(url, url); // hand subscribers the remote URL as a fallback
 }
 
 export function getCachedUriSync(url) {

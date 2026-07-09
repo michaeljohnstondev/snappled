@@ -11,7 +11,7 @@
 import React, { useImperativeHandle, forwardRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCachedVideoUri } from '../../services/videoCache';
+import { useCachedVideoUri, invalidateCachedVideo } from '../../services/videoCache';
 
 const SnappleVideoPlayer = forwardRef(({ snapple, style, muted }, ref) => {
   // Explicit `muted` prop wins; otherwise fall back to the snapple's
@@ -31,6 +31,27 @@ const SnappleVideoPlayer = forwardRef(({ snapple, style, muted }, ref) => {
   useEffect(() => {
     if (player) player.muted = resolvedMuted;
   }, [player, resolvedMuted]);
+
+  // Self-heal on playback errors. If the local cache file is corrupt
+  // or the source fails to decode, drop the cache entry so the next
+  // mount refetches from the remote URL. Prevents "black rectangle
+  // that never plays" for videos where a bad cache write survived.
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener?.('statusChange', (event) => {
+      if (event?.status === 'error') {
+        const remoteUrl = snapple?.videoUrl;
+        if (remoteUrl) {
+          console.warn('[SnappleVideoPlayer] playback error — invalidating cache', {
+            url: remoteUrl,
+            error: event?.error?.message,
+          });
+          invalidateCachedVideo(remoteUrl);
+        }
+      }
+    });
+    return () => { try { sub?.remove?.(); } catch (e) {} };
+  }, [player, snapple?.videoUrl]);
 
   useImperativeHandle(ref, () => ({
     play: () => player.play(),

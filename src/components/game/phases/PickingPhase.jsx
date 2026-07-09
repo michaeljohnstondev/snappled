@@ -11,7 +11,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
-import PreviewPlayer from '../PreviewPlayer';
+import PhasePromptBanner from '../PhasePromptBanner';
+import PreviewModal from '../PreviewModal';
 import CreatorActionRow from '../CreatorActionRow';
 import theme from '../../../theme/themes';
 
@@ -75,9 +76,13 @@ export default function PickingPhase({
         <Text style={styles.timerText}>{timer}s</Text>
       </View>
 
-      {/* Prompt + admin Edit/Delete buttons (admin only) */}
-      <View style={styles.promptBanner}>
-        <Text style={styles.promptText}>{currentPrompt}</Text>
+      {/* Prompt + admin Edit/Delete buttons (admin only). The verb-line
+          above the prompt tells new players exactly what to do this
+          phase so they don't stare at a hand of thumbnails wondering. */}
+      <PhasePromptBanner
+        instruction={alreadyPicked ? 'WAITING ON OTHERS FOR:' : 'PICK YOUR BEST MATCH FOR:'}
+        prompt={currentPrompt}
+      >
         {isAdmin && (
           <View style={styles.promptAdminRow}>
             <Pressable style={styles.promptAdminBtn} onPress={() => onEditPromptOpen(currentPrompt)}>
@@ -91,7 +96,7 @@ export default function PickingPhase({
             </Pressable>
           </View>
         )}
-      </View>
+      </PhasePromptBanner>
 
       {alreadyPicked ? (
         // Post-pick wait screen — YOUR PICK + standings + voted-status list.
@@ -189,50 +194,43 @@ export default function PickingPhase({
         </>
       )}
 
-      {/* Card preview modal — Play This Card from hand, or just info+actions
-          row when triggered from the post-pick wait screen. */}
+      {/* Card preview — full-bleed video + fat cyan action bar.
+          Post-pick wait-screen previews (_isWaiting) hide the play bar
+          and surface creator actions in a floating overlay instead. */}
       {previewCard && (
-        <Modal visible transparent animationType="fade" onRequestClose={onClosePreview}>
-          <View style={styles.previewOverlay}>
-            <View style={styles.previewCard}>
-              <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
-              {previewCard._isWaiting && (
-                <CreatorActionRow
-                  submission={previewCard}
-                  currentUser={user}
-                  ownedSnappleIds={userCurrency.ownedSnapples || []}
-                  showToast={showToast}
-                  showError={showError}
-                />
-              )}
-              {/* Admin nuke — delegates to GameScreen so the exclusion
-                  confirms, broadcasts, and auto-replaces in everyone's
-                  hand who doesn't own the card. */}
-              {isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) && (
-                <Pressable
-                  style={pickingAdminStyles.poolNukeBtn}
-                  onPress={() => {
-                    onExcludeFromPool(previewCard.snappleId || previewCard.id);
-                    onClosePreview();
-                  }}
-                >
-                  <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
-                  <Text style={pickingAdminStyles.poolNukeText}>Exclude from pool</Text>
-                </Pressable>
-              )}
-              <View style={styles.previewButtons}>
-                <Pressable style={styles.previewCancel} onPress={onClosePreview}>
-                  <Text style={styles.previewCancelText}>Back</Text>
-                </Pressable>
-                {!previewCard._isWaiting && (
-                  <Pressable style={styles.previewPlay} onPress={() => onPickCard(previewCard)}>
-                    <Text style={styles.previewPlayText}>Play This Card</Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <PreviewModal
+          visible
+          videoUrl={previewCard.videoUrl}
+          muted={!!previewCard.muted}
+          onClose={onClosePreview}
+          primaryLabel={previewCard._isWaiting ? null : 'PLAY THIS CARD'}
+          onPrimary={() => onPickCard(previewCard)}
+          topRightSlot={
+            isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) ? (
+              <Pressable
+                style={pickingAdminStyles.poolNukeBtn}
+                onPress={() => {
+                  onExcludeFromPool(previewCard.snappleId || previewCard.id);
+                  onClosePreview();
+                }}
+              >
+                <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                <Text style={pickingAdminStyles.poolNukeText}>Exclude</Text>
+              </Pressable>
+            ) : null
+          }
+          overlaySlot={
+            previewCard._isWaiting ? (
+              <CreatorActionRow
+                submission={previewCard}
+                currentUser={user}
+                ownedSnappleIds={userCurrency.ownedSnapples || []}
+                showToast={showToast}
+                showError={showError}
+              />
+            ) : null
+          }
+        />
       )}
 
       {/* Admin: edit / replace the round's prompt mid-game */}
@@ -283,16 +281,13 @@ const pickingAdminStyles = StyleSheet.create({
   poolNukeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
     gap: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 68, 68, 0.5)',
-    backgroundColor: 'rgba(255, 68, 68, 0.1)',
-    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   poolNukeText: {
     color: '#FF4444',
@@ -433,34 +428,6 @@ const styles = StyleSheet.create({
   playerStatusLabelDone: {
     color: theme.colors.vibeGreen, fontWeight: 'bold',
   },
-  // Preview modal (shared)
-  previewOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
-  },
-  previewCard: {
-    width: '100%', aspectRatio: 9 / 16,
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue, backgroundColor: '#000',
-  },
-  previewButtons: {
-    position: 'absolute', bottom: 16, left: 16, right: 16,
-    flexDirection: 'row', gap: 12, justifyContent: 'space-between',
-  },
-  previewCancel: {
-    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-  },
-  previewCancelText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
-  previewPlay: {
-    flex: 1,
-    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10,
-    backgroundColor: 'rgba(0,198,255,0.15)',
-    borderWidth: 2, borderColor: theme.colors.vibeBlue,
-    alignItems: 'center',
-  },
-  previewPlayText: { color: theme.colors.vibeBlue, fontSize: 14, fontWeight: 'bold' },
   // Admin edit-prompt modal
   editPromptCard: {
     width: '85%',

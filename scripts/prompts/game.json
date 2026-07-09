@@ -449,5 +449,6 @@
   { "text": "Vibe check failed", "category": "general" },
   { "text": "Catching feelings", "category": "general" },
   { "text": "Faking it", "category": "general" },
-  { "text": "Misread the situation", "category": "general" }
+  { "text": "Misread the situation", "category": "general" },
+  { "text": "When you have your full squad:", "category": "general" }
 ]

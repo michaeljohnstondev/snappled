@@ -18,13 +18,16 @@ import { userService } from '../services/userService';
 import VibeButton from '../components/ui/VibeButton';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
-import PreviewPlayer from '../components/game/PreviewPlayer';
+import PreviewModal from '../components/game/PreviewModal';
 import VoteAuraCard from '../components/game/VoteAuraCard';
 import CreatorActionRow from '../components/game/CreatorActionRow';
 import LobbyPhase from '../components/game/phases/LobbyPhase';
 import WarmupPhase from '../components/game/phases/WarmupPhase';
 import FinalResultsPhase from '../components/game/phases/FinalResultsPhase';
 import PickingPhase from '../components/game/phases/PickingPhase';
+import PhasePromptBanner from '../components/game/PhasePromptBanner';
+import TutorialOverlay from '../components/game/TutorialOverlay';
+import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -296,6 +299,20 @@ export default function GameScreen({ navigation }) {
   useEffect(() => { allSnapplesRef.current = allSnapples; }, [allSnapples]);
   const [useRandomCards, setUseRandomCards] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
+  // Tutorial mode: a practice game with tap-to-dismiss phase tips.
+  // Cleared on leaveGame the same as isPractice.
+  const [isTutorial, setIsTutorial] = useState(false);
+  const { activeTip: tutorialTip, dismiss: dismissTutorialTip } = useTutorial(
+    isTutorial,
+    game?.phase,
+  );
+  // Freeze flag consumed by the phase timer and auto-advance triggers.
+  // While a tutorial tip is open the round pauses so first-timers can
+  // read without racing the countdown. Kept as a ref so the interval
+  // callback + subscription handler see the current value without
+  // needing to be re-registered on every tip toggle.
+  const pausedRef = useRef(false);
+  useEffect(() => { pausedRef.current = !!tutorialTip; }, [tutorialTip]);
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
   const [previewCard, setPreviewCard] = useState(null);
@@ -600,6 +617,7 @@ export default function GameScreen({ navigation }) {
     if (game?.phase === GAME_PHASES.REVIEW) {
       setTimer(60);
       timerRef.current = setInterval(() => {
+        if (pausedRef.current) return;
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -615,6 +633,7 @@ export default function GameScreen({ navigation }) {
     } else if (game?.phase === GAME_PHASES.PICKING) {
       setTimer(45);
       timerRef.current = setInterval(() => {
+        if (pausedRef.current) return;
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -633,6 +652,7 @@ export default function GameScreen({ navigation }) {
     } else if (game?.phase === GAME_PHASES.VOTING) {
       setTimer(30); // 30 seconds to pick a favorite
       timerRef.current = setInterval(() => {
+        if (pausedRef.current) return;
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -655,6 +675,7 @@ export default function GameScreen({ navigation }) {
       // to ROUND_RESULTS (or FINAL_RESULTS) when the timer runs out.
       setTimer(15);
       timerRef.current = setInterval(() => {
+        if (pausedRef.current) return;
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -672,6 +693,7 @@ export default function GameScreen({ navigation }) {
       // give breathing room for ties + score swap animations.
       setTimer(37);
       timerRef.current = setInterval(() => {
+        if (pausedRef.current) return;
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -718,7 +740,9 @@ export default function GameScreen({ navigation }) {
 
         // Auto-advance: when everyone in REVIEW has hit Ready, the host
         // force-starts PICKING. The 60s warmup timer is the fallback.
-        if (gameData.phase === GAME_PHASES.REVIEW && gameData.hostId === user?.uid) {
+        // Gated on pausedRef so bots pinging Ready during a tutorial tip
+        // don't skip the user past the phase's intro.
+        if (gameData.phase === GAME_PHASES.REVIEW && gameData.hostId === user?.uid && !pausedRef.current) {
           const ready = gameData.ready || {};
           const allReady = (gameData.players || []).length > 0 &&
             (gameData.players || []).every(p => ready[p.uid]);
@@ -727,8 +751,10 @@ export default function GameScreen({ navigation }) {
           }
         }
 
-        // Auto-advance: if all players submitted, move to voting
-        if (gameData.phase === GAME_PHASES.PICKING) {
+        // Auto-advance: if all players submitted, move to voting.
+        // Same paused gate so bots don't slam the phase forward while
+        // the tutorial user is reading the picking tip.
+        if (gameData.phase === GAME_PHASES.PICKING && !pausedRef.current) {
           const allSubmitted = gameData.players.every(p =>
             gameData.submissions.some(s => s.uid === p.uid)
           );
@@ -935,6 +961,13 @@ export default function GameScreen({ navigation }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Tutorial mode = practice game + tap-to-dismiss tip on each phase.
+  // Same setup path as practice so bots + hand + prompts are identical.
+  const handleTutorial = async () => {
+    setIsTutorial(true);
+    await handlePractice();
   };
 
   const handlePickCard = async (snapple) => {
@@ -1177,6 +1210,7 @@ export default function GameScreen({ navigation }) {
           setCurrentVoteIndex(0);
           setIsSpectating(false);
           setIsPractice(false);
+          setIsTutorial(false);
           setPlayedCardIds([]);
           setMulliganMode(false);
 
@@ -1295,6 +1329,13 @@ export default function GameScreen({ navigation }) {
               color="cyan"
               disabled={isLoading || allSnapples.length < 4}
             />
+            <VibeButton
+              label="How to Play (Tutorial)"
+              onPress={handleTutorial}
+              variant="toggle"
+              color="pink"
+              disabled={isLoading || allSnapples.length < 4}
+            />
           </View>
 
           {allSnapples.length < 4 && (
@@ -1333,27 +1374,31 @@ export default function GameScreen({ navigation }) {
   // host can also start early.
   if (game.phase === GAME_PHASES.REVIEW) {
     return (
-      <WarmupPhase
-        hand={hand}
-        timer={timer}
-        readyMap={game.ready || {}}
-        players={game.players || []}
-        selfUid={user?.uid}
-        previewCard={previewCard}
-        onLeave={handleLeaveGame}
-        onPreviewCard={(card) => setPreviewCard(card)}
-        onClosePreview={() => setPreviewCard(null)}
-        onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
-        isAdmin={isAdmin}
-        onExcludeFromPool={handleExcludeFromPool}
-      />
+      <>
+        <WarmupPhase
+          hand={hand}
+          timer={timer}
+          readyMap={game.ready || {}}
+          players={game.players || []}
+          selfUid={user?.uid}
+          previewCard={previewCard}
+          onLeave={handleLeaveGame}
+          onPreviewCard={(card) => setPreviewCard(card)}
+          onClosePreview={() => setPreviewCard(null)}
+          onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
+          isAdmin={isAdmin}
+          onExcludeFromPool={handleExcludeFromPool}
+        />
+        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
+      </>
     );
   }
 
   // Picking phase — choose a card from your hand
   if (game.phase === GAME_PHASES.PICKING) {
     return (
-      <PickingPhase
+      <>
+        <PickingPhase
         game={game}
         gameId={gameId}
         user={user}
@@ -1388,7 +1433,9 @@ export default function GameScreen({ navigation }) {
         onEditPromptSave={handleSavePrompt}
         onDeletePrompt={handleDeletePrompt}
         onExcludeFromPool={handleExcludeFromPool}
-      />
+        />
+        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
+      </>
     );
   }
 
@@ -1417,9 +1464,10 @@ export default function GameScreen({ navigation }) {
           </View>
         )}
 
-        <View style={styles.promptBanner}>
-          <Text style={styles.promptText}>{game.prompts[game.currentRound - 1]}</Text>
-        </View>
+        <PhasePromptBanner
+          instruction={hasVoted ? 'WAITING ON VOTES FOR:' : 'VOTE FOR THE BEST MATCH TO:'}
+          prompt={game.prompts[game.currentRound - 1]}
+        />
 
         {hasVoted ? (
           // Vote-submitted wait screen — unified grid of all snapples,
@@ -1552,54 +1600,45 @@ export default function GameScreen({ navigation }) {
           </>
         )}
 
-        {/* Card Preview Modal — reused for voting */}
+        {/* Card Preview Modal — full-bleed video + fat cyan action bar.
+            Voting variant swaps the CTA to PICK AS FAVORITE and hides
+            it if the user has already voted. */}
         {previewCard && previewCard._isVoting && (
-          <Modal visible transparent animationType="fade" onRequestClose={() => setPreviewCard(null)}>
-            <View style={styles.previewOverlay}>
-              <View style={styles.previewCard}>
-                <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
-
-                <CreatorActionRow
-                  submission={previewCard}
-                  currentUser={user}
-                  ownedSnappleIds={userCurrency.ownedSnapples || []}
-                  showToast={showToast}
-                  showError={showError}
-                />
-
-                {/* Admin nuke. Asks for confirmation, then broadcasts
-                    the exclusion so every client's hand auto-drops the
-                    card (unless they own it). Re-include later via the
-                    eye toggle in SnappleOverlay. */}
-                {isAdmin && previewCard.snappleId && (
-                  <Pressable
-                    style={adminGameStyles.poolNukeBtn}
-                    onPress={() => {
-                      handleExcludeFromPool(previewCard.snappleId);
-                      setPreviewCard(null);
-                    }}
-                  >
-                    <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
-                    <Text style={adminGameStyles.poolNukeText}>Exclude from pool</Text>
-                  </Pressable>
-                )}
-
-                <View style={styles.previewButtons}>
-                  <Pressable style={styles.previewCancel} onPress={() => setPreviewCard(null)}>
-                    <Text style={styles.previewCancelText}>Back</Text>
-                  </Pressable>
-                  {!hasVoted && (
-                    <Pressable style={styles.previewPlay} onPress={() => {
-                      setFavoriteCard(previewCard);
-                      setPreviewCard(null);
-                    }}>
-                      <Text style={styles.previewPlayText}>Pick as Favorite</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            </View>
-          </Modal>
+          <PreviewModal
+            visible
+            videoUrl={previewCard.videoUrl}
+            muted={!!previewCard.muted}
+            onClose={() => setPreviewCard(null)}
+            primaryLabel={hasVoted ? null : 'PICK AS FAVORITE'}
+            primaryIcon="heart"
+            onPrimary={() => {
+              setFavoriteCard(previewCard);
+              setPreviewCard(null);
+            }}
+            topRightSlot={
+              isAdmin && previewCard.snappleId ? (
+                <Pressable
+                  style={adminGameStyles.poolNukeBtn}
+                  onPress={() => {
+                    handleExcludeFromPool(previewCard.snappleId);
+                    setPreviewCard(null);
+                  }}
+                >
+                  <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                  <Text style={adminGameStyles.poolNukeText}>Exclude</Text>
+                </Pressable>
+              ) : null
+            }
+            overlaySlot={
+              <CreatorActionRow
+                submission={previewCard}
+                currentUser={user}
+                ownedSnappleIds={userCurrency.ownedSnapples || []}
+                showToast={showToast}
+                showError={showError}
+              />
+            }
+          />
         )}
 
         {/* Scoreboard modal — opens from the wait-screen Scoreboard
@@ -1653,6 +1692,7 @@ export default function GameScreen({ navigation }) {
             </Modal>
           );
         })()}
+        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </LinearGradient>
     );
   }
@@ -1732,9 +1772,10 @@ export default function GameScreen({ navigation }) {
             votes={topVotes}
           />
         ) : (
-          <View style={styles.promptBanner}>
-            <Text style={styles.promptText}>{game.prompts[game.currentRound - 1]}</Text>
-          </View>
+          <PhasePromptBanner
+            instruction="ROUND RECAP:"
+            prompt={game.prompts[game.currentRound - 1]}
+          />
         )}
 
         <View style={styles.pickedWaitWrap}>
@@ -1790,6 +1831,7 @@ export default function GameScreen({ navigation }) {
             </Modal>
           );
         })()}
+        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </LinearGradient>
     );
   }
@@ -1843,16 +1885,13 @@ const adminGameStyles = StyleSheet.create({
   poolNukeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
     gap: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 68, 68, 0.5)',
-    backgroundColor: 'rgba(255, 68, 68, 0.1)',
-    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   poolNukeText: {
     color: '#FF4444',
@@ -2690,61 +2729,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-  },
-  // Card preview modal
-  previewOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
-  },
-  previewCard: {
-    // Lock to the recorded video's native 9:16 aspect so the blue
-    // border wraps the actual video edges instead of leaving the
-    // VideoView's contentFit="cover" to crop to a mismatched box.
-    // maxHeight caps the box on tall/narrow screens so it never
-    // exceeds the modal area.
-    width: screenWidth - 48,
-    aspectRatio: 9 / 16,
-    maxHeight: screenHeight * 0.75,
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue, backgroundColor: '#000',
-  },
-  previewInfo: {
-    position: 'absolute', bottom: 60, left: 16, right: 16,
-  },
-  previewCreator: {
-    color: 'white', fontSize: 16, fontWeight: 'bold',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-    marginBottom: 4,
-  },
-  previewPromptLabel: {
-    color: 'rgba(255,255,255,0.8)', fontSize: 13,
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  previewButtons: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', height: 50,
-  },
-  previewCancel: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)', borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    // Match the previewCard's rounded inner corners so the fill reaches
-    // the video's edge instead of stopping short inside the rounded
-    // mask. Right corner only matters when Cancel is rendered alone
-    // (e.g. when hasVoted hides the Pick button).
-    borderBottomLeftRadius: 13,
-    borderBottomRightRadius: 13,
-  },
-  previewCancelText: {
-    color: theme.colors.textSecondary, fontSize: 14, fontWeight: theme.fontWeights.semiBold,
-  },
-  previewPlay: {
-    flex: 2, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: 'rgba(0, 198, 255, 0.2)',
-    // Match the previewCard's bottom-right rounded corner.
-    borderBottomRightRadius: 13,
-  },
-  previewPlayText: {
-    color: theme.colors.vibeBlue, fontSize: 16, fontWeight: theme.fontWeights.bold,
   },
   swipeHints: {
     flexDirection: 'row', justifyContent: 'space-between', width: '100%',
