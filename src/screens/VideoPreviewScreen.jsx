@@ -347,8 +347,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
     setShowPromptPicker(false);
     setCreatingPrompt(false);
     setNewPromptText('');
-    // Auto-submit with the picked prompt
-    handleSubmit(p);
+    // Defer the submit until AFTER the picker's slide-out animation
+    // completes. On iOS, kicking off another Modal (the Save/Discard
+    // alert at the end of upload) while the picker is mid-dismiss
+    // silently swallows the second modal — testers hit this as
+    // "can't upload after picking a prompt". 400ms clears the slide.
+    setTimeout(() => handleSubmit(p), 400);
   };
 
   const handleCreatePrompt = async () => {

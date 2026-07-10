@@ -30,9 +30,27 @@ export async function uploadVideo(videoUri, promptText, userId = 'anonymous', on
     // Upload directly from file URI using expo-file-system
     const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${storage.app.options.storageBucket}/o/${encodeURIComponent(filename)}?uploadType=media`;
 
-    // Get auth token for the upload
+    // Get auth token for the upload. Fail fast with a clear error
+    // instead of sending "Bearer null" — iOS testers saw silent
+    // upload failures when currentUser was momentarily null after
+    // an app suspend/resume between recording and prompt pick.
     const { auth: firebaseAuth } = require('./firebase');
-    const token = await firebaseAuth.currentUser?.getIdToken();
+    if (!firebaseAuth.currentUser) {
+      throw new Error('Not signed in — please sign in again and retry.');
+    }
+    const token = await firebaseAuth.currentUser.getIdToken();
+    if (!token) {
+      throw new Error('Auth token unavailable — please sign in again and retry.');
+    }
+
+    // Sanity-check the source file. iOS occasionally purges the temp
+    // recording between capture and upload (backgrounded app, low
+    // storage). A clear error beats "Upload failed with status 400".
+    const info = await LegacyFS.getInfoAsync(videoUri);
+    if (!info.exists || (info.size || 0) === 0) {
+      throw new Error('Recorded video is missing or empty. Please retake and try again.');
+    }
+    console.log('[uploadVideo] source ok', { uri: videoUri, size: info.size });
 
     if (onProgress) onProgress(10);
 
@@ -48,7 +66,13 @@ export async function uploadVideo(videoUri, promptText, userId = 'anonymous', on
     if (onProgress) onProgress(90);
 
     if (uploadResult.status !== 200) {
-      throw new Error(`Upload failed with status ${uploadResult.status}`);
+      // Log the response body so TestFlight logs surface the actual
+      // Firebase Storage rejection reason instead of just a status.
+      console.error('[uploadVideo] non-200', {
+        status: uploadResult.status,
+        body: uploadResult.body?.slice?.(0, 500),
+      });
+      throw new Error(`Upload failed (${uploadResult.status}). ${uploadResult.body?.slice?.(0, 200) || ''}`);
     }
 
     const downloadURL = await getDownloadURL(storageRef);
