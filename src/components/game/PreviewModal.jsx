@@ -48,7 +48,7 @@ export default function PreviewModal({
           <Pressable style={styles.actionBar} onPress={onPrimary}>
             <Text style={styles.actionBarText}>{primaryLabel}</Text>
             {primaryIcon ? (
-              <Ionicons name={primaryIcon} size={26} color="#fff" />
+              <Ionicons name={primaryIcon} size={22} color="#fff" />
             ) : null}
           </Pressable>
         ) : null}
@@ -101,21 +101,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: theme.colors.vibeBlue,
-    paddingTop: 26,
-    paddingBottom: 30,
+    paddingTop: 20,
+    paddingBottom: 24,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
-    borderTopWidth: 4,
+    gap: 12,
+    borderTopWidth: 3,
     borderTopColor: '#000',
   },
   actionBarText: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 4,
+    letterSpacing: 3,
     textTransform: 'uppercase',
   },
 });
