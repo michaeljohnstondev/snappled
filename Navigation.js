@@ -17,6 +17,8 @@ import CreatePromptScreen from './src/screens/CreatePromptScreen';
 import RecordScreen from './src/screens/RecordScreen';
 import VideoPreviewScreen from './src/screens/VideoPreviewScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
+import OtherPersonsProfile from './src/screens/OtherPersonsProfile';
+import FollowingListScreen from './src/screens/FollowingListScreen';
 import DeckBuilderScreen from './src/screens/DeckBuilderScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import GameScreen from './src/screens/GameScreen';
@@ -134,6 +136,8 @@ export default function Navigation() {
           <Stack.Screen name="Record" component={RecordScreen} />
           <Stack.Screen name="VideoPreview" component={VideoPreviewScreen} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+          <Stack.Screen name="OtherPersonsProfile" component={OtherPersonsProfile} />
+          <Stack.Screen name="FollowingList" component={FollowingListScreen} />
           <Stack.Screen name="Game" component={GameScreen} />
           <Stack.Screen name="Achievements" component={AchievementsScreen} />
           <Stack.Screen name="Admin" component={AdminScreen} />

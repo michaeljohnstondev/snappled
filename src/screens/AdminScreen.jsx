@@ -465,7 +465,7 @@ export default function AdminScreen({ navigation }) {
       case 'users':
         const isGranting = grantUserId === item.id;
         return (
-          <Pressable style={styles.card} onPress={() => navigation.navigate('UserProfile', { userId: item.id })}>
+          <Pressable style={styles.card} onPress={() => navigation.navigate(item.id === user?.uid ? 'UserProfile' : 'OtherPersonsProfile', { userId: item.id })}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>@{item.username || item.email}</Text>
               {item.isBanned && <Text style={styles.badgeRed}>BANNED</Text>}

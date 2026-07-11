@@ -25,6 +25,9 @@ export default function DeckBuilderScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [replacingSnapple, setReplacingSnapple] = useState(null);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
+  // Index within the displayed grid so the overlay opens on the
+  // tapped card and the user can swipe through the rest.
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [sortBy, setSortBy] = useState('time');
   const [ascending, setAscending] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
@@ -160,7 +163,11 @@ export default function DeckBuilderScreen({ navigation }) {
 
     return (
       <View style={styles.snappleItem}>
-        <Pressable style={styles.videoContainer} onPress={() => setSelectedSnapple(item)}>
+        <Pressable style={styles.videoContainer} onPress={() => {
+          const idx = displayedSnapples.findIndex(s => s?.id === item?.id);
+          setSelectedIndex(Math.max(0, idx));
+          setSelectedSnapple(item);
+        }}>
           {item.videoUrl ? (
             <SnappleThumbnail videoUrl={item.videoUrl} />
           ) : (
@@ -278,6 +285,8 @@ export default function DeckBuilderScreen({ navigation }) {
       <SnappleOverlay
         visible={!!selectedSnapple}
         snapple={selectedSnapple}
+        snapples={displayedSnapples}
+        initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
         onLike={(id) => snappleService.likeSnapple(id, user?.uid)}
         onDislike={(id) => snappleService.dislikeSnapple(id, user?.uid)}

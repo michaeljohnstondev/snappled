@@ -23,6 +23,9 @@ export default function HomeScreen({ navigation, route }) {
   const [selectedPrompt, setSelectedPrompt] = useState(null);
   const [snapples, setSnapples] = useState([]);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
+  // Index of the tapped snapple in the current grid so the overlay
+  // starts on it and the user can swipe through the rest of the list.
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +98,9 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleSnapplePress = (snapple) => {
+    const list = snapples.filter(Boolean);
+    const idx = list.findIndex(s => s?.id === snapple?.id);
+    setSelectedIndex(Math.max(0, idx));
     setSelectedSnapple(snapple);
   };
 
@@ -231,7 +237,14 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleVisitProfile = (userId) => {
-    navigation.navigate('UserProfile', { userId });
+    // Own uid → the tabbed own-profile screen; anyone else → the
+    // read-only OtherPersonsProfile so the private tabs (Deck, Saved)
+    // stay hidden from other viewers.
+    if (userId === user?.uid) {
+      navigation.navigate('UserProfile', { userId });
+    } else {
+      navigation.navigate('OtherPersonsProfile', { userId });
+    }
   };
 
   const handleFollowUser = async (userId) => {
@@ -358,6 +371,8 @@ export default function HomeScreen({ navigation, route }) {
         <SnappleOverlay
           visible={!!selectedSnapple}
           snapple={selectedSnapple}
+          snapples={snapples.filter(Boolean)}
+          initialIndex={selectedIndex}
           onClose={handleSnappleOverlayClose}
           onLike={handleLike}
           onDislike={handleDislike}

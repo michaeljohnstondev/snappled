@@ -60,15 +60,21 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const loadSnapples = async () => {
     try {
-      // Load snapples created by this user
+      // Load snapples created by this user. getActiveSnapples returns
+      // sorted by totalVotes (its use case is game-pool selection), so
+      // re-sort by createdAt desc here to show newest-recorded first.
       const result = await snappleService.getActiveSnapples(50);
       if (result.success) {
-        const created = result.snapples.filter(s => s.creatorId === userId);
+        const created = result.snapples
+          .filter(s => s.creatorId === userId)
+          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         setCreatedSnapples(created);
       }
-      // Load owned snapples from user doc
+      // Load owned snapples from user doc. ownedSnapples is append-only
+      // (see VideoPreviewScreen onSave, SnappleOverlay purchase flow),
+      // so iterating in reverse gives "most recently added" first.
       const userData = await userService.getUserData(userId);
-      const ownedIds = userData?.ownedSnapples || [];
+      const ownedIds = [...(userData?.ownedSnapples || [])].reverse();
       if (ownedIds.length > 0) {
         const owned = [];
         for (const id of ownedIds) {
@@ -116,8 +122,13 @@ export default function UserProfileScreen({ route, navigation }) {
   };
 
   const [selectedSnapple, setSelectedSnapple] = useState(null);
+  // Which item in the active-tab list was tapped, so the overlay can
+  // start on it and let the user swipe through the rest of the tab.
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   const handleSnapplePress = (snapple) => {
+    const idx = activeSnapples.findIndex(s => s?.id === snapple?.id);
+    setSelectedIndex(Math.max(0, idx));
     setSelectedSnapple(snapple);
   };
 
@@ -195,10 +206,13 @@ export default function UserProfileScreen({ route, navigation }) {
           <Text style={styles.statNumber}>{followers}</Text>
           <Text style={styles.statLabel}>Followers</Text>
         </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{followingCount}</Text>
+        <Pressable
+          style={styles.statItem}
+          onPress={() => navigation.navigate('FollowingList', { userId, type: 'following' })}
+        >
+          <Text style={[styles.statNumber, styles.statNumberLink]}>{followingCount}</Text>
           <Text style={styles.statLabel}>Following</Text>
-        </View>
+        </Pressable>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{createdSnapples.length}</Text>
           <Text style={styles.statLabel}>Snapples</Text>
@@ -273,6 +287,8 @@ export default function UserProfileScreen({ route, navigation }) {
       <SnappleOverlay
         visible={!!selectedSnapple}
         snapple={selectedSnapple}
+        snapples={activeSnapples}
+        initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
         onLike={(id) => snappleService.likeSnapple(id, user?.uid)}
         onDislike={(id) => snappleService.dislikeSnapple(id, user?.uid)}
@@ -383,6 +399,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: 20,
     fontWeight: theme.fontWeights.bold,
+  },
+  // Cyan tint on the tappable Following count so it reads as actionable
+  // instead of a plain number like Followers or Snapples.
+  statNumberLink: {
+    color: theme.colors.vibeBlue,
   },
   statLabel: {
     color: theme.colors.textSecondary,

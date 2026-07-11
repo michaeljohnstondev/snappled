@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Share
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import SnappleVideoPlayer from '../../media/SnappleVideoPlayer';
 import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
@@ -17,19 +19,62 @@ import theme from '../../../theme/themes';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-export default function SnappleOverlay({ 
-  visible, 
-  snapple, 
+export default function SnappleOverlay({
+  visible,
+  snapple: snappleProp,
+  // Optional list + initial index. When present, users can swipe up/down
+  // in the overlay to move through the list without closing back to the
+  // grid. Callers that only ever open a single snapple can keep passing
+  // `snapple` on its own.
+  snapples,
+  initialIndex = 0,
   onClose,
   onLike,
   onDislike,
   onBuy,
   onReport,
-  navigation
+  navigation,
 }) {
   const { user, userCurrency, updateUserCurrency } = useAuth();
   const { showConfirm, showError, showAlert } = useModal();
   const playerRef = useRef(null);
+  // Index into `snapples` (ignored when the caller only passed a single
+  // `snapple`). Reset on open so re-tapping a grid thumbnail always
+  // lands on the tapped card.
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  useEffect(() => {
+    if (visible) setCurrentIndex(initialIndex);
+  }, [visible, initialIndex]);
+  // Active snapple: swipable list wins when present, otherwise fall
+  // back to the single-prop form. Clamped so an out-of-range index
+  // from a stale close/reopen can't crash the render.
+  const snapple = (snapples && snapples.length > 0)
+    ? snapples[Math.max(0, Math.min(currentIndex, snapples.length - 1))]
+    : snappleProp;
+
+  // Vertical swipe → advance / go back within the swipable list.
+  // activeOffsetY([-15, 15]) means Pressables underneath still get
+  // taps (Gesture.Pan only "wins" once the finger has moved past the
+  // threshold), and failOffsetX cancels the swipe if the drag drifts
+  // sideways so a horizontal fling never fires an accidental page.
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-15, 15])
+        .failOffsetX([-30, 30])
+        .onEnd((e) => {
+          const canSwipe = snapples && snapples.length > 1;
+          if (!canSwipe) return;
+          if (e.translationY < -80) {
+            runOnJS(setCurrentIndex)(
+              Math.min(currentIndex + 1, snapples.length - 1),
+            );
+          } else if (e.translationY > 80) {
+            runOnJS(setCurrentIndex)(Math.max(currentIndex - 1, 0));
+          }
+        }),
+    [snapples, currentIndex],
+  );
   const [isPlaying, setIsPlaying] = useState(true);
   const [showComments, setShowComments] = useState(false);
   const [metrics, setMetrics] = useState({
@@ -257,6 +302,11 @@ export default function SnappleOverlay({
       transparent
       onRequestClose={onClose}
     >
+      {/* Modals render in a portal outside the app's root
+          GestureHandlerRootView, so gestures inside need their own
+          root to be active. Same pattern PromptCurator uses. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureDetector gesture={swipeGesture}>
       <View style={styles.overlay}>
         {/* Full Screen Video */}
         <SnappleVideoPlayer
@@ -543,8 +593,14 @@ export default function SnappleOverlay({
         <View style={styles.videoInfo}>
           <Pressable onPress={() => {
             onClose();
+            // Own creator → tabbed own-profile; anyone else → the
+            // read-only OtherPersonsProfile view.
             if (snapple.creatorId && navigation) {
-              navigation.navigate('UserProfile', { userId: snapple.creatorId });
+              const isSelf = snapple.creatorId === user?.uid;
+              navigation.navigate(
+                isSelf ? 'UserProfile' : 'OtherPersonsProfile',
+                { userId: snapple.creatorId },
+              );
             }
           }}>
             <Text style={styles.creatorName}>@{snapple.creatorUsername || 'anonymous'}</Text>
@@ -553,6 +609,8 @@ export default function SnappleOverlay({
           <Text style={styles.viewCount}>{formatCount(metrics.views || 0)} views</Text>
         </View>
       </View>
+      </GestureDetector>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
