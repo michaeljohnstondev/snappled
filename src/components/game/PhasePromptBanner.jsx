@@ -26,15 +26,16 @@ export default function PhasePromptBanner({ instruction, prompt, children }) {
 }
 
 const styles = StyleSheet.create({
-  // Edge-to-edge banner — no side margins, no rounded corners, no
-  // outer vertical breathing room. The top inset absorbs the status
-  // bar so callers don't need their own header row above the banner.
+  // Edge-to-edge banner — tightened to eat the least vertical space
+  // possible while still clearing the status bar and staying legible.
+  // Top inset is a status-bar allowance; bottom is intentionally
+  // razor-thin so the grid butts right up against the bottom border.
   banner: {
     paddingTop: 44,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingBottom: 4,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
     borderBottomColor: theme.colors.vibeBlue,
   },
   instruction: {
@@ -43,14 +44,14 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
     letterSpacing: 2,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     textTransform: 'uppercase',
   },
   prompt: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-    lineHeight: 26,
+    lineHeight: 20,
   },
 });

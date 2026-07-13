@@ -155,7 +155,7 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
 function RoundResultsReveal({
   rankings, players, prompt, submissions,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare, onEndGame, selfUid,
+  isHost, onNextRound, onShare, onEndGame, onLeave, selfUid,
 }) {
   const isInfinite = totalRounds === 0;
 
@@ -221,7 +221,14 @@ function RoundResultsReveal({
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
-        <View style={{ width: 36 }} />
+        {/* Close X — exits to the main menu. Same button that used
+            to live on the picking/voting headers before those were
+            stripped down. */}
+        <Pressable onPress={onLeave}>
+          <View style={styles.backBg}>
+            <Ionicons name="close" size={18} color="white" />
+          </View>
+        </Pressable>
         <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
         <Text style={styles.timerText}>{timer}s</Text>
       </View>
@@ -1858,6 +1865,18 @@ export default function GameScreen({ navigation }) {
           </ScrollView>
         </View>
 
+        {/* Host skip — advance to Round Results early without waiting
+            out the 15s scoring timer. Same flush-bar style as the
+            other primary CTAs so it reads instantly as an action. */}
+        {isHost && (
+          <Pressable
+            style={styles.hostAdvanceBar}
+            onPress={() => gameService.enterRoundResults(gameId)}
+          >
+            <Text style={styles.hostAdvanceBarText}>SHOW RESULTS</Text>
+          </Pressable>
+        )}
+
         {/* Scoreboard modal — opened from the header podium icon.
             Mirrors the VOTING phase's scoreboard so the look stays
             consistent across phases. */}
@@ -1927,13 +1946,14 @@ export default function GameScreen({ navigation }) {
         onNextRound={handleNextRound}
         onShare={handleShareRound}
         onEndGame={() => gameService.endGameEarly(gameId)}
+        onLeave={handleLeaveGame}
       />
     );
   }
 
   // Final results
   if (game.phase === GAME_PHASES.FINAL_RESULTS) {
-    return <FinalResultsPhase game={game} selfUid={user?.uid} onDone={handleFinish} />;
+    return <FinalResultsPhase game={game} selfUid={user?.uid} onDone={handleFinish} onLeave={handleLeaveGame} />;
   }
 
   return null;
@@ -2787,6 +2807,25 @@ const styles = StyleSheet.create({
   favoriteTag: {
     position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 10, padding: 3,
+  },
+  // Host skip on Scoring — same flush-bar shape as the other CTAs
+  // so it reads instantly as the primary action for whoever's hosting.
+  hostAdvanceBar: {
+    backgroundColor: theme.colors.vibeBlue,
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+  },
+  hostAdvanceBarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
   // Flush at the bottom, full-width, styled like the PLAY THIS CARD
   // action bar in PreviewModal so every primary CTA looks identical.

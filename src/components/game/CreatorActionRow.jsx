@@ -78,47 +78,50 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   // Creator name hidden in-phase per user request — all snapples are
   // currently the user's own anyway, so showing "by @me" everywhere is
   // confusing. Will return once the pool is more diverse.
+  // Bail entirely when there'd be no buttons to render (own snapple
+  // or missing creatorId). Otherwise the wrap's semi-transparent
+  // black bg shows through as a mystery rectangle over the video.
+  const hasActions = !isMine && !!creatorId;
+  if (!hasActions) return null;
   return (
     <View style={styles.wrap}>
       <View style={{ flex: 1 }} />
-      {!isMine && creatorId && (
-        <View style={styles.actions}>
+      <View style={styles.actions}>
+        <Pressable
+          style={[styles.btn, following && styles.btnActive]}
+          onPress={handleFollow}
+          disabled={busy}
+        >
+          <Ionicons
+            name={following ? 'person' : 'person-add'}
+            size={13}
+            color={following ? theme.colors.vibeBlue : 'white'}
+          />
+        </Pressable>
+        {!isPrivate && (
           <Pressable
-            style={[styles.btn, following && styles.btnActive]}
-            onPress={handleFollow}
+            style={[styles.btn, wishlisted && styles.btnActive]}
+            onPress={handleWishlist}
             disabled={busy}
           >
             <Ionicons
-              name={following ? 'person' : 'person-add'}
+              name={wishlisted ? 'heart' : 'heart-outline'}
               size={13}
-              color={following ? theme.colors.vibeBlue : 'white'}
+              color={wishlisted ? theme.colors.vibeRed : 'white'}
             />
           </Pressable>
-          {!isPrivate && (
-            <Pressable
-              style={[styles.btn, wishlisted && styles.btnActive]}
-              onPress={handleWishlist}
-              disabled={busy}
-            >
-              <Ionicons
-                name={wishlisted ? 'heart' : 'heart-outline'}
-                size={13}
-                color={wishlisted ? theme.colors.vibeRed : 'white'}
-              />
-            </Pressable>
-          )}
-          {!isPrivate && (
-            <Pressable
-              style={[styles.btn, owned && styles.btnActive, { paddingHorizontal: 10 }]}
-              onPress={handleBuy}
-              disabled={busy || owned}
-            >
-              <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
-              <Text style={styles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
+        )}
+        {!isPrivate && (
+          <Pressable
+            style={[styles.btn, owned && styles.btnActive, { paddingHorizontal: 10 }]}
+            onPress={handleBuy}
+            disabled={busy || owned}
+          >
+            <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
+            <Text style={styles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }

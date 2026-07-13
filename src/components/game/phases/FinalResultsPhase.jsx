@@ -26,7 +26,7 @@ const VOTER_PALETTE = [
 // Renders the final placement scoreboard. handleFinish closes out the
 // game (reward claim, navigation back to lobby, etc.) — passed in as
 // onDone since that side of the game lifecycle stays in GameScreen.
-export default function FinalResultsPhase({ game, selfUid, onDone }) {
+export default function FinalResultsPhase({ game, selfUid, onDone, onLeave }) {
   const rewards = gameService.calculateRewards(game.players);
 
   // Per-player color map — self locks to vibeGreen, others cycle through
@@ -58,7 +58,14 @@ export default function FinalResultsPhase({ game, selfUid, onDone }) {
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
-        <View style={{ width: 36 }} />
+        {/* Close X — exits to the main menu the same as the old
+            in-round header button did. Kept subtle in the corner so
+            it doesn't compete with the leaderboard. */}
+        <Pressable onPress={onLeave}>
+          <View style={styles.backBg}>
+            <Ionicons name="close" size={18} color="white" />
+          </View>
+        </Pressable>
         <Text style={styles.headerTitle}>Final Results</Text>
         <View style={{ width: 36 }} />
       </View>
@@ -112,6 +119,12 @@ const styles = StyleSheet.create({
     color: theme.colors.vibeBlue, fontSize: 20, fontWeight: theme.fontWeights.bold,
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  backBg: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   row: {
