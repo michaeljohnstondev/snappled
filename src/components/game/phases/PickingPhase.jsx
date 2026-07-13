@@ -155,26 +155,28 @@ export default function PickingPhase({
             data={hand}
             keyExtractor={(item, i) => item?.id || `hand-${i}`}
             numColumns={3}
-            columnWrapperStyle={styles.handRow}
             contentContainerStyle={styles.handContainer}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[
-                  styles.handCard,
-                  selectedCard?.id === item.id && styles.handCardSelected,
-                  mulliganMode && styles.handCardMulligan,
-                ]}
-                onPress={() => {
-                  if (mulliganMode) onMulliganSwap(item);
-                  else onPreviewCard(item);
-                }}
-              >
-                <View style={styles.handCardVideo}>
-                  {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
-                </View>
-              </Pressable>
-            )}
+            renderItem={({ item }) => {
+              const isSelected = selectedCard?.id === item.id;
+              return (
+                <Pressable
+                  style={styles.handCard}
+                  onPress={() => {
+                    if (mulliganMode) onMulliganSwap(item);
+                    else onPreviewCard(item);
+                  }}
+                >
+                  <View style={styles.handCardVideo}>
+                    {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
+                  </View>
+                  {/* Overlay rings so selection/mulligan don't push
+                      the grid layout — cards stay perfectly flush. */}
+                  {isSelected && <View style={styles.selectionRing} />}
+                  {mulliganMode && <View style={styles.mulliganRing} />}
+                </Pressable>
+              );
+            }}
           />
           {(user?.inventory?.mulligans || 0) > 0 && (
             <Pressable
@@ -362,15 +364,28 @@ const styles = StyleSheet.create({
   pickInstruction: {
     color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
   },
-  handContainer: { paddingHorizontal: 12, paddingBottom: 40 },
-  handRow: { gap: 8, marginBottom: 8 },
+  // Grid packed edge-to-edge — no side/inner padding, no gaps between
+  // cards. 6 thumbnails tile the screen like a mosaic.
+  handContainer: { paddingHorizontal: 0, paddingBottom: 40 },
+  handRow: { marginBottom: 0 },
   handCard: {
-    width: (screenWidth - 40) / 3, aspectRatio: 9 / 16, borderRadius: 10, overflow: 'hidden',
-    borderWidth: 2, borderColor: theme.colors.vibeBlue, backgroundColor: 'rgba(0,0,0,0.3)',
+    width: screenWidth / 3, aspectRatio: 9 / 16, overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  handCardSelected: { borderColor: theme.colors.vibeGreen, borderWidth: 3 },
-  handCardMulligan: { borderColor: theme.colors.vibeYellow, borderStyle: 'dashed' },
   handCardVideo: { flex: 1 },
+  // Selection / mulligan indicators are absolutely-positioned rings
+  // over the card so they don't offset neighbors and break the tiling.
+  selectionRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 4,
+    borderColor: theme.colors.vibeGreen,
+  },
+  mulliganRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    borderColor: theme.colors.vibeYellow,
+    borderStyle: 'dashed',
+  },
   mulliganBtnBottom: {
     flexDirection: 'row',
     alignItems: 'center',

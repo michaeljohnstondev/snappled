@@ -49,8 +49,7 @@ export default function WarmupPhase({
         data={hand}
         keyExtractor={(item, idx) => item?.id || `hand-${idx}`}
         numColumns={3}
-        contentContainerStyle={[styles.handContainer, { paddingTop: 16 }]}
-        columnWrapperStyle={styles.handRow}
+        contentContainerStyle={styles.handContainer}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <Pressable
@@ -163,11 +162,12 @@ const styles = StyleSheet.create({
     borderRadius: 8, borderWidth: 1, borderColor: theme.colors.vibeBlue,
     paddingVertical: 4, paddingHorizontal: 8,
   },
-  handContainer: { paddingHorizontal: 12, paddingBottom: 40 },
-  handRow: { gap: 8, marginBottom: 8 },
+  // Grid packed edge-to-edge — no side padding, no gaps. 6 thumbnails
+  // tile the screen like a mosaic.
+  handContainer: { paddingHorizontal: 0, paddingBottom: 40 },
   handCard: {
-    width: (screenWidth - 40) / 3, aspectRatio: 9 / 16, borderRadius: 10, overflow: 'hidden',
-    borderWidth: 2, borderColor: theme.colors.vibeBlue, backgroundColor: 'rgba(0,0,0,0.3)',
+    width: screenWidth / 3, aspectRatio: 9 / 16, overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   handCardVideo: { flex: 1 },
   footer: {

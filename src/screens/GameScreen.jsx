@@ -25,6 +25,7 @@ import LobbyPhase from '../components/game/phases/LobbyPhase';
 import WarmupPhase from '../components/game/phases/WarmupPhase';
 import FinalResultsPhase from '../components/game/phases/FinalResultsPhase';
 import PickingPhase from '../components/game/phases/PickingPhase';
+import LoadingPhase from '../components/game/phases/LoadingPhase';
 import PhasePromptBanner from '../components/game/PhasePromptBanner';
 import TutorialOverlay from '../components/game/TutorialOverlay';
 import { useTutorial } from '../hooks/useTutorial';
@@ -480,8 +481,13 @@ export default function GameScreen({ navigation }) {
   // fires once per phase entry.
   useEffect(() => {
     if (!game?.phase) return;
+    // LOADING included so we can prefetch the hand's videos before
+    // the warmup timer starts; the hand persists straight through
+    // into REVIEW/PICKING without being redrawn.
     const inDrawingPhase =
-      game.phase === GAME_PHASES.REVIEW || game.phase === GAME_PHASES.PICKING;
+      game.phase === GAME_PHASES.LOADING ||
+      game.phase === GAME_PHASES.REVIEW ||
+      game.phase === GAME_PHASES.PICKING;
     if (!inDrawingPhase) return;
     if (hand.length > 0) return;
     if (mySnapples.length === 0 && allSnapples.length === 0) return;
@@ -1366,6 +1372,20 @@ export default function GameScreen({ navigation }) {
         onStartGame={handleStartGame}
         onSetRounds={(n) => gameService.setTotalRounds(gameId, n)}
       />
+    );
+  }
+
+  // Loading phase — pre-download every video in the drawn hand so the
+  // warmup timer isn't fighting for bandwidth with the video prefetch.
+  // Only the host advances the doc to REVIEW; other clients wait for
+  // the phase transition to propagate.
+  if (game.phase === GAME_PHASES.LOADING) {
+    const isHostClient = game.hostId === user?.uid;
+    const advance = () => {
+      if (isHostClient) gameService.startWarmup(gameId);
+    };
+    return (
+      <LoadingPhase hand={hand} onLoaded={advance} />
     );
   }
 

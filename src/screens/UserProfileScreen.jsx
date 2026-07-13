@@ -202,10 +202,13 @@ export default function UserProfileScreen({ route, navigation }) {
 
       {/* Stats */}
       <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{followers}</Text>
+        <Pressable
+          style={styles.statItem}
+          onPress={() => navigation.navigate('FollowingList', { userId, type: 'followers' })}
+        >
+          <Text style={[styles.statNumber, styles.statNumberLink]}>{followers}</Text>
           <Text style={styles.statLabel}>Followers</Text>
-        </View>
+        </Pressable>
         <Pressable
           style={styles.statItem}
           onPress={() => navigation.navigate('FollowingList', { userId, type: 'following' })}

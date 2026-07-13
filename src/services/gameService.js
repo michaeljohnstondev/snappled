@@ -65,6 +65,12 @@ const MAX_PLAYERS = 8;
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
+  // Loading — pre-download every video in the drawn hand before the
+  // warmup timer starts so first-round scrolling isn't jittery on
+  // slow networks. Host advances to REVIEW once its client finishes
+  // (or a fallback timeout fires, so a stuck client can't stall the
+  // whole game).
+  LOADING: 'loading',
   REVIEW: 'review',
   PICKING: 'picking',
   VOTING: 'voting',
@@ -178,6 +184,24 @@ export const gameService = {
     }
   },
 
+  // Transition LOADING → REVIEW. Host-only. LoadingPhase calls this
+  // once its prefetches complete (or the fallback timer fires) so the
+  // warmup timer never starts on a client that's still downloading.
+  async startWarmup(gameId) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        phase: GAME_PHASES.REVIEW,
+        reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error starting warmup:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // Start the game (host only)
   async startGame(gameId, hostId, prompts) {
     try {
@@ -193,8 +217,11 @@ export const gameService = {
       // Game length is now driven by play-to TARGET POINTS, not round
       // count, so we can't pre-slice. Just store the full buffer the
       // caller fetched — nextRound refills when it runs low.
+      // Enter LOADING first — LoadingPhase on each client will
+      // prefetch every video in the drawn hand and the host bumps to
+      // REVIEW when ready (or the LoadingPhase fallback timer fires).
       await updateDoc(gameRef, {
-        phase: GAME_PHASES.REVIEW,
+        phase: GAME_PHASES.LOADING,
         currentRound: 1,
         prompts: prompts,
         submissions: [],

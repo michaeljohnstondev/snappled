@@ -122,9 +122,11 @@ export default function OtherPersonsProfile({ route, navigation }) {
     }
   };
 
-  // Drill into who this profile follows.
-  const openFollowingList = () => {
-    navigation.navigate('FollowingList', { userId: targetUserId, type: 'following' });
+  // Drill into who this profile follows (or is followed by). `type`
+  // matches FollowingListScreen's route param — 'following' by
+  // default, 'followers' for the other tap target.
+  const openSocialList = (type) => {
+    navigation.navigate('FollowingList', { userId: targetUserId, type });
   };
 
   const username = profileData?.username || profileData?.email?.split('@')[0] || 'Unknown';
@@ -198,11 +200,11 @@ export default function OtherPersonsProfile({ route, navigation }) {
       </View>
 
       <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{followers}</Text>
+        <Pressable style={styles.statItem} onPress={() => openSocialList('followers')}>
+          <Text style={[styles.statNumber, styles.statNumberLink]}>{followers}</Text>
           <Text style={styles.statLabel}>Followers</Text>
-        </View>
-        <Pressable style={styles.statItem} onPress={openFollowingList}>
+        </Pressable>
+        <Pressable style={styles.statItem} onPress={() => openSocialList('following')}>
           <Text style={[styles.statNumber, styles.statNumberLink]}>{followingCount}</Text>
           <Text style={styles.statLabel}>Following</Text>
         </Pressable>
