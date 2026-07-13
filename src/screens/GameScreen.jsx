@@ -27,6 +27,8 @@ import FinalResultsPhase from '../components/game/phases/FinalResultsPhase';
 import PickingPhase from '../components/game/phases/PickingPhase';
 import LoadingPhase from '../components/game/phases/LoadingPhase';
 import PhasePromptBanner from '../components/game/PhasePromptBanner';
+import RoundStartOverlay from '../components/game/RoundStartOverlay';
+import CountdownOverlay from '../components/game/CountdownOverlay';
 import TutorialOverlay from '../components/game/TutorialOverlay';
 import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
@@ -313,7 +315,13 @@ export default function GameScreen({ navigation }) {
   // callback + subscription handler see the current value without
   // needing to be re-registered on every tip toggle.
   const pausedRef = useRef(false);
-  useEffect(() => { pausedRef.current = !!tutorialTip; }, [tutorialTip]);
+  // Paused whenever a full-screen overlay is up — tutorial tips OR
+  // the per-round "60s to pick / vote" alert. Both are tap-to-dismiss
+  // and freeze the countdown + auto-advance so reading isn't racing
+  // the clock.
+  useEffect(() => {
+    pausedRef.current = !!tutorialTip || !!roundAlert;
+  }, [tutorialTip, roundAlert]);
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
   const [previewCard, setPreviewCard] = useState(null);
@@ -323,6 +331,36 @@ export default function GameScreen({ navigation }) {
   // When true, tapping a card in the hand replaces it instead of previewing.
   const [mulliganMode, setMulliganMode] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
+  // Round-start alert: which phases have been announced this round.
+  // Reset every round change so the "60s to pick" / "60s to vote"
+  // callout fires exactly once per phase per round.
+  const [roundAlert, setRoundAlert] = useState(null);
+  const shownRoundAlertsRef = useRef(new Set());
+  useEffect(() => {
+    shownRoundAlertsRef.current = new Set();
+    setRoundAlert(null);
+  }, [game?.currentRound]);
+  useEffect(() => {
+    const phase = game?.phase;
+    if (phase !== GAME_PHASES.PICKING && phase !== GAME_PHASES.VOTING) return;
+    // Tutorial mode drives its own per-phase tips (with different
+    // copy), so suppress the round-start alert to avoid double-modal.
+    if (isTutorial) return;
+    const key = `${game?.currentRound}:${phase}`;
+    if (shownRoundAlertsRef.current.has(key)) return;
+    shownRoundAlertsRef.current.add(key);
+    if (phase === GAME_PHASES.PICKING) {
+      setRoundAlert({
+        title: '60 seconds to pick',
+        sub: 'Tap a card in your hand to preview it, then hit PLAY THIS CARD to lock in.',
+      });
+    } else {
+      setRoundAlert({
+        title: '60 seconds to vote',
+        sub: "Tap a card to preview, then PICK AS FAVORITE for the funniest match. You can't vote for your own.",
+      });
+    }
+  }, [game?.phase, game?.currentRound, isTutorial]);
   // Round count for newly-created games (practice + custom). Adjustable
   // on the no-game choice screen via the rounds picker.
   // Default play-to target points (was rounds count). Lobby picker for
@@ -637,7 +675,7 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.PICKING) {
-      setTimer(45);
+      setTimer(60);
       timerRef.current = setInterval(() => {
         if (pausedRef.current) return;
         setTimer(prev => {
@@ -656,7 +694,7 @@ export default function GameScreen({ navigation }) {
         });
       }, 1000);
     } else if (game?.phase === GAME_PHASES.VOTING) {
-      setTimer(30); // 30 seconds to pick a favorite
+      setTimer(60); // 60 seconds to vote
       timerRef.current = setInterval(() => {
         if (pausedRef.current) return;
         setTimer(prev => {
@@ -1454,6 +1492,13 @@ export default function GameScreen({ navigation }) {
         onDeletePrompt={handleDeletePrompt}
         onExcludeFromPool={handleExcludeFromPool}
         />
+        <CountdownOverlay seconds={timer} />
+        <RoundStartOverlay
+          visible={!!roundAlert}
+          title={roundAlert?.title}
+          sub={roundAlert?.sub}
+          onDismiss={() => setRoundAlert(null)}
+        />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </>
     );
@@ -1467,14 +1512,15 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        {/* Slim header — phase title + top timer dropped per the
+            redesign. Prompt banner below owns the top of the screen
+            and the last-5s countdown handles urgency. */}
         <View style={styles.header}>
           <Pressable onPress={handleLeaveGame}>
             <View style={styles.backBg}>
               <Ionicons name="close" size={18} color="white" />
             </View>
           </Pressable>
-          <Text style={styles.headerTitle}>{isSpectating ? 'Watching' : 'Vote'}</Text>
-          {!isSpectating && <Text style={styles.timerText}>{timer}s</Text>}
         </View>
 
         {isSpectating && (
@@ -1594,24 +1640,25 @@ export default function GameScreen({ navigation }) {
           })()
         ) : (
           <>
-            <FlatList
-              data={votableSubmissions}
-              keyExtractor={(item, i) => item?.snappleId || `vote-${i}`}
-              numColumns={3}
-              columnWrapperStyle={styles.handRow}
-              contentContainerStyle={styles.handContainer}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[styles.handCard, favoriteCard?.uid === item.uid && styles.handCardSelected]}
-                  onPress={() => setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true })}
-                >
-                  <View style={styles.handCardVideo}>
-                    {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
-                  </View>
-                </Pressable>
-              )}
-            />
+            {/* Flex-fill 3 rows × 2 columns — matches the picking grid
+                so the layout doesn't shift on phase transition. */}
+            <View style={styles.handGrid}>
+              {votableSubmissions.map((item, i) => {
+                const isSelected = favoriteCard?.uid === item.uid;
+                return (
+                  <Pressable
+                    key={item?.snappleId || `vote-${i}`}
+                    style={styles.handCard}
+                    onPress={() => setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true })}
+                  >
+                    <View style={styles.handCardVideo}>
+                      {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
+                    </View>
+                    {isSelected && <View style={styles.handSelectionRing} />}
+                  </Pressable>
+                );
+              })}
+            </View>
             {favoriteCard && (
               <View style={styles.submitVoteWrap}>
                 <VibeButton label="Submit Vote" onPress={handleSubmitVote} />
@@ -1712,6 +1759,13 @@ export default function GameScreen({ navigation }) {
             </Modal>
           );
         })()}
+        <CountdownOverlay seconds={timer} />
+        <RoundStartOverlay
+          visible={!!roundAlert}
+          title={roundAlert?.title}
+          sub={roundAlert?.sub}
+          onDismiss={() => setRoundAlert(null)}
+        />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </LinearGradient>
     );
@@ -2713,11 +2767,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  handContainer: { paddingHorizontal: 12, paddingBottom: 40 },
-  handRow: { gap: 8, marginBottom: 8 },
+  // Flex-fill 3 rows × 2 columns. Container claims the space between
+  // the prompt banner and the Submit Vote button below.
+  handGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
   handCard: {
-    width: (screenWidth - 40) / 3, aspectRatio: 9 / 16, borderRadius: 10, overflow: 'hidden',
-    borderWidth: 2, borderColor: theme.colors.vibeBlue, backgroundColor: 'rgba(0,0,0,0.3)',
+    width: '50%',
+    height: '33.333%',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    overflow: 'hidden',
+  },
+  // Inner selection ring for the picked-favorite card in voting. Kept
+  // as an absolute overlay so it doesn't offset the tiled grid.
+  handSelectionRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 4,
+    borderColor: theme.colors.vibeGreen,
   },
   handCardSelected: { borderColor: theme.colors.vibeGreen, borderWidth: 3 },
   handCardEmpty: {

@@ -3,15 +3,13 @@
 // host force-advances to PICKING when everyone's ready or the timer hits 0.
 
 import React from 'react';
-import { View, Text, Pressable, FlatList, Modal, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewPlayer from '../PreviewPlayer';
 import theme from '../../../theme/themes';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 // Renders the warmup grid + ready controls. State (hand, ready map)
 // and handlers come from GameScreen.
@@ -45,14 +43,12 @@ export default function WarmupPhase({
         <Text style={styles.timerText}>{timer}s</Text>
       </View>
 
-      <FlatList
-        data={hand}
-        keyExtractor={(item, idx) => item?.id || `hand-${idx}`}
-        numColumns={3}
-        contentContainerStyle={styles.handContainer}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
+      {/* Flex-fill 3 rows × 2 columns — matches PickingPhase so the
+          layout doesn't jump when warmup transitions to picking. */}
+      <View style={styles.handGrid}>
+        {hand.map((item, i) => (
           <Pressable
+            key={item?.id || `hand-${i}`}
             style={styles.handCard}
             onPress={() => onPreviewCard({ ...item, _isWaiting: true })}
           >
@@ -60,8 +56,8 @@ export default function WarmupPhase({
               {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
             </View>
           </Pressable>
-        )}
-      />
+        ))}
+      </View>
 
       <View style={styles.footer}>
         <Text style={styles.readyCount}>
@@ -162,12 +158,18 @@ const styles = StyleSheet.create({
     borderRadius: 8, borderWidth: 1, borderColor: theme.colors.vibeBlue,
     paddingVertical: 4, paddingHorizontal: 8,
   },
-  // Grid packed edge-to-edge — no side padding, no gaps. 6 thumbnails
-  // tile the screen like a mosaic.
-  handContainer: { paddingHorizontal: 0, paddingBottom: 40 },
+  // Flex-fill 3 rows × 2 columns. Container claims the remaining
+  // vertical space; each card takes 50% width × 33.33% height.
+  handGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
   handCard: {
-    width: screenWidth / 3, aspectRatio: 9 / 16, overflow: 'hidden',
+    width: '50%',
+    height: '33.333%',
     backgroundColor: 'rgba(0,0,0,0.3)',
+    overflow: 'hidden',
   },
   handCardVideo: { flex: 1 },
   footer: {

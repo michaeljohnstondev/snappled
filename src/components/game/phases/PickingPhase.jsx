@@ -5,7 +5,7 @@
 
 import React from 'react';
 import {
-  View, Text, Pressable, FlatList, ScrollView, Modal, TextInput,
+  View, Text, Pressable, ScrollView, Modal, TextInput,
   ActivityIndicator, StyleSheet, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -66,14 +66,15 @@ export default function PickingPhase({
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      {/* Slim header — just the close button. Phase title + timer moved
+          off screen per the redesign; the prompt banner below owns the
+          top of the screen, and the last-5s countdown covers timing. */}
       <View style={styles.header}>
         <Pressable onPress={onLeave}>
           <View style={styles.backBg}>
             <Ionicons name="close" size={18} color="white" />
           </View>
         </Pressable>
-        <Text style={styles.headerTitle}>Picking</Text>
-        <Text style={styles.timerText}>{timer}s</Text>
       </View>
 
       {/* Prompt + admin Edit/Delete buttons (admin only). The verb-line
@@ -151,16 +152,16 @@ export default function PickingPhase({
           <Text style={styles.pickInstruction}>
             {mulliganMode ? 'Tap a card to replace it' : ''}
           </Text>
-          <FlatList
-            data={hand}
-            keyExtractor={(item, i) => item?.id || `hand-${i}`}
-            numColumns={3}
-            contentContainerStyle={styles.handContainer}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
+          {/* Flex-fill 3 rows × 2 columns grid. 6 cards is small
+              enough that virtualization buys nothing; a plain flex
+              wrap fills the available height and gives each card a
+              much bigger tap target than the old 3×2 grid. */}
+          <View style={styles.handGrid}>
+            {hand.map((item, i) => {
               const isSelected = selectedCard?.id === item.id;
               return (
                 <Pressable
+                  key={item?.id || `hand-${i}`}
                   style={styles.handCard}
                   onPress={() => {
                     if (mulliganMode) onMulliganSwap(item);
@@ -176,8 +177,8 @@ export default function PickingPhase({
                   {mulliganMode && <View style={styles.mulliganRing} />}
                 </Pressable>
               );
-            }}
-          />
+            })}
+          </View>
           {(user?.inventory?.mulligans || 0) > 0 && (
             <Pressable
               style={[styles.mulliganBtnBottom, mulliganMode && styles.mulliganBtnBottomActive]}
@@ -364,13 +365,19 @@ const styles = StyleSheet.create({
   pickInstruction: {
     color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
   },
-  // Grid packed edge-to-edge — no side/inner padding, no gaps between
-  // cards. 6 thumbnails tile the screen like a mosaic.
-  handContainer: { paddingHorizontal: 0, paddingBottom: 40 },
-  handRow: { marginBottom: 0 },
+  // Flex-fill 3 rows × 2 columns. The container claims all remaining
+  // vertical space; each card takes 50% width × 33.33% of that height.
+  // No side/inner padding, no gaps — the whole screen becomes cards.
+  handGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
   handCard: {
-    width: screenWidth / 3, aspectRatio: 9 / 16, overflow: 'hidden',
+    width: '50%',
+    height: '33.333%',
     backgroundColor: 'rgba(0,0,0,0.3)',
+    overflow: 'hidden',
   },
   handCardVideo: { flex: 1 },
   // Selection / mulligan indicators are absolutely-positioned rings
