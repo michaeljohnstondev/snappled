@@ -66,24 +66,10 @@ export default function PickingPhase({
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      {/* Slim header — just the close button. Phase title + timer moved
-          off screen per the redesign; the prompt banner below owns the
-          top of the screen, and the last-5s countdown covers timing. */}
-      <View style={styles.header}>
-        <Pressable onPress={onLeave}>
-          <View style={styles.backBg}>
-            <Ionicons name="close" size={18} color="white" />
-          </View>
-        </Pressable>
-      </View>
-
-      {/* Prompt + admin Edit/Delete buttons (admin only). The verb-line
-          above the prompt tells new players exactly what to do this
-          phase so they don't stare at a hand of thumbnails wondering. */}
-      <PhasePromptBanner
-        instruction={alreadyPicked ? 'WAITING ON OTHERS FOR:' : 'PICK YOUR BEST MATCH FOR:'}
-        prompt={currentPrompt}
-      >
+      {/* Header removed — users leave via the close in Scoring. The
+          prompt banner owns the top of the screen; its top padding
+          absorbs the status bar so content sits right up top. */}
+      <PhasePromptBanner prompt={currentPrompt}>
         {isAdmin && (
           <View style={styles.promptAdminRow}>
             <Pressable style={styles.promptAdminBtn} onPress={() => onEditPromptOpen(currentPrompt)}>

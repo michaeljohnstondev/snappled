@@ -3,12 +3,12 @@
 // host force-advances to PICKING when everyone's ready or the timer hits 0.
 
 import React from 'react';
-import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import VibeButton from '../../ui/VibeButton';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
-import PreviewPlayer from '../PreviewPlayer';
+import PreviewModal from '../PreviewModal';
+import PhasePromptBanner from '../PhasePromptBanner';
 import theme from '../../../theme/themes';
 
 // Renders the warmup grid + ready controls. State (hand, ready map)
@@ -20,6 +20,7 @@ export default function WarmupPhase({
   players,
   selfUid,
   previewCard,
+  currentPrompt,
   onLeave,
   onPreviewCard,
   onClosePreview,
@@ -33,15 +34,9 @@ export default function WarmupPhase({
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={onLeave}>
-          <View style={styles.backBg}>
-            <Ionicons name="close" size={18} color="white" />
-          </View>
-        </Pressable>
-        <Text style={styles.headerTitle}>Warmup</Text>
-        <Text style={styles.timerText}>{timer}s</Text>
-      </View>
+      {/* Prompt banner up top — status bar padding is built in so no
+          separate header row above it. Matches picking/voting. */}
+      <PhasePromptBanner prompt={currentPrompt} />
 
       {/* Flex-fill 3 rows × 2 columns — matches PickingPhase so the
           layout doesn't jump when warmup transitions to picking. */}
@@ -59,46 +54,47 @@ export default function WarmupPhase({
         ))}
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.readyCount}>
-          {readyCount} of {totalCount} ready
+      {/* Ready Up bar — full-width, flush at the bottom, styled to
+          match the PLAY THIS CARD action bar in PreviewModal. Flips
+          green when the local player is ready. Sub-line shows how
+          many players are in. */}
+      <Pressable
+        style={[styles.readyBar, isReady && styles.readyBarReady]}
+        onPress={() => onToggleReady(!isReady)}
+      >
+        <Text style={styles.readyBarText}>
+          {isReady ? 'READY ✓' : 'READY UP'}
         </Text>
-        <VibeButton
-          label={isReady ? "Ready! ✓" : "Ready Up"}
-          onPress={() => onToggleReady(!isReady)}
-          color={isReady ? "green" : "blue"}
-        />
-      </View>
+        <Text style={styles.readyBarSub}>
+          {readyCount} of {totalCount} ready · {timer}s
+        </Text>
+      </Pressable>
 
-      {/* Preview modal — tap a card on the grid to watch it during
-          warmup. View-only here (no Play / Pick action — picking
-          hasn't started yet). */}
+      {/* Full-bleed preview — same PreviewModal picking uses. No
+          primary CTA because picking hasn't started yet; the top-
+          right admin nuke stays available. */}
       {previewCard && (
-        <Modal visible transparent animationType="fade" onRequestClose={onClosePreview}>
-          <View style={styles.previewOverlay}>
-            <View style={styles.previewCard}>
-              <PreviewPlayer videoUrl={previewCard.videoUrl} muted={!!previewCard.muted} />
-              {/* Admin nuke — delegates to GameScreen so the exclusion
-                  confirms, broadcasts, and auto-replaces in everyone's
-                  hand who doesn't own the card. */}
-              {isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) && (
-                <Pressable
-                  style={warmupAdminStyles.poolNukeBtn}
-                  onPress={() => {
-                    onExcludeFromPool(previewCard.snappleId || previewCard.id);
-                    onClosePreview();
-                  }}
-                >
-                  <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
-                  <Text style={warmupAdminStyles.poolNukeText}>Exclude from pool</Text>
-                </Pressable>
-              )}
-              <Pressable style={styles.previewBack} onPress={onClosePreview}>
-                <Text style={styles.previewBackText}>Back</Text>
+        <PreviewModal
+          visible
+          videoUrl={previewCard.videoUrl}
+          muted={!!previewCard.muted}
+          onClose={onClosePreview}
+          primaryLabel={null}
+          topRightSlot={
+            isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) ? (
+              <Pressable
+                style={warmupAdminStyles.poolNukeBtn}
+                onPress={() => {
+                  onExcludeFromPool(previewCard.snappleId || previewCard.id);
+                  onClosePreview();
+                }}
+              >
+                <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                <Text style={warmupAdminStyles.poolNukeText}>Exclude</Text>
               </Pressable>
-            </View>
-          </View>
-        </Modal>
+            ) : null
+          }
+        />
       )}
     </LinearGradient>
   );
@@ -110,16 +106,13 @@ const warmupAdminStyles = StyleSheet.create({
   poolNukeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
     gap: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 68, 68, 0.5)',
-    backgroundColor: 'rgba(255, 68, 68, 0.1)',
-    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   poolNukeText: {
     color: '#FF4444',
@@ -130,34 +123,6 @@ const warmupAdminStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'rgba(0, 198, 255, 0.2)',
-  },
-  backBg: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue,
-  },
-  headerTitle: {
-    color: theme.colors.vibeBlue, fontSize: 20, fontWeight: theme.fontWeights.bold,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  timerText: {
-    color: theme.colors.textPrimary, fontSize: 16, fontWeight: theme.fontWeights.bold,
-    minWidth: 48, textAlign: 'center',
-    backgroundColor: 'rgba(0, 198, 255, 0.15)',
-    borderRadius: 8, borderWidth: 1, borderColor: theme.colors.vibeBlue,
-    paddingVertical: 4, paddingHorizontal: 8,
-  },
   // Flex-fill 3 rows × 2 columns. Container claims the remaining
   // vertical space; each card takes 50% width × 33.33% height.
   handGrid: {
@@ -172,30 +137,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   handCardVideo: { flex: 1 },
-  footer: {
-    padding: 16,
-    paddingBottom: 24,
-    gap: 10,
+  // Full-width action bar, flush at bottom. Same shape as the PLAY
+  // THIS CARD bar in PreviewModal so tapping any primary action in
+  // the game feels identical. Flips green when locally ready.
+  readyBar: {
+    backgroundColor: theme.colors.vibeBlue,
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
   },
-  readyCount: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    textAlign: 'center',
+  readyBarReady: {
+    backgroundColor: theme.colors.vibeGreen,
   },
-  previewOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
+  readyBarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
-  previewCard: {
-    width: '100%', aspectRatio: 9 / 16,
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue, backgroundColor: '#000',
+  readyBarSub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: 4,
   },
-  previewBack: {
-    position: 'absolute', bottom: 16, left: 16,
-    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-  },
-  previewBackText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
 });

@@ -1440,6 +1440,7 @@ export default function GameScreen({ navigation }) {
           players={game.players || []}
           selfUid={user?.uid}
           previewCard={previewCard}
+          currentPrompt={game.prompts[game.currentRound - 1] || 'Show us something!'}
           onLeave={handleLeaveGame}
           onPreviewCard={(card) => setPreviewCard(card)}
           onClosePreview={() => setPreviewCard(null)}
@@ -1512,17 +1513,8 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        {/* Slim header — phase title + top timer dropped per the
-            redesign. Prompt banner below owns the top of the screen
-            and the last-5s countdown handles urgency. */}
-        <View style={styles.header}>
-          <Pressable onPress={handleLeaveGame}>
-            <View style={styles.backBg}>
-              <Ionicons name="close" size={18} color="white" />
-            </View>
-          </Pressable>
-        </View>
-
+        {/* Header removed — leave lives on Scoring. Prompt banner
+            owns the top; its status-bar padding sits right up top. */}
         {isSpectating && (
           <View style={styles.spectateBanner}>
             <Ionicons name="eye" size={14} color={theme.colors.vibeBlue} />
@@ -1530,10 +1522,7 @@ export default function GameScreen({ navigation }) {
           </View>
         )}
 
-        <PhasePromptBanner
-          instruction={hasVoted ? 'WAITING ON VOTES FOR:' : 'VOTE FOR THE BEST MATCH TO:'}
-          prompt={game.prompts[game.currentRound - 1]}
-        />
+        <PhasePromptBanner prompt={game.prompts[game.currentRound - 1]} />
 
         {hasVoted ? (
           // Vote-submitted wait screen — unified grid of all snapples,
@@ -1660,9 +1649,9 @@ export default function GameScreen({ navigation }) {
               })}
             </View>
             {favoriteCard && (
-              <View style={styles.submitVoteWrap}>
-                <VibeButton label="Submit Vote" onPress={handleSubmitVote} />
-              </View>
+              <Pressable style={styles.submitVoteBar} onPress={handleSubmitVote}>
+                <Text style={styles.submitVoteBarText}>SUBMIT VOTE</Text>
+              </Pressable>
             )}
           </>
         )}
@@ -1846,10 +1835,7 @@ export default function GameScreen({ navigation }) {
             votes={topVotes}
           />
         ) : (
-          <PhasePromptBanner
-            instruction="ROUND RECAP:"
-            prompt={game.prompts[game.currentRound - 1]}
-          />
+          <PhasePromptBanner prompt={game.prompts[game.currentRound - 1]} />
         )}
 
         <View style={styles.pickedWaitWrap}>
@@ -2802,9 +2788,24 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 10, padding: 3,
   },
-  submitVoteWrap: {
-    paddingHorizontal: 32,
-    marginBottom: 16,
+  // Flush at the bottom, full-width, styled like the PLAY THIS CARD
+  // action bar in PreviewModal so every primary CTA looks identical.
+  submitVoteBar: {
+    backgroundColor: theme.colors.vibeBlue,
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+  },
+  submitVoteBarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
   swipeHints: {
     flexDirection: 'row', justifyContent: 'space-between', width: '100%',

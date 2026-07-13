@@ -26,15 +26,16 @@ export default function PhasePromptBanner({ instruction, prompt, children }) {
 }
 
 const styles = StyleSheet.create({
+  // Edge-to-edge banner — no side margins, no rounded corners, no
+  // outer vertical breathing room. The top inset absorbs the status
+  // bar so callers don't need their own header row above the banner.
   banner: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 12,
-    padding: 20,
-    borderRadius: 16,
+    paddingTop: 44,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 3,
-    borderColor: theme.colors.vibeBlue,
+    borderBottomWidth: 3,
+    borderBottomColor: theme.colors.vibeBlue,
   },
   instruction: {
     color: theme.colors.vibeBlue,

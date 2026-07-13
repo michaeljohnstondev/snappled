@@ -22,7 +22,10 @@ export default function PreviewModal({
   muted,
   onClose,
   primaryLabel,
-  primaryIcon = 'play',
+  // Optional trailing icon. Defaulted to null so both PLAY THIS CARD
+  // and PICK AS FAVORITE render text-only; callers can pass one
+  // explicitly when they want an accent glyph.
+  primaryIcon = null,
   onPrimary,
   topRightSlot,
   overlaySlot,
