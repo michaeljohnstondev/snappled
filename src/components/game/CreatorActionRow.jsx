@@ -8,6 +8,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { userService } from '../../services/userService';
 import { snappleService } from '../../services/snappleService';
+import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
 
 // Renders the creator credit line + action buttons. Each button is
@@ -22,6 +23,7 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   // purchased). Hide both buttons when the creator played a private.
   const isPrivate = submission?.isPrivate === true;
 
+  const { showConfirm } = useModal();
   const [following, setFollowing] = useState(false);
   const [wishlisted, setWishlisted] = useState(false);
   const [owned, setOwned] = useState(!!snappleId && (ownedSnappleIds || []).includes(snappleId));
@@ -60,6 +62,29 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
     } finally { setBusy(false); }
   };
 
+  // Confirm + submit a report against this snapple. Non-destructive:
+  // the snapple keeps playing for everyone else; moderators review
+  // reports out of band. Kept generic ("Inappropriate") for now —
+  // we can add a reason picker later if reports need triage.
+  const handleReport = async () => {
+    if (busy || !snappleId || isMine) return;
+    showConfirm?.(
+      'Report Snapple',
+      'Send this to the moderation queue? You won\'t see the video removed instantly, but the team will review it.',
+      async () => {
+        setBusy(true);
+        try {
+          const r = await snappleService.reportSnapple(snappleId, currentUser.uid, 'Inappropriate');
+          if (r?.success) {
+            showToast?.('info', 'Report Sent', 'Thanks — we\'ll take a look.');
+          } else {
+            showError?.('Report Failed', r?.error || 'Something went wrong.');
+          }
+        } finally { setBusy(false); }
+      },
+    );
+  };
+
   // Spend coins to add this snapple to the user's collection.
   const handleBuy = async () => {
     if (busy || !snappleId || isMine || owned) return;
@@ -84,87 +109,98 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   const hasActions = !isMine && !!creatorId;
   if (!hasActions) return null;
   return (
-    <View style={styles.wrap}>
-      <View style={{ flex: 1 }} />
-      <View style={styles.actions}>
-        <Pressable
-          style={[styles.btn, following && styles.btnActive]}
-          onPress={handleFollow}
-          disabled={busy}
-        >
+    <View style={styles.rail}>
+      <Pressable
+        style={styles.railBtn}
+        onPress={handleFollow}
+        disabled={busy}
+      >
+        <View style={[styles.railIcon, following && styles.railIconActive]}>
           <Ionicons
             name={following ? 'person' : 'person-add'}
-            size={13}
+            size={22}
             color={following ? theme.colors.vibeBlue : 'white'}
           />
-        </Pressable>
-        {!isPrivate && (
-          <Pressable
-            style={[styles.btn, wishlisted && styles.btnActive]}
-            onPress={handleWishlist}
-            disabled={busy}
-          >
+        </View>
+        <Text style={styles.railLabel}>{following ? 'Following' : 'Follow'}</Text>
+      </Pressable>
+      {!isPrivate && (
+        <Pressable
+          style={styles.railBtn}
+          onPress={handleWishlist}
+          disabled={busy}
+        >
+          <View style={[styles.railIcon, wishlisted && styles.railIconActive]}>
             <Ionicons
               name={wishlisted ? 'heart' : 'heart-outline'}
-              size={13}
+              size={22}
               color={wishlisted ? theme.colors.vibeRed : 'white'}
             />
-          </Pressable>
-        )}
-        {!isPrivate && (
-          <Pressable
-            style={[styles.btn, owned && styles.btnActive, { paddingHorizontal: 10 }]}
-            onPress={handleBuy}
-            disabled={busy || owned}
-          >
-            <Ionicons name="diamond" size={13} color={theme.colors.vibeBlue} />
-            <Text style={styles.btnText}>{owned ? 'Owned' : 'Buy'}</Text>
-          </Pressable>
-        )}
-      </View>
+          </View>
+          <Text style={styles.railLabel}>{wishlisted ? 'Saved' : 'Save'}</Text>
+        </Pressable>
+      )}
+      {!isPrivate && (
+        <Pressable
+          style={styles.railBtn}
+          onPress={handleBuy}
+          disabled={busy || owned}
+        >
+          <View style={[styles.railIcon, owned && styles.railIconActive]}>
+            <Ionicons name="diamond" size={22} color={theme.colors.vibeBlue} />
+          </View>
+          <Text style={styles.railLabel}>{owned ? 'Owned' : 'Buy'}</Text>
+        </Pressable>
+      )}
+      <Pressable
+        style={styles.railBtn}
+        onPress={handleReport}
+        disabled={busy}
+      >
+        <View style={styles.railIcon}>
+          <Ionicons name="flag-outline" size={22} color="white" />
+        </View>
+        <Text style={styles.railLabel}>Report</Text>
+      </Pressable>
     </View>
   );
 }
 
+// TikTok-style right-side rail. Circular icon buttons stacked
+// vertically with a small caption below each. Backgrounds are
+// darkened just enough to keep the icons legible over any video
+// frame without turning into a full opaque bar.
 const styles = StyleSheet.create({
-  wrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
+  rail: {
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    gap: 14,
   },
-  creator: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    flexShrink: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  btn: {
-    flexDirection: 'row',
+  railBtn: {
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
   },
-  btnActive: {
+  railIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  railIconActive: {
     borderColor: theme.colors.vibeBlue,
-    backgroundColor: 'rgba(0,198,255,0.12)',
+    backgroundColor: 'rgba(0,198,255,0.18)',
   },
-  btnText: {
+  railLabel: {
     color: 'white',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

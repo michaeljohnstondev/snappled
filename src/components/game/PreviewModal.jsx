@@ -85,11 +85,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Right-side vertical rail — mirrors TikTok's action column so
+  // Follow / Save / Buy / Report stack down the edge of the video
+  // instead of blocking a strip at the bottom.
   overlaySlot: {
     position: 'absolute',
-    bottom: 120,
-    left: 16,
-    right: 16,
+    right: 14,
+    bottom: 140,
     alignItems: 'center',
     zIndex: 10,
   },
