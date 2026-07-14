@@ -26,9 +26,9 @@ import WarmupPhase from '../components/game/phases/WarmupPhase';
 import FinalResultsPhase from '../components/game/phases/FinalResultsPhase';
 import PickingPhase from '../components/game/phases/PickingPhase';
 import LoadingPhase from '../components/game/phases/LoadingPhase';
-import PhasePromptBanner from '../components/game/PhasePromptBanner';
+import RoundHeaderBar from '../components/game/round/RoundHeaderBar';
+import RoundPromptBanner from '../components/game/round/RoundPromptBanner';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
-import CountdownOverlay from '../components/game/CountdownOverlay';
 import TutorialOverlay from '../components/game/TutorialOverlay';
 import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
@@ -155,7 +155,7 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
 function RoundResultsReveal({
   rankings, players, prompt, submissions,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare, onEndGame, onLeave, selfUid,
+  isHost, onNextRound, onShare, onEndGame, onLeave, onHelp, selfUid,
 }) {
   const isInfinite = totalRounds === 0;
 
@@ -220,18 +220,12 @@ function RoundResultsReveal({
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <View style={styles.header}>
-        {/* Close X — exits to the main menu. Same button that used
-            to live on the picking/voting headers before those were
-            stripped down. */}
-        <Pressable onPress={onLeave}>
-          <View style={styles.backBg}>
-            <Ionicons name="close" size={18} color="white" />
-          </View>
-        </Pressable>
-        <Text style={styles.headerTitle}>Round {currentRound} Results</Text>
-        <Text style={styles.timerText}>{timer}s</Text>
-      </View>
+      <RoundHeaderBar phase="roundResults" timerSec={timer} onHelp={onHelp} />
+      <RoundPromptBanner
+        prompt={prompt}
+        round={currentRound}
+        totalRounds={totalRounds || null}
+      />
 
       <ScrollView contentContainerStyle={styles.resultsScrollContent} showsVerticalScrollIndicator={false}>
         {/* Standings — picker reveal + prompt already shown on the
@@ -338,36 +332,39 @@ export default function GameScreen({ navigation }) {
   // When true, tapping a card in the hand replaces it instead of previewing.
   const [mulliganMode, setMulliganMode] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
-  // Round-start alert: which phases have been announced this round.
-  // Reset every round change so the "60s to pick" / "60s to vote"
-  // callout fires exactly once per phase per round.
+  // Help overlay — user-triggered via the "?" button on
+  // RoundHeaderBar. Copy per phase lives here so it stays with the
+  // game screen instead of leaking into each phase component.
   const [roundAlert, setRoundAlert] = useState(null);
-  const shownRoundAlertsRef = useRef(new Set());
-  useEffect(() => {
-    shownRoundAlertsRef.current = new Set();
-    setRoundAlert(null);
-  }, [game?.currentRound]);
-  useEffect(() => {
+  const showPhaseHelp = () => {
     const phase = game?.phase;
-    if (phase !== GAME_PHASES.PICKING && phase !== GAME_PHASES.VOTING) return;
-    // Tutorial mode drives its own per-phase tips (with different
-    // copy), so suppress the round-start alert to avoid double-modal.
-    if (isTutorial) return;
-    const key = `${game?.currentRound}:${phase}`;
-    if (shownRoundAlertsRef.current.has(key)) return;
-    shownRoundAlertsRef.current.add(key);
     if (phase === GAME_PHASES.PICKING) {
       setRoundAlert({
-        title: '60 seconds to pick',
-        sub: 'Tap a card in your hand to preview it, then hit PLAY THIS CARD to lock in.',
+        title: 'Pick a card',
+        sub: 'Tap a card in your hand to select it. The one you pick goes to YOUR CARD at the bottom — hit PLAY THIS CARD when ready.',
       });
-    } else {
+    } else if (phase === GAME_PHASES.VOTING) {
       setRoundAlert({
-        title: '60 seconds to vote',
-        sub: "Tap a card to preview, then PICK AS FAVORITE for the funniest match. You can't vote for your own.",
+        title: 'Vote for the best',
+        sub: "Tap a card to preview it, then PICK AS FAVORITE for the funniest match. You can't vote for your own submission.",
+      });
+    } else if (phase === GAME_PHASES.SCORING) {
+      setRoundAlert({
+        title: 'Scoring',
+        sub: 'Each vote your card got is worth a point. The round winner wears the crown.',
+      });
+    } else if (phase === GAME_PHASES.REVIEW) {
+      setRoundAlert({
+        title: 'Warmup',
+        sub: 'Get comfy with your hand. Tap READY UP when you\'re set — the round starts when everyone\'s ready or the timer runs out.',
+      });
+    } else if (phase === GAME_PHASES.ROUND_RESULTS) {
+      setRoundAlert({
+        title: 'Round results',
+        sub: 'Standings after the round. Host advances to the next round when ready.',
       });
     }
-  }, [game?.phase, game?.currentRound, isTutorial]);
+  };
   // Round count for newly-created games (practice + custom). Adjustable
   // on the no-game choice screen via the rounds picker.
   // Default play-to target points (was rounds count). Lobby picker for
@@ -1452,6 +1449,7 @@ export default function GameScreen({ navigation }) {
           onPreviewCard={(card) => setPreviewCard(card)}
           onClosePreview={() => setPreviewCard(null)}
           onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
+          onHelp={showPhaseHelp}
           isAdmin={isAdmin}
           onExcludeFromPool={handleExcludeFromPool}
         />
@@ -1500,8 +1498,8 @@ export default function GameScreen({ navigation }) {
         onEditPromptSave={handleSavePrompt}
         onDeletePrompt={handleDeletePrompt}
         onExcludeFromPool={handleExcludeFromPool}
+        onHelp={showPhaseHelp}
         />
-        <CountdownOverlay seconds={timer} />
         <RoundStartOverlay
           visible={!!roundAlert}
           title={roundAlert?.title}
@@ -1521,8 +1519,7 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        {/* Header removed — leave lives on Scoring. Prompt banner
-            owns the top; its status-bar padding sits right up top. */}
+        <RoundHeaderBar phase="voting" timerSec={timer} onHelp={showPhaseHelp} />
         {isSpectating && (
           <View style={styles.spectateBanner}>
             <Ionicons name="eye" size={14} color={theme.colors.vibeBlue} />
@@ -1530,7 +1527,11 @@ export default function GameScreen({ navigation }) {
           </View>
         )}
 
-        <PhasePromptBanner prompt={game.prompts[game.currentRound - 1]} />
+        <RoundPromptBanner
+          prompt={game.prompts[game.currentRound - 1]}
+          round={game.currentRound}
+          totalRounds={game.totalRounds || null}
+        />
 
         {hasVoted ? (
           // Vote-submitted wait screen — unified grid of all snapples,
@@ -1756,7 +1757,6 @@ export default function GameScreen({ navigation }) {
             </Modal>
           );
         })()}
-        <CountdownOverlay seconds={timer} />
         <RoundStartOverlay
           visible={!!roundAlert}
           title={roundAlert?.title}
@@ -1810,27 +1810,7 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        {/* Compact header: smaller title, scoreboard icon next to the
-            timer so any player can peek standings without a bottom
-            button taking vertical space. */}
-        <View style={styles.header}>
-          <Pressable onPress={handleLeaveGame}>
-            <View style={styles.backBg}>
-              <Ionicons name="close" size={18} color="white" />
-            </View>
-          </Pressable>
-          <Text style={scoringStyles.headerTitleCompact}>Scoring</Text>
-          <View style={scoringStyles.headerRight}>
-            <Pressable
-              onPress={() => setShowScoreboard(true)}
-              hitSlop={8}
-              style={scoringStyles.scoreboardIcon}
-            >
-              <Ionicons name="podium" size={20} color={theme.colors.vibeBlue} />
-            </Pressable>
-            <Text style={styles.timerText}>{timer}s</Text>
-          </View>
-        </View>
+        <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} />
 
         {/* Winner banner takes the prompt's slot during SCORING — the
             prompt has done its job (voting is over) and the winner is
@@ -1843,7 +1823,11 @@ export default function GameScreen({ navigation }) {
             votes={topVotes}
           />
         ) : (
-          <PhasePromptBanner prompt={game.prompts[game.currentRound - 1]} />
+          <RoundPromptBanner
+            prompt={game.prompts[game.currentRound - 1]}
+            round={game.currentRound}
+            totalRounds={game.totalRounds || null}
+          />
         )}
 
         <View style={styles.pickedWaitWrap}>
@@ -1948,6 +1932,7 @@ export default function GameScreen({ navigation }) {
         onShare={handleShareRound}
         onEndGame={() => gameService.endGameEarly(gameId)}
         onLeave={handleLeaveGame}
+        onHelp={showPhaseHelp}
       />
     );
   }
@@ -2828,10 +2813,11 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     textTransform: 'uppercase',
   },
-  // Flush at the bottom, full-width, styled like the PLAY THIS CARD
-  // action bar in PreviewModal so every primary CTA looks identical.
+  // Flush action bar — green because it's the selection CTA
+  // (matches PLAY THIS CARD in picking). Consistent selection color
+  // across the whole game.
   submitVoteBar: {
-    backgroundColor: theme.colors.vibeBlue,
+    backgroundColor: theme.colors.vibeGreen,
     paddingTop: 20,
     paddingBottom: 30,
     paddingHorizontal: 24,

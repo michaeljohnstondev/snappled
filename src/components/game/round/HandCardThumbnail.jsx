@@ -111,6 +111,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: theme.colors.vibeBlue,
+    borderColor: theme.colors.vibeGreen,
   },
 });

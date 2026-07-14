@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewModal from '../PreviewModal';
-import PhasePromptBanner from '../PhasePromptBanner';
+import RoundHeaderBar from '../round/RoundHeaderBar';
 import theme from '../../../theme/themes';
 
 // Renders the warmup grid + ready controls. State (hand, ready map)
@@ -25,6 +25,7 @@ export default function WarmupPhase({
   onPreviewCard,
   onClosePreview,
   onToggleReady,
+  onHelp,
   isAdmin,
   onExcludeFromPool,
 }) {
@@ -34,9 +35,9 @@ export default function WarmupPhase({
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      {/* Prompt banner up top — status bar padding is built in so no
-          separate header row above it. Matches picking/voting. */}
-      <PhasePromptBanner prompt={currentPrompt} />
+      {/* Chips-only header — warmup doesn't need the prompt banner;
+          the prompt gets its own moment during picking. */}
+      <RoundHeaderBar phase="review" timerSec={timer} onHelp={onHelp} />
 
       {/* Flex-fill 3 rows × 2 columns — matches PickingPhase so the
           layout doesn't jump when warmup transitions to picking. */}

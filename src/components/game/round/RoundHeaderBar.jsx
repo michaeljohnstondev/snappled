@@ -4,7 +4,8 @@
 // the prompt banner + hand grid.
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import PhaseChips from './PhaseChips';
 import theme from '../../../theme/themes';
 
@@ -20,19 +21,29 @@ function formatTimer(sec) {
 // Render the header row. `phase` matches gameService.GAME_PHASES
 // values. `timerSec` is the remaining seconds for the current phase;
 // pass 0 or null to hide the timer entirely (e.g. during LOADING).
-export default function RoundHeaderBar({ phase, timerSec }) {
+// `onHelp` optionally shows a "?" button between the chips and the
+// timer that fires when tapped — used to surface phase help text
+// on demand instead of shoving it on-screen every round.
+export default function RoundHeaderBar({ phase, timerSec, onHelp }) {
   const showTimer = typeof timerSec === 'number' && timerSec > 0;
   return (
     <View style={styles.bar}>
       <View style={styles.chipsWrap}>
         <PhaseChips phase={phase} />
       </View>
-      {showTimer ? (
-        <View style={styles.timerPill}>
-          <View style={styles.timerDot} />
-          <Text style={styles.timerText}>{formatTimer(timerSec)}</Text>
-        </View>
-      ) : null}
+      <View style={styles.rightGroup}>
+        {onHelp ? (
+          <Pressable style={styles.helpBtn} onPress={onHelp} hitSlop={6}>
+            <Text style={styles.helpText}>?</Text>
+          </Pressable>
+        ) : null}
+        {showTimer ? (
+          <View style={styles.timerPill}>
+            <View style={styles.timerDot} />
+            <Text style={styles.timerText}>{formatTimer(timerSec)}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -49,6 +60,27 @@ const styles = StyleSheet.create({
   },
   chipsWrap: {
     flexShrink: 1,
+  },
+  rightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  helpBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 15,
   },
   timerPill: {
     flexDirection: 'row',

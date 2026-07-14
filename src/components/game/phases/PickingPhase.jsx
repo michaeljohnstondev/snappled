@@ -48,6 +48,7 @@ export default function PickingPhase({
   onClosePreview,
   onSelectCard,
   onPickCard,
+  onHelp,
   onMulliganToggle,
   onMulliganSwap,
   onEditPromptOpen,
@@ -80,7 +81,7 @@ export default function PickingPhase({
     const totalCount = (game.players || []).length;
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <RoundHeaderBar phase="picking" timerSec={timer} />
+        <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} />
         <RoundPromptBanner
           prompt={currentPrompt}
           round={game.currentRound}
@@ -162,7 +163,6 @@ export default function PickingPhase({
           prompt={currentPrompt}
           round={game.currentRound}
           totalRounds={totalRoundsShown}
-          subtitle="Everyone plays one card. Best card takes the round."
         />
 
         {isAdmin && (
@@ -487,9 +487,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Flush action bar — same shape as PLAY THIS CARD in PreviewModal.
+  // Flush action bar — green when a card is selected + ready to
+  // submit (selection color), dim when nothing's picked yet.
   submitBar: {
-    backgroundColor: theme.colors.vibeBlue,
+    backgroundColor: theme.colors.vibeGreen,
     paddingTop: 20,
     paddingBottom: 30,
     paddingHorizontal: 24,
@@ -499,7 +500,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#000',
   },
   submitBarDisabled: {
-    backgroundColor: 'rgba(0,198,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   submitBarText: {
     color: '#fff',
