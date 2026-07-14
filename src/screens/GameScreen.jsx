@@ -1454,6 +1454,12 @@ export default function GameScreen({ navigation }) {
           isAdmin={isAdmin}
           onExcludeFromPool={handleExcludeFromPool}
         />
+        <RoundStartOverlay
+          visible={!!roundAlert}
+          title={roundAlert?.title}
+          sub={roundAlert?.sub}
+          onDismiss={() => setRoundAlert(null)}
+        />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </>
     );
@@ -1670,15 +1676,29 @@ export default function GameScreen({ navigation }) {
                 {votableSubmissions.length % 2 === 1 && <View style={styles.votingCell} />}
               </View>
             </ScrollView>
-            <Pressable
-              style={[styles.submitVoteBar, !favoriteCard && styles.submitVoteBarDisabled]}
-              onPress={() => favoriteCard && handleSubmitVote()}
-              disabled={!favoriteCard}
-            >
-              <Text style={styles.submitVoteBarText}>
-                {favoriteCard ? 'SUBMIT VOTE' : 'PICK A FAVORITE'}
-              </Text>
-            </Pressable>
+            {favoriteCard ? (
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={styles.actionBackChunk}
+                  onPress={() => setFavoriteCard(null)}
+                >
+                  <Ionicons name="arrow-back" size={22} color="#fff" />
+                </Pressable>
+                <Pressable
+                  style={[styles.submitVoteBar, styles.actionSubmitChunk]}
+                  onPress={handleSubmitVote}
+                >
+                  <Text style={styles.submitVoteBarText}>SUBMIT VOTE</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.submitVoteBar, styles.submitVoteBarDisabled]}
+                disabled
+              >
+                <Text style={styles.submitVoteBarText}>PICK A FAVORITE</Text>
+              </Pressable>
+            )}
           </>
         )}
 
@@ -1912,6 +1932,12 @@ export default function GameScreen({ navigation }) {
             </Modal>
           );
         })()}
+        <RoundStartOverlay
+          visible={!!roundAlert}
+          title={roundAlert?.title}
+          sub={roundAlert?.sub}
+          onDismiss={() => setRoundAlert(null)}
+        />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </LinearGradient>
     );
@@ -1935,22 +1961,30 @@ export default function GameScreen({ navigation }) {
       } catch (e) {}
     };
     return (
-      <RoundResultsReveal
-        rankings={lastRoundResult?.rankings || []}
-        players={game.players}
-        submissions={game.submissions || []}
-        prompt={game.prompts[game.currentRound - 1] || ''}
-        currentRound={game.currentRound}
-        totalRounds={game.totalRounds}
-        timer={timer}
-        isHost={isHost}
-        selfUid={user?.uid}
-        onNextRound={handleNextRound}
-        onShare={handleShareRound}
-        onEndGame={() => gameService.endGameEarly(gameId)}
-        onLeave={handleLeaveGame}
-        onHelp={showPhaseHelp}
-      />
+      <>
+        <RoundResultsReveal
+          rankings={lastRoundResult?.rankings || []}
+          players={game.players}
+          submissions={game.submissions || []}
+          prompt={game.prompts[game.currentRound - 1] || ''}
+          currentRound={game.currentRound}
+          totalRounds={game.totalRounds}
+          timer={timer}
+          isHost={isHost}
+          selfUid={user?.uid}
+          onNextRound={handleNextRound}
+          onShare={handleShareRound}
+          onEndGame={() => gameService.endGameEarly(gameId)}
+          onLeave={handleLeaveGame}
+          onHelp={showPhaseHelp}
+        />
+        <RoundStartOverlay
+          visible={!!roundAlert}
+          title={roundAlert?.title}
+          sub={roundAlert?.sub}
+          onDismiss={() => setRoundAlert(null)}
+        />
+      </>
     );
   }
 
@@ -2845,6 +2879,29 @@ const styles = StyleSheet.create({
   },
   submitVoteBarDisabled: {
     backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  // Two-chunk submit row: 1/4 back button, 3/4 primary CTA. Same
+  // full-width footprint as the plain submit bar, split by a
+  // hairline black divider so both chunks read as one bar.
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+  },
+  actionBackChunk: {
+    flex: 1,
+    paddingTop: 20,
+    paddingBottom: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRightWidth: 2,
+    borderRightColor: '#000',
+  },
+  actionSubmitChunk: {
+    flex: 3,
+    borderTopWidth: 0,
   },
   submitVoteBarText: {
     color: '#fff',

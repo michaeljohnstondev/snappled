@@ -8,22 +8,23 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
 
-// Static base — PICK / VOTE / SCORE always render. WARMUP is prepended
-// conditionally in the render below.
+// Static base — PICK / VOTE / SCORE / RESULT always render. WARMUP
+// is prepended conditionally in the render below.
 const BASE_STEPS = [
   { key: 'picking', label: 'PICK' },
   { key: 'voting', label: 'VOTE' },
   { key: 'scoring', label: 'SCORE' },
+  { key: 'roundResults', label: 'RESULT' },
 ];
 
-// Which chip should be highlighted for a given game.phase.
-// SCORING + ROUND_RESULTS both light up the SCORE chip since they're
-// the same conceptual step from the player's view.
+// Which chip should be highlighted for a given game.phase. Scoring
+// and Round Results are now separate chips.
 function activeKeyForPhase(phase) {
   if (phase === 'review') return 'warmup';
   if (phase === 'picking') return 'picking';
   if (phase === 'voting') return 'voting';
-  if (phase === 'scoring' || phase === 'roundResults') return 'scoring';
+  if (phase === 'scoring') return 'scoring';
+  if (phase === 'roundResults') return 'roundResults';
   return null;
 }
 
@@ -65,29 +66,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 1,
   },
+  // Base chip = VibeButton-style outline: cyan border on transparent
+  // bg, white text. Active = filled cyan, still white text so it
+  // reads like the CTA bars across the game.
   chip: {
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 7,
+    borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: theme.colors.vibeBlue,
     backgroundColor: 'transparent',
   },
   chipActive: {
-    borderColor: theme.colors.vibeBlue,
     backgroundColor: theme.colors.vibeBlue,
   },
   label: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 10,
+    color: 'white',
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
   },
   labelActive: {
-    color: '#000',
+    color: 'white',
   },
   divider: {
-    width: 6,
+    width: 4,
     height: 1.5,
     backgroundColor: 'rgba(255,255,255,0.25)',
     marginHorizontal: 1,

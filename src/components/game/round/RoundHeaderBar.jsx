@@ -24,7 +24,7 @@ function formatTimer(sec) {
 // `onHelp` optionally shows a "?" button between the chips and the
 // timer that fires when tapped — used to surface phase help text
 // on demand instead of shoving it on-screen every round.
-export default function RoundHeaderBar({ phase, timerSec, onHelp }) {
+export default function RoundHeaderBar({ phase, timerSec, onHelp, caption }) {
   const showTimer = typeof timerSec === 'number' && timerSec > 0;
   // Real safe-area inset so chips clear the status bar / notch on
   // every device without a fat hardcoded padding. Fallback to 8 for
@@ -35,18 +35,19 @@ export default function RoundHeaderBar({ phase, timerSec, onHelp }) {
     <View style={[styles.bar, { paddingTop: topPad + 2 }]}>
       <View style={styles.chipsWrap}>
         <PhaseChips phase={phase} />
+        {caption ? <Text style={styles.caption}>{caption}</Text> : null}
       </View>
       <View style={styles.rightGroup}>
-        {onHelp ? (
-          <Pressable style={styles.helpBtn} onPress={onHelp} hitSlop={6}>
-            <Text style={styles.helpText}>?</Text>
-          </Pressable>
-        ) : null}
         {showTimer ? (
           <View style={styles.timerPill}>
             <View style={styles.timerDot} />
             <Text style={styles.timerText}>{formatTimer(timerSec)}</Text>
           </View>
+        ) : null}
+        {onHelp ? (
+          <Pressable style={styles.helpBtn} onPress={onHelp} hitSlop={6}>
+            <Text style={styles.helpText}>?</Text>
+          </Pressable>
         ) : null}
       </View>
     </View>
@@ -66,6 +67,15 @@ const styles = StyleSheet.create({
   chipsWrap: {
     flexShrink: 1,
     minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  caption: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   rightGroup: {
     flexDirection: 'row',

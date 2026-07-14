@@ -36,8 +36,15 @@ export default function WarmupPhase({
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
       {/* Chips-only header — warmup doesn't need the prompt banner;
-          the prompt gets its own moment during picking. */}
-      <RoundHeaderBar phase="review" timerSec={timer} onHelp={onHelp} />
+          the prompt gets its own moment during picking. Ready count
+          rides in the header as a caption instead of the sub-line
+          on the Ready Up bar. */}
+      <RoundHeaderBar
+        phase="review"
+        timerSec={timer}
+        onHelp={onHelp}
+        caption={`${readyCount} of ${totalCount} ready`}
+      />
 
       {/* Flex-fill 3 rows × 2 columns — matches PickingPhase so the
           layout doesn't jump when warmup transitions to picking. */}
@@ -65,9 +72,6 @@ export default function WarmupPhase({
       >
         <Text style={styles.readyBarText}>
           {isReady ? 'READY ✓' : 'READY UP'}
-        </Text>
-        <Text style={styles.readyBarSub}>
-          {readyCount} of {totalCount} ready · {timer}s
         </Text>
       </Pressable>
 

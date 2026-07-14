@@ -164,7 +164,6 @@ export default function PickingPhase({
           round={game.currentRound}
           totalRounds={totalRoundsShown}
           onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
-          onDelete={isAdmin ? onDeletePrompt : undefined}
         />
 
         <View style={styles.sectionHead}>
@@ -242,18 +241,30 @@ export default function PickingPhase({
         </View>
       </ScrollView>
 
-      {/* Flush cyan submit bar — only enabled once a card is
-          selected. Same shape as the PLAY THIS CARD bar in the
-          fullscreen preview so the actions feel identical. */}
-      <Pressable
-        style={[styles.submitBar, !selectedCard && styles.submitBarDisabled]}
-        onPress={() => selectedCard && onPickCard(selectedCard)}
-        disabled={!selectedCard}
-      >
-        <Text style={styles.submitBarText}>
-          {selectedCard ? 'PLAY THIS CARD' : 'PICK A CARD'}
-        </Text>
-      </Pressable>
+      {/* Flush action row — Back on the left 25%, primary CTA on
+          the right 75% when a card is selected. Empty-state shows
+          only the dim PICK A CARD bar so there's nothing to go
+          back from. */}
+      {selectedCard ? (
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionBackChunk}
+            onPress={() => onSelectCard && onSelectCard(null)}
+          >
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </Pressable>
+          <Pressable
+            style={[styles.submitBar, styles.actionSubmitChunk]}
+            onPress={() => onPickCard(selectedCard)}
+          >
+            <Text style={styles.submitBarText}>PLAY THIS CARD</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable style={[styles.submitBar, styles.submitBarDisabled]} disabled>
+          <Text style={styles.submitBarText}>PICK A CARD</Text>
+        </Pressable>
+      )}
 
       {/* Fullscreen preview modal — opened from either a grid tap
           (via _fromYourCard/regular) or from the YOUR CARD play icon.
@@ -360,7 +371,10 @@ const pickingAdminStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: {
-    paddingBottom: 24,
+    // Enough clearance for the flush action bar at the bottom
+    // (~86pt tall including safe padding) so YOUR CARD isn't
+    // hidden behind it.
+    paddingBottom: 120,
   },
   loadingHand: {
     flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12,
@@ -502,6 +516,28 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 3,
     textTransform: 'uppercase',
+  },
+  // Split action row: 1/4 Back chunk, 3/4 primary CTA. Same
+  // full-width footprint as the plain submit bar.
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+  },
+  actionBackChunk: {
+    flex: 1,
+    paddingTop: 20,
+    paddingBottom: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRightWidth: 2,
+    borderRightColor: '#000',
+  },
+  actionSubmitChunk: {
+    flex: 3,
+    borderTopWidth: 0,
   },
 
   // Post-pick wait screen — leaderboard of who's picked yet.
