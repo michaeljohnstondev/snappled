@@ -137,13 +137,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   handCardVideo: { flex: 1 },
-  // Full-width action bar, flush at bottom. Same shape as the PLAY
-  // THIS CARD bar in PreviewModal so tapping any primary action in
-  // the game feels identical. Flips green when locally ready.
+  // Full-width action bar, flush at bottom. Bigger than the other
+  // CTA bars because it's the ONLY thing the warmup screen wants
+  // you to tap — 60s of dead space above it otherwise. Flips green
+  // when locally ready.
   readyBar: {
     backgroundColor: theme.colors.vibeBlue,
-    paddingTop: 20,
-    paddingBottom: 30,
+    paddingTop: 32,
+    paddingBottom: 42,
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
@@ -155,16 +156,16 @@ const styles = StyleSheet.create({
   },
   readyBarText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 26,
     fontWeight: '900',
-    letterSpacing: 3,
+    letterSpacing: 4,
     textTransform: 'uppercase',
   },
   readyBarSub: {
     color: 'rgba(255,255,255,0.85)',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
-    marginTop: 4,
+    marginTop: 6,
   },
 });
