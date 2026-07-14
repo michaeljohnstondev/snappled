@@ -28,6 +28,10 @@ export default function HandCardThumbnail({
   card,
   isSelected,
   isPlaying,
+  // Incremented on every tap by the parent — used as a React key on
+  // the inline PreviewPlayer so tapping the same card again forces
+  // a fresh mount and replays the video from the start.
+  playToken = 0,
   onTogglePlay,
   onFullscreen,
   label,
@@ -45,7 +49,12 @@ export default function HandCardThumbnail({
       >
         <View style={styles.videoWrap}>
           {card?.videoUrl && isPlaying ? (
-            <PreviewPlayer videoUrl={card.videoUrl} muted={!!card.muted} />
+            <PreviewPlayer
+              key={`inline-${card.id || card.snappleId || 'x'}-${playToken}`}
+              videoUrl={card.videoUrl}
+              muted={!!card.muted}
+              loop={false}
+            />
           ) : card?.videoUrl ? (
             <SnappleThumbnailImg videoUrl={card.videoUrl} />
           ) : (

@@ -41,7 +41,10 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, pick
 
   const colors = (voters || []).map(v => v.color);
   const hasVoters = colors.length > 0;
-  const auraThickness = 3;
+  // Per-voter ring thickness. Kept thin so 4+ votes can stack
+  // outward without swamping the neighbor cards' margins.
+  const ringThickness = 2;
+  const videoRadius = 10;
 
   // Crown pop-in on winners (SCORING phase). Starts hidden, springs to
   // full scale after a short delay so the reveal feels staged rather
@@ -101,56 +104,56 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, pick
         />
       )}
 
-      {/* Segmented multi-color aura around the video — one stripe per voter
-          on each side. Wraps just the video, no extra card chrome. */}
-      <View style={styles.videoFrame}>
-        <View style={styles.video}>
-          {submission?.videoUrl ? <SnappleThumbnailImg videoUrl={submission.videoUrl} /> : null}
+      {/* Nested vote rings + video. Each voter adds one solid border
+          farther OUT than the last — first voter is the innermost
+          ring (hugging the video), most-recent voter is the
+          outermost. Rings sit as absolute siblings so the video's
+          overflow: hidden doesn't clip them. */}
+      <View style={styles.frameOuter}>
+        <View style={styles.videoFrame}>
+          <View style={styles.video}>
+            {submission?.videoUrl ? <SnappleThumbnailImg videoUrl={submission.videoUrl} /> : null}
+          </View>
+
+          {/* Scoring-phase badges live INSIDE the videoFrame so the
+              overflow: hidden clips them to the card's rounded
+              corners. Rings live outside (below). */}
+          {isWinner && (
+            <Animated.View
+              style={[
+                styles.winnerBadge,
+                { transform: [{ scale: crownScale }] },
+              ]}
+            >
+              <Text style={styles.winnerBadgeText}>👑</Text>
+            </Animated.View>
+          )}
+          {typeof pointsEarned === 'number' && pointsEarned > 0 && (
+            <View style={styles.pointsChip}>
+              <Text style={styles.pointsChipText}>+{displayedPoints}</Text>
+            </View>
+          )}
         </View>
 
-        {hasVoters && (
-          <>
-            <View style={[styles.auraStripTop, { height: auraThickness }]}>
-              {colors.map((c, i) => (
-                <View key={`t-${i}`} style={{ flex: 1, backgroundColor: c }} />
-              ))}
-            </View>
-            <View style={[styles.auraStripBottom, { height: auraThickness }]}>
-              {colors.map((c, i) => (
-                <View key={`b-${i}`} style={{ flex: 1, backgroundColor: c }} />
-              ))}
-            </View>
-            <View style={[styles.auraStripLeft, { width: auraThickness }]}>
-              {colors.map((c, i) => (
-                <View key={`l-${i}`} style={{ flex: 1, backgroundColor: c }} />
-              ))}
-            </View>
-            <View style={[styles.auraStripRight, { width: auraThickness }]}>
-              {colors.map((c, i) => (
-                <View key={`r-${i}`} style={{ flex: 1, backgroundColor: c }} />
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* Scoring-phase badges. Crown for round winner(s), points chip
-            for everyone who got at least one vote. Both render only when
-            the parent passes the props — voting wait stays clean. */}
-        {isWinner && (
-          <Animated.View
-            style={[
-              styles.winnerBadge,
-              { transform: [{ scale: crownScale }] },
-            ]}
-          >
-            <Text style={styles.winnerBadgeText}>👑</Text>
-          </Animated.View>
-        )}
-        {typeof pointsEarned === 'number' && pointsEarned > 0 && (
-          <View style={styles.pointsChip}>
-            <Text style={styles.pointsChipText}>+{displayedPoints}</Text>
-          </View>
-        )}
+        {colors.map((c, i) => {
+          const inset = -(i + 1) * ringThickness;
+          return (
+            <View
+              key={`ring-${i}`}
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: inset,
+                left: inset,
+                right: inset,
+                bottom: inset,
+                borderWidth: ringThickness,
+                borderColor: c,
+                borderRadius: videoRadius + (i + 1) * ringThickness,
+              }}
+            />
+          );
+        })}
       </View>
 
       {picker && (
@@ -174,8 +177,18 @@ export default VoteAuraCard;
 const styles = StyleSheet.create({
   wrap: {
     width: 100,
-    margin: 4,
+    // Extra margin so the nested vote rings can extend outward
+    // (up to ~4 rings * 2pt = 8pt on each side) without slamming
+    // into the neighbor card.
+    margin: 10,
     alignItems: 'center',
+  },
+  // Positioning parent for the nested rings — rings absolute-
+  // position around it. Matches videoFrame's footprint.
+  frameOuter: {
+    width: 100,
+    aspectRatio: 9 / 16,
+    position: 'relative',
   },
   videoFrame: {
     width: 100,
@@ -195,32 +208,6 @@ const styles = StyleSheet.create({
     height: 178,
     borderRadius: 16,
     borderWidth: 2,
-  },
-  auraStripTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-  },
-  auraStripBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-  },
-  auraStripLeft: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-  },
-  auraStripRight: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
   },
   pickerName: {
     fontSize: 11,

@@ -1,18 +1,21 @@
-// Warmup phase (a.k.a. REVIEW) — shows the prompt + the user's drawn hand
-// before picking starts. Players hit the Ready button when they're set;
-// host force-advances to PICKING when everyone's ready or the timer hits 0.
+// Warmup phase (a.k.a. REVIEW) — shows the drawn hand before picking
+// starts. Layout matches PickingPhase (2-col HandCardThumbnail grid
+// with a YOUR HAND section header) minus the prompt banner, since
+// the prompt reveals during PICKING. Players tap READY UP to
+// advance; host force-transitions when everyone's ready or the
+// timer hits 0.
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewModal from '../PreviewModal';
 import RoundHeaderBar from '../round/RoundHeaderBar';
+import HandCardThumbnail from '../round/HandCardThumbnail';
 import theme from '../../../theme/themes';
 
-// Renders the warmup grid + ready controls. State (hand, ready map)
-// and handlers come from GameScreen.
+// Renders the warmup hand + ready controls. State lives in GameScreen;
+// only local inline-play state lives here.
 export default function WarmupPhase({
   hand,
   timer,
@@ -20,12 +23,12 @@ export default function WarmupPhase({
   players,
   selfUid,
   previewCard,
-  currentPrompt,
   onLeave,
   onPreviewCard,
   onClosePreview,
   onToggleReady,
   onHelp,
+  onHelpEnd,
   isAdmin,
   onExcludeFromPool,
 }) {
@@ -33,39 +36,65 @@ export default function WarmupPhase({
   const readyCount = (players || []).filter(p => readyMap?.[p.uid]).length;
   const totalCount = (players || []).length;
 
+  // Same inline mini-player behavior as picking — tap a card body
+  // plays it inline once. Token increments so re-tapping the same
+  // card replays via a fresh mount.
+  const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
+  const bumpInline = (id) => {
+    setInlinePlaying(prev => ({
+      id,
+      token: prev.id === id ? prev.token + 1 : 1,
+    }));
+  };
+
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      {/* Chips-only header — warmup doesn't need the prompt banner;
-          the prompt gets its own moment during picking. Ready count
-          rides in the header as a caption instead of the sub-line
-          on the Ready Up bar. */}
+      {/* Chips-only header — no prompt banner during warmup. Ready
+          count rides in the caption slot next to the WARMUP chip. */}
       <RoundHeaderBar
         phase="review"
         timerSec={timer}
         onHelp={onHelp}
+        onHelpEnd={onHelpEnd}
         caption={`${readyCount} of ${totalCount} ready`}
       />
 
-      {/* Flex-fill 3 rows × 2 columns — matches PickingPhase so the
-          layout doesn't jump when warmup transitions to picking. */}
-      <View style={styles.handGrid}>
-        {hand.map((item, i) => (
-          <Pressable
-            key={item?.id || `hand-${i}`}
-            style={styles.handCard}
-            onPress={() => onPreviewCard({ ...item, _isWaiting: true })}
-          >
-            <View style={styles.handCardVideo}>
-              {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
-            </View>
-          </Pressable>
-        ))}
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>YOUR HAND</Text>
+          <Text style={styles.sectionCount}>{hand.length} cards</Text>
+          <View style={{ flex: 1 }} />
+          <Text style={styles.sectionHint}>Preview before picking</Text>
+        </View>
 
-      {/* Ready Up bar — full-width, flush at the bottom, styled to
-          match the PLAY THIS CARD action bar in PreviewModal. Flips
-          green when the local player is ready. Sub-line shows how
-          many players are in. */}
+        <View style={styles.grid}>
+          {hand.map((item, i) => {
+            const isInlinePlaying = inlinePlaying.id === item.id;
+            return (
+              <View key={item?.id || `hand-${i}`} style={styles.gridCell}>
+                <HandCardThumbnail
+                  card={item}
+                  isPlaying={isInlinePlaying}
+                  playToken={isInlinePlaying ? inlinePlaying.token : 0}
+                  onTogglePlay={() => bumpInline(item.id)}
+                  onFullscreen={() => {
+                    setInlinePlaying({ id: null, token: 0 });
+                    onPreviewCard({ ...item, _isWaiting: true });
+                  }}
+                />
+              </View>
+            );
+          })}
+          {hand.length % 2 === 1 && <View style={styles.gridCell} />}
+        </View>
+      </ScrollView>
+
+      {/* Ready Up bar — flush at the bottom, same shape as the other
+          primary action bars. Flips green when the local player is
+          ready. */}
       <Pressable
         style={[styles.readyBar, isReady && styles.readyBarReady]}
         onPress={() => onToggleReady(!isReady)}
@@ -75,9 +104,9 @@ export default function WarmupPhase({
         </Text>
       </Pressable>
 
-      {/* Full-bleed preview — same PreviewModal picking uses. No
-          primary CTA because picking hasn't started yet; the top-
-          right admin nuke stays available. */}
+      {/* Full-bleed preview — reuses PreviewModal from picking / voting.
+          No primary CTA because picking hasn't started yet; admin
+          exclude stays in the top-right slot. */}
       {previewCard && (
         <PreviewModal
           visible
@@ -128,24 +157,54 @@ const warmupAdminStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // Flex-fill 3 rows × 2 columns. Container claims the remaining
-  // vertical space; each card takes 50% width × 33.33% height.
-  handGrid: {
-    flex: 1,
+  scrollContent: {
+    // Enough clearance for the flush READY UP bar (~110pt tall
+    // including safe-area padding) so the last row of cards isn't
+    // hidden behind it.
+    paddingBottom: 140,
+  },
+
+  // Section header ("YOUR HAND · N cards · Preview before picking")
+  // matches the shape used in picking + voting for consistency.
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 14,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 8,
+  },
+  sectionTitle: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  sectionCount: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sectionHint: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // 2-col grid — mirrors picking's grid so warmup → picking feels
+  // like the same screen with a new bar underneath.
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    paddingHorizontal: 10,
   },
-  handCard: {
+  gridCell: {
     width: '50%',
-    height: '33.333%',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    overflow: 'hidden',
+    padding: 4,
   },
-  handCardVideo: { flex: 1 },
-  // Full-width action bar, flush at bottom. Bigger than the other
-  // CTA bars because it's the ONLY thing the warmup screen wants
-  // you to tap — 60s of dead space above it otherwise. Flips green
-  // when locally ready.
+
+  // Full-width Ready Up bar. Same overall shape as PLAY THIS CARD;
+  // slightly beefier because it's the ONLY tap target during warmup.
   readyBar: {
     backgroundColor: theme.colors.vibeBlue,
     paddingTop: 32,
@@ -165,12 +224,5 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 4,
     textTransform: 'uppercase',
-  },
-  readyBarSub: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginTop: 6,
   },
 });

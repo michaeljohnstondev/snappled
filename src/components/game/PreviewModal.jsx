@@ -106,16 +106,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  // Fat cyan action bar — solid punch of color across the bottom with
-  // graffiti-thick text so the primary CTA is impossible to miss.
-  // Vertical padding kept near-equal so the label sits visually
-  // centered; the small extra chin at the bottom is intentional
-  // breathing room on devices without a home indicator.
-  actionBar: {
+  // Split action row: 1/4 Back chunk + 3/4 primary CTA chunk. The
+  // OUTER row is what carries the absolute bottom positioning now
+  // that the bar is split; the two chunks live inside it as
+  // regular flex children.
+  actionRow: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+  },
+  actionBackChunk: {
+    flex: 1,
+    paddingTop: 20,
+    paddingBottom: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 18, 40, 0.95)',
+    borderRightWidth: 2,
+    borderRightColor: '#000',
+  },
+  actionBackText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+  },
+  // Right-hand submit chunk — flex: 3 so it takes 3/4 of the row.
+  // NO longer position: absolute (the outer row carries that now)
+  // and NO borderTopWidth (the row already draws one).
+  actionSubmitChunk: {
+    flex: 3,
     backgroundColor: theme.colors.vibeGreen,
     paddingTop: 20,
     paddingBottom: 24,
@@ -124,9 +150,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    borderTopWidth: 3,
-    borderTopColor: '#000',
   },
+  actionBar: {},
   actionBarText: {
     color: '#fff',
     fontSize: 18,

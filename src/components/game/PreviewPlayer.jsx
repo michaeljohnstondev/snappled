@@ -12,10 +12,10 @@ import { useCachedVideoUri, invalidateCachedVideo } from '../../services/videoCa
 // On playback error (corrupt cache / bad source) the cache entry is
 // dropped so a re-open pulls fresh from the remote URL — fixes the
 // "black rectangle that never plays" case.
-export default function PreviewPlayer({ videoUrl, muted = false }) {
+export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) {
   const cachedUri = useCachedVideoUri(videoUrl);
   const player = useVideoPlayer(cachedUri, (p) => {
-    p.loop = true;
+    p.loop = loop;
     p.muted = muted;
     p.play();
   });

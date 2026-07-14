@@ -63,11 +63,15 @@ export default function PickingPhase({
   const totalRoundsShown = game.totalRounds || null;
 
   // Which card in the hand is playing inline right now (only one
-  // at a time). Local to the picking screen — cleared on unmount
-  // and whenever the fullscreen preview opens (parent tap).
-  const [inlinePlayingId, setInlinePlayingId] = useState(null);
-  const toggleInline = (id) => {
-    setInlinePlayingId(prev => (prev === id ? null : id));
+  // at a time). The token increments on each tap so tapping the
+  // same card again re-triggers the play (via HandCardThumbnail's
+  // playToken -> React key remount).
+  const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
+  const bumpInline = (id) => {
+    setInlinePlaying(prev => ({
+      id,
+      token: prev.id === id ? prev.token + 1 : 1,
+    }));
   };
 
   if (hand.length === 0) {
@@ -186,20 +190,22 @@ export default function PickingPhase({
         <View style={styles.grid}>
           {hand.map((item, i) => {
             const isSelected = selectedCard?.id === item.id;
-            const isInlinePlaying = inlinePlayingId === item.id;
-            // Card body tap = pause / play inline. Fullscreen chip
-            // opens the full preview modal AND selects (populates
-            // YOUR CARD). Mulligan mode still swaps on tap.
+            const isInlinePlaying = inlinePlaying.id === item.id;
+            // Card body tap = SELECT + play inline once. Tap the
+            // same card again to replay (playToken increments so
+            // the inline player remounts). Fullscreen chip opens
+            // the full preview modal. Mulligan mode overrides.
             const onCardTap = () => {
               if (mulliganMode) {
                 onMulliganSwap(item);
                 return;
               }
-              toggleInline(item.id);
+              if (onSelectCard) onSelectCard(item);
+              bumpInline(item.id);
             };
             const onFullscreen = () => {
               if (mulliganMode) return;
-              setInlinePlayingId(null);
+              setInlinePlaying({ id: null, token: 0 });
               if (onSelectCard) onSelectCard(item);
               onPreviewCard(item);
             };
@@ -209,6 +215,7 @@ export default function PickingPhase({
                   card={item}
                   isSelected={isSelected}
                   isPlaying={isInlinePlaying}
+                  playToken={isInlinePlaying ? inlinePlaying.token : 0}
                   onTogglePlay={onCardTap}
                   onFullscreen={onFullscreen}
                 />
@@ -246,12 +253,9 @@ export default function PickingPhase({
               <HandCardThumbnail
                 card={selectedCard}
                 label="@you"
-                isPlaying={inlinePlayingId === `your-card:${selectedCard.id}`}
-                onTogglePlay={() =>
-                  setInlinePlayingId(prev =>
-                    prev === `your-card:${selectedCard.id}` ? null : `your-card:${selectedCard.id}`
-                  )
-                }
+                isPlaying={inlinePlaying.id === `your-card:${selectedCard.id}`}
+                playToken={inlinePlaying.id === `your-card:${selectedCard.id}` ? inlinePlaying.token : 0}
+                onTogglePlay={() => bumpInline(`your-card:${selectedCard.id}`)}
                 onFullscreen={() => onPreviewCard({ ...selectedCard, _fromYourCard: true })}
               />
             ) : (

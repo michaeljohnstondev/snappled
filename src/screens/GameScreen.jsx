@@ -337,8 +337,9 @@ export default function GameScreen({ navigation }) {
   const [timer, setTimer] = useState(0);
   const [previewCard, setPreviewCard] = useState(null);
   // Which voting card is playing inline (mini-player inside the
-  // thumbnail). Only one at a time; tapping another swaps.
-  const [votingInlinePlayingId, setVotingInlinePlayingId] = useState(null);
+  // thumbnail). Token increments per tap so tapping the same card
+  // replays via a fresh mount.
+  const [votingInlinePlaying, setVotingInlinePlaying] = useState({ id: null, token: 0 });
   // IDs of snapples this user has already played in the current game — used to
   // filter the hand pool so each round reveals unseen cards.
   const [playedCardIds, setPlayedCardIds] = useState([]);
@@ -1671,7 +1672,7 @@ export default function GameScreen({ navigation }) {
                 {votableSubmissions.map((item, i) => {
                   const isSelected = favoriteCard?.uid === item.uid;
                   const cardId = item?.snappleId || item?.uid || `vote-${i}`;
-                  const isInlinePlaying = votingInlinePlayingId === cardId;
+                  const isInlinePlaying = votingInlinePlaying.id === cardId;
                   return (
                     <View
                       key={cardId}
@@ -1682,11 +1683,18 @@ export default function GameScreen({ navigation }) {
                         label="@anon"
                         isSelected={isSelected}
                         isPlaying={isInlinePlaying}
-                        onTogglePlay={() =>
-                          setVotingInlinePlayingId(prev => (prev === cardId ? null : cardId))
-                        }
+                        playToken={isInlinePlaying ? votingInlinePlaying.token : 0}
+                        onTogglePlay={() => {
+                          // Select this card as the favorite AND
+                          // play it inline once. Re-tap replays.
+                          setFavoriteCard(item);
+                          setVotingInlinePlaying(prev => ({
+                            id: cardId,
+                            token: prev.id === cardId ? prev.token + 1 : 1,
+                          }));
+                        }}
                         onFullscreen={() => {
-                          setVotingInlinePlayingId(null);
+                          setVotingInlinePlaying({ id: null, token: 0 });
                           setFavoriteCard(item);
                           setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true });
                         }}
