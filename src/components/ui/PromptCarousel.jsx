@@ -14,7 +14,10 @@ const getPromptGradient = (index) => {
   const gradients = [
     [theme.colors.vibeBlue, theme.colors.vibeGreen],
     [theme.colors.vibePurple, theme.colors.vibePink],
-    [theme.colors.vibeOrange, theme.colors.vibeYellow],
+    // Was orange -> yellow, which read as a flat orange because
+    // the two hues sit ~30 degrees apart. Grenadine red gives the
+    // gradient a real sunset shift.
+    [theme.colors.vibeOrange, '#C60C30'],
     [theme.colors.vibePink, theme.colors.vibeBlue],
     [theme.colors.vibeGreen, theme.colors.vibeOrange],
   ];

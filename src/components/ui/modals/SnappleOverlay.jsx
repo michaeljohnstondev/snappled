@@ -376,7 +376,17 @@ export default function SnappleOverlay({
                   <Ionicons name={userInteraction.hasPurchased ? "checkmark" : "diamond"} size={20} style={{ marginTop: 2 }} color={userInteraction.hasPurchased ? theme.colors.vibeGreen : theme.colors.vibeBlue} />
                 </View>
               </Pressable>
-              <Text style={styles.actionCount}>{userInteraction.hasPurchased ? 'Owned' : `${metrics.currentPrice}`}</Text>
+              {/* Owned state still surfaces the current price under
+                  "Owned" — signals that the snapple has resale value
+                  without hiding the number entirely. */}
+              {userInteraction.hasPurchased ? (
+                <View style={styles.buyLabelStack}>
+                  <Text style={[styles.actionCount, styles.ownedLabel]}>Owned</Text>
+                  <Text style={styles.ownedPrice}>{metrics.currentPrice}c</Text>
+                </View>
+              ) : (
+                <Text style={styles.actionCount}>{metrics.currentPrice}</Text>
+              )}
             </View>
           )}
 
@@ -662,16 +672,15 @@ const styles = StyleSheet.create({
   purchasedBg: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
-  // Bottom-anchored column growing upward. Gap tightened to 10pt
-  // so the full stack (up to ~8 buttons for creator+admin) fits
-  // without clipping the top like/dislike, and without needing
-  // an explicit top offset.
+  // Bottom-anchored column growing upward. Full stack (up to
+  // ~8 buttons for creator+admin) fits without clipping the top
+  // like/dislike once bottom is at 60.
   actionsColumn: {
     position: 'absolute',
     right: 12,
     bottom: 60,
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     zIndex: 10,
   },
   actionGroup: {
@@ -688,6 +697,24 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  // Owned-state label stack — "Owned" on top (green) with the
+  // current price muted underneath so users still see resale value.
+  buyLabelStack: {
+    alignItems: 'center',
+  },
+  ownedLabel: {
+    color: theme.colors.vibeGreen,
+  },
+  ownedPrice: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    fontWeight: theme.fontWeights.semiBold,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    marginTop: 1,
   },
   videoInfo: {
     position: 'absolute',
