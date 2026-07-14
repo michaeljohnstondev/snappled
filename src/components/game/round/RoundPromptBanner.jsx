@@ -1,0 +1,84 @@
+// RoundPromptBanner — richer prompt card used across the round
+// screens. Left cyan stripe, pink PROMPT label + "ROUND N" (adds
+// "OF M" only when a max round is set), big prompt title, and an
+// optional subtitle underneath. Rounded, not edge-to-edge — sits
+// as a card inside the phase's padded content area.
+
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import theme from '../../../theme/themes';
+
+// Render the banner. `round` is 1-based; `totalRounds` is optional
+// (0 or null = infinite mode, hides the "OF M" suffix). `subtitle`
+// is optional — omit to render just the prompt.
+export default function RoundPromptBanner({ prompt, round, totalRounds, subtitle }) {
+  const roundText = totalRounds
+    ? `ROUND ${round} OF ${totalRounds}`
+    : `ROUND ${round}`;
+  return (
+    <View style={styles.card}>
+      <View style={styles.stripe} />
+      <View style={styles.body}>
+        <View style={styles.labelRow}>
+          <Text style={styles.promptLabel}>PROMPT</Text>
+          <Text style={styles.roundLabel}>{roundText}</Text>
+        </View>
+        <Text style={styles.promptText}>{prompt}</Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(20, 34, 60, 0.7)',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,198,255,0.2)',
+  },
+  stripe: {
+    width: 4,
+    backgroundColor: theme.colors.vibePink,
+  },
+  body: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 4,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  promptLabel: {
+    color: theme.colors.vibePink,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  roundLabel: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  promptText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 30,
+    marginTop: 2,
+  },
+  subtitle: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    marginTop: 6,
+  },
+});

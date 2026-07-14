@@ -1,25 +1,31 @@
-// Picking phase — choose a card from your hand for the current prompt.
-// Two states: pre-pick (card grid + mulligan + preview modal) and
-// post-pick (YOUR PICK thumbnail + per-player status list). Includes
-// the admin Edit/Delete prompt overlay accessible to admin UIDs.
+// Picking phase — mockup-driven redesign. Layout mirrors the
+// tiktok-inspired mock: phase chips + tiny timer top bar, a rich
+// prompt banner, a scrollable 2-col hand grid where each thumbnail
+// shows a play button + @username, and a "YOUR CARD" section at the
+// bottom holding whatever the user has selected. A flush cyan
+// PLAY THIS CARD bar sits under it all and submits the selected
+// card. Tapping YOUR CARD's play icon (or tapping again in the
+// hand) opens the fullscreen PreviewModal for a proper watch.
 
 import React from 'react';
 import {
   View, Text, Pressable, ScrollView, Modal, TextInput,
-  ActivityIndicator, StyleSheet, Dimensions,
+  ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
-import PhasePromptBanner from '../PhasePromptBanner';
 import PreviewModal from '../PreviewModal';
 import CreatorActionRow from '../CreatorActionRow';
+import HandCardThumbnail from '../round/HandCardThumbnail';
+import RoundHeaderBar from '../round/RoundHeaderBar';
+import RoundPromptBanner from '../round/RoundPromptBanner';
 import theme from '../../../theme/themes';
 
-const { width: screenWidth } = Dimensions.get('window');
-
-// Renders the picking phase. All state and async work lives in GameScreen
-// — this component is pure render with handlers passed in.
+// Renders the picking phase. All state and async work lives in
+// GameScreen — this component is pure render with handlers passed in.
+// New in this pass: `selectedCard` populates the YOUR CARD section
+// at the bottom; tap-in-grid = select, tap-YOUR-CARD-play = preview
+// fullscreen, PLAY THIS CARD bar submits.
 export default function PickingPhase({
   game,
   gameId,
@@ -40,6 +46,7 @@ export default function PickingPhase({
   onLeave,
   onPreviewCard,
   onClosePreview,
+  onSelectCard,
   onPickCard,
   onMulliganToggle,
   onMulliganSwap,
@@ -52,6 +59,7 @@ export default function PickingPhase({
 }) {
   const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
   const alreadyPicked = game.submissions.some(s => s.uid === user.uid);
+  const totalRoundsShown = game.totalRounds || null;
 
   if (hand.length === 0) {
     return (
@@ -64,12 +72,99 @@ export default function PickingPhase({
     );
   }
 
+  // Post-pick wait screen — leaderboard of who's picked. Same shape
+  // as before, just with the new header on top for continuity.
+  if (alreadyPicked) {
+    const myPick = (game.submissions || []).find(s => s.uid === user.uid);
+    const submittedCount = (game.submissions || []).length;
+    const totalCount = (game.players || []).length;
+    return (
+      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+        <RoundHeaderBar phase="picking" timerSec={timer} />
+        <RoundPromptBanner
+          prompt={currentPrompt}
+          round={game.currentRound}
+          totalRounds={totalRoundsShown}
+        />
+        <ScrollView contentContainerStyle={styles.pickedWaitContent}>
+          <Text style={styles.yourPickLabel}>YOUR PICK</Text>
+          <View style={styles.yourPickCard}>
+            {myPick?.videoUrl ? (
+              <HandCardThumbnail
+                card={{ videoUrl: myPick.videoUrl, creatorUsername: 'you' }}
+                label="@you"
+                onPress={() => onPreviewCard({ ...myPick, _isWaiting: true })}
+              />
+            ) : null}
+          </View>
+
+          <Text style={styles.pickProgressText}>
+            {submittedCount} of {totalCount} picked
+          </Text>
+
+          <View style={styles.playerStatusList}>
+            {(game.players || []).map(p => {
+              const picked = (game.submissions || []).some(s => s.uid === p.uid);
+              const isMe = p.uid === user.uid;
+              return (
+                <View key={p.uid} style={styles.playerStatusRow}>
+                  <Ionicons
+                    name={picked ? 'checkmark-circle' : 'time-outline'}
+                    size={18}
+                    color={picked ? theme.colors.vibeGreen : theme.colors.textSecondary}
+                  />
+                  <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
+                    {p.username}
+                  </Text>
+                  <Text style={[styles.playerStatusLabel, picked && styles.playerStatusLabelDone]}>
+                    {picked ? 'picked' : 'picking...'}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        {/* Preview modal stays available on the wait screen so users
+            can rewatch anyone's pick as they come in. */}
+        {previewCard && (
+          <PreviewModal
+            visible
+            videoUrl={previewCard.videoUrl}
+            muted={!!previewCard.muted}
+            onClose={onClosePreview}
+            primaryLabel={null}
+            overlaySlot={
+              <CreatorActionRow
+                submission={previewCard}
+                currentUser={user}
+                ownedSnappleIds={userCurrency.ownedSnapples || []}
+                showToast={showToast}
+                showError={showError}
+              />
+            }
+          />
+        )}
+      </LinearGradient>
+    );
+  }
+
+  // Pre-pick screen — chips, prompt, hand grid, YOUR CARD, submit bar.
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      {/* Header removed — users leave via the close in Scoring. The
-          prompt banner owns the top of the screen; its top padding
-          absorbs the status bar so content sits right up top. */}
-      <PhasePromptBanner prompt={currentPrompt}>
+      <RoundHeaderBar phase="picking" timerSec={timer} />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <RoundPromptBanner
+          prompt={currentPrompt}
+          round={game.currentRound}
+          totalRounds={totalRoundsShown}
+          subtitle="Everyone plays one card. Best card takes the round."
+        />
+
         {isAdmin && (
           <View style={styles.promptAdminRow}>
             <Pressable style={styles.promptAdminBtn} onPress={() => onEditPromptOpen(currentPrompt)}>
@@ -83,109 +178,92 @@ export default function PickingPhase({
             </Pressable>
           </View>
         )}
-      </PhasePromptBanner>
 
-      {alreadyPicked ? (
-        // Post-pick wait screen — YOUR PICK + standings + voted-status list.
-        // Other players' cards intentionally hidden until voting.
-        (() => {
-          const myPick = (game.submissions || []).find(s => s.uid === user.uid);
-          const submittedCount = (game.submissions || []).length;
-          const totalCount = (game.players || []).length;
-          return (
-            <ScrollView
-              style={styles.pickedWaitWrap}
-              contentContainerStyle={styles.pickedWaitContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.yourPickSection}>
-                <Text style={styles.yourPickLabel}>YOUR PICK</Text>
-                <View style={styles.yourPickCard}>
-                  {myPick?.videoUrl ? <SnappleThumbnailImg videoUrl={myPick.videoUrl} /> : null}
-                </View>
-              </View>
-
-              <Text style={styles.pickProgressText}>
-                {submittedCount} of {totalCount} picked
-              </Text>
-
-              <View style={styles.playerStatusList}>
-                {(game.players || []).map(p => {
-                  const picked = (game.submissions || []).some(s => s.uid === p.uid);
-                  const isMe = p.uid === user.uid;
-                  return (
-                    <View key={p.uid} style={styles.playerStatusRow}>
-                      <Ionicons
-                        name={picked ? 'checkmark-circle' : 'time-outline'}
-                        size={18}
-                        color={picked ? theme.colors.vibeGreen : theme.colors.textSecondary}
-                      />
-                      <Text style={[styles.playerStatusName, isMe && styles.playerStatusNameMe]}>
-                        {p.username}
-                      </Text>
-                      <Text style={[styles.playerStatusLabel, picked && styles.playerStatusLabelDone]}>
-                        {picked ? 'picked' : 'picking...'}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          );
-        })()
-      ) : (
-        <>
-          <Text style={styles.pickInstruction}>
-            {mulliganMode ? 'Tap a card to replace it' : ''}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>YOUR HAND</Text>
+          <Text style={styles.sectionCount}>{hand.length} cards</Text>
+          <View style={{ flex: 1 }} />
+          <Text style={styles.sectionHint}>
+            {mulliganMode ? 'Tap to replace' : 'Tap to select'}
           </Text>
-          {/* Flex-fill 3 rows × 2 columns grid. 6 cards is small
-              enough that virtualization buys nothing; a plain flex
-              wrap fills the available height and gives each card a
-              much bigger tap target than the old 3×2 grid. */}
-          <View style={styles.handGrid}>
-            {hand.map((item, i) => {
-              const isSelected = selectedCard?.id === item.id;
-              return (
-                <Pressable
-                  key={item?.id || `hand-${i}`}
-                  style={styles.handCard}
-                  onPress={() => {
-                    if (mulliganMode) onMulliganSwap(item);
-                    else onPreviewCard(item);
-                  }}
-                >
-                  <View style={styles.handCardVideo}>
-                    {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
-                  </View>
-                  {/* Overlay rings so selection/mulligan don't push
-                      the grid layout — cards stay perfectly flush. */}
-                  {isSelected && <View style={styles.selectionRing} />}
-                  {mulliganMode && <View style={styles.mulliganRing} />}
-                </Pressable>
-              );
-            })}
-          </View>
-          {(user?.inventory?.mulligans || 0) > 0 && (
-            <Pressable
-              style={[styles.mulliganBtnBottom, mulliganMode && styles.mulliganBtnBottomActive]}
-              onPress={onMulliganToggle}
-            >
-              <Ionicons
-                name={mulliganMode ? 'close' : 'refresh'}
-                size={16}
-                color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
-              />
-              <Text style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}>
-                {mulliganMode ? 'Cancel' : `Mulligan (${user?.inventory?.mulligans || 0})`}
-              </Text>
-            </Pressable>
-          )}
-        </>
-      )}
+        </View>
 
-      {/* Card preview — full-bleed video + fat cyan action bar.
-          Post-pick wait-screen previews (_isWaiting) hide the play bar
-          and surface creator actions in a floating overlay instead. */}
+        <View style={styles.grid}>
+          {hand.map((item, i) => {
+            const isSelected = selectedCard?.id === item.id;
+            const onCardPress = () => {
+              if (mulliganMode) onMulliganSwap(item);
+              else if (onSelectCard) onSelectCard(item);
+              else onPreviewCard(item);
+            };
+            return (
+              <View key={item?.id || `hand-${i}`} style={styles.gridCell}>
+                <HandCardThumbnail
+                  card={item}
+                  isSelected={isSelected}
+                  onPress={onCardPress}
+                />
+              </View>
+            );
+          })}
+          {/* When the hand has an odd count, the last row has one card;
+              add a spacer cell so the leftover doesn't stretch full-width. */}
+          {hand.length % 2 === 1 && <View style={styles.gridCell} />}
+        </View>
+
+        {(user?.inventory?.mulligans || 0) > 0 && (
+          <Pressable
+            style={[styles.mulliganBtnBottom, mulliganMode && styles.mulliganBtnBottomActive]}
+            onPress={onMulliganToggle}
+          >
+            <Ionicons
+              name={mulliganMode ? 'close' : 'refresh'}
+              size={16}
+              color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
+            />
+            <Text style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}>
+              {mulliganMode ? 'Cancel' : `Mulligan (${user?.inventory?.mulligans || 0})`}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* YOUR CARD panel — shows the selected thumbnail with a play
+            button that opens the fullscreen preview. Empty state
+            prompts the user to pick one. */}
+        <View style={styles.yourCardSection}>
+          <Text style={styles.sectionTitle}>YOUR CARD</Text>
+          <View style={styles.yourCardWrap}>
+            {selectedCard ? (
+              <HandCardThumbnail
+                card={selectedCard}
+                label="@you"
+                onPress={() => onPreviewCard({ ...selectedCard, _fromYourCard: true })}
+              />
+            ) : (
+              <View style={styles.yourCardEmpty}>
+                <Text style={styles.yourCardEmptyText}>Pick a card above</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Flush cyan submit bar — only enabled once a card is
+          selected. Same shape as the PLAY THIS CARD bar in the
+          fullscreen preview so the actions feel identical. */}
+      <Pressable
+        style={[styles.submitBar, !selectedCard && styles.submitBarDisabled]}
+        onPress={() => selectedCard && onPickCard(selectedCard)}
+        disabled={!selectedCard}
+      >
+        <Text style={styles.submitBarText}>
+          {selectedCard ? 'PLAY THIS CARD' : 'PICK A CARD'}
+        </Text>
+      </Pressable>
+
+      {/* Fullscreen preview modal — opened from either a grid tap
+          (via _fromYourCard/regular) or from the YOUR CARD play icon.
+          When previewing from picking, the CTA still submits. */}
       {previewCard && (
         <PreviewModal
           visible
@@ -225,7 +303,7 @@ export default function PickingPhase({
       {/* Admin: edit / replace the round's prompt mid-game */}
       {isEditingPrompt && (
         <Modal visible transparent animationType="fade" onRequestClose={onEditPromptClose}>
-          <Pressable style={styles.previewOverlay} onPress={onEditPromptClose}>
+          <Pressable style={styles.editPromptOverlay} onPress={onEditPromptClose}>
             <Pressable style={styles.editPromptCard} onPress={() => {}}>
               <Text style={styles.editPromptTitle}>Edit Round Prompt</Text>
               <TextInput
@@ -264,8 +342,8 @@ export default function PickingPhase({
   );
 }
 
-// Admin nuke styling for the in-hand card preview. Subdued + red so
-// it's clearly not a player action and never the easiest tap target.
+// Admin nuke chip for the fullscreen preview modal — subdued red so
+// it can't be mistaken for a player action.
 const pickingAdminStyles = StyleSheet.create({
   poolNukeBtn: {
     flexDirection: 'row',
@@ -287,32 +365,8 @@ const pickingAdminStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'rgba(0, 198, 255, 0.2)',
-  },
-  backBg: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue,
-  },
-  headerTitle: {
-    color: theme.colors.vibeBlue, fontSize: 20, fontWeight: theme.fontWeights.bold,
-    letterSpacing: 1, textTransform: 'uppercase',
-  },
-  timerText: {
-    color: theme.colors.textPrimary, fontSize: 16, fontWeight: theme.fontWeights.bold,
-    minWidth: 48, textAlign: 'center',
-    backgroundColor: 'rgba(0, 198, 255, 0.15)',
-    borderRadius: 8, borderWidth: 1, borderColor: theme.colors.vibeBlue,
-    paddingVertical: 4, paddingHorizontal: 8,
+  scrollContent: {
+    paddingBottom: 24,
   },
   loadingHand: {
     flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12,
@@ -320,26 +374,20 @@ const styles = StyleSheet.create({
   loadingHandText: {
     color: theme.colors.textSecondary, fontSize: 14,
   },
-  promptBanner: {
-    marginHorizontal: 16, marginTop: 12, marginBottom: 12, padding: 20, borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 3, borderColor: theme.colors.vibeBlue,
-  },
-  promptText: {
-    color: 'white', fontSize: 18, fontWeight: theme.fontWeights.bold,
-    textAlign: 'center', lineHeight: 24,
-  },
+
+  // Admin edit/delete row under the prompt (only shown to admin uids).
   promptAdminRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
+    marginTop: -6,
+    marginBottom: 10,
   },
   promptAdminBtn: {
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 8,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: theme.colors.vibeBlue,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
@@ -348,44 +396,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  pickInstruction: {
-    color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
+
+  // Section headers ("YOUR HAND", "YOUR CARD").
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 14,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 8,
   },
-  // Flex-fill 3 rows × 2 columns. The container claims all remaining
-  // vertical space; each card takes 50% width × 33.33% of that height.
-  // No side/inner padding, no gaps — the whole screen becomes cards.
-  handGrid: {
-    flex: 1,
+  sectionTitle: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  sectionCount: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sectionHint: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // 2-col grid.
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    paddingHorizontal: 10,
+    marginBottom: 4,
   },
-  handCard: {
+  gridCell: {
     width: '50%',
-    height: '33.333%',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    overflow: 'hidden',
+    padding: 4,
   },
-  handCardVideo: { flex: 1 },
-  // Selection / mulligan indicators are absolutely-positioned rings
-  // over the card so they don't offset neighbors and break the tiling.
-  selectionRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: 4,
-    borderColor: theme.colors.vibeGreen,
-  },
-  mulliganRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: 3,
-    borderColor: theme.colors.vibeYellow,
-    borderStyle: 'dashed',
-  },
+
+  // Mulligan chip — carried over from the previous design.
   mulliganBtnBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 16,
+    marginTop: 4,
+    marginBottom: 8,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -400,24 +457,81 @@ const styles = StyleSheet.create({
   mulliganText: {
     color: theme.colors.vibeGreen,
     fontSize: 13,
-    fontWeight: theme.fontWeights.bold,
+    fontWeight: 'bold',
   },
-  // Post-pick wait screen
-  pickedWaitWrap: { flex: 1, paddingHorizontal: 20 },
-  pickedWaitContent: { paddingTop: 8, paddingBottom: 40 },
-  yourPickSection: { alignItems: 'center', marginBottom: 20 },
+
+  // YOUR CARD section at the bottom of the scroll.
+  yourCardSection: {
+    paddingHorizontal: 14,
+    marginTop: 14,
+    marginBottom: 8,
+    gap: 8,
+  },
+  yourCardWrap: {
+    flexDirection: 'row',
+  },
+  yourCardEmpty: {
+    flex: 1,
+    aspectRatio: 4 / 5,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  yourCardEmptyText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Flush action bar — same shape as PLAY THIS CARD in PreviewModal.
+  submitBar: {
+    backgroundColor: theme.colors.vibeBlue,
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+  },
+  submitBarDisabled: {
+    backgroundColor: 'rgba(0,198,255,0.25)',
+  },
+  submitBarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+  },
+
+  // Post-pick wait screen — leaderboard of who's picked yet.
+  pickedWaitContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
   yourPickLabel: {
-    color: theme.colors.vibeBlue, fontSize: 11, fontWeight: 'bold',
-    letterSpacing: 2, marginBottom: 8,
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: 4,
+    marginBottom: 8,
   },
   yourPickCard: {
-    width: 130, height: 180, borderRadius: 12, overflow: 'hidden',
-    borderWidth: 2, borderColor: theme.colors.vibeGreen,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    flexDirection: 'row',
+    marginBottom: 14,
   },
   pickProgressText: {
-    color: 'white', fontSize: 14, fontWeight: 'bold',
-    textAlign: 'center', marginBottom: 12,
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   playerStatusList: { gap: 6 },
   playerStatusRow: {
@@ -436,7 +550,12 @@ const styles = StyleSheet.create({
   playerStatusLabelDone: {
     color: theme.colors.vibeGreen, fontWeight: 'bold',
   },
-  // Admin edit-prompt modal
+
+  // Admin edit-prompt modal.
+  editPromptOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
+  },
   editPromptCard: {
     width: '85%',
     backgroundColor: '#0A1A2A',
@@ -456,7 +575,7 @@ const styles = StyleSheet.create({
   editPromptInput: {
     color: 'white',
     fontSize: 18,
-    fontWeight: theme.fontWeights.bold,
+    fontWeight: 'bold',
     textAlign: 'center',
     lineHeight: 24,
     minHeight: 60,

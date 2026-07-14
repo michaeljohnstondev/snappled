@@ -1484,6 +1484,7 @@ export default function GameScreen({ navigation }) {
         onLeave={handleLeaveGame}
         onPreviewCard={(card) => setPreviewCard(card)}
         onClosePreview={() => setPreviewCard(null)}
+        onSelectCard={(card) => setSelectedCard(card)}
         onPickCard={(card) => {
           handlePickCard(card);
           setPreviewCard(null);
