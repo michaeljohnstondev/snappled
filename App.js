@@ -7,6 +7,7 @@ import Navigation from "./Navigation";
 import { AuthProvider } from "./src/store/AuthContext";
 import { ModalProvider } from "./src/store/ModalContext";
 import { RewardClaimProvider } from "./src/store/RewardClaimContext";
+import { UploadQueueProvider } from "./src/store/UploadQueueContext";
 
 LogBox.ignoreLogs([
   "SafeAreaView has been deprecated",
@@ -44,9 +45,11 @@ export default function App() {
           <AuthProvider>
             <ModalProvider>
               <RewardClaimProvider>
-                <NavigationContainer ref={navRef}>
-                  <Navigation />
-                </NavigationContainer>
+                <UploadQueueProvider>
+                  <NavigationContainer ref={navRef}>
+                    <Navigation />
+                  </NavigationContainer>
+                </UploadQueueProvider>
               </RewardClaimProvider>
             </ModalProvider>
           </AuthProvider>

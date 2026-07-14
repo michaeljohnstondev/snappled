@@ -8,6 +8,7 @@ import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
 import TokenPromptModal from '../modals/TokenPromptModal';
 import UpdateBanner from '../UpdateBanner';
+import UploadProgressToast from '../UploadProgressToast';
 import { useAppUpdate } from '../../../hooks/useAppUpdate';
 import theme from '../../../theme/themes';
 
@@ -75,6 +76,8 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
       </Text>
 
       <UpdateBanner visible={isUpdateReady} onRestart={applyUpdate} />
+
+      <UploadProgressToast />
     </LinearGradient>
   );
 }

@@ -11,7 +11,7 @@ import VibeButton from '../components/ui/VibeButton';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
-import { uploadVideo } from '../services/videoStorage';
+import { useUploadQueue } from '../store/UploadQueueContext';
 import { snappleService } from '../services/snappleService';
 import { promptService } from '../services/promptService';
 import { achievementService } from '../services/achievementService';
@@ -24,14 +24,16 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const { user, userCurrency, updateUserCurrency } = useAuth();
   const { showSuccess, showError, showConfirm, showAlert, showToast } = useModal();
   const { flyRewards } = useRewardClaim();
+  const { enqueueUpload } = useUploadQueue();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   // Private snapples never appear in public feeds (prompt grid, trending,
   // community game pool) and can't be purchased. The creator can still
   // play them from their own owned hand and flip back to public later.
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  // Upload state now lives in UploadQueueContext; this screen fires
+  // and forgets. The floating toast above the tab bar owns progress
+  // + retry UI.
 
   // Prompt selection (for free-record mode). Picker no longer auto-opens
   // on free record — the user can tap the Prompts button when ready.
@@ -142,7 +144,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                 return;
               }
               await updateUserCurrency({ coins: (userCurrency.coins || 0) - price });
-              doSubmit(activePrompt);
+              askSaveThenSubmit(activePrompt);
             }
           );
           return;
@@ -150,182 +152,192 @@ export default function VideoPreviewScreen({ route, navigation }) {
       } catch (e) {}
     }
 
-    doSubmit(activePrompt);
+    askSaveThenSubmit(activePrompt);
   };
 
-  const doSubmit = async (activePrompt) => {
+  // Runs after the upload lands. Owns the createSnapple call, XP /
+  // achievement wiring, and application of the user's save/discard
+  // choice. Captured as a closure by enqueueUpload so it survives
+  // the screen unmount and fires wherever the user has navigated to.
+  const buildOnUploadSuccess = (submitPrompt, saveChoice) => async (uploadResult) => {
+    // Reviver perk: if this user revived/created the prompt instance
+    // and no boost is currently live for this prompt, float their
+    // snapple to the top for 2 hours.
+    let boostedUntil = null;
+    const isPromptOriginator =
+      submitPrompt.createdBy === user.uid ||
+      submitPrompt.revivedBy === user.uid ||
+      submitPrompt.summonedBy === user.uid;
+    if (isPromptOriginator) {
+      try {
+        const { collection: c, query: q, where: w, getDocs: g, limit: l } = await import('firebase/firestore');
+        const { db: d } = await import('../services/firebase');
+        const nowISO = new Date().toISOString();
+        const existingBoost = await g(q(
+          c(d, 'snapples'),
+          w('promptId', '==', submitPrompt.id),
+          w('boostedUntil', '>', nowISO),
+          l(1),
+        ));
+        if (existingBoost.empty) {
+          boostedUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+        }
+      } catch (e) {}
+    }
+
+    const snappleResult = await snappleService.createSnapple({
+      promptId: submitPrompt.id,
+      videoUrl: uploadResult.downloadURL,
+      videoId: uploadResult.id,
+      creatorId: user.uid,
+      creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
+      prompt: submitPrompt.text || 'Snapple video',
+      category: submitPrompt.category || 'general',
+      boostedUntil,
+      muted: isMuted,
+      isPrivate,
+    });
+
+    if (!snappleResult.success) {
+      showError('Error', snappleResult.error || 'Failed to create snapple');
+      return;
+    }
+
+    // Award XP/achievements once per promptId per user. Same gating
+    // as the pre-refactor flow — recycled prompts (new promptId,
+    // same text) count as a fresh cycle.
+    try {
+      const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc, getDoc: xpGet, arrayUnion: xpUnion } = await import('firebase/firestore');
+      const { db: xpDb } = await import('../services/firebase');
+
+      const beforeSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
+      const beforeData = beforeSnap.data() || {};
+      const earnedPrompts = beforeData.xpEarnedPrompts || [];
+      const alreadyEarned = submitPrompt?.id && earnedPrompts.includes(submitPrompt.id);
+
+      if (!alreadyEarned) {
+        const beforeXP = beforeData.profile?.experience || beforeData.profile?.xp || 0;
+        const beforeLevel = levelService.getLevelFromXP(beforeXP);
+
+        const boosts = beforeData.boosts || {};
+        const now = new Date().toISOString();
+        const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
+
+        flyRewards({
+          rewards: { xp: xpAmount },
+          commit: async () => {
+            const updates = {
+              'profile.experience': xpInc(xpAmount),
+              'profile.xp': xpInc(xpAmount),
+              'stats.videosCreated': xpInc(1),
+            };
+            if (submitPrompt?.id) {
+              updates.xpEarnedPrompts = xpUnion(submitPrompt.id);
+            }
+            await xpUpdate(xpDoc(xpDb, 'users', user.uid), updates).catch(() => {});
+          },
+        });
+
+        const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
+        if (afterLevel > beforeLevel) {
+          setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1500);
+        }
+
+        const afterSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
+        const stats = afterSnap.data()?.stats || {};
+        stats.level = afterLevel;
+        stats.trophies = afterSnap.data()?.resources?.trophies || 0;
+        const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+        newAchievements.forEach((a, i) => {
+          const rewards = [];
+          if (a.coins) rewards.push(`+${a.coins}c`);
+          if (a.xp) rewards.push(`+${a.xp}xp`);
+          setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3000 + i * 1500);
+        });
+
+        if (submitPrompt?.id) {
+          try {
+            const { doc: docRef, updateDoc: update, increment: inc } = await import('firebase/firestore');
+            const { db: database } = await import('../services/firebase');
+            await update(docRef(database, 'activePrompts', submitPrompt.id), {
+              participantCount: inc(1),
+            }).catch(() =>
+              update(docRef(database, 'snapplePrompts', submitPrompt.id), {
+                participantCount: inc(1),
+              }).catch(() => {})
+            );
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
+    // Apply the save/discard choice picked up front. Save = stays
+    // as owner + added to ownedSnapples. Discard = arrayRemove from
+    // owners; the onSnappleOwnersEmpty trigger deletes the snapple.
+    const newSnappleId = snappleResult.snappleId;
+    if (saveChoice === 'discard') {
+      try {
+        const { doc: docRef, updateDoc: update, arrayRemove: aRemove } = await import('firebase/firestore');
+        const { db: database } = await import('../services/firebase');
+        await update(docRef(database, 'snapples', newSnappleId), {
+          owners: aRemove(user.uid),
+        }).catch(() => {});
+      } catch (e) {}
+    } else {
+      // Use arrayUnion at the Firestore layer so racing saves from
+      // other tabs / other simultaneous uploads don't clobber each
+      // other's ownedSnapples arrays.
+      try {
+        const { doc: docRef, updateDoc: update, arrayUnion: aUnion } = await import('firebase/firestore');
+        const { db: database } = await import('../services/firebase');
+        await update(docRef(database, 'users', user.uid), {
+          'resources.ownedSnapples': aUnion(newSnappleId),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  };
+
+  // Kicks off the upload in the background and pops the user back to
+  // wherever they came from immediately. The toast pill above the
+  // tab bar surfaces progress + retry for the queued upload.
+  const doSubmit = async (activePrompt, saveChoice) => {
     const submitPrompt = activePrompt || prompt;
-    setIsSubmitting(true);
-    setUploadProgress(0);
-    player.pause();
-    setIsPlaying(false);
 
     try {
-      // Upload video to Firebase Storage
-      const uploadResult = await uploadVideo(
-        recordedVideo.uri,
-        submitPrompt?.text || 'Snapple video',
-        user.uid,
-        (progress) => setUploadProgress(progress)
-      );
-
-      // Reviver perk: if this user revived/created the prompt instance and no
-      // boost is currently live for this prompt, float their snapple to the
-      // top for 2 hours.
-      let boostedUntil = null;
-      const isPromptOriginator =
-        submitPrompt.createdBy === user.uid ||
-        submitPrompt.revivedBy === user.uid ||
-        submitPrompt.summonedBy === user.uid;
-      if (isPromptOriginator) {
-        try {
-          const { collection: c, query: q, where: w, getDocs: g, limit: l } = await import('firebase/firestore');
-          const { db: d } = await import('../services/firebase');
-          const nowISO = new Date().toISOString();
-          const existingBoost = await g(q(
-            c(d, 'snapples'),
-            w('promptId', '==', submitPrompt.id),
-            w('boostedUntil', '>', nowISO),
-            l(1),
-          ));
-          if (existingBoost.empty) {
-            boostedUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-          }
-        } catch (e) {}
-      }
-
-      // Create the snapple record. handleSubmit guarantees submitPrompt is valid,
-      // so no defensive 'unknown' fallback here — that path produced orphan snapples.
-      const snappleResult = await snappleService.createSnapple({
-        promptId: submitPrompt.id,
-        videoUrl: uploadResult.downloadURL,
-        videoId: uploadResult.id,
-        creatorId: user.uid,
-        creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
-        prompt: submitPrompt.text || 'Snapple video',
-        category: submitPrompt.category || 'general',
-        boostedUntil,
-        muted: isMuted,
-        isPrivate,
+      enqueueUpload({
+        uri: recordedVideo.uri,
+        promptText: submitPrompt?.text || 'Snapple video',
+        userId: user.uid,
+        label: submitPrompt?.text || 'Snapple',
+        onSuccess: buildOnUploadSuccess(submitPrompt, saveChoice),
+        onFailure: (err) => {
+          // Toast already surfaces the retry chip; only fire a modal
+          // if we've truly exhausted all retries and lost the video.
+          console.error('[VideoPreview] Upload permanently failed:', err);
+        },
       });
-
-      if (snappleResult.success) {
-        // Award XP/achievements/participantCount once per promptId per
-        // user — recycled prompts (new promptId, same text) count as a
-        // fresh cycle and earn again. xpEarnedPrompts on the user doc
-        // tracks claimed promptIds so create-discard-create can't farm.
-        try {
-          const { doc: xpDoc, updateDoc: xpUpdate, increment: xpInc, getDoc: xpGet, arrayUnion: xpUnion } = await import('firebase/firestore');
-          const { db: xpDb } = await import('../services/firebase');
-
-          const beforeSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
-          const beforeData = beforeSnap.data() || {};
-          const earnedPrompts = beforeData.xpEarnedPrompts || [];
-          const alreadyEarned = submitPrompt?.id && earnedPrompts.includes(submitPrompt.id);
-
-          if (!alreadyEarned) {
-            const beforeXP = beforeData.profile?.experience || beforeData.profile?.xp || 0;
-            const beforeLevel = levelService.getLevelFromXP(beforeXP);
-
-            const boosts = beforeData.boosts || {};
-            const now = new Date().toISOString();
-            const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
-
-            flyRewards({
-              rewards: { xp: xpAmount },
-              commit: async () => {
-                const updates = {
-                  'profile.experience': xpInc(xpAmount),
-                  'profile.xp': xpInc(xpAmount),
-                  'stats.videosCreated': xpInc(1),
-                };
-                if (submitPrompt?.id) {
-                  updates.xpEarnedPrompts = xpUnion(submitPrompt.id);
-                }
-                await xpUpdate(xpDoc(xpDb, 'users', user.uid), updates).catch(() => {});
-              },
-            });
-
-            const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
-            if (afterLevel > beforeLevel) {
-              setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1500);
-            }
-
-            const afterSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
-            const stats = afterSnap.data()?.stats || {};
-            stats.level = afterLevel;
-            stats.trophies = afterSnap.data()?.resources?.trophies || 0;
-            const newAchievements = await achievementService.checkAndAward(user.uid, stats);
-            newAchievements.forEach((a, i) => {
-              const rewards = [];
-              if (a.coins) rewards.push(`+${a.coins}c`);
-              if (a.xp) rewards.push(`+${a.xp}xp`);
-              setTimeout(() => showToast('achievement', a.name, rewards.join(' ')), 3000 + i * 1500);
-            });
-
-            if (submitPrompt?.id) {
-              try {
-                const { doc: docRef, updateDoc: update, increment: inc } = await import('firebase/firestore');
-                const { db: database } = await import('../services/firebase');
-                await update(docRef(database, 'activePrompts', submitPrompt.id), {
-                  participantCount: inc(1),
-                }).catch(() =>
-                  update(docRef(database, 'snapplePrompts', submitPrompt.id), {
-                    participantCount: inc(1),
-                  }).catch(() => {})
-                );
-              } catch (e) {}
-            }
-          }
-        } catch (e) {}
-
-        // Ask whether to keep this snapple in the user's collection.
-        // Save = stays as owner + added to ownedSnapples. Discard =
-        // arrayRemove from owners; the onSnappleOwnersEmpty trigger
-        // deletes the snapple. Rewards already fired above (gated on
-        // promptId) so Discard doesn't undo XP — same as on real life
-        // when you tear up a draft, you still did the work.
-        const newSnappleId = snappleResult.snappleId;
-        const onSave = async () => {
-            const owned = [...(userCurrency.ownedSnapples || []), newSnappleId];
-            await updateUserCurrency({ ownedSnapples: owned });
-            showToast('reward', 'Snapple Saved', 'Added to your collection');
-            setTimeout(() => navigation.popToTop(), 800);
-        };
-        const onDiscard = async () => {
-          try {
-            const { doc: docRef, updateDoc: update, arrayRemove: aRemove } = await import('firebase/firestore');
-            const { db: database } = await import('../services/firebase');
-            await update(docRef(database, 'snapples', newSnappleId), {
-              owners: aRemove(user.uid),
-            }).catch(() => {});
-          } catch (e) {}
-          showToast('info', 'Snapple Discarded', 'Not saved to collection');
-          setTimeout(() => navigation.popToTop(), 800);
-        };
-        showAlert(
-          'Save this snapple?',
-          'Saved snapples stay in your collection. Discarded snapples disappear unless someone else saves them.',
-          [
-            { text: 'Discard', onPress: onDiscard },
-            { text: 'Save', onPress: onSave },
-          ],
-        );
-      } else {
-        showError('Error', snappleResult.error || 'Failed to create snapple');
-      }
-    } catch (error) {
-      console.error('[VideoPreview] Submit error:', error);
-      console.error('[VideoPreview] Error details:', JSON.stringify(error, null, 2));
-      try {
-        showError('Upload Failed', error.message || 'Something went wrong. Please try again.');
-      } catch (e) {
-        // Modal not ready
-        console.error('[VideoPreview] Could not show error modal');
-      }
-    } finally {
-      setIsSubmitting(false);
+    } catch (e) {
+      showError('Upload Failed', e.message || 'Could not queue upload.');
+      return;
     }
+
+    player.pause();
+    setIsPlaying(false);
+    navigation.popToTop();
+  };
+
+  // Ask the user up front whether to keep this snapple in their
+  // collection, then hand off to doSubmit which enqueues + pops back.
+  // Save is the default; the alert dismisses to Save on accidental tap.
+  const askSaveThenSubmit = (submitPrompt) => {
+    showAlert(
+      'Save this snapple?',
+      'Saved snapples stay in your collection. Discarded snapples disappear unless someone else saves them.',
+      [
+        { text: 'Discard', onPress: () => doSubmit(submitPrompt, 'discard') },
+        { text: 'Save', onPress: () => doSubmit(submitPrompt, 'save') },
+      ],
+    );
   };
 
   const handleRetake = () => {
@@ -472,48 +484,34 @@ export default function VideoPreviewScreen({ route, navigation }) {
 
         {/* Bottom Controls */}
         <View style={styles.controls}>
-          {isSubmitting ? (
-            <View style={styles.uploadingContainer}>
-              <ActivityIndicator size="small" color={theme.colors.vibeBlue} />
-              <Text style={styles.uploadingText}>
-                Uploading... {Math.round(uploadProgress)}%
-              </Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
-              </View>
-            </View>
+          <VibeButton
+            label="Retake"
+            onPress={handleRetake}
+            variant="toggle"
+            color="blue"
+            style={{ flex: 1, backgroundColor: '#000000' }}
+          />
+          {prompt ? (
+            <VibeButton
+              label="Submit"
+              onPress={() => handleSubmit()}
+              variant="toggle"
+              color="blue"
+              style={{ flex: 1, backgroundColor: '#000000' }}
+            />
           ) : (
-            <>
-              <VibeButton
-                label="Retake"
-                onPress={handleRetake}
-                variant="toggle"
-                color="blue"
-                style={{ flex: 1, backgroundColor: '#000000' }}
-              />
-              {prompt ? (
-                <VibeButton
-                  label="Submit"
-                  onPress={() => handleSubmit()}
-                  variant="toggle"
-                  color="blue"
-                  style={{ flex: 1, backgroundColor: '#000000' }}
-                />
-              ) : (
-                <VibeButton
-                  label="Prompts"
-                  onPress={() => setShowPromptPicker(true)}
-                  variant="toggle"
-                  color="green"
-                  style={{ flex: 1, backgroundColor: '#000000' }}
-                />
-              )}
-            </>
+            <VibeButton
+              label="Prompts"
+              onPress={() => setShowPromptPicker(true)}
+              variant="toggle"
+              color="green"
+              style={{ flex: 1, backgroundColor: '#000000' }}
+            />
           )}
         </View>
 
         {/* Selected prompt indicator */}
-        {prompt && !isSubmitting && (
+        {prompt && (
           <Pressable style={styles.promptIndicator} onPress={() => setShowPromptPicker(true)}>
             <Text style={styles.promptIndicatorLabel}>Prompt:</Text>
             <Text style={styles.promptIndicatorText} numberOfLines={2}>{prompt.text}</Text>
@@ -853,34 +851,6 @@ const styles = StyleSheet.create({
     right: 20,
     flexDirection: 'row',
     gap: 16,
-  },
-  uploadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#000000',
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: theme.colors.vibeBlue,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  uploadingText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  progressBar: {
-    width: '100%',
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.vibeBlue,
-    borderRadius: 2,
   },
   closeText: {
     color: 'white',
