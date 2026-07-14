@@ -27,10 +27,10 @@ const theme = {
     vibeForest: '#228B22',
     vibeOrange: '#FFCC66',
     vibePurple: '#6B00CC',
-    // Brighter, punchier purple used for card accent borders on
-    // the game screens. The stock vibePurple sits too dark against
-    // the surface #141A33 to read as a real neon line.
-    vibeNeonPurple: '#B14EFF',
+    // Deep neon purple used for card accent borders on the game
+    // screens — saturated enough to feel like a real neon line
+    // against the #141A33 card surface without going lavender.
+    vibeNeonPurple: '#7B2CBF',
     vibeYellow: '#FFD700',
     vibePink: '#FF10F0',
     vibeRed: '#FF4444',

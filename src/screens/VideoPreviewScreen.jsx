@@ -593,11 +593,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  // Prompt swap chip sits above the Retake / Submit row. Padding
+  // + position bumped so it (a) has real vertical breathing room
+  // above the row and (b) matches VibeButton's ~50pt tap-target
+  // height so the two rows feel like siblings.
   promptIndicator: {
     position: 'absolute',
-    bottom: 100,
-    left: 16,
-    right: 16,
+    bottom: 122,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -605,8 +609,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.vibeBlue,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 50,
   },
   promptIndicatorLabel: {
     color: theme.colors.vibeBlue,

@@ -303,7 +303,7 @@ function RoundResultsReveal({
               style={quitPracticeStyles.btn}
               onPress={onQuitPractice}
             >
-              <Text style={quitPracticeStyles.btnText}>QUIT PRACTICE</Text>
+              <Text style={quitPracticeStyles.btnText}>Quit Practice</Text>
             </Pressable>
           ) : null}
           {isHost && isInfinite && !isPractice && (
@@ -2156,7 +2156,10 @@ const quitPracticeStyles = StyleSheet.create({
     backgroundColor: '#CC0033',
     borderColor: theme.colors.vibeOrange,
     borderWidth: 3,
-    paddingVertical: 14,
+    // 13pt padding + 3pt borders + 16pt text = 48pt tall, which
+    // matches VibeButton's default variant height (~49pt from its
+    // 10pt content padding + 3pt gradient padding + 3/4pt borders).
+    paddingVertical: 13,
     paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
@@ -2165,8 +2168,8 @@ const quitPracticeStyles = StyleSheet.create({
   btnText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
 

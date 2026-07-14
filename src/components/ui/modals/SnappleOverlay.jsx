@@ -306,29 +306,38 @@ export default function SnappleOverlay({
           GestureHandlerRootView, so gestures inside need their own
           root to be active. Same pattern PromptCurator uses. */}
       <GestureHandlerRootView style={{ flex: 1 }}>
-      <GestureDetector gesture={swipeGesture}>
       <View style={styles.overlay}>
-        {/* Full Screen Video */}
-        <SnappleVideoPlayer
-          ref={playerRef}
-          snapple={snapple}
-          /* Drive mute live from the creator-only toggle's local state so
-             the speaker reacts instantly, before the parent re-fetches
-             the snapple doc. */
-          muted={muted}
-          style={StyleSheet.absoluteFill}
-        />
+        {/* GestureDetector wraps ONLY the video + tap-to-pause
+            layer. If it wrapped the whole screen, the Pan gesture
+            would race with the action buttons' Pressables and eat
+            their taps — user couldn't hit close / like / delete /
+            report / etc. Buttons render as siblings outside the
+            gesture so they get touches directly. */}
+        <GestureDetector gesture={swipeGesture}>
+          <View style={StyleSheet.absoluteFill}>
+            <SnappleVideoPlayer
+              ref={playerRef}
+              snapple={snapple}
+              /* Drive mute live from the creator-only toggle's local state so
+                 the speaker reacts instantly, before the parent re-fetches
+                 the snapple doc. */
+              muted={muted}
+              style={StyleSheet.absoluteFill}
+            />
 
-        {/* Tap to pause/play - covers entire screen behind buttons */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={handlePlayPause}>
-          {!isPlaying && (
-            <View style={styles.pauseIndicator}>
-              <View style={styles.playIconBg}>
-                <Ionicons name="play" size={40} color="white" />
-              </View>
-            </View>
-          )}
-        </Pressable>
+            {/* Tap to pause/play — behind buttons, ONLY covers the
+                video area so it doesn't fight the buttons for taps. */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={handlePlayPause}>
+              {!isPlaying && (
+                <View style={styles.pauseIndicator}>
+                  <View style={styles.playIconBg}>
+                    <Ionicons name="play" size={40} color="white" />
+                  </View>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </GestureDetector>
 
         {/* Close Button - top left */}
         <Pressable style={styles.closeButton} onPress={onClose}>
@@ -609,7 +618,6 @@ export default function SnappleOverlay({
           <Text style={styles.viewCount}>{formatCount(metrics.views || 0)} views</Text>
         </View>
       </View>
-      </GestureDetector>
       </GestureHandlerRootView>
     </Modal>
   );
@@ -654,12 +662,16 @@ const styles = StyleSheet.create({
   purchasedBg: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
+  // Bottom-anchored column growing upward. Gap tightened to 10pt
+  // so the full stack (up to ~8 buttons for creator+admin) fits
+  // without clipping the top like/dislike, and without needing
+  // an explicit top offset.
   actionsColumn: {
     position: 'absolute',
     right: 12,
-    bottom: 120,
+    bottom: 60,
     alignItems: 'center',
-    gap: 16,
+    gap: 10,
     zIndex: 10,
   },
   actionGroup: {
