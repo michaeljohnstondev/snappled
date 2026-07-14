@@ -48,18 +48,26 @@ export default function HandCardThumbnail({
         onPress={onTogglePlay}
       >
         <View style={styles.videoWrap}>
-          {card?.videoUrl && isPlaying ? (
-            <PreviewPlayer
-              key={`inline-${card.id || card.snappleId || 'x'}-${playToken}`}
-              videoUrl={card.videoUrl}
-              muted={!!card.muted}
-              loop={false}
-            />
-          ) : card?.videoUrl ? (
+          {/* Always render the static thumbnail underneath. When
+              isPlaying flips on, PreviewPlayer overlays on top —
+              the video's first-frame gap used to flash black; with
+              the thumbnail underneath it holds the still until the
+              video paints. */}
+          {card?.videoUrl ? (
             <SnappleThumbnailImg videoUrl={card.videoUrl} />
           ) : (
             <View style={styles.placeholder} />
           )}
+          {card?.videoUrl && isPlaying ? (
+            <View style={StyleSheet.absoluteFill}>
+              <PreviewPlayer
+                key={`inline-${card.id || card.snappleId || 'x'}-${playToken}`}
+                videoUrl={card.videoUrl}
+                muted={!!card.muted}
+                loop={false}
+              />
+            </View>
+          ) : null}
         </View>
 
         {duration ? (

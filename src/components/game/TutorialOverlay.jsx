@@ -24,7 +24,6 @@ export default function TutorialOverlay({ tip, onDismiss }) {
           </View>
           <Text style={styles.title}>{tip.title}</Text>
           <Text style={styles.body}>{tip.body}</Text>
-          <Text style={styles.hint}>tap anywhere to continue</Text>
         </View>
       </Pressable>
     </Modal>

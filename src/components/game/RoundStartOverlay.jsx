@@ -20,7 +20,6 @@ export default function RoundStartOverlay({ visible, title, sub, onDismiss }) {
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
           {sub ? <Text style={styles.sub}>{sub}</Text> : null}
-          <Text style={styles.hint}>tap anywhere to continue</Text>
         </View>
       </Pressable>
     </Modal>

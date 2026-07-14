@@ -47,12 +47,15 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // vibeBlue and made adjacent players hard to tell apart. Replaced with
 // vibeTurquoise (clearly different green-blue), vibeRed, and
 // vibeRoyalBlue for spread.
+// vibeOrange dropped — sat too close to vibeYellow in the palette
+// and two adjacent voters would end up looking identical. Swapped
+// for vibeElectricBlue which reads distinctly against the yellow.
 const VOTER_PALETTE = [
   theme.colors.vibeBlue,
   theme.colors.vibePurple,
   theme.colors.vibePink,
   theme.colors.vibeYellow,
-  theme.colors.vibeOrange,
+  theme.colors.vibeElectricBlue,
   theme.colors.vibeRed,
   theme.colors.vibeTurquoise,
   theme.colors.vibeRoyalBlue,
@@ -107,7 +110,18 @@ function ScoringWinnerBanner({ isTie, names, votes }) {
 // Optional props:
 //   winnerUids (Set):    submission.uid values to crown (SCORING phase)
 //   pointsByUid (Map):   submission.uid → pointsEarned chip (SCORING phase)
-function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, allVotedIn, onPressCard, winnerUids, pointsByUid }) {
+function VotingWaitGrid({
+  submissions, voters, players, playerColors, selfUid, allVotedIn,
+  onPressCard, winnerUids, pointsByUid,
+  // Optional inline-play controls — when passed, cards behave like
+  // the picking/voting hand cards (tap = play once inline, expand
+  // chip = fullscreen preview).
+  inlinePlayingId, playToken, onTogglePlay, onFullscreen,
+  // "large" = 2-col grid with big cards (SCORING screen), matches
+  // the picking/voting hand grid. Anything else = the older
+  // 8-column-ish centered flex-wrap for the voting wait screen.
+  variant = 'wait',
+}) {
   const nameOpacity = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!allVotedIn) return;
@@ -118,8 +132,20 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
     }).start();
   }, [allVotedIn]);
 
+  const isLarge = variant === 'large';
+  const gridStyle = isLarge ? styles.auraGridLarge : styles.allSnapplesGrid;
+  const cellStyle = isLarge ? styles.auraCellLarge : styles.auraCellSmall;
+  // Reserve the same picker-name offset on every card so the row
+  // reads as a clean line regardless of who got how many votes.
+  const maxRingCount = React.useMemo(
+    () => (submissions || []).reduce(
+      (max, sub) => Math.max(max, (voters(sub.uid) || []).length),
+      0,
+    ),
+    [submissions, voters],
+  );
   return (
-    <View style={styles.allSnapplesGrid}>
+    <View style={gridStyle}>
       {(submissions || []).map((sub, i) => {
         const player = (players || []).find(p => p.uid === sub.uid);
         const color = playerColors.get(sub.uid) || theme.colors.textSecondary;
@@ -131,15 +157,21 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
           opacity: nameOpacity,
         } : null;
         return (
-          <VoteAuraCard
-            key={sub.snappleId || `sub-${i}`}
-            submission={sub}
-            voters={voters(sub.uid)}
-            picker={picker}
-            onPress={() => onPressCard(sub)}
-            isWinner={winnerUids ? winnerUids.has(sub.uid) : false}
-            pointsEarned={pointsByUid ? pointsByUid.get(sub.uid) : undefined}
-          />
+          <View key={sub.snappleId || `sub-${i}`} style={cellStyle}>
+            <VoteAuraCard
+              submission={sub}
+              voters={voters(sub.uid)}
+              picker={picker}
+              maxRingCount={maxRingCount}
+              onPress={() => onPressCard(sub)}
+              isWinner={winnerUids ? winnerUids.has(sub.uid) : false}
+              pointsEarned={pointsByUid ? pointsByUid.get(sub.uid) : undefined}
+              isPlaying={inlinePlayingId === sub.uid}
+              playToken={inlinePlayingId === sub.uid ? (playToken || 0) : 0}
+              onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
+              onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
+            />
+          </View>
         );
       })}
     </View>
@@ -340,6 +372,9 @@ export default function GameScreen({ navigation }) {
   // thumbnail). Token increments per tap so tapping the same card
   // replays via a fresh mount.
   const [votingInlinePlaying, setVotingInlinePlaying] = useState({ id: null, token: 0 });
+  // Same shape for the SCORING screen — mini-player inside each
+  // VoteAuraCard so users can rewatch after voting closes.
+  const [scoringInlinePlaying, setScoringInlinePlaying] = useState({ id: null, token: 0 });
   // IDs of snapples this user has already played in the current game — used to
   // filter the hand pool so each round reveals unseen cards.
   const [playedCardIds, setPlayedCardIds] = useState([]);
@@ -1671,7 +1706,10 @@ export default function GameScreen({ navigation }) {
               <View style={styles.votingGrid}>
                 {votableSubmissions.map((item, i) => {
                   const isSelected = favoriteCard?.uid === item.uid;
-                  const cardId = item?.snappleId || item?.uid || `vote-${i}`;
+                  // Key on the submitter's uid — snappleId collides
+                  // when two players play the same snapple, and both
+                  // cards' inline players would fire together.
+                  const cardId = item?.uid || item?.snappleId || `vote-${i}`;
                   const isInlinePlaying = votingInlinePlaying.id === cardId;
                   return (
                     <View
@@ -1679,7 +1717,7 @@ export default function GameScreen({ navigation }) {
                       style={styles.votingCell}
                     >
                       <HandCardThumbnail
-                        card={{ videoUrl: item.videoUrl }}
+                        card={{ id: cardId, videoUrl: item.videoUrl }}
                         label="@anon"
                         isSelected={isSelected}
                         isPlaying={isInlinePlaying}
@@ -1903,6 +1941,7 @@ export default function GameScreen({ navigation }) {
             showsVerticalScrollIndicator={false}
           >
             <VotingWaitGrid
+              variant="large"
               submissions={game.submissions || []}
               voters={buildVoters}
               players={game.players || []}
@@ -1912,6 +1951,18 @@ export default function GameScreen({ navigation }) {
               onPressCard={() => {}}
               winnerUids={winnerUids}
               pointsByUid={pointsByUid}
+              inlinePlayingId={scoringInlinePlaying.id}
+              playToken={scoringInlinePlaying.token}
+              onTogglePlay={(sub) => {
+                setScoringInlinePlaying(prev => ({
+                  id: sub.uid,
+                  token: prev.id === sub.uid ? prev.token + 1 : 1,
+                }));
+              }}
+              onFullscreen={(sub) => {
+                setScoringInlinePlaying({ id: null, token: 0 });
+                setPreviewCard({ ...sub, videoUrl: sub.videoUrl, _isVoting: true });
+              }}
             />
           </ScrollView>
         </View>
@@ -2624,6 +2675,28 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 8,
+  },
+  // Small-mode cell for the voting-wait screen — keeps the old
+  // fixed-width cards. VoteAuraCard fills the cell, so we set the
+  // width here instead of in the card.
+  auraCellSmall: {
+    width: 100,
+    margin: 6,
+  },
+  // Large-mode cell for the SCORING screen — 2-col grid matching
+  // the picking/voting hand layout so screens feel consistent.
+  // Extra padding on each cell (18pt) gives the outward-extending
+  // vote rings room to breathe. 5 rings at 2pt each = 10pt outward
+  // → 8pt clearance from the neighbor before rings meet.
+  auraGridLarge: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 6,
+  },
+  auraCellLarge: {
+    width: '50%',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
   },
   // Vote-wait top row: YOUR VOTE on the left, aura grid wrapping on the
   // right. Pulls all videos up next to the user's pick so eyes don't have

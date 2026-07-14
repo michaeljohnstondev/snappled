@@ -243,54 +243,20 @@ export default function PickingPhase({
           </Pressable>
         )}
 
-        {/* YOUR CARD panel — shows the selected thumbnail with a play
-            button that opens the fullscreen preview. Empty state
-            prompts the user to pick one. */}
-        <View style={styles.yourCardSection}>
-          <Text style={styles.sectionTitle}>YOUR CARD</Text>
-          <View style={styles.yourCardWrap}>
-            {selectedCard ? (
-              <HandCardThumbnail
-                card={selectedCard}
-                label="@you"
-                isPlaying={inlinePlaying.id === `your-card:${selectedCard.id}`}
-                playToken={inlinePlaying.id === `your-card:${selectedCard.id}` ? inlinePlaying.token : 0}
-                onTogglePlay={() => bumpInline(`your-card:${selectedCard.id}`)}
-                onFullscreen={() => onPreviewCard({ ...selectedCard, _fromYourCard: true })}
-              />
-            ) : (
-              <View style={styles.yourCardEmpty}>
-                <Text style={styles.yourCardEmptyText}>Pick a card above</Text>
-              </View>
-            )}
-          </View>
-        </View>
       </ScrollView>
 
-      {/* Flush action row — Back on the left 25%, primary CTA on
-          the right 75% when a card is selected. Empty-state shows
-          only the dim PICK A CARD bar so there's nothing to go
-          back from. */}
-      {selectedCard ? (
-        <View style={styles.actionRow}>
-          <Pressable
-            style={styles.actionBackChunk}
-            onPress={() => onSelectCard && onSelectCard(null)}
-          >
-            <Text style={styles.actionBackText}>BACK</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.submitBar, styles.actionSubmitChunk]}
-            onPress={() => onPickCard(selectedCard)}
-          >
-            <Text style={styles.submitBarText}>PLAY THIS CARD</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <Pressable style={[styles.submitBar, styles.submitBarDisabled]} disabled>
-          <Text style={styles.submitBarText}>PICK A CARD</Text>
-        </Pressable>
-      )}
+      {/* Flush submit bar — green + tappable when a card is
+          selected, dim + disabled otherwise. No BACK chunk here;
+          tapping a different card in the hand switches selection. */}
+      <Pressable
+        style={[styles.submitBar, !selectedCard && styles.submitBarDisabled]}
+        onPress={() => selectedCard && onPickCard(selectedCard)}
+        disabled={!selectedCard}
+      >
+        <Text style={styles.submitBarText}>
+          {selectedCard ? 'PLAY THIS CARD' : 'PICK A CARD'}
+        </Text>
+      </Pressable>
 
       {/* Fullscreen preview modal — opened from either a grid tap
           (via _fromYourCard/regular) or from the YOUR CARD play icon.

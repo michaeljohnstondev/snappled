@@ -6,7 +6,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Animated, Easing, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import SnappleThumbnailImg from '../ui/SnappleThumbnail';
+import PreviewPlayer from './PreviewPlayer';
 import theme from '../../theme/themes';
 
 // voters: [{ uid, name, color, isMe }, ...] in vote-arrival order
@@ -19,7 +21,17 @@ import theme from '../../theme/themes';
 // pointsEarned (optional): when set, shows a small "+N" chip on the
 //   card. Used during SCORING to make each card's contribution legible
 //   at a glance.
-const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, picker, onPress, isWinner, pointsEarned }) {
+const VoteAuraCard = React.memo(function VoteAuraCard({
+  submission, voters, picker, onPress, isWinner, pointsEarned,
+  // Inline playback — matches the picking/voting/warmup hand cards.
+  // When isPlaying is true the thumbnail swaps to a mini-player;
+  // playToken bumps to force a remount so re-taps replay.
+  isPlaying, playToken = 0, onTogglePlay, onFullscreen,
+  // Max ring count across the whole grid — used to reserve a
+  // consistent gap between the card and its picker name so every
+  // card in the grid lines up regardless of individual vote count.
+  maxRingCount = 0,
+}) {
   const pulse = useRef(new Animated.Value(0)).current;
   const prevCountRef = useRef(voters?.length || 0);
 
@@ -87,7 +99,10 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, pick
   }, [pointsEarned]);
 
   return (
-    <Pressable onPress={onPress} style={styles.wrap}>
+    <Pressable
+      onPress={onTogglePlay || onPress}
+      style={styles.wrap}
+    >
       {/* One-shot expanding pulse ring on each new vote. Uses the latest
           voter's color so the burst feels personal. */}
       {hasVoters && (
@@ -112,8 +127,36 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, pick
       <View style={styles.frameOuter}>
         <View style={styles.videoFrame}>
           <View style={styles.video}>
-            {submission?.videoUrl ? <SnappleThumbnailImg videoUrl={submission.videoUrl} /> : null}
+            {/* Thumbnail always renders underneath; the inline
+                player overlays on top when playing so the video's
+                first-frame gap doesn't flash black. */}
+            {submission?.videoUrl ? (
+              <SnappleThumbnailImg videoUrl={submission.videoUrl} />
+            ) : null}
+            {submission?.videoUrl && isPlaying ? (
+              <View style={StyleSheet.absoluteFill}>
+                <PreviewPlayer
+                  key={`aura-inline-${submission.uid || submission.snappleId || 'x'}-${playToken}`}
+                  videoUrl={submission.videoUrl}
+                  muted={!!submission.muted}
+                  loop={false}
+                />
+              </View>
+            ) : null}
           </View>
+
+          {/* Fullscreen expand chip — nested Pressable so tapping it
+              doesn't fire the card body's onTogglePlay. Absent
+              onFullscreen = chip hidden. */}
+          {onFullscreen ? (
+            <Pressable
+              style={styles.fullscreenBtn}
+              onPress={onFullscreen}
+              hitSlop={6}
+            >
+              <Ionicons name="expand" size={11} color="white" />
+            </Pressable>
+          ) : null}
 
           {/* Scoring-phase badges live INSIDE the videoFrame so the
               overflow: hidden clips them to the card's rounded
@@ -160,6 +203,12 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, pick
         <Animated.Text
           style={[
             styles.pickerName,
+            // Fixed gap based on the grid's max ring count so every
+            // card in the row lines up. Uses the max across the whole
+            // grid (passed by the parent), not this card's own count,
+            // so 4-vote cards and 0-vote cards align to the same
+            // horizontal line.
+            { marginTop: 6 + maxRingCount * ringThickness },
             { color: picker.color, opacity: picker.opacity ?? 1 },
             picker.isMe && styles.pickerNameMe,
           ]}
@@ -175,23 +224,23 @@ const VoteAuraCard = React.memo(function VoteAuraCard({ submission, voters, pick
 export default VoteAuraCard;
 
 const styles = StyleSheet.create({
+  // No hard-coded width anymore — the wrap fills whatever cell the
+  // parent grid provides. Callers control size + margin via the
+  // outer cell so we can drop the same card into a small
+  // 8-column wait grid OR a big 2-column scoring grid without
+  // touching this file.
   wrap: {
-    width: 100,
-    // Extra margin so the nested vote rings can extend outward
-    // (up to ~4 rings * 2pt = 8pt on each side) without slamming
-    // into the neighbor card.
-    margin: 10,
     alignItems: 'center',
   },
   // Positioning parent for the nested rings — rings absolute-
-  // position around it. Matches videoFrame's footprint.
+  // position around it. Full width of the cell.
   frameOuter: {
-    width: 100,
+    width: '100%',
     aspectRatio: 9 / 16,
     position: 'relative',
   },
   videoFrame: {
-    width: 100,
+    width: '100%',
     aspectRatio: 9 / 16,
     borderRadius: 10,
     overflow: 'hidden',
@@ -200,24 +249,42 @@ const styles = StyleSheet.create({
   video: {
     flex: 1,
   },
+  // Pulse ring insets past every edge — no hard-coded height so it
+  // scales with the card. Uses bottom:-8 instead of a fixed height.
   pulseRing: {
     position: 'absolute',
     top: -8,
     left: -8,
     right: -8,
-    height: 178,
+    bottom: -8,
     borderRadius: 16,
     borderWidth: 2,
   },
   pickerName: {
     fontSize: 11,
-    marginTop: 4,
+    // marginTop is set inline based on ring count — leaving base 0
+    // here so the inline value takes precedence cleanly.
     textAlign: 'center',
     fontWeight: '600',
-    width: 100,
+    width: '100%',
   },
   pickerNameMe: {
     fontWeight: 'bold',
+  },
+  // Small expand chip in the top-right — smaller than the hand-card
+  // version because VoteAuraCard is only 100pt wide.
+  fullscreenBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   winnerBadge: {
     position: 'absolute',

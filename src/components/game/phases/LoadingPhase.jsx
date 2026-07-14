@@ -13,6 +13,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { prefetchVideo } from '../../../services/videoCache';
+import { thumbnailService } from '../../../services/thumbnailService';
 import theme from '../../../theme/themes';
 
 // Max time we'll sit on the loading screen before advancing anyway.
@@ -52,8 +53,12 @@ export default function LoadingPhase({ hand, onLoaded }) {
     let cancelled = false;
     let completed = 0;
 
-    // Each snapple's prefetch settles independently — we count settled
-    // (not just successful) so a bad URL can't hold up the round.
+    // For each card we kick off BOTH the video prefetch and the
+    // thumbnail extraction in parallel, then wait for both to
+    // settle before counting the card done. Without preloading
+    // thumbnails, SnappleThumbnail would show its own loading
+    // spinner on mount even though the video is cached — user
+    // sees a "twirl" on every card on the picking screen.
     hand.forEach((card) => {
       const url = card?.videoUrl;
       if (!url) {
@@ -61,7 +66,10 @@ export default function LoadingPhase({ hand, onLoaded }) {
         if (!cancelled) setDoneCount(completed);
         return;
       }
-      prefetchVideo(url).finally(() => {
+      Promise.allSettled([
+        prefetchVideo(url),
+        thumbnailService.getThumbnail(url),
+      ]).then(() => {
         if (cancelled) return;
         completed += 1;
         setDoneCount(completed);
