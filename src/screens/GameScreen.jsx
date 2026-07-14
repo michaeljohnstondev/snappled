@@ -255,11 +255,6 @@ function RoundResultsReveal({
   return (
     <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="roundResults" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
-      <RoundPromptBanner
-        prompt={prompt}
-        round={currentRound}
-        totalRounds={totalRounds || null}
-      />
 
       <ScrollView contentContainerStyle={styles.resultsScrollContent} showsVerticalScrollIndicator={false}>
         {/* Standings — picker reveal + prompt already shown on the
@@ -2000,16 +1995,15 @@ export default function GameScreen({ navigation }) {
           </ScrollView>
         </View>
 
-        {/* Host skip — advance to the SCORE (round-results) phase
-            early without waiting out the scoring timer. Matches the
-            SCORE chip in the phase strip so the button reads as
-            "jump to the scoreboard phase". */}
+        {/* Host skip — end the current round early instead of
+            waiting out the scoring timer. Advances the game to the
+            SCORE (round-results) phase. */}
         {isHost && (
           <Pressable
             style={styles.hostAdvanceBar}
             onPress={() => gameService.enterRoundResults(gameId)}
           >
-            <Text style={styles.hostAdvanceBarText}>SHOW SCORE</Text>
+            <Text style={styles.hostAdvanceBarText}>END ROUND</Text>
           </Pressable>
         )}
 

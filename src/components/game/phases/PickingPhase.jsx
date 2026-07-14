@@ -19,6 +19,7 @@ import CreatorActionRow from '../CreatorActionRow';
 import HandCardThumbnail from '../round/HandCardThumbnail';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import RoundPromptBanner from '../round/RoundPromptBanner';
+import DisabledPickBarVariants from '../round/DisabledPickBarVariants';
 import theme from '../../../theme/themes';
 
 // Renders the picking phase. All state and async work lives in
@@ -254,18 +255,21 @@ export default function PickingPhase({
 
       </ScrollView>
 
-      {/* Flush submit bar — green + tappable when a card is
-          selected, dim + disabled otherwise. No BACK chunk here;
-          tapping a different card in the hand switches selection. */}
-      <Pressable
-        style={[styles.submitBar, !selectedCard && styles.submitBarDisabled]}
-        onPress={() => selectedCard && onPickCard(selectedCard)}
-        disabled={!selectedCard}
-      >
-        <Text style={styles.submitBarText}>
-          {selectedCard ? 'PLAY THIS CARD' : 'PICK A CARD'}
-        </Text>
-      </Pressable>
+      {/* Flush submit bar — when a card is selected, the normal green
+          PLAY THIS CARD bar. When nothing's selected, we stack the 4
+          disabled-bar design variants (TEMP demo, user is picking
+          which one wins). Delete DisabledPickBarVariants + restore
+          the single dim bar once the winner is chosen. */}
+      {selectedCard ? (
+        <Pressable
+          style={styles.submitBar}
+          onPress={() => onPickCard(selectedCard)}
+        >
+          <Text style={styles.submitBarText}>PLAY THIS CARD</Text>
+        </Pressable>
+      ) : (
+        <DisabledPickBarVariants />
+      )}
 
       {/* Fullscreen preview modal — opened from either a grid tap
           (via _fromYourCard/regular) or from the YOUR CARD play icon.

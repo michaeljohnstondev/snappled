@@ -504,9 +504,40 @@ export const gameService = {
       const gameDoc = await getDoc(gameRef);
       if (!gameDoc.exists()) return { success: false, error: 'Game not found' };
       const data = gameDoc.data();
+      const oldText = (data.prompts || [])[roundIndex] || '';
       const newPrompts = [...(data.prompts || [])];
       newPrompts[roundIndex] = newText;
       await updateDoc(gameRef, { prompts: newPrompts, updatedAt: serverTimestamp() });
+
+      // Propagate the edit to the source `gamePrompts` doc(s) that
+      // seeded this round so future games pull the corrected text.
+      // game.prompts is stored as raw text (no id reference), so we
+      // match by the old text. Fire-and-forget — game-round update
+      // has already succeeded; source propagation shouldn't block.
+      if (oldText && oldText !== newText) {
+        (async () => {
+          try {
+            const srcQ = query(
+              collection(db, 'gamePrompts'),
+              where('text', '==', oldText),
+              limit(20)
+            );
+            const srcSnap = await getDocs(srcQ);
+            const writes = [];
+            srcSnap.forEach(d => {
+              writes.push(updateDoc(doc(db, 'gamePrompts', d.id), {
+                text: newText,
+                updatedAt: serverTimestamp(),
+              }));
+            });
+            await Promise.all(writes);
+            console.log('[GameService] editRoundPrompt propagated to', writes.length, 'gamePrompts doc(s)');
+          } catch (e) {
+            console.warn('[GameService] editRoundPrompt source propagation failed', e);
+          }
+        })();
+      }
+
       return { success: true };
     } catch (error) {
       console.error('[GameService] editRoundPrompt error:', error);
