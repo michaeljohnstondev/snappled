@@ -36,15 +36,15 @@ export default function WarmupPhase({
   const readyCount = (players || []).filter(p => readyMap?.[p.uid]).length;
   const totalCount = (players || []).length;
 
-  // Same inline mini-player behavior as picking — tap a card body
-  // plays it inline once. Token increments so re-tapping the same
-  // card replays via a fresh mount.
+  // Tap a card = play it inline once. Tap the same card again =
+  // pause (unmount the player, thumbnail returns). Tap a different
+  // card = swap + play (token bumps to force a fresh mount).
   const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
   const bumpInline = (id) => {
-    setInlinePlaying(prev => ({
-      id,
-      token: prev.id === id ? prev.token + 1 : 1,
-    }));
+    setInlinePlaying(prev => {
+      if (prev.id === id) return { id: null, token: prev.token };
+      return { id, token: prev.token + 1 };
+    });
   };
 
   return (

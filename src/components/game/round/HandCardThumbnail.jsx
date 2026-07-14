@@ -13,11 +13,11 @@ import PreviewPlayer from '../PreviewPlayer';
 import theme from '../../../theme/themes';
 
 // Base palette for the card chrome. surface = card fill, line =
-// magenta accent border on the unselected state, glow = selected
-// state accent (green = "picked").
+// neon purple accent border on the unselected state, glow =
+// selected state accent (green = "picked").
 const COLORS = {
   surface: '#141A33',
-  line: theme.colors.vibePink,
+  line: theme.colors.vibeNeonPurple,
   glow: theme.colors.vibeGreen,
 };
 

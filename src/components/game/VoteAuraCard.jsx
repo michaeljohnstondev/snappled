@@ -239,17 +239,15 @@ const styles = StyleSheet.create({
     aspectRatio: 9 / 16,
     position: 'relative',
   },
-  // Match HandCardThumbnail — surface fill + magenta accent border
-  // in the base (unvoted) state. Ring overlays cover this border
-  // once votes come in.
+  // No border on the videoFrame — the vote-ring overlays draw
+  // their own outward borders as votes stack, and the base card
+  // reads fine on its own without a competing purple stroke.
   videoFrame: {
     width: '100%',
     aspectRatio: 9 / 16,
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#141A33',
-    borderWidth: 1.5,
-    borderColor: theme.colors.vibePink,
   },
   video: {
     flex: 1,

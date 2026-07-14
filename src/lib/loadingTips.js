@@ -32,7 +32,6 @@ export const LOADING_TIPS = [
   // Prompt system
   { title: 'Prompts rotate', body: 'The pool cycles so you rarely see the same prompt twice in a row. Popular ones come back around.' },
   { title: 'Create your own prompt', body: 'Costs 1 ticket. Your prompt goes into the live pool and can be voted on and remembered.' },
-  { title: 'Bad prompt? Skip it', body: 'Anyone can Ready Up early to move past a prompt they don\'t vibe with.' },
 
   // Game feel
   { title: '60 seconds per phase', body: 'You get a full minute to pick and to vote — no rushed decisions.' },

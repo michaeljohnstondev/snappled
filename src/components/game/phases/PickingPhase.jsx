@@ -64,15 +64,16 @@ export default function PickingPhase({
   const totalRoundsShown = game.totalRounds || null;
 
   // Which card in the hand is playing inline right now (only one
-  // at a time). The token increments on each tap so tapping the
-  // same card again re-triggers the play (via HandCardThumbnail's
-  // playToken -> React key remount).
+  // at a time). Tap a different card = swap + play. Tap the same
+  // card that's currently playing = pause (unmounts the player so
+  // the thumbnail shows again). Token increment on swap forces a
+  // fresh mount so the video starts from frame 0.
   const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
   const bumpInline = (id) => {
-    setInlinePlaying(prev => ({
-      id,
-      token: prev.id === id ? prev.token + 1 : 1,
-    }));
+    setInlinePlaying(prev => {
+      if (prev.id === id) return { id: null, token: prev.token };
+      return { id, token: prev.token + 1 };
+    });
   };
 
   if (hand.length === 0) {

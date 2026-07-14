@@ -1764,12 +1764,13 @@ export default function GameScreen({ navigation }) {
                         playToken={isInlinePlaying ? votingInlinePlaying.token : 0}
                         onTogglePlay={() => {
                           // Select this card as the favorite AND
-                          // play it inline once. Re-tap replays.
+                          // play it inline once. Re-tap the same
+                          // card pauses (unmounts the player).
                           setFavoriteCard(item);
-                          setVotingInlinePlaying(prev => ({
-                            id: cardId,
-                            token: prev.id === cardId ? prev.token + 1 : 1,
-                          }));
+                          setVotingInlinePlaying(prev => {
+                            if (prev.id === cardId) return { id: null, token: prev.token };
+                            return { id: cardId, token: prev.token + 1 };
+                          });
                         }}
                         onFullscreen={() => {
                           setVotingInlinePlaying({ id: null, token: 0 });
@@ -1986,10 +1987,10 @@ export default function GameScreen({ navigation }) {
               inlinePlayingId={scoringInlinePlaying.id}
               playToken={scoringInlinePlaying.token}
               onTogglePlay={(sub) => {
-                setScoringInlinePlaying(prev => ({
-                  id: sub.uid,
-                  token: prev.id === sub.uid ? prev.token + 1 : 1,
-                }));
+                setScoringInlinePlaying(prev => {
+                  if (prev.id === sub.uid) return { id: null, token: prev.token };
+                  return { id: sub.uid, token: prev.token + 1 };
+                });
               }}
               onFullscreen={(sub) => {
                 setScoringInlinePlaying({ id: null, token: 0 });
@@ -2146,12 +2147,15 @@ export default function GameScreen({ navigation }) {
   return null;
 }
 
-// Quit Practice button — solid vibeOrange fill, distinct from the
-// outlined VibeButton toggles so it doesn't blend into the results
-// screen chrome.
+// Quit Practice button — solid red fill with a vibeOrange border,
+// mirrors bvs-app's "DELETE EVENT" red variant so destructive
+// actions read the same across our apps. Orange border + white
+// text on a #CC0033 fill.
 const quitPracticeStyles = StyleSheet.create({
   btn: {
-    backgroundColor: theme.colors.vibeOrange,
+    backgroundColor: '#CC0033',
+    borderColor: theme.colors.vibeOrange,
+    borderWidth: 3,
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
