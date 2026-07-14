@@ -156,8 +156,8 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
 function RoundResultsReveal({
   rankings, players, prompt, submissions,
   currentRound, totalRounds, timer,
-  isHost, isPractice, onNextRound, onShare, onEndGame, onLeave, onHelp,
-  onQuitPractice, selfUid,
+  isHost, isPractice, onNextRound, onShare, onEndGame, onLeave,
+  onHelp, onHelpEnd, onQuitPractice, selfUid,
 }) {
   const isInfinite = totalRounds === 0;
 
@@ -222,7 +222,7 @@ function RoundResultsReveal({
 
   return (
     <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <RoundHeaderBar phase="roundResults" timerSec={timer} onHelp={onHelp} />
+      <RoundHeaderBar phase="roundResults" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
       <RoundPromptBanner
         prompt={prompt}
         round={currentRound}
@@ -343,9 +343,11 @@ export default function GameScreen({ navigation }) {
   const [mulliganMode, setMulliganMode] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
   // Help overlay — user-triggered via the "?" button on
-  // RoundHeaderBar. Copy per phase lives here so it stays with the
-  // game screen instead of leaking into each phase component.
+  // RoundHeaderBar. Now a press-and-hold: press-in shows the tip,
+  // press-out hides it. Copy per phase lives here so it stays with
+  // the game screen instead of leaking into each phase component.
   const [roundAlert, setRoundAlert] = useState(null);
+  const hidePhaseHelp = () => setRoundAlert(null);
   const showPhaseHelp = () => {
     const phase = game?.phase;
     if (phase === GAME_PHASES.PICKING) {
@@ -1459,7 +1461,7 @@ export default function GameScreen({ navigation }) {
           onPreviewCard={(card) => setPreviewCard(card)}
           onClosePreview={() => setPreviewCard(null)}
           onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
-          onHelp={showPhaseHelp}
+          onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp}
           isAdmin={isAdmin}
           onExcludeFromPool={handleExcludeFromPool}
         />
@@ -1514,7 +1516,7 @@ export default function GameScreen({ navigation }) {
         onEditPromptSave={handleSavePrompt}
         onDeletePrompt={handleDeletePrompt}
         onExcludeFromPool={handleExcludeFromPool}
-        onHelp={showPhaseHelp}
+        onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp}
         />
         <RoundStartOverlay
           visible={!!roundAlert}
@@ -1535,7 +1537,7 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <RoundHeaderBar phase="voting" timerSec={timer} onHelp={showPhaseHelp} />
+        <RoundHeaderBar phase="voting" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
         {isSpectating && (
           <View style={styles.spectateBanner}>
             <Ionicons name="eye" size={14} color={theme.colors.vibeBlue} />
@@ -1691,7 +1693,7 @@ export default function GameScreen({ navigation }) {
                   style={styles.actionBackChunk}
                   onPress={() => setFavoriteCard(null)}
                 >
-                  <Ionicons name="arrow-back" size={22} color="#fff" />
+                  <Text style={styles.actionBackText}>BACK</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.submitVoteBar, styles.actionSubmitChunk]}
@@ -1856,7 +1858,7 @@ export default function GameScreen({ navigation }) {
 
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-        <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} />
+        <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
 
         {/* Winner banner takes the prompt's slot during SCORING — the
             prompt has done its job (voting is over) and the winner is
@@ -1986,7 +1988,7 @@ export default function GameScreen({ navigation }) {
           onShare={handleShareRound}
           onEndGame={() => gameService.endGameEarly(gameId)}
           onLeave={handleLeaveGame}
-          onHelp={showPhaseHelp}
+          onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp}
           onQuitPractice={handleLeaveGame}
         />
         <RoundStartOverlay
@@ -2906,9 +2908,18 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    // Dark tinted chrome that fits the vibe palette without
+    // pulling attention off the primary CTA on the right.
+    backgroundColor: 'rgba(10, 18, 40, 0.95)',
     borderRightWidth: 2,
     borderRightColor: '#000',
+  },
+  actionBackText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
   actionSubmitChunk: {
     flex: 3,

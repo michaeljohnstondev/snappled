@@ -20,6 +20,11 @@ import theme from '../../../theme/themes';
 // whole game hostage — 12s covers slow LTE and still feels snappy.
 const MAX_WAIT_MS = 12000;
 
+// Minimum time the screen stays up even when every prefetch was
+// already cached. Without this the loading screen flashes for a
+// frame and users think it never rendered.
+const MIN_DISPLAY_MS = 1500;
+
 // Render the loading UI. `hand` is the array of drawn snapples;
 // `onLoaded` fires exactly once when every URL has resolved (or the
 // per-video attempt has settled — a failing prefetch still counts as
@@ -29,6 +34,13 @@ export default function LoadingPhase({ hand, onLoaded }) {
   const total = hand?.length || 0;
   const [doneCount, setDoneCount] = useState(0);
   const [firedOnce, setFiredOnce] = useState(false);
+  // Guarantees the loading screen renders long enough to actually
+  // be seen — flips true after MIN_DISPLAY_MS.
+  const [minElapsed, setMinElapsed] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setMinElapsed(true), MIN_DISPLAY_MS);
+    return () => clearTimeout(id);
+  }, []);
   // Callers often pass a fresh arrow function each render — snapshot
   // the latest into a ref so effect deps stay stable and the fallback
   // timer doesn't reset every parent render.
@@ -64,11 +76,14 @@ export default function LoadingPhase({ hand, onLoaded }) {
   // if both conditions land in the same tick.
   useEffect(() => {
     if (firedOnce) return;
-    if (total > 0 && doneCount >= total) {
+    // Wait for BOTH the minimum display window AND the prefetch
+    // completion. Prevents the flash-and-gone case when every
+    // video is already cached.
+    if (minElapsed && total > 0 && doneCount >= total) {
       setFiredOnce(true);
       onLoadedRef.current?.();
     }
-  }, [doneCount, total, firedOnce]);
+  }, [doneCount, total, firedOnce, minElapsed]);
 
   useEffect(() => {
     const id = setTimeout(() => {

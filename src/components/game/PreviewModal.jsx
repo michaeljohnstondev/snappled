@@ -48,12 +48,23 @@ export default function PreviewModal({
         ) : null}
 
         {primaryLabel ? (
-          <Pressable style={styles.actionBar} onPress={onPrimary}>
-            <Text style={styles.actionBarText}>{primaryLabel}</Text>
-            {primaryIcon ? (
-              <Ionicons name={primaryIcon} size={22} color="#fff" />
-            ) : null}
-          </Pressable>
+          <View style={styles.actionRow}>
+            {/* Back chunk mirrors the picking / voting submit bars —
+                1/4 width, cyan text on dark, closes the preview so
+                the user lands back on the grid with selection intact. */}
+            <Pressable style={styles.actionBackChunk} onPress={onClose}>
+              <Text style={styles.actionBackText}>BACK</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.actionBar, styles.actionSubmitChunk]}
+              onPress={onPrimary}
+            >
+              <Text style={styles.actionBarText}>{primaryLabel}</Text>
+              {primaryIcon ? (
+                <Ionicons name={primaryIcon} size={22} color="#fff" />
+              ) : null}
+            </Pressable>
+          </View>
         ) : null}
       </View>
     </Modal>

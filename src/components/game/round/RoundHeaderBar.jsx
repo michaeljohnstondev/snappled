@@ -21,10 +21,11 @@ function formatTimer(sec) {
 // Render the header row. `phase` matches gameService.GAME_PHASES
 // values. `timerSec` is the remaining seconds for the current phase;
 // pass 0 or null to hide the timer entirely (e.g. during LOADING).
-// `onHelp` optionally shows a "?" button between the chips and the
-// timer that fires when tapped — used to surface phase help text
-// on demand instead of shoving it on-screen every round.
-export default function RoundHeaderBar({ phase, timerSec, onHelp, caption }) {
+// `onHelp` (optional) surfaces a "?" button next to the timer that
+// works press-and-hold: `onHelp()` fires on press-in, `onHelpEnd()`
+// on press-out so the help text appears while the finger's down
+// and disappears when it lifts.
+export default function RoundHeaderBar({ phase, timerSec, onHelp, onHelpEnd, caption }) {
   const showTimer = typeof timerSec === 'number' && timerSec > 0;
   // Real safe-area inset so chips clear the status bar / notch on
   // every device without a fat hardcoded padding. Fallback to 8 for
@@ -45,7 +46,12 @@ export default function RoundHeaderBar({ phase, timerSec, onHelp, caption }) {
           </View>
         ) : null}
         {onHelp ? (
-          <Pressable style={styles.helpBtn} onPress={onHelp} hitSlop={6}>
+          <Pressable
+            style={styles.helpBtn}
+            onPressIn={onHelp}
+            onPressOut={onHelpEnd}
+            hitSlop={6}
+          >
             <Text style={styles.helpText}>?</Text>
           </Pressable>
         ) : null}

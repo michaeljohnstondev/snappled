@@ -251,7 +251,7 @@ export default function PickingPhase({
             style={styles.actionBackChunk}
             onPress={() => onSelectCard && onSelectCard(null)}
           >
-            <Ionicons name="arrow-back" size={22} color="#fff" />
+            <Text style={styles.actionBackText}>BACK</Text>
           </Pressable>
           <Pressable
             style={[styles.submitBar, styles.actionSubmitChunk]}
@@ -535,9 +535,21 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    // Dim cyan-tinted dark background so it reads as chrome (not a
+    // primary action) but stays inside the neon vibe palette.
+    backgroundColor: 'rgba(10, 18, 40, 0.95)',
     borderRightWidth: 2,
     borderRightColor: '#000',
+  },
+  actionBackText: {
+    // Matches PLAY THIS CARD typography (900 weight, 3pt tracking)
+    // just shorter + cyan so the two chunks read as one bar even
+    // though they're doing different things.
+    color: theme.colors.vibeBlue,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
   actionSubmitChunk: {
     flex: 3,
