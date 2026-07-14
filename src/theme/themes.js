@@ -4,6 +4,11 @@ const theme = {
   colors: {
     background: '#001020',
     backgroundGradient: ['#001020', '#001840', '#002060'],
+    // Flatter, darker gradient used inside a round (picking / voting /
+    // scoring / round results / warmup) so the card surface #141A33
+    // reads as a lift off the background instead of blending into
+    // the bluer default gradient.
+    gameBackgroundGradient: ['#05080F', '#0A0E1F', '#0F1229'],
     buttonGradient: ['#00c6ff', '#0072ff'],
     royalPurpleGradient: ['#4B0082', '#0066FF', '#4B0082', '#0066FF', '#4B0082'],
     // Modal background — deeper than backgroundGradient, with a vibeBlue

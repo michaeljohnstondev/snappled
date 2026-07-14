@@ -77,7 +77,7 @@ export default function PickingPhase({
 
   if (hand.length === 0) {
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
         <View style={styles.loadingHand}>
           <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
           <Text style={styles.loadingHandText}>Drawing your hand...</Text>
@@ -93,22 +93,29 @@ export default function PickingPhase({
     const submittedCount = (game.submissions || []).length;
     const totalCount = (game.players || []).length;
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} />
         <RoundPromptBanner
           prompt={currentPrompt}
           round={game.currentRound}
           totalRounds={totalRoundsShown}
         />
-        <ScrollView contentContainerStyle={styles.pickedWaitContent}>
-          <Text style={styles.yourPickLabel}>YOUR PICK</Text>
-          <View style={styles.yourPickCard}>
+        <ScrollView
+          contentContainerStyle={styles.pickedWaitContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* YOUR PICK horizontally centered — label above, card
+              beneath, both centered on the screen. */}
+          <View style={styles.yourPickSection}>
+            <Text style={styles.yourPickLabel}>YOUR PICK</Text>
             {myPick?.videoUrl ? (
-              <HandCardThumbnail
-                card={{ videoUrl: myPick.videoUrl, creatorUsername: 'you' }}
-                label="@you"
-                onFullscreen={() => onPreviewCard({ ...myPick, _isWaiting: true })}
-              />
+              <View style={styles.yourPickCardWrap}>
+                <HandCardThumbnail
+                  card={{ videoUrl: myPick.videoUrl, creatorUsername: 'you' }}
+                  label="@you"
+                  onFullscreen={() => onPreviewCard({ ...myPick, _isWaiting: true })}
+                />
+              </View>
             ) : null}
           </View>
 
@@ -165,7 +172,7 @@ export default function PickingPhase({
 
   // Pre-pick screen — chips, prompt, hand grid, YOUR CARD, submit bar.
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} />
 
       <ScrollView
@@ -568,17 +575,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 40,
   },
+  // Wait screen — YOUR PICK label + thumbnail centered horizontally.
+  yourPickSection: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 14,
+    gap: 10,
+  },
   yourPickLabel: {
     color: 'white',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.5,
-    marginTop: 4,
-    marginBottom: 8,
+    textAlign: 'center',
   },
-  yourPickCard: {
-    flexDirection: 'row',
-    marginBottom: 14,
+  yourPickCardWrap: {
+    width: 180,
   },
   pickProgressText: {
     color: 'white',

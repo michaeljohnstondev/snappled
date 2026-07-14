@@ -123,7 +123,7 @@ export default function LoadingPhase({ hand, onLoaded }) {
   return (
     <Pressable style={styles.container} onPress={nextTip}>
       <LinearGradient
-        colors={theme.colors.backgroundGradient}
+        colors={theme.colors.gameBackgroundGradient}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.pctBlock}>

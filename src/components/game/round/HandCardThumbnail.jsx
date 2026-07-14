@@ -13,10 +13,11 @@ import PreviewPlayer from '../PreviewPlayer';
 import theme from '../../../theme/themes';
 
 // Base palette for the card chrome. surface = card fill, line =
-// subtle stroke, glow = selected-state accent (green = "picked").
+// magenta accent border on the unselected state, glow = selected
+// state accent (green = "picked").
 const COLORS = {
   surface: '#141A33',
-  line: '#263054',
+  line: theme.colors.vibePink,
   glow: theme.colors.vibeGreen,
 };
 
@@ -130,13 +131,15 @@ const styles = StyleSheet.create({
     bottom: -8,
     borderRadius: 28,
   },
+  // Match the mockup exactly — surface fill + hairline line border.
+  // Was #0A0E1F which was noticeably darker than the reference.
   card: {
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: COLORS.line,
     aspectRatio: 4 / 5,
-    backgroundColor: '#0A0E1F',
+    backgroundColor: COLORS.surface,
   },
   cardFeatured: {
     borderWidth: 2,
@@ -145,7 +148,7 @@ const styles = StyleSheet.create({
   videoWrap: { flex: 1 },
   placeholder: {
     flex: 1,
-    backgroundColor: '#0A0E1F',
+    backgroundColor: COLORS.surface,
   },
   durationBadge: {
     position: 'absolute',

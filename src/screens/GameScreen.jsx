@@ -253,7 +253,7 @@ function RoundResultsReveal({
   }, []);
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="roundResults" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
       <RoundPromptBanner
         prompt={prompt}
@@ -299,12 +299,12 @@ function RoundResultsReveal({
             <Text style={styles.waitingText}>Next round in {timer}s...</Text>
           )}
           {isPractice && onQuitPractice ? (
-            <VibeButton
-              label="Quit Practice"
+            <Pressable
+              style={quitPracticeStyles.btn}
               onPress={onQuitPractice}
-              variant="toggle"
-              color="red"
-            />
+            >
+              <Text style={quitPracticeStyles.btnText}>QUIT PRACTICE</Text>
+            </Pressable>
           ) : null}
           {isHost && isInfinite && !isPractice && (
             <VibeButton label="End Game" onPress={onEndGame} color="red" variant="toggle" />
@@ -781,7 +781,7 @@ export default function GameScreen({ navigation }) {
       // Brief breather between voting and the scoreboard so players can
       // see who won the round + voter attribution. Host auto-advances
       // to ROUND_RESULTS (or FINAL_RESULTS) when the timer runs out.
-      setTimer(15);
+      setTimer(20);
       timerRef.current = setInterval(() => {
         if (pausedRef.current) return;
         setTimer(prev => {
@@ -1615,7 +1615,7 @@ export default function GameScreen({ navigation }) {
       : game.submissions.filter(s => s.uid !== user.uid);
 
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="voting" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
         {isSpectating && (
           <View style={styles.spectateBanner}>
@@ -1953,7 +1953,7 @@ export default function GameScreen({ navigation }) {
     const topVotes = rankings.find(r => r.placement === 1)?.votes ?? 0;
 
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
 
         {/* Prompt banner during scoring — winner banner removed per
@@ -2145,6 +2145,26 @@ export default function GameScreen({ navigation }) {
 
   return null;
 }
+
+// Quit Practice button — solid vibeOrange fill, distinct from the
+// outlined VibeButton toggles so it doesn't blend into the results
+// screen chrome.
+const quitPracticeStyles = StyleSheet.create({
+  btn: {
+    backgroundColor: theme.colors.vibeOrange,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+});
 
 // Admin nuke button styling for the in-game card preview modal.
 // Visually subdued + red so it can't be mistaken for a player action.
@@ -3065,20 +3085,20 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderTopColor: '#000',
   },
+  // Matches PreviewModal's BACK chunk — solid cyan + white text.
+  // All BACK buttons across the game read as the same action now.
   actionBackChunk: {
     flex: 1,
     paddingTop: 20,
     paddingBottom: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    // Dark tinted chrome that fits the vibe palette without
-    // pulling attention off the primary CTA on the right.
-    backgroundColor: 'rgba(10, 18, 40, 0.95)',
+    backgroundColor: theme.colors.vibeBlue,
     borderRightWidth: 2,
     borderRightColor: '#000',
   },
   actionBackText: {
-    color: theme.colors.vibeBlue,
+    color: '#fff',
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 3,

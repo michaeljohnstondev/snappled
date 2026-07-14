@@ -48,7 +48,7 @@ export default function WarmupPhase({
   };
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
       {/* Chips-only header — no prompt banner during warmup. Ready
           count rides in the caption slot next to the WARMUP chip. */}
       <RoundHeaderBar

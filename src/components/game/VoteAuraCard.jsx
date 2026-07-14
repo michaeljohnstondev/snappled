@@ -239,12 +239,17 @@ const styles = StyleSheet.create({
     aspectRatio: 9 / 16,
     position: 'relative',
   },
+  // Match HandCardThumbnail — surface fill + magenta accent border
+  // in the base (unvoted) state. Ring overlays cover this border
+  // once votes come in.
   videoFrame: {
     width: '100%',
     aspectRatio: 9 / 16,
     borderRadius: 10,
     overflow: 'hidden',
-    backgroundColor: '#000',
+    backgroundColor: '#141A33',
+    borderWidth: 1.5,
+    borderColor: theme.colors.vibePink,
   },
   video: {
     flex: 1,
