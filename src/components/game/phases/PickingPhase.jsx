@@ -163,21 +163,9 @@ export default function PickingPhase({
           prompt={currentPrompt}
           round={game.currentRound}
           totalRounds={totalRoundsShown}
+          onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
+          onDelete={isAdmin ? onDeletePrompt : undefined}
         />
-
-        {isAdmin && (
-          <View style={styles.promptAdminRow}>
-            <Pressable style={styles.promptAdminBtn} onPress={() => onEditPromptOpen(currentPrompt)}>
-              <Text style={styles.promptAdminBtnText}>Edit</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.promptAdminBtn, { borderColor: theme.colors.vibeRed }]}
-              onPress={onDeletePrompt}
-            >
-              <Text style={[styles.promptAdminBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
-            </Pressable>
-          </View>
-        )}
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>YOUR HAND</Text>
@@ -192,9 +180,15 @@ export default function PickingPhase({
           {hand.map((item, i) => {
             const isSelected = selectedCard?.id === item.id;
             const onCardPress = () => {
-              if (mulliganMode) onMulliganSwap(item);
-              else if (onSelectCard) onSelectCard(item);
-              else onPreviewCard(item);
+              if (mulliganMode) {
+                onMulliganSwap(item);
+                return;
+              }
+              // Select and open fullscreen preview so the video
+              // actually plays. YOUR CARD below stays populated
+              // when the user closes the preview.
+              if (onSelectCard) onSelectCard(item);
+              onPreviewCard(item);
             };
             return (
               <View key={item?.id || `hand-${i}`} style={styles.gridCell}>

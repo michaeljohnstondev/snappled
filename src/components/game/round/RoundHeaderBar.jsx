@@ -53,13 +53,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingBottom: 10,
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingTop: 42,
+    paddingBottom: 6,
+    paddingHorizontal: 10,
+    gap: 6,
   },
   chipsWrap: {
     flexShrink: 1,
+    minWidth: 0,
   },
   rightGroup: {
     flexDirection: 'row',

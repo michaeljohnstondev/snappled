@@ -60,11 +60,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.25)',
     backgroundColor: 'transparent',
@@ -75,17 +76,17 @@ const styles = StyleSheet.create({
   },
   label: {
     color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 0.6,
   },
   labelActive: {
     color: '#000',
   },
   divider: {
-    width: 8,
+    width: 6,
     height: 1.5,
     backgroundColor: 'rgba(255,255,255,0.25)',
-    marginHorizontal: 2,
+    marginHorizontal: 1,
   },
 });

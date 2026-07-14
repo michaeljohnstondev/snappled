@@ -5,13 +5,24 @@
 // as a card inside the phase's padded content area.
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import theme from '../../../theme/themes';
 
 // Render the banner. `round` is 1-based; `totalRounds` is optional
 // (0 or null = infinite mode, hides the "OF M" suffix). `subtitle`
-// is optional — omit to render just the prompt.
-export default function RoundPromptBanner({ prompt, round, totalRounds, subtitle }) {
+// is optional — omit to render just the prompt. `onEdit`/`onDelete`
+// are admin-only handlers; when passed, small pencil/X icons appear
+// in the top-right corner. Kept intentionally tiny so they don't
+// look like player actions.
+export default function RoundPromptBanner({
+  prompt,
+  round,
+  totalRounds,
+  subtitle,
+  onEdit,
+  onDelete,
+}) {
   const roundText = totalRounds
     ? `ROUND ${round} OF ${totalRounds}`
     : `ROUND ${round}`;
@@ -26,6 +37,21 @@ export default function RoundPromptBanner({ prompt, round, totalRounds, subtitle
         <Text style={styles.promptText}>{prompt}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
+
+      {(onEdit || onDelete) ? (
+        <View style={styles.adminCorner}>
+          {onEdit ? (
+            <Pressable style={styles.adminBtn} onPress={onEdit} hitSlop={6}>
+              <Ionicons name="pencil" size={12} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+          ) : null}
+          {onDelete ? (
+            <Pressable style={styles.adminBtn} onPress={onDelete} hitSlop={6}>
+              <Ionicons name="close" size={14} color="rgba(255,120,120,0.85)" />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -80,5 +106,21 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 13,
     marginTop: 6,
+  },
+  // Tiny corner admin controls. Positioned absolute so they don't
+  // reflow the prompt when they render, and quiet-colored so they
+  // don't compete with the prompt itself.
+  adminCorner: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    flexDirection: 'row',
+    gap: 2,
+  },
+  adminBtn: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

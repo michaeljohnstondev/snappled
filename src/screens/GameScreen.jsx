@@ -28,6 +28,7 @@ import PickingPhase from '../components/game/phases/PickingPhase';
 import LoadingPhase from '../components/game/phases/LoadingPhase';
 import RoundHeaderBar from '../components/game/round/RoundHeaderBar';
 import RoundPromptBanner from '../components/game/round/RoundPromptBanner';
+import HandCardThumbnail from '../components/game/round/HandCardThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import TutorialOverlay from '../components/game/TutorialOverlay';
 import { useTutorial } from '../hooks/useTutorial';
@@ -1638,30 +1639,46 @@ export default function GameScreen({ navigation }) {
           })()
         ) : (
           <>
-            {/* Flex-fill 3 rows × 2 columns — matches the picking grid
-                so the layout doesn't shift on phase transition. */}
-            <View style={styles.handGrid}>
-              {votableSubmissions.map((item, i) => {
-                const isSelected = favoriteCard?.uid === item.uid;
-                return (
-                  <Pressable
-                    key={item?.snappleId || `vote-${i}`}
-                    style={styles.handCard}
-                    onPress={() => setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true })}
-                  >
-                    <View style={styles.handCardVideo}>
-                      {item.videoUrl ? <SnappleThumbnailImg videoUrl={item.videoUrl} /> : null}
+            {/* 2-col scroll grid using HandCardThumbnail — same shape
+                as the picking hand so cards look identical across
+                phases. Creator names are hidden during voting (kept
+                anonymous with "@anon") and reveal on scoring. */}
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 16 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.votingGrid}>
+                {votableSubmissions.map((item, i) => {
+                  const isSelected = favoriteCard?.uid === item.uid;
+                  return (
+                    <View
+                      key={item?.snappleId || `vote-${i}`}
+                      style={styles.votingCell}
+                    >
+                      <HandCardThumbnail
+                        card={{ videoUrl: item.videoUrl }}
+                        label="@anon"
+                        isSelected={isSelected}
+                        onPress={() => {
+                          setFavoriteCard(item);
+                          setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true });
+                        }}
+                      />
                     </View>
-                    {isSelected && <View style={styles.handSelectionRing} />}
-                  </Pressable>
-                );
-              })}
-            </View>
-            {favoriteCard && (
-              <Pressable style={styles.submitVoteBar} onPress={handleSubmitVote}>
-                <Text style={styles.submitVoteBarText}>SUBMIT VOTE</Text>
-              </Pressable>
-            )}
+                  );
+                })}
+                {votableSubmissions.length % 2 === 1 && <View style={styles.votingCell} />}
+              </View>
+            </ScrollView>
+            <Pressable
+              style={[styles.submitVoteBar, !favoriteCard && styles.submitVoteBarDisabled]}
+              onPress={() => favoriteCard && handleSubmitVote()}
+              disabled={!favoriteCard}
+            >
+              <Text style={styles.submitVoteBarText}>
+                {favoriteCard ? 'SUBMIT VOTE' : 'PICK A FAVORITE'}
+              </Text>
+            </Pressable>
           </>
         )}
 
@@ -2826,12 +2843,26 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderTopColor: '#000',
   },
+  submitVoteBarDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
   submitVoteBarText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 3,
     textTransform: 'uppercase',
+  },
+  // 2-col voting grid — mirrors PickingPhase's grid so the two
+  // phases feel like the same screen with a different title.
+  votingGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 10,
+  },
+  votingCell: {
+    width: '50%',
+    padding: 4,
   },
   swipeHints: {
     flexDirection: 'row', justifyContent: 'space-between', width: '100%',
