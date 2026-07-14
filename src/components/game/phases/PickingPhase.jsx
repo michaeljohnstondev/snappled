@@ -56,6 +56,7 @@ export default function PickingPhase({
   onEditPromptTextChange,
   onEditPromptSave,
   onDeletePrompt,
+  onTrueDeletePrompt,
   onExcludeFromPool,
 }) {
   const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
@@ -311,24 +312,33 @@ export default function PickingPhase({
                 placeholder="New prompt text..."
                 placeholderTextColor="rgba(255,255,255,0.3)"
               />
+              {/* Vertical stack — Save (primary), Replace (swap for
+                  another prompt this round only), Delete (hard-remove
+                  from the pool + swap), Cancel. */}
               <View style={styles.editPromptButtons}>
-                <Pressable
-                  style={[styles.editPromptBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
-                  onPress={onEditPromptClose}
-                >
-                  <Text style={styles.editPromptBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.editPromptBtn, { borderColor: theme.colors.vibeRed }]}
-                  onPress={onDeletePrompt}
-                >
-                  <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeRed }]}>Replace & Restart</Text>
-                </Pressable>
                 <Pressable
                   style={[styles.editPromptBtn, { borderColor: theme.colors.vibeBlue }]}
                   onPress={onEditPromptSave}
                 >
                   <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeBlue }]}>Save</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.editPromptBtn, { borderColor: theme.colors.vibeYellow }]}
+                  onPress={onDeletePrompt}
+                >
+                  <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeYellow }]}>Replace</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.editPromptBtn, { borderColor: theme.colors.vibeRed }]}
+                  onPress={onTrueDeletePrompt}
+                >
+                  <Text style={[styles.editPromptBtnText, { color: theme.colors.vibeRed }]}>Delete</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.editPromptBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
+                  onPress={onEditPromptClose}
+                >
+                  <Text style={styles.editPromptBtnText}>Cancel</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -622,15 +632,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
+  // Vertical button stack — each takes full width, tap targets
+  // stay comfortable, and the primary action sits on top.
   editPromptButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     gap: 8,
     marginTop: 16,
   },
   editPromptBtn: {
-    flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 2,
@@ -640,7 +650,8 @@ const styles = StyleSheet.create({
   },
   editPromptBtnText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
 });

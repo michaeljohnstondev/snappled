@@ -1103,11 +1103,41 @@ export default function GameScreen({ navigation }) {
     showToast('reward', 'Mulligan!', 'Card swapped');
   };
 
-  // Admin: replace the current round's prompt with a fresh one from the
-  // pool and restart the picking phase. Used by Delete button on banner
-  // and the modal's Replace & Restart action.
+  // Admin: replace the current round's prompt with a fresh one from
+  // the pool and restart the picking phase. Round-local — the prompt
+  // stays in Firestore, just gets swapped for this round.
   const handleDeletePrompt = async () => {
     setIsEditingPrompt(false);
+    const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
+    if (!result?.success) showError('Error', result?.error || 'Failed to replace prompt');
+  };
+
+  // Admin: hard-delete the current prompt from the gamePrompts pool
+  // AND swap in a fresh one for the round. Uses the current prompt
+  // text to look up the doc since game.prompts stores plain strings.
+  const handleTrueDeletePrompt = async () => {
+    setIsEditingPrompt(false);
+    const currentText = game?.prompts?.[game.currentRound - 1];
+    try {
+      if (currentText) {
+        const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+        const { db } = await import('../services/firebase');
+        const { deletePrompt } = await import('../services/promptAdminService');
+        const q = query(
+          collection(db, 'gamePrompts'),
+          where('text', '==', currentText),
+          limit(1),
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          await deletePrompt('gamePrompts', snap.docs[0].id);
+        }
+      }
+    } catch (e) {
+      // Non-fatal — still swap the prompt for the round so play
+      // continues even if the pool delete failed.
+      console.warn('[GameScreen] deletePrompt failed', e);
+    }
     const result = await gameService.replaceAndRestartRound(gameId, game.currentRound - 1);
     if (!result?.success) showError('Error', result?.error || 'Failed to replace prompt');
   };
@@ -1554,6 +1584,7 @@ export default function GameScreen({ navigation }) {
         onEditPromptTextChange={setEditPromptText}
         onEditPromptSave={handleSavePrompt}
         onDeletePrompt={handleDeletePrompt}
+        onTrueDeletePrompt={handleTrueDeletePrompt}
         onExcludeFromPool={handleExcludeFromPool}
         onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp}
         />

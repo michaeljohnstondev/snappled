@@ -1,19 +1,15 @@
 // Loading phase — sits between LOBBY and REVIEW so every client has a
-// chance to pre-download every video in the drawn hand before the
-// warmup timer starts. Prevents the "warmup opens but thumbnails are
-// blank while videos stream in" glitch on slow networks.
-//
-// Behavior:
-// - Renders a spinner + progress ("Loading 3/6").
-// - Kicks off videoCache.prefetchVideo on every hand URL in parallel.
-// - Reports completion up to GameScreen, which is the only client with
-//   authority to advance the game phase (host).
+// chance to pre-download every video AND thumbnail in the drawn hand
+// before the warmup timer starts. Shows a big percentage counter (no
+// per-video status text) with a rotating tip from loadingTips.js —
+// tap the screen to cycle to another tip.
 
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { prefetchVideo } from '../../../services/videoCache';
 import { thumbnailService } from '../../../services/thumbnailService';
+import { pickRandomTip } from '../../../lib/loadingTips';
 import theme from '../../../theme/themes';
 
 // Max time we'll sit on the loading screen before advancing anyway.
@@ -42,6 +38,25 @@ export default function LoadingPhase({ hand, onLoaded }) {
     const id = setTimeout(() => setMinElapsed(true), MIN_DISPLAY_MS);
     return () => clearTimeout(id);
   }, []);
+
+  // Cycling tip. Start with one random tip; tapping the backdrop
+  // swaps it. Keep a small "seen" set to avoid repeating the last
+  // few tips back-to-back.
+  const seenRef = useRef(new Set());
+  const [tip, setTip] = useState(() => {
+    const picked = pickRandomTip(seenRef.current);
+    seenRef.current.add(picked.index);
+    return picked.tip;
+  });
+  const nextTip = useCallback(() => {
+    const picked = pickRandomTip(seenRef.current);
+    seenRef.current.add(picked.index);
+    // Keep the "seen" cap small so the pool refreshes as the user
+    // taps through it.
+    if (seenRef.current.size > 6) seenRef.current = new Set([picked.index]);
+    setTip(picked.tip);
+  }, []);
+
   // Callers often pass a fresh arrow function each render — snapshot
   // the latest into a ref so effect deps stay stable and the fallback
   // timer doesn't reset every parent render.
@@ -84,9 +99,6 @@ export default function LoadingPhase({ hand, onLoaded }) {
   // if both conditions land in the same tick.
   useEffect(() => {
     if (firedOnce) return;
-    // Wait for BOTH the minimum display window AND the prefetch
-    // completion. Prevents the flash-and-gone case when every
-    // video is already cached.
     if (minElapsed && total > 0 && doneCount >= total) {
       setFiredOnce(true);
       onLoadedRef.current?.();
@@ -103,42 +115,91 @@ export default function LoadingPhase({ hand, onLoaded }) {
     return () => clearTimeout(id);
   }, [firedOnce]);
 
+  // Percentage — capped at 100 and blended with a soft floor so the
+  // display never stays at 0 forever if a slow network is dragging
+  // the first prefetch.
+  const pct = total > 0 ? Math.min(100, Math.round((doneCount / total) * 100)) : 0;
+
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
-      <View style={styles.content}>
-        <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
-        <Text style={styles.title}>Loading Snapples</Text>
-        <Text style={styles.progress}>
-          {total > 0 ? `${doneCount} of ${total}` : 'Drawing hand...'}
-        </Text>
-        <Text style={styles.hint}>
-          Downloading videos so the round runs smooth.
-        </Text>
+    <Pressable style={styles.container} onPress={nextTip}>
+      <LinearGradient
+        colors={theme.colors.backgroundGradient}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.pctBlock}>
+        <Text style={styles.pctText}>{pct}%</Text>
+        <View style={styles.progressBarWrap}>
+          <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+        </View>
       </View>
-    </LinearGradient>
+
+      <View style={styles.tipBlock}>
+        <Text style={styles.tipTitle}>{tip.title}</Text>
+        <Text style={styles.tipBody}>{tip.body}</Text>
+        <Text style={styles.tipHint}>tap for another tip</Text>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { alignItems: 'center', gap: 14, paddingHorizontal: 32 },
-  title: {
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  pctBlock: {
+    alignItems: 'center',
+    marginBottom: 36,
+    width: '100%',
+  },
+  pctText: {
     color: theme.colors.vibeBlue,
-    fontSize: 22,
-    fontWeight: theme.fontWeights.bold,
+    fontSize: 64,
+    fontWeight: '900',
     letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: 8,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 14,
   },
-  progress: {
-    color: theme.colors.textPrimary,
+  progressBarWrap: {
+    width: '70%',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: theme.colors.vibeBlue,
+    borderRadius: 3,
+  },
+  tipBlock: {
+    alignItems: 'center',
+    maxWidth: 340,
+  },
+  tipTitle: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: theme.fontWeights.bold,
-  },
-  hint: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 8,
     textAlign: 'center',
-    marginTop: 4,
+  },
+  tipBody: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  tipHint: {
+    color: theme.colors.vibeBlue,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    opacity: 0.6,
   },
 });

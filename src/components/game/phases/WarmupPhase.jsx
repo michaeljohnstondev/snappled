@@ -203,12 +203,12 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // Full-width Ready Up bar. Same overall shape as PLAY THIS CARD;
-  // slightly beefier because it's the ONLY tap target during warmup.
+  // Full-width Ready Up bar — same shape / padding as the other
+  // CTA bars in the game (PLAY THIS CARD, SUBMIT VOTE).
   readyBar: {
     backgroundColor: theme.colors.vibeBlue,
-    paddingTop: 32,
-    paddingBottom: 42,
+    paddingTop: 20,
+    paddingBottom: 30,
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
@@ -220,9 +220,9 @@ const styles = StyleSheet.create({
   },
   readyBarText: {
     color: '#fff',
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 4,
+    letterSpacing: 3,
     textTransform: 'uppercase',
   },
 });
