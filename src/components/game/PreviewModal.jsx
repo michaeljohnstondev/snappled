@@ -120,18 +120,22 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderTopColor: '#000',
   },
+  // Solid cyan fill with white text — matches the phase-chip active
+  // state up top so leaving the preview reads as a real cyan action,
+  // not gray chrome. Sits next to the green submit chunk = the
+  // core vibe palette.
   actionBackChunk: {
     flex: 1,
     paddingTop: 20,
     paddingBottom: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(10, 18, 40, 0.95)',
+    backgroundColor: theme.colors.vibeBlue,
     borderRightWidth: 2,
     borderRightColor: '#000',
   },
   actionBackText: {
-    color: theme.colors.vibeBlue,
+    color: '#fff',
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 3,

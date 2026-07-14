@@ -513,8 +513,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderTopColor: '#000',
   },
+  // Waiting state — cyan-tinted fill with a solid cyan top border
+  // so it fits the vibe palette (matches the phase chips + BACK
+  // button) instead of reading as a dead gray bar.
   submitBarDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0, 198, 255, 0.18)',
+    borderTopColor: theme.colors.vibeBlue,
+    borderTopWidth: 3,
   },
   submitBarText: {
     color: '#fff',

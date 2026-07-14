@@ -375,6 +375,15 @@ export default function GameScreen({ navigation }) {
   // Same shape for the SCORING screen — mini-player inside each
   // VoteAuraCard so users can rewatch after voting closes.
   const [scoringInlinePlaying, setScoringInlinePlaying] = useState({ id: null, token: 0 });
+
+  // Reset both inline-play states on any phase transition / round
+  // bump. Without this, tapping a card in round 1's voting kept the
+  // submitter's uid in state; round 2's voting saw the same uid and
+  // auto-played whatever new snapple that player had submitted.
+  useEffect(() => {
+    setVotingInlinePlaying({ id: null, token: 0 });
+    setScoringInlinePlaying({ id: null, token: 0 });
+  }, [game?.phase, game?.currentRound]);
   // IDs of snapples this user has already played in the current game — used to
   // filter the hand pool so each round reveals unseen cards.
   const [playedCardIds, setPlayedCardIds] = useState([]);
@@ -1947,23 +1956,15 @@ export default function GameScreen({ navigation }) {
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
 
-        {/* Winner banner takes the prompt's slot during SCORING — the
-            prompt has done its job (voting is over) and the winner is
-            now the focal point. Same vertical footprint as the prompt
-            banner so no layout shift. */}
-        {winnerNames.length > 0 && topVotes > 0 ? (
-          <ScoringWinnerBanner
-            isTie={winnerNames.length > 1}
-            names={winnerNames}
-            votes={topVotes}
-          />
-        ) : (
-          <RoundPromptBanner
-            prompt={game.prompts[game.currentRound - 1]}
-            round={game.currentRound}
-            totalRounds={game.totalRounds || null}
-          />
-        )}
+        {/* Prompt banner during scoring — winner banner removed per
+            user ask. The crown badge on the winning card + points
+            chip already surface the winner without a duplicate
+            headline. */}
+        <RoundPromptBanner
+          prompt={game.prompts[game.currentRound - 1]}
+          round={game.currentRound}
+          totalRounds={game.totalRounds || null}
+        />
 
         <View style={styles.pickedWaitWrap}>
           <ScrollView
@@ -2043,6 +2044,42 @@ export default function GameScreen({ navigation }) {
             </Modal>
           );
         })()}
+        {/* Fullscreen preview — mirrors the voting branch's modal so
+            the scoring expand chip actually opens a full player with
+            the follow/save/buy/report rail. `_isVoting: true` reuses
+            the voting flow but with the CTA hidden (voting closed). */}
+        {previewCard && previewCard._isVoting && (
+          <PreviewModal
+            visible
+            videoUrl={previewCard.videoUrl}
+            muted={!!previewCard.muted}
+            onClose={() => setPreviewCard(null)}
+            primaryLabel={null}
+            topRightSlot={
+              isAdmin && previewCard.snappleId ? (
+                <Pressable
+                  style={adminGameStyles.poolNukeBtn}
+                  onPress={() => {
+                    handleExcludeFromPool(previewCard.snappleId);
+                    setPreviewCard(null);
+                  }}
+                >
+                  <Ionicons name="eye-off" size={16} color={theme.colors.vibeRed} />
+                  <Text style={adminGameStyles.poolNukeText}>Exclude</Text>
+                </Pressable>
+              ) : null
+            }
+            overlaySlot={
+              <CreatorActionRow
+                submission={previewCard}
+                currentUser={user}
+                ownedSnappleIds={userCurrency.ownedSnapples || []}
+                showToast={showToast}
+                showError={showError}
+              />
+            }
+          />
+        )}
         <RoundStartOverlay
           visible={!!roundAlert}
           title={roundAlert?.title}
@@ -2715,19 +2752,18 @@ const styles = StyleSheet.create({
     margin: 6,
   },
   // Large-mode cell for the SCORING screen — 2-col grid matching
-  // the picking/voting hand layout so screens feel consistent.
-  // Extra padding on each cell (18pt) gives the outward-extending
-  // vote rings room to breathe. 5 rings at 2pt each = 10pt outward
-  // → 8pt clearance from the neighbor before rings meet.
+  // the picking/voting hand layout. Cell padding drops to 10pt
+  // each side so cards get closer to the picking-hand size (only
+  // ~14pt narrower). 6-ring vote piles still clear the neighbor.
   auraGridLarge: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   auraCellLarge: {
     width: '50%',
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
   },
   // Vote-wait top row: YOUR VOTE on the left, aura grid wrapping on the
   // right. Pulls all videos up next to the user's pick so eyes don't have
@@ -3012,8 +3048,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderTopColor: '#000',
   },
+  // Waiting state — cyan-tinted fill + cyan top border so it reads
+  // as chrome-in-the-vibe-palette instead of a dead gray bar.
+  // Matches PickingPhase.submitBarDisabled for consistency.
   submitVoteBarDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0, 198, 255, 0.18)',
+    borderTopColor: theme.colors.vibeBlue,
+    borderTopWidth: 3,
   },
   // Two-chunk submit row: 1/4 back button, 3/4 primary CTA. Same
   // full-width footprint as the plain submit bar, split by a
