@@ -11,7 +11,8 @@ import theme from '../../theme/themes';
 
 const AUTO_DISMISS_MS = 2000;
 
-// Sum of active-upload progress bars, averaged. Ignores DONE/FAILED
+// averageActiveProgress — average pct across all active items (any
+// non-terminal, non-staging status). Ignores DONE/FAILED/STAGING
 // because those get their own visual treatment.
 function averageActiveProgress(items) {
   const active = items.filter(
@@ -20,6 +21,13 @@ function averageActiveProgress(items) {
   if (!active.length) return 0;
   const sum = active.reduce((acc, i) => acc + (i.progress || 0), 0);
   return Math.round(sum / active.length);
+}
+
+// truncate — clip long error messages so the failed chip doesn't
+// blow up to full-screen height on a giant Firebase stack.
+function truncate(str, n) {
+  if (!str) return '';
+  return str.length > n ? `${str.slice(0, n - 1)}…` : str;
 }
 
 export default function UploadProgressToast() {
@@ -41,6 +49,7 @@ export default function UploadProgressToast() {
   const active = items.filter(
     (i) => i.status === UPLOAD_STATUS.UPLOADING || i.status === UPLOAD_STATUS.FINALIZING,
   );
+  const staging = items.filter((i) => i.status === UPLOAD_STATUS.STAGING);
   const done = items.filter((i) => i.status === UPLOAD_STATUS.DONE);
 
   const avgPct = averageActiveProgress(items);
@@ -52,9 +61,16 @@ export default function UploadProgressToast() {
       {failed.map((item) => (
         <View key={item.id} style={styles.failedChip}>
           <Ionicons name="alert-circle" size={18} color="#fff" />
-          <Text style={styles.failedText} numberOfLines={1}>
-            Upload failed
-          </Text>
+          <View style={styles.failedTextWrap}>
+            <Text style={styles.failedText} numberOfLines={1}>
+              Upload failed
+            </Text>
+            {item.error ? (
+              <Text style={styles.failedDetail} numberOfLines={2}>
+                {truncate(item.error, 90)}
+              </Text>
+            ) : null}
+          </View>
           <Pressable
             style={styles.retryBtn}
             onPress={() => retryUpload(item.id)}
@@ -72,10 +88,17 @@ export default function UploadProgressToast() {
         </View>
       ))}
 
-      {/* Single aggregated pill for active + just-done uploads. */}
-      {(active.length > 0 || done.length > 0) && (
+      {/* Single aggregated pill for staging + active + just-done uploads. */}
+      {(active.length > 0 || staging.length > 0 || done.length > 0) && (
         <View style={styles.pill}>
-          {active.length > 0 ? (
+          {staging.length > 0 && active.length === 0 ? (
+            <>
+              <View style={styles.spinnerDot} />
+              <Text style={styles.pillText} numberOfLines={1}>
+                Preparing snapple…
+              </Text>
+            </>
+          ) : active.length > 0 ? (
             <>
               <View style={styles.spinnerDot} />
               <Text style={styles.pillText} numberOfLines={1}>
@@ -159,11 +182,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+  failedTextWrap: {
+    flex: 1,
+  },
   failedText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    flex: 1,
+  },
+  failedDetail: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    marginTop: 2,
   },
   retryBtn: {
     backgroundColor: 'rgba(0,0,0,0.35)',
