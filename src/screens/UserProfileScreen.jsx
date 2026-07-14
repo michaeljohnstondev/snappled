@@ -60,15 +60,15 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const loadSnapples = async () => {
     try {
-      // Load snapples created by this user. getActiveSnapples returns
-      // sorted by totalVotes (its use case is game-pool selection), so
-      // re-sort by createdAt desc here to show newest-recorded first.
-      const result = await snappleService.getActiveSnapples(50);
+      // Query by creatorId directly. getActiveSnapples was the wrong
+      // source — it sorts by totalVotes desc and only returns the top
+      // 50, so a new user's own snapples (0 votes) got pushed off the
+      // list. getSnapplesByCreator hits the creatorId index and is
+      // already sorted newest-first. This is our own profile, so
+      // private snapples are included.
+      const result = await snappleService.getSnapplesByCreator(userId);
       if (result.success) {
-        const created = result.snapples
-          .filter(s => s.creatorId === userId)
-          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        setCreatedSnapples(created);
+        setCreatedSnapples(result.snapples || []);
       }
       // Load owned snapples from user doc. ownedSnapples is append-only
       // (see VideoPreviewScreen onSave, SnappleOverlay purchase flow),

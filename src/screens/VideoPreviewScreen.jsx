@@ -286,12 +286,15 @@ export default function VideoPreviewScreen({ route, navigation }) {
     } else {
       // Use arrayUnion at the Firestore layer so racing saves from
       // other tabs / other simultaneous uploads don't clobber each
-      // other's ownedSnapples arrays.
+      // other's ownedSnapples arrays. Top-level field name — the
+      // rest of the app (userService, AuthContext, ProfileScreen)
+      // reads/writes ownedSnapples at the doc root, NOT under
+      // resources.*.
       try {
         const { doc: docRef, updateDoc: update, arrayUnion: aUnion } = await import('firebase/firestore');
         const { db: database } = await import('../services/firebase');
         await update(docRef(database, 'users', user.uid), {
-          'resources.ownedSnapples': aUnion(newSnappleId),
+          ownedSnapples: aUnion(newSnappleId),
         }).catch(() => {});
       } catch (e) {}
     }

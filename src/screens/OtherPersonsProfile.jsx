@@ -76,19 +76,17 @@ export default function OtherPersonsProfile({ route, navigation }) {
   };
 
   // Fetch created + owned public snapples for the grid tabs.
-  // Created: sorted by createdAt desc (newest first) — getActiveSnapples
-  // sorts by totalVotes for its pool use case, so we re-sort locally.
+  // Created: query by creatorId directly. getActiveSnapples was wrong
+  // — it sorts by totalVotes and returns top-50, so low-vote creators
+  // showed as empty. Filter out private snapples client-side since
+  // this is someone else's profile.
   // Collection: iterate ownedSnapples array in reverse since it's
   // append-only, giving "most recently added" first.
   const loadSnapples = async () => {
     try {
-      const result = await snappleService.getActiveSnapples(50);
+      const result = await snappleService.getSnapplesByCreator(targetUserId);
       if (result.success) {
-        setCreatedSnapples(
-          result.snapples
-            .filter(s => s.creatorId === targetUserId)
-            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')),
-        );
+        setCreatedSnapples((result.snapples || []).filter(s => s.isPrivate !== true));
       }
       const targetData = await userService.getUserData(targetUserId);
       const ownedIds = [...(targetData?.ownedSnapples || [])].reverse();
