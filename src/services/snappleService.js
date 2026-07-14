@@ -187,7 +187,6 @@ export const snappleService = {
         return '';
       };
       snapples.sort((a, b) => toKey(b.createdAt).localeCompare(toKey(a.createdAt)));
-      console.log('[SnappleService] getSnapplesByCreator', { creatorId, count: snapples.length });
       return { success: true, snapples };
     } catch (error) {
       console.error('[SnappleService] getSnapplesByCreator error:', error);

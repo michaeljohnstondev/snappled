@@ -16,7 +16,7 @@ import { useAuth } from '../store/AuthContext';
 import { userService } from '../services/userService';
 import { levelService } from '../services/levelService';
 import { snappleService } from '../services/snappleService';
-import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
+import SectionDropdown from '../components/ui/SectionDropdown';
 import VibeButton from '../components/ui/VibeButton';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
@@ -199,11 +199,11 @@ export default function OtherPersonsProfile({ route, navigation }) {
 
       <View style={styles.statsRow}>
         <Pressable style={styles.statItem} onPress={() => openSocialList('followers')}>
-          <Text style={[styles.statNumber, styles.statNumberLink]}>{followers}</Text>
+          <Text style={styles.statNumber}>{followers}</Text>
           <Text style={styles.statLabel}>Followers</Text>
         </Pressable>
         <Pressable style={styles.statItem} onPress={() => openSocialList('following')}>
-          <Text style={[styles.statNumber, styles.statNumberLink]}>{followingCount}</Text>
+          <Text style={styles.statNumber}>{followingCount}</Text>
           <Text style={styles.statLabel}>Following</Text>
         </Pressable>
         <View style={styles.statItem}>
@@ -222,7 +222,7 @@ export default function OtherPersonsProfile({ route, navigation }) {
       </View>
 
       <View style={styles.tabSection}>
-        <VibeSegmentedControl
+        <SectionDropdown
           options={tabOptions}
           selectedValue={activeTab}
           onSelect={setActiveTab}
@@ -344,7 +344,6 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   // Cyan tint on the tappable count so users know it's actionable.
-  statNumberLink: { color: theme.colors.vibeBlue },
   statLabel: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 },
   actionSection: { paddingTop: 20 },
   tabSection: { paddingTop: 20, paddingBottom: 16 },

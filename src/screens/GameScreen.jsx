@@ -2000,15 +2000,16 @@ export default function GameScreen({ navigation }) {
           </ScrollView>
         </View>
 
-        {/* Host skip — advance to Round Results early without waiting
-            out the 15s scoring timer. Same flush-bar style as the
-            other primary CTAs so it reads instantly as an action. */}
+        {/* Host skip — advance to the SCORE (round-results) phase
+            early without waiting out the scoring timer. Matches the
+            SCORE chip in the phase strip so the button reads as
+            "jump to the scoreboard phase". */}
         {isHost && (
           <Pressable
             style={styles.hostAdvanceBar}
             onPress={() => gameService.enterRoundResults(gameId)}
           >
-            <Text style={styles.hostAdvanceBarText}>SHOW RESULTS</Text>
+            <Text style={styles.hostAdvanceBarText}>SHOW SCORE</Text>
           </Pressable>
         )}
 

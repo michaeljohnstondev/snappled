@@ -8,13 +8,16 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
 
-// Static base — PICK / VOTE / SCORE / RESULT always render. WARMUP
+// Static base — PICK / VOTE / RESULT / SCORE always render. WARMUP
 // is prepended conditionally in the render below.
+// Labels vs phase keys: `scoring` is when THIS round's vote result
+// is revealed → RESULT. `roundResults` is the running scoreboard
+// between rounds → SCORE. Older names, kept for wire compat.
 const BASE_STEPS = [
   { key: 'picking', label: 'PICK' },
   { key: 'voting', label: 'VOTE' },
-  { key: 'scoring', label: 'SCORE' },
-  { key: 'roundResults', label: 'RESULT' },
+  { key: 'scoring', label: 'RESULT' },
+  { key: 'roundResults', label: 'SCORE' },
 ];
 
 // Which chip should be highlighted for a given game.phase. Scoring

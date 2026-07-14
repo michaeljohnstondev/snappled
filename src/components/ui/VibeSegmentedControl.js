@@ -22,6 +22,9 @@ const VibeSegmentedControl = ({ options, selectedValue, onSelect, style }) => {
               styles.segmentText,
               selectedValue === option.value && styles.selectedSegmentText,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
           >
             {option.icon && `${option.icon} `}
             {option.label}

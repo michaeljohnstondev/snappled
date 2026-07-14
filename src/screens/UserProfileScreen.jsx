@@ -6,7 +6,7 @@ import { useAuth } from '../store/AuthContext';
 import { userService } from '../services/userService';
 import { levelService } from '../services/levelService';
 import { snappleService } from '../services/snappleService';
-import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
+import SectionDropdown from '../components/ui/SectionDropdown';
 import VibeButton from '../components/ui/VibeButton';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
@@ -28,10 +28,6 @@ export default function UserProfileScreen({ route, navigation }) {
   const [createdSnapples, setCreatedSnapples] = useState([]);
   const [ownedSnapples, setOwnedSnapples] = useState([]);
   const [savedSnapples, setSavedSnapples] = useState([]);
-  // Live debug info so an empty Created tab is diagnosable at a
-  // glance without console access — shows query result + userId
-  // tail + any error text in the empty-state row.
-  const [createdDebug, setCreatedDebug] = useState(null);
 
   const isOwnProfile = user?.uid === userId;
 
@@ -70,14 +66,9 @@ export default function UserProfileScreen({ route, navigation }) {
       // list. getSnapplesByCreator hits the creatorId index and is
       // already sorted newest-first. This is our own profile, so
       // private snapples are included.
-      console.log('[UserProfileScreen] querying creator', { userId, viewer: user?.uid });
       const result = await snappleService.getSnapplesByCreator(userId);
-      console.log('[UserProfileScreen] creator query result', result);
       if (result.success) {
         setCreatedSnapples(result.snapples || []);
-        setCreatedDebug({ ok: true, count: (result.snapples || []).length });
-      } else {
-        setCreatedDebug({ ok: false, error: result.error });
       }
       // Load owned snapples from user doc. ownedSnapples is append-only
       // (see VideoPreviewScreen onSave, SnappleOverlay purchase flow),
@@ -148,23 +139,18 @@ export default function UserProfileScreen({ route, navigation }) {
   const followers = profileData?.social?.followers?.length || 0;
   const followingCount = profileData?.social?.following?.length || 0;
 
+  // Dropdown-only view modes. Deck used to live here but was the
+  // only option that navigated away instead of filtering the grid,
+  // which read badly in a dropdown; it's a sibling button now.
   const tabOptions = [
     { label: 'Created', value: 'created' },
-    { label: 'Deck', value: 'deck' },
     { label: 'Collection', value: 'collection' },
     { label: 'Saved', value: 'saved' },
   ];
 
-  const handleTabSelect = (tab) => {
-    if (tab === 'deck' && isOwnProfile) {
-      navigation.navigate('DeckBuilder');
-      return;
-    }
-    setActiveTab(tab);
-  };
+  const handleTabSelect = (tab) => setActiveTab(tab);
 
   const activeSnapples = activeTab === 'created' ? createdSnapples
-    : activeTab === 'deck' ? ownedSnapples
     : activeTab === 'saved' ? savedSnapples
     : ownedSnapples; // collection
 
@@ -215,14 +201,14 @@ export default function UserProfileScreen({ route, navigation }) {
           style={styles.statItem}
           onPress={() => navigation.navigate('FollowingList', { userId, type: 'followers' })}
         >
-          <Text style={[styles.statNumber, styles.statNumberLink]}>{followers}</Text>
+          <Text style={styles.statNumber}>{followers}</Text>
           <Text style={styles.statLabel}>Followers</Text>
         </Pressable>
         <Pressable
           style={styles.statItem}
           onPress={() => navigation.navigate('FollowingList', { userId, type: 'following' })}
         >
-          <Text style={[styles.statNumber, styles.statNumberLink]}>{followingCount}</Text>
+          <Text style={styles.statNumber}>{followingCount}</Text>
           <Text style={styles.statLabel}>Following</Text>
         </Pressable>
         <View style={styles.statItem}>
@@ -249,13 +235,28 @@ export default function UserProfileScreen({ route, navigation }) {
         </Pressable>
       )}
 
-      {/* Tabs */}
+      {/* Section picker + Edit Deck. Dropdown filters the grid
+          below; Edit Deck ships you to the DeckBuilder screen. Only
+          shown on your own profile since Deck-building is per-user. */}
       <View style={styles.tabSection}>
-        <VibeSegmentedControl
-          options={tabOptions}
-          selectedValue={activeTab}
-          onSelect={handleTabSelect}
-        />
+        <View style={styles.tabRow}>
+          <View style={styles.tabDropdown}>
+            <SectionDropdown
+              options={tabOptions}
+              selectedValue={activeTab}
+              onSelect={handleTabSelect}
+            />
+          </View>
+          {isOwnProfile ? (
+            <Pressable
+              style={styles.editDeckBtn}
+              onPress={() => navigation.navigate('DeckBuilder')}
+            >
+              <Ionicons name="layers" size={18} color={theme.colors.vibeGreen} />
+              <Text style={styles.editDeckBtnText}>Edit Deck</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </>
   );
@@ -264,17 +265,9 @@ export default function UserProfileScreen({ route, navigation }) {
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>
         {activeTab === 'created' ? 'No snapples created yet'
-          : activeTab === 'deck' ? 'No snapples in deck yet'
           : activeTab === 'saved' ? 'No saved snapples yet'
           : 'No snapples in collection yet'}
       </Text>
-      {activeTab === 'created' && createdDebug ? (
-        <Text style={styles.debugText}>
-          uid: {String(userId || '').slice(-6)} · {createdDebug.ok
-            ? `query ok, ${createdDebug.count} rows`
-            : `error: ${createdDebug.error || 'unknown'}`}
-        </Text>
-      ) : null}
     </View>
   );
 
@@ -419,11 +412,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: theme.fontWeights.bold,
   },
-  // Cyan tint on the tappable Following count so it reads as actionable
-  // instead of a plain number like Followers or Snapples.
-  statNumberLink: {
-    color: theme.colors.vibeBlue,
-  },
   statLabel: {
     color: theme.colors.textSecondary,
     fontSize: 12,
@@ -453,6 +441,31 @@ const styles = StyleSheet.create({
   tabSection: {
     paddingTop: 20,
     paddingBottom: 16,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  tabDropdown: {
+    flex: 1,
+  },
+  editDeckBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeGreen,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  editDeckBtnText: {
+    color: theme.colors.vibeGreen,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   row: {
     justifyContent: 'space-between',
@@ -498,12 +511,5 @@ const styles = StyleSheet.create({
   emptyText: {
     color: theme.colors.textSecondary,
     fontSize: 14,
-  },
-  debugText: {
-    color: theme.colors.vibeYellow || '#ffcc00',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    marginTop: 8,
-    opacity: 0.85,
   },
 });
