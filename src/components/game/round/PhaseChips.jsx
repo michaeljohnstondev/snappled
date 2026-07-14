@@ -29,10 +29,13 @@ function activeKeyForPhase(phase) {
 
 // Render the strip. Compact by design — the timer sits to its right
 // in RoundHeaderBar, so the whole row stays under ~40pt tall.
+// During WARMUP we render just the single WARMUP chip so the strip
+// isn't three dim upcoming labels; the three-step strip reappears
+// once picking starts.
 export default function PhaseChips({ phase }) {
   const activeKey = activeKeyForPhase(phase);
   const steps = phase === 'review'
-    ? [{ key: 'warmup', label: 'WARMUP' }, ...BASE_STEPS]
+    ? [{ key: 'warmup', label: 'WARMUP' }]
     : BASE_STEPS;
   return (
     <View style={styles.row}>

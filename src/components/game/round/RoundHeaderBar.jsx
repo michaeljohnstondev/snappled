@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PhaseChips from './PhaseChips';
 import theme from '../../../theme/themes';
 
@@ -26,8 +26,13 @@ function formatTimer(sec) {
 // on demand instead of shoving it on-screen every round.
 export default function RoundHeaderBar({ phase, timerSec, onHelp }) {
   const showTimer = typeof timerSec === 'number' && timerSec > 0;
+  // Real safe-area inset so chips clear the status bar / notch on
+  // every device without a fat hardcoded padding. Fallback to 8 for
+  // rare cases where insets aren't ready (e.g. inside a portal).
+  const insets = useSafeAreaInsets();
+  const topPad = Math.max(insets.top, 8);
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { paddingTop: topPad + 2 }]}>
       <View style={styles.chipsWrap}>
         <PhaseChips phase={phase} />
       </View>
@@ -53,7 +58,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 42,
+    // paddingTop applied inline from safe-area insets
     paddingBottom: 6,
     paddingHorizontal: 10,
     gap: 6,

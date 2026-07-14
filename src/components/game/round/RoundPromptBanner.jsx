@@ -42,12 +42,12 @@ export default function RoundPromptBanner({
         <View style={styles.adminCorner}>
           {onEdit ? (
             <Pressable style={styles.adminBtn} onPress={onEdit} hitSlop={6}>
-              <Ionicons name="pencil" size={12} color="rgba(255,255,255,0.7)" />
+              <Ionicons name="pencil" size={14} color="rgba(255,255,255,0.7)" />
             </Pressable>
           ) : null}
           {onDelete ? (
             <Pressable style={styles.adminBtn} onPress={onDelete} hitSlop={6}>
-              <Ionicons name="close" size={14} color="rgba(255,120,120,0.85)" />
+              <Ionicons name="close" size={16} color="rgba(255,120,120,0.85)" />
             </Pressable>
           ) : null}
         </View>
@@ -118,8 +118,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   adminBtn: {
-    width: 22,
-    height: 22,
+    width: 26,
+    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },

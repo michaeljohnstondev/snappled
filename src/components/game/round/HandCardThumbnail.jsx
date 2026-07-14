@@ -7,8 +7,17 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import theme from '../../../theme/themes';
+
+// Base palette for the card chrome. surface = card fill, line =
+// subtle stroke, glow = selected-state accent (green = "picked").
+const COLORS = {
+  surface: '#141A33',
+  line: '#263054',
+  glow: theme.colors.vibeGreen,
+};
 
 // Render one card. `card` must have `videoUrl` + `creatorUsername`
 // (falls back to a friendly placeholder). `label` overrides the
@@ -23,47 +32,86 @@ export default function HandCardThumbnail({
 }) {
   const username = label || `@${card?.creatorUsername || 'anon'}`;
   return (
-    <Pressable style={styles.card} onPress={onPress}>
-      <View style={styles.videoWrap}>
-        {card?.videoUrl ? (
-          <SnappleThumbnailImg videoUrl={card.videoUrl} />
-        ) : (
-          <View style={styles.placeholder} />
-        )}
-      </View>
-
-      {duration ? (
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{duration}</Text>
-        </View>
+    <View style={[styles.glowWrap, isSelected && styles.glowWrapFeatured]}>
+      {/* Soft neon glow behind the card when selected. Pointer-events
+          off so taps land on the Pressable underneath. */}
+      {isSelected ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(0,255,140,0.35)', 'transparent']}
+          style={styles.glowGradient}
+        />
       ) : null}
-
-      <View style={styles.footer}>
-        <View style={styles.playBtn}>
-          <Ionicons name="play" size={12} color="white" />
+      <Pressable
+        style={[styles.card, isSelected && styles.cardFeatured]}
+        onPress={onPress}
+      >
+        <View style={styles.videoWrap}>
+          {card?.videoUrl ? (
+            <SnappleThumbnailImg videoUrl={card.videoUrl} />
+          ) : (
+            <View style={styles.placeholder} />
+          )}
         </View>
-        <Text style={styles.username} numberOfLines={1}>{username}</Text>
-      </View>
 
-      {isSelected && <View style={styles.selectionRing} />}
-    </Pressable>
+        {duration ? (
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>{duration}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.footer}>
+          <View style={styles.playBtn}>
+            <Ionicons name="play" size={12} color="white" />
+          </View>
+          <Text style={styles.username} numberOfLines={1}>{username}</Text>
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Outer wrapper carries the drop-shadow on iOS / elevation on
+  // Android. Needs an opaque background for iOS to render the
+  // shadow at all.
+  glowWrap: {
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+  },
+  glowWrapFeatured: {
+    shadowColor: COLORS.glow,
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+  },
+  // Optional bloom that softens the glow beyond the card border on
+  // devices that don't render colored elevation shadows well.
+  glowGradient: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: 28,
+  },
   card: {
-    flex: 1,
-    aspectRatio: 4 / 5,
-    borderRadius: 12,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#0a1428',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5,
+    borderColor: COLORS.line,
+    aspectRatio: 4 / 5,
+    backgroundColor: '#0A0E1F',
+  },
+  cardFeatured: {
+    borderWidth: 2,
+    borderColor: COLORS.glow,
   },
   videoWrap: { flex: 1 },
   placeholder: {
     flex: 1,
-    backgroundColor: '#0a1428',
+    backgroundColor: '#0A0E1F',
   },
   durationBadge: {
     position: 'absolute',
@@ -106,11 +154,5 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-  },
-  selectionRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: theme.colors.vibeGreen,
   },
 });
