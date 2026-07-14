@@ -174,11 +174,24 @@ export const snappleService = {
           snapples.push({ id: d.id, ...data });
         }
       });
-      snapples.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      // Sort newest first, tolerant of both ISO strings (current)
+      // and legacy Firestore Timestamp objects (older docs). Calling
+      // localeCompare on a Timestamp throws — that used to silently
+      // wipe the whole result via the outer try/catch.
+      const toKey = (v) => {
+        if (typeof v === 'string') return v;
+        if (v && typeof v.toDate === 'function') {
+          try { return v.toDate().toISOString(); } catch (e) { return ''; }
+        }
+        if (typeof v === 'number') return new Date(v).toISOString();
+        return '';
+      };
+      snapples.sort((a, b) => toKey(b.createdAt).localeCompare(toKey(a.createdAt)));
+      console.log('[SnappleService] getSnapplesByCreator', { creatorId, count: snapples.length });
       return { success: true, snapples };
     } catch (error) {
       console.error('[SnappleService] getSnapplesByCreator error:', error);
-      return { success: false, error: 'Failed to fetch creator snapples' };
+      return { success: false, error: error.message || 'Failed to fetch creator snapples' };
     }
   },
 

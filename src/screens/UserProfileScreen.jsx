@@ -28,6 +28,10 @@ export default function UserProfileScreen({ route, navigation }) {
   const [createdSnapples, setCreatedSnapples] = useState([]);
   const [ownedSnapples, setOwnedSnapples] = useState([]);
   const [savedSnapples, setSavedSnapples] = useState([]);
+  // Live debug info so an empty Created tab is diagnosable at a
+  // glance without console access — shows query result + userId
+  // tail + any error text in the empty-state row.
+  const [createdDebug, setCreatedDebug] = useState(null);
 
   const isOwnProfile = user?.uid === userId;
 
@@ -66,9 +70,14 @@ export default function UserProfileScreen({ route, navigation }) {
       // list. getSnapplesByCreator hits the creatorId index and is
       // already sorted newest-first. This is our own profile, so
       // private snapples are included.
+      console.log('[UserProfileScreen] querying creator', { userId, viewer: user?.uid });
       const result = await snappleService.getSnapplesByCreator(userId);
+      console.log('[UserProfileScreen] creator query result', result);
       if (result.success) {
         setCreatedSnapples(result.snapples || []);
+        setCreatedDebug({ ok: true, count: (result.snapples || []).length });
+      } else {
+        setCreatedDebug({ ok: false, error: result.error });
       }
       // Load owned snapples from user doc. ownedSnapples is append-only
       // (see VideoPreviewScreen onSave, SnappleOverlay purchase flow),
@@ -259,6 +268,13 @@ export default function UserProfileScreen({ route, navigation }) {
           : activeTab === 'saved' ? 'No saved snapples yet'
           : 'No snapples in collection yet'}
       </Text>
+      {activeTab === 'created' && createdDebug ? (
+        <Text style={styles.debugText}>
+          uid: {String(userId || '').slice(-6)} · {createdDebug.ok
+            ? `query ok, ${createdDebug.count} rows`
+            : `error: ${createdDebug.error || 'unknown'}`}
+        </Text>
+      ) : null}
     </View>
   );
 
@@ -482,5 +498,12 @@ const styles = StyleSheet.create({
   emptyText: {
     color: theme.colors.textSecondary,
     fontSize: 14,
+  },
+  debugText: {
+    color: theme.colors.vibeYellow || '#ffcc00',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    marginTop: 8,
+    opacity: 0.85,
   },
 });
