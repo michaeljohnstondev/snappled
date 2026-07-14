@@ -1,6 +1,14 @@
+import { Platform } from 'react-native';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { storage, db, auth as firebaseAuth } from './firebase';
+
+// Firebase Storage bucket + REST upload host. Keep this in sync
+// with firebase.js. Used by the Android native-upload path which
+// bypasses `fetch(file:///…)` (that call throws "Network request
+// failed" on many Android builds).
+const STORAGE_BUCKET = 'snapplepark.firebasestorage.app';
+const STORAGE_UPLOAD_HOST = 'https://firebasestorage.googleapis.com';
 
 // iOS returns camera recordings under `file:///private/var/mobile/...`.
 // Some file-system APIs choke on the `/private/` symlink prefix.
@@ -25,17 +33,116 @@ async function getFreshIdToken(forceRefresh = false) {
   return token;
 }
 
+// uploadViaFileSystem — Android upload path. Bypasses the flaky
+// `fetch(file:///…)` polyfill (which throws "Network request failed"
+// on many Android builds) by POSTing the file straight to Firebase
+// Storage's REST endpoint via expo-file-system's native uploader.
+// Returns { downloadURL, size } like the resumable path.
+async function uploadViaFileSystem(sourceUri, filename, onProgress) {
+  const LegacyFS = require('expo-file-system/legacy');
+  const { FileSystemUploadType } = LegacyFS;
+
+  // Progress is best-effort; uploadAsync (non-Task) can't stream
+  // pct. Fire a mid-upload tick so the pill doesn't look frozen.
+  if (onProgress) onProgress(30);
+
+  const token = await getFreshIdToken(false);
+  const encodedName = encodeURIComponent(filename);
+  const url = `${STORAGE_UPLOAD_HOST}/v0/b/${STORAGE_BUCKET}/o?name=${encodedName}&uploadType=media`;
+
+  const doPost = async (tokenToUse) => LegacyFS.uploadAsync(url, sourceUri, {
+    httpMethod: 'POST',
+    uploadType: FileSystemUploadType.BINARY_CONTENT,
+    headers: {
+      'Content-Type': 'video/mp4',
+      Authorization: `Firebase ${tokenToUse}`,
+    },
+  });
+
+  let res = await doPost(token);
+  // Token grace-period retry mirrors the resumable path.
+  if (res.status === 401 || res.status === 403) {
+    const fresh = await getFreshIdToken(true);
+    res = await doPost(fresh);
+  }
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`Firebase Storage upload failed (${res.status}): ${res.body?.slice(0, 200)}`);
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(res.body);
+  } catch (e) {
+    throw new Error('Firebase Storage returned non-JSON response.');
+  }
+  const downloadToken = (payload.downloadTokens || '').split(',')[0];
+  if (!downloadToken) {
+    throw new Error('Firebase Storage response missing downloadTokens.');
+  }
+  const downloadURL = `${STORAGE_UPLOAD_HOST}/v0/b/${STORAGE_BUCKET}/o/${encodedName}?alt=media&token=${downloadToken}`;
+
+  if (onProgress) onProgress(90);
+  return { downloadURL, size: Number(payload.size) || 0 };
+}
+
+// uploadViaFirebaseSDK — iOS upload path. Reads the file into a
+// Blob via fetch and hands it to the Firebase SDK's resumable
+// uploader for real progress + retry. This path is known-good on
+// iOS but breaks on Android (see uploadViaFileSystem for the fix).
+async function uploadViaFirebaseSDK(sourceUri, filename, onProgress) {
+  const storageRef = ref(storage, filename);
+
+  if (onProgress) onProgress(6);
+  const res = await fetch(sourceUri);
+  const blob = await res.blob();
+
+  await getFreshIdToken(false);
+  if (onProgress) onProgress(10);
+
+  const doUpload = () => new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, blob, { contentType: 'video/mp4' });
+    task.on(
+      'state_changed',
+      (snapshot) => {
+        if (!onProgress) return;
+        const pct = 10 + Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 80);
+        onProgress(Math.min(90, pct));
+      },
+      (err) => reject(err),
+      () => resolve(task.snapshot),
+    );
+  });
+
+  let snapshot;
+  try {
+    snapshot = await doUpload();
+  } catch (err) {
+    const code = err?.code || '';
+    const authIssue = code === 'storage/unauthenticated' || code === 'storage/unauthorized';
+    if (!authIssue) throw err;
+    console.warn('[uploadVideo] auth error, refreshing token + retrying', code);
+    await getFreshIdToken(true);
+    snapshot = await doUpload();
+  }
+
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return { downloadURL, size: blob.size };
+}
+
 /**
- * Upload video to Firebase Storage and save metadata to Firestore.
+ * uploadVideo — upload video to Firebase Storage + save metadata to Firestore.
  *
- * iOS pipeline notes:
- * - URI normalized so `/private/var/mobile` doesn't break fetch/blob.
- * - Firebase SDK's uploadBytesResumable is the primary path — it
- *   handles token attachment, retries, and Content-Length correctly.
- *   Legacy expo-file-system/legacy uploadAsync had known iOS 17+
- *   issues (silent 400s, missing Content-Length on files > 5MB).
- * - Token grace-period recovery: if the first upload fails auth,
- *   force-refresh the token and try once more before surfacing.
+ * Platform routing:
+ * - Android → uploadViaFileSystem (native POST via expo-file-system).
+ *   Bypasses `fetch(file:///…)` which throws "Network request failed"
+ *   on many Android builds.
+ * - iOS → uploadViaFirebaseSDK (fetch + Blob + uploadBytesResumable).
+ *   Known-good on iOS; gives real streaming progress.
+ *
+ * Both paths do URI normalization + source-exists sanity check + a
+ * force-token-refresh retry on auth failure. After the file lands,
+ * we write the `videos` Firestore doc and return { id, downloadURL,
+ * metadata } for the caller.
  *
  * @param {string} videoUri - Local file URI of the video
  * @param {string} promptText - The prompt the video responds to
@@ -44,23 +151,15 @@ async function getFreshIdToken(forceRefresh = false) {
  */
 export async function uploadVideo(videoUri, promptText, userId = 'anonymous', onProgress) {
   try {
-    console.log('[uploadVideo] start', { videoUri, promptText, userId });
+    console.log('[uploadVideo] start', { videoUri, promptText, userId, platform: Platform.OS });
 
-    // Normalize the iOS `/private/` prefix — safe on Android too
-    // (it's a no-op for URIs that don't start with `file:///private/`).
     const sourceUri = normalizeIosFileUri(videoUri);
-
-    // Filename in Firebase Storage
     const timestamp = Date.now();
     const filename = `videos/${userId}/${timestamp}.mp4`;
-    const storageRef = ref(storage, filename);
 
     if (onProgress) onProgress(3);
 
-    // Sanity-check the source before we even try to fetch it. iOS
-    // occasionally purges the temp recording between capture and
-    // upload (backgrounded app, low storage) — a clear error beats
-    // a 4xx with a vague body.
+    // Sanity-check the source before we spend a network round-trip.
     const LegacyFS = require('expo-file-system/legacy');
     const info = await LegacyFS.getInfoAsync(sourceUri);
     if (!info.exists || (info.size || 0) === 0) {
@@ -68,72 +167,28 @@ export async function uploadVideo(videoUri, promptText, userId = 'anonymous', on
     }
     console.log('[uploadVideo] source ok', { uri: sourceUri, size: info.size });
 
-    // Fetch the file into a Blob so Firebase SDK can upload it.
-    // fetch() on file:// URIs works on both iOS and Android; the
-    // Blob is streamed under the hood so this doesn't OOM on
-    // reasonable-length (< 60s) video clips.
-    if (onProgress) onProgress(6);
-    const res = await fetch(sourceUri);
-    const blob = await res.blob();
-    console.log('[uploadVideo] blob ready', { size: blob.size, type: blob.type });
-
-    // Prime the auth token BEFORE the upload starts so Firebase SDK
-    // doesn't try (and fail) with a stale one mid-stream.
-    await getFreshIdToken(false);
-    if (onProgress) onProgress(10);
-
-    // Primary upload attempt — Firebase's own resumable uploader.
-    // Wraps a real XMLHttpRequest with proper Content-Length and
-    // retry, and reports progress natively.
-    const doUpload = () => new Promise((resolve, reject) => {
-      const task = uploadBytesResumable(storageRef, blob, {
-        contentType: 'video/mp4',
-      });
-      task.on(
-        'state_changed',
-        (snapshot) => {
-          if (!onProgress) return;
-          const pct = 10 + Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 80);
-          onProgress(Math.min(90, pct));
-        },
-        (err) => reject(err),
-        () => resolve(task.snapshot),
-      );
-    });
-
-    let snapshot;
-    try {
-      snapshot = await doUpload();
-    } catch (err) {
-      // On auth error, force-refresh the token and try once more.
-      const code = err?.code || '';
-      const authIssue = code === 'storage/unauthenticated' || code === 'storage/unauthorized';
-      if (!authIssue) throw err;
-      console.warn('[uploadVideo] auth error, refreshing token + retrying', code);
-      await getFreshIdToken(true);
-      snapshot = await doUpload();
-    }
+    const uploaded = Platform.OS === 'android'
+      ? await uploadViaFileSystem(sourceUri, filename, onProgress)
+      : await uploadViaFirebaseSDK(sourceUri, filename, onProgress);
 
     if (onProgress) onProgress(95);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    const fileSize = info.size || 0;
-    if (onProgress) onProgress(100);
-    console.log('[uploadVideo] success', { downloadURL, size: fileSize });
+    console.log('[uploadVideo] file landed', uploaded);
 
     const videoMetadata = {
-      videoUrl: downloadURL,
+      videoUrl: uploaded.downloadURL,
       filename,
       prompt: promptText,
       userId,
       createdAt: serverTimestamp(),
-      fileSize,
+      fileSize: uploaded.size || info.size || 0,
       mimeType: 'video/mp4',
       status: 'active',
     };
     const docRef = await addDoc(collection(db, 'videos'), videoMetadata);
+    if (onProgress) onProgress(100);
     console.log('[uploadVideo] metadata saved', docRef.id);
 
-    return { id: docRef.id, downloadURL, metadata: videoMetadata };
+    return { id: docRef.id, downloadURL: uploaded.downloadURL, metadata: videoMetadata };
   } catch (error) {
     console.error('[uploadVideo] failed', error);
     throw new Error(`Upload failed: ${error.message}`);
