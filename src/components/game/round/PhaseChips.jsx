@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../../theme/themes';
 
 // Static base — PICK / VOTE / RESULT / SCORE always render. WARMUP
@@ -43,22 +44,28 @@ export default function PhaseChips({ phase }) {
     : BASE_STEPS;
   return (
     <View style={styles.row}>
-      {steps.map((step, i) => (
-        <React.Fragment key={step.key}>
-          {i > 0 && <View style={styles.divider} />}
-          <View style={[
-            styles.chip,
-            step.key === activeKey && styles.chipActive,
-          ]}>
-            <Text style={[
-              styles.label,
-              step.key === activeKey && styles.labelActive,
-            ]}>
-              {step.label}
-            </Text>
-          </View>
-        </React.Fragment>
-      ))}
+      {steps.map((step, i) => {
+        const isActive = step.key === activeKey;
+        return (
+          <React.Fragment key={step.key}>
+            {i > 0 && <View style={styles.divider} />}
+            {isActive ? (
+              <LinearGradient
+                colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.chipActive}
+              >
+                <Text style={styles.labelActive}>{step.label}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.chip}>
+                <Text style={styles.label}>{step.label}</Text>
+              </View>
+            )}
+          </React.Fragment>
+        );
+      })}
     </View>
   );
 }
@@ -69,9 +76,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 1,
   },
-  // Base chip = VibeButton-style outline: cyan border on transparent
-  // bg, white text. Active = filled cyan, still white text so it
-  // reads like the CTA bars across the game.
+  // Inactive chip = cyan outline on transparent bg. Active chip =
+  // cyan → neon-purple gradient fill (matches the ShimmerBar CTA
+  // aesthetic so the whole phase strip reads as one design system).
   chip: {
     paddingVertical: 4,
     paddingHorizontal: 7,
@@ -81,7 +88,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   chipActive: {
-    backgroundColor: theme.colors.vibeBlue,
+    paddingVertical: 4,
+    paddingHorizontal: 7,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    // Purple sitting between vibeBlue and vibeNeonPurple so the
+    // border ties the gradient into the rest of the strip.
+    borderColor: theme.colors.vibeNeonPurple,
   },
   label: {
     color: 'white',
@@ -91,11 +104,17 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: 'white',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   divider: {
-    width: 4,
-    height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginHorizontal: 1,
+    // Brighter connector — was 25% white which read as dead grey.
+    // Cyan at 70% makes the flow between chips visible and vibe-y.
+    width: 6,
+    height: 2,
+    backgroundColor: 'rgba(0, 198, 255, 0.7)',
+    marginHorizontal: 2,
+    borderRadius: 1,
   },
 });

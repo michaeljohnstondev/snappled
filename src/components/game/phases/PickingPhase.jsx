@@ -19,7 +19,7 @@ import CreatorActionRow from '../CreatorActionRow';
 import HandCardThumbnail from '../round/HandCardThumbnail';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import RoundPromptBanner from '../round/RoundPromptBanner';
-import DisabledPickBarVariants from '../round/DisabledPickBarVariants';
+import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
 
 // Renders the picking phase. All state and async work lives in
@@ -50,6 +50,7 @@ export default function PickingPhase({
   onSelectCard,
   onPickCard,
   onHelp,
+  onHelpEnd,
   onMulliganToggle,
   onMulliganSwap,
   onEditPromptOpen,
@@ -96,7 +97,7 @@ export default function PickingPhase({
     const totalCount = (game.players || []).length;
     return (
       <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
-        <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} />
+        <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
         <RoundPromptBanner
           prompt={currentPrompt}
           round={game.currentRound}
@@ -175,7 +176,7 @@ export default function PickingPhase({
   // Pre-pick screen — chips, prompt, hand grid, YOUR CARD, submit bar.
   return (
     <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
-      <RoundHeaderBar phase="picking" timerSec={timer} />
+      <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -255,20 +256,21 @@ export default function PickingPhase({
 
       </ScrollView>
 
-      {/* Flush submit bar — when a card is selected, the normal green
-          PLAY THIS CARD bar. When nothing's selected, we stack the 4
-          disabled-bar design variants (TEMP demo, user is picking
-          which one wins). Delete DisabledPickBarVariants + restore
-          the single dim bar once the winner is chosen. */}
+      {/* Flush submit bar — gradient + shimmer via ShimmerBar so the
+          resting (blue → purple) and armed (green → yellow) states
+          both feel alive. Selected state includes the paddingBottom
+          safe-area bump via the style prop. */}
       {selectedCard ? (
-        <Pressable
-          style={styles.submitBar}
+        <ShimmerBar
+          colors={[theme.colors.vibeGreen, theme.colors.vibeYellow]}
+          label="PLAY THIS CARD"
           onPress={() => onPickCard(selectedCard)}
-        >
-          <Text style={styles.submitBarText}>PLAY THIS CARD</Text>
-        </Pressable>
+        />
       ) : (
-        <DisabledPickBarVariants />
+        <ShimmerBar
+          colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
+          label="PICK A CARD"
+        />
       )}
 
       {/* Fullscreen preview modal — opened from either a grid tap
@@ -513,33 +515,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Flush action bar — green when a card is selected + ready to
-  // submit (selection color), dim when nothing's picked yet.
-  submitBar: {
-    backgroundColor: theme.colors.vibeGreen,
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 3,
-    borderTopColor: '#000',
-  },
-  // Waiting state — cyan-tinted fill with a solid cyan top border
-  // so it fits the vibe palette (matches the phase chips + BACK
-  // button) instead of reading as a dead gray bar.
-  submitBarDisabled: {
-    backgroundColor: 'rgba(0, 198, 255, 0.18)',
-    borderTopColor: theme.colors.vibeBlue,
-    borderTopWidth: 3,
-  },
-  submitBarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
+  // (Legacy submitBar / submitBarDisabled / submitBarText styles
+  // removed — flush CTA now handled by <ShimmerBar>.)
+
   // Split action row: 1/4 Back chunk, 3/4 primary CTA. Same
   // full-width footprint as the plain submit bar.
   actionRow: {

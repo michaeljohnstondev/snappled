@@ -396,27 +396,45 @@ export default function GameScreen({ navigation }) {
     if (phase === GAME_PHASES.PICKING) {
       setRoundAlert({
         title: 'Pick a card',
-        sub: 'Tap a card in your hand to select it. The one you pick goes to YOUR CARD at the bottom — hit PLAY THIS CARD when ready.',
+        bullets: [
+          'Pick the snapple that best suits the prompt',
+          'Tap a card to preview it fullscreen',
+          'Hit PLAY THIS CARD when you\'re locked in',
+        ],
       });
     } else if (phase === GAME_PHASES.VOTING) {
       setRoundAlert({
         title: 'Vote for the best',
-        sub: "Tap a card to preview it, then PICK AS FAVORITE for the funniest match. You can't vote for your own submission.",
+        bullets: [
+          'Pick your favorite snapple for this prompt',
+          'Tap a card to preview it fullscreen',
+          'You can\'t vote for your own submission',
+        ],
       });
     } else if (phase === GAME_PHASES.SCORING) {
       setRoundAlert({
         title: 'Scoring',
-        sub: 'Each vote your card got is worth a point. The round winner wears the crown.',
+        bullets: [
+          'Each vote your card got is worth a point',
+          'The round winner wears the crown',
+        ],
       });
     } else if (phase === GAME_PHASES.REVIEW) {
       setRoundAlert({
         title: 'Warmup',
-        sub: 'Get comfy with your hand. Tap READY UP when you\'re set — the round starts when everyone\'s ready or the timer runs out.',
+        bullets: [
+          'Get comfy with your hand',
+          'Tap READY UP when you\'re set',
+          'Round starts when everyone\'s ready or the timer runs out',
+        ],
       });
     } else if (phase === GAME_PHASES.ROUND_RESULTS) {
       setRoundAlert({
         title: 'Round results',
-        sub: 'Standings after the round. Host advances to the next round when ready.',
+        bullets: [
+          'Standings after the round',
+          'Host advances to the next round when ready',
+        ],
       });
     }
   };
@@ -1542,6 +1560,7 @@ export default function GameScreen({ navigation }) {
           visible={!!roundAlert}
           title={roundAlert?.title}
           sub={roundAlert?.sub}
+          bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
@@ -1596,6 +1615,7 @@ export default function GameScreen({ navigation }) {
           visible={!!roundAlert}
           title={roundAlert?.title}
           sub={roundAlert?.sub}
+          bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
@@ -1901,6 +1921,7 @@ export default function GameScreen({ navigation }) {
           visible={!!roundAlert}
           title={roundAlert?.title}
           sub={roundAlert?.sub}
+          bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
@@ -2080,6 +2101,7 @@ export default function GameScreen({ navigation }) {
           visible={!!roundAlert}
           title={roundAlert?.title}
           sub={roundAlert?.sub}
+          bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
         <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
@@ -2128,6 +2150,7 @@ export default function GameScreen({ navigation }) {
           visible={!!roundAlert}
           title={roundAlert?.title}
           sub={roundAlert?.sub}
+          bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
       </>

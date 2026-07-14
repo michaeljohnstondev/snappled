@@ -9,17 +9,31 @@ import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
 
 // Render the overlay. `title` is the big graffiti-thick headline
-// (e.g. "60 SECONDS TO PICK"), `sub` is the one-line hint below.
+// (e.g. "60 SECONDS TO PICK"). Body copy can be either `sub` (one
+// paragraph, back-compat) or `bullets` (an array of short lines —
+// renders as a bullet list, preferred for help copy so tips scan
+// instead of forcing the eye through a paragraph).
 // Renders nothing when `visible` is false so the game plays through
 // underneath without a flicker.
-export default function RoundStartOverlay({ visible, title, sub, onDismiss }) {
+export default function RoundStartOverlay({ visible, title, sub, bullets, onDismiss }) {
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
       <Pressable style={styles.backdrop} onPress={onDismiss}>
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
-          {sub ? <Text style={styles.sub}>{sub}</Text> : null}
+          {Array.isArray(bullets) && bullets.length > 0 ? (
+            <View style={styles.bulletList}>
+              {bullets.map((line, i) => (
+                <View key={i} style={styles.bulletRow}>
+                  <Text style={styles.bulletDot}>•</Text>
+                  <Text style={styles.bulletText}>{line}</Text>
+                </View>
+              ))}
+            </View>
+          ) : sub ? (
+            <Text style={styles.sub}>{sub}</Text>
+          ) : null}
         </View>
       </Pressable>
     </Modal>
@@ -60,6 +74,29 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 20,
+  },
+  bulletList: {
+    alignSelf: 'stretch',
+    marginBottom: 20,
+    gap: 8,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 6,
+  },
+  bulletDot: {
+    color: theme.colors.vibeBlue,
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  bulletText: {
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    lineHeight: 22,
+    flex: 1,
   },
   hint: {
     color: theme.colors.vibeBlue,
