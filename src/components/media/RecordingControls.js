@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
 import VibeAlert from "../ui/VibeAlert";
 import theme from "../../theme/themes";
 
@@ -136,6 +136,11 @@ export default function RecordingControls({
       const recordingOptions = {
         quality: "720p",
         maxDuration: (maxDuration || 10) * 1000, // Convert to milliseconds
+        // Force H.264 on iOS so the recorded MOV can play on
+        // Android / web without a re-encode. iOS records HEVC by
+        // default on modern devices, which Firebase stores fine
+        // but breaks playback on non-Apple video pipelines.
+        ...(Platform.OS === 'ios' && { codec: 'avc1' }),
       };
 
       console.log("Starting camera recording with options:", recordingOptions);
