@@ -7,7 +7,7 @@
 // card. Tapping YOUR CARD's play icon (or tapping again in the
 // hand) opens the fullscreen PreviewModal for a proper watch.
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, Pressable, ScrollView, Modal, TextInput,
   ActivityIndicator, StyleSheet,
@@ -62,6 +62,14 @@ export default function PickingPhase({
   const alreadyPicked = game.submissions.some(s => s.uid === user.uid);
   const totalRoundsShown = game.totalRounds || null;
 
+  // Which card in the hand is playing inline right now (only one
+  // at a time). Local to the picking screen — cleared on unmount
+  // and whenever the fullscreen preview opens (parent tap).
+  const [inlinePlayingId, setInlinePlayingId] = useState(null);
+  const toggleInline = (id) => {
+    setInlinePlayingId(prev => (prev === id ? null : id));
+  };
+
   if (hand.length === 0) {
     return (
       <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
@@ -94,7 +102,7 @@ export default function PickingPhase({
               <HandCardThumbnail
                 card={{ videoUrl: myPick.videoUrl, creatorUsername: 'you' }}
                 label="@you"
-                onPress={() => onPreviewCard({ ...myPick, _isWaiting: true })}
+                onFullscreen={() => onPreviewCard({ ...myPick, _isWaiting: true })}
               />
             ) : null}
           </View>
@@ -178,14 +186,20 @@ export default function PickingPhase({
         <View style={styles.grid}>
           {hand.map((item, i) => {
             const isSelected = selectedCard?.id === item.id;
-            const onCardPress = () => {
+            const isInlinePlaying = inlinePlayingId === item.id;
+            // Card body tap = pause / play inline. Fullscreen chip
+            // opens the full preview modal AND selects (populates
+            // YOUR CARD). Mulligan mode still swaps on tap.
+            const onCardTap = () => {
               if (mulliganMode) {
                 onMulliganSwap(item);
                 return;
               }
-              // Select and open fullscreen preview so the video
-              // actually plays. YOUR CARD below stays populated
-              // when the user closes the preview.
+              toggleInline(item.id);
+            };
+            const onFullscreen = () => {
+              if (mulliganMode) return;
+              setInlinePlayingId(null);
               if (onSelectCard) onSelectCard(item);
               onPreviewCard(item);
             };
@@ -194,7 +208,9 @@ export default function PickingPhase({
                 <HandCardThumbnail
                   card={item}
                   isSelected={isSelected}
-                  onPress={onCardPress}
+                  isPlaying={isInlinePlaying}
+                  onTogglePlay={onCardTap}
+                  onFullscreen={onFullscreen}
                 />
               </View>
             );
@@ -230,7 +246,13 @@ export default function PickingPhase({
               <HandCardThumbnail
                 card={selectedCard}
                 label="@you"
-                onPress={() => onPreviewCard({ ...selectedCard, _fromYourCard: true })}
+                isPlaying={inlinePlayingId === `your-card:${selectedCard.id}`}
+                onTogglePlay={() =>
+                  setInlinePlayingId(prev =>
+                    prev === `your-card:${selectedCard.id}` ? null : `your-card:${selectedCard.id}`
+                  )
+                }
+                onFullscreen={() => onPreviewCard({ ...selectedCard, _fromYourCard: true })}
               />
             ) : (
               <View style={styles.yourCardEmpty}>

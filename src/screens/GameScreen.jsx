@@ -336,6 +336,9 @@ export default function GameScreen({ navigation }) {
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
   const [previewCard, setPreviewCard] = useState(null);
+  // Which voting card is playing inline (mini-player inside the
+  // thumbnail). Only one at a time; tapping another swaps.
+  const [votingInlinePlayingId, setVotingInlinePlayingId] = useState(null);
   // IDs of snapples this user has already played in the current game — used to
   // filter the hand pool so each round reveals unseen cards.
   const [playedCardIds, setPlayedCardIds] = useState([]);
@@ -1667,16 +1670,23 @@ export default function GameScreen({ navigation }) {
               <View style={styles.votingGrid}>
                 {votableSubmissions.map((item, i) => {
                   const isSelected = favoriteCard?.uid === item.uid;
+                  const cardId = item?.snappleId || item?.uid || `vote-${i}`;
+                  const isInlinePlaying = votingInlinePlayingId === cardId;
                   return (
                     <View
-                      key={item?.snappleId || `vote-${i}`}
+                      key={cardId}
                       style={styles.votingCell}
                     >
                       <HandCardThumbnail
                         card={{ videoUrl: item.videoUrl }}
                         label="@anon"
                         isSelected={isSelected}
-                        onPress={() => {
+                        isPlaying={isInlinePlaying}
+                        onTogglePlay={() =>
+                          setVotingInlinePlayingId(prev => (prev === cardId ? null : cardId))
+                        }
+                        onFullscreen={() => {
+                          setVotingInlinePlayingId(null);
                           setFavoriteCard(item);
                           setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true });
                         }}
