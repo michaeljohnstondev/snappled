@@ -475,11 +475,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
+  // Fixed small width so the YOUR CARD thumbnail doesn't stretch
+  // to full screen and blow past the visible viewport. The section
+  // was blowing up to ~500pt tall on some phones; capping to a
+  // ~150pt-wide chip keeps it visible without extra scroll.
   yourCardWrap: {
-    flexDirection: 'row',
+    width: 150,
   },
   yourCardEmpty: {
-    flex: 1,
+    width: 150,
     aspectRatio: 4 / 5,
     borderRadius: 12,
     borderWidth: 2,

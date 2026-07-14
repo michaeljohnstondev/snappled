@@ -156,7 +156,8 @@ function VotingWaitGrid({ submissions, voters, players, playerColors, selfUid, a
 function RoundResultsReveal({
   rankings, players, prompt, submissions,
   currentRound, totalRounds, timer,
-  isHost, onNextRound, onShare, onEndGame, onLeave, onHelp, selfUid,
+  isHost, isPractice, onNextRound, onShare, onEndGame, onLeave, onHelp,
+  onQuitPractice, selfUid,
 }) {
   const isInfinite = totalRounds === 0;
 
@@ -265,7 +266,15 @@ function RoundResultsReveal({
           ) : (
             <Text style={styles.waitingText}>Next round in {timer}s...</Text>
           )}
-          {isHost && isInfinite && (
+          {isPractice && onQuitPractice ? (
+            <VibeButton
+              label="Quit Practice"
+              onPress={onQuitPractice}
+              variant="toggle"
+              color="red"
+            />
+          ) : null}
+          {isHost && isInfinite && !isPractice && (
             <VibeButton label="End Game" onPress={onEndGame} color="red" variant="toggle" />
           )}
           <Pressable style={styles.shareResultsBtn} onPress={onShare}>
@@ -1971,12 +1980,14 @@ export default function GameScreen({ navigation }) {
           totalRounds={game.totalRounds}
           timer={timer}
           isHost={isHost}
+          isPractice={isPractice}
           selfUid={user?.uid}
           onNextRound={handleNextRound}
           onShare={handleShareRound}
           onEndGame={() => gameService.endGameEarly(gameId)}
           onLeave={handleLeaveGame}
           onHelp={showPhaseHelp}
+          onQuitPractice={handleLeaveGame}
         />
         <RoundStartOverlay
           visible={!!roundAlert}

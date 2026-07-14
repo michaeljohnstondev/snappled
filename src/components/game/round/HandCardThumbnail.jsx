@@ -33,15 +33,6 @@ export default function HandCardThumbnail({
   const username = label || `@${card?.creatorUsername || 'anon'}`;
   return (
     <View style={[styles.glowWrap, isSelected && styles.glowWrapFeatured]}>
-      {/* Soft neon glow behind the card when selected. Pointer-events
-          off so taps land on the Pressable underneath. */}
-      {isSelected ? (
-        <LinearGradient
-          pointerEvents="none"
-          colors={['rgba(0,255,140,0.35)', 'transparent']}
-          style={styles.glowGradient}
-        />
-      ) : null}
       <Pressable
         style={[styles.card, isSelected && styles.cardFeatured]}
         onPress={onPress}
