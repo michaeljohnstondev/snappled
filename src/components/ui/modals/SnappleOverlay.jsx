@@ -29,7 +29,6 @@ export default function SnappleOverlay({
   snapples,
   initialIndex = 0,
   onClose,
-  onBuy,
   onReport,
   navigation,
 }) {
@@ -230,19 +229,49 @@ export default function SnappleOverlay({
       'Purchase Snapple',
       `Buy this Snapple for ${metrics.currentPrice} coins?`,
       async () => {
+        // Optimistic UI — apply the state changes locally before the
+        // server round-trip so the deck/coins update feels instant.
+        // AuthContext's onSnapshot listener will confirm shortly after;
+        // if the server rejects, we roll back and surface the error.
+        // Snapshot pre-purchase state for rollback (arrays are cloned
+        // so rollback isn't affected by any later local mutations).
+        const price = metrics.currentPrice;
+        const prevCoins = userCurrency.coins || 0;
+        const prevOwned = [...(userCurrency.ownedSnapples || [])];
+        const prevMetrics = metrics;
+        const prevInteraction = userInteraction;
+
+        updateUserCurrency({
+          coins: Math.max(0, prevCoins - price),
+          ownedSnapples: [...prevOwned, snapple.id],
+        });
+        setMetrics(prev => ({
+          ...prev,
+          buyCount: prev.buyCount + 1,
+        }));
+        setUserInteraction(prev => ({ ...prev, hasPurchased: true }));
+
         try {
-          const result = await onBuy?.(snapple.id);
+          const result = await snappleService.purchaseSnapple(snapple.id, user?.uid);
           if (result?.success) {
-            setMetrics(prev => ({
-              ...prev,
-              buyCount: prev.buyCount + 1,
-              currentPrice: result.newPrice || prev.currentPrice,
-            }));
-            setUserInteraction(prev => ({ ...prev, hasPurchased: true }));
-          } else if (result?.error) {
-            showError('Purchase Failed', result.error);
+            // Server may have adjusted the new price via bonding curve;
+            // fold that in. Everything else is already optimistically
+            // applied and the onSnapshot confirmation is on its way.
+            if (result.newPrice) {
+              setMetrics(prev => ({ ...prev, currentPrice: result.newPrice }));
+            }
+          } else {
+            // Roll back — server rejected (not enough coins, race with
+            // another buyer, etc). Restore the exact pre-purchase state.
+            updateUserCurrency({ coins: prevCoins, ownedSnapples: prevOwned });
+            setMetrics(prevMetrics);
+            setUserInteraction(prevInteraction);
+            showError('Purchase Failed', result?.error || 'Something went wrong');
           }
         } catch (error) {
+          updateUserCurrency({ coins: prevCoins, ownedSnapples: prevOwned });
+          setMetrics(prevMetrics);
+          setUserInteraction(prevInteraction);
           showError('Purchase Failed', error.message || 'Something went wrong');
         }
       }

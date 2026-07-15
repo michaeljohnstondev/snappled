@@ -374,7 +374,6 @@ export default function HomeScreen({ navigation, route }) {
           snapples={snapples.filter(Boolean)}
           initialIndex={selectedIndex}
           onClose={handleSnappleOverlayClose}
-          onBuy={handleBuy}
           onReport={handleReport}
           navigation={navigation}
         />

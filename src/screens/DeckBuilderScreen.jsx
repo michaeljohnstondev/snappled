@@ -288,7 +288,6 @@ export default function DeckBuilderScreen({ navigation }) {
         snapples={displayedSnapples}
         initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
-        onBuy={(id) => snappleService.purchaseSnapple(id, user?.uid)}
         onReport={(id, reason) => snappleService.reportSnapple(id, user?.uid, reason)}
         navigation={navigation}
       />

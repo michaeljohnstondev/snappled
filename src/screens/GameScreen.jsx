@@ -11,6 +11,7 @@ import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
 import { prefetchVideo } from '../services/videoCache';
+import { thumbnailService } from '../services/thumbnailService';
 import { gameService, GAME_PHASES } from '../services/gameService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
@@ -575,22 +576,55 @@ export default function GameScreen({ navigation }) {
     if (!gameId) lastBotReadyScheduleRef.current = null;
   }, [gameId]);
 
-  // Incremental video prefetch — concurrent (forEach without await), so
-  // every new video starts downloading immediately. By the time we need
-  // them in voting / reveal, they're cached.
+  // Incremental video + thumbnail prefetch — concurrent (forEach
+  // without await) so every new video starts downloading + its
+  // first-frame extraction runs the instant a submission lands.
+  // By the time we render the voting grid the poster frame is
+  // already in-memory and the video's already on disk, so cards
+  // pop in with zero shimmer/black flash. Both helpers dedupe
+  // internally (in-flight promise + result cache), so repeated
+  // effect runs on submissions.length changes are cheap.
   useEffect(() => {
     (game?.submissions || []).forEach(s => {
-      if (s?.videoUrl) prefetchVideo(s.videoUrl);
+      if (s?.videoUrl) {
+        prefetchVideo(s.videoUrl);
+        thumbnailService.getThumbnail(s.videoUrl);
+      }
     });
   }, [game?.submissions?.length]);
 
-  // Same for the user's own hand: as soon as a hand is drawn (or refreshed
-  // after a played card swap), prefetch all 6 cards in parallel.
+  // Same treatment for the user's own hand: video + thumbnail on
+  // draw / refresh so the picking grid renders with everything
+  // already loaded.
   useEffect(() => {
     hand.forEach(card => {
-      if (card?.videoUrl) prefetchVideo(card.videoUrl);
+      if (card?.videoUrl) {
+        prefetchVideo(card.videoUrl);
+        thumbnailService.getThumbnail(card.videoUrl);
+      }
     });
   }, [hand]);
+
+  // Lookahead prefetch during idle wait screens (SCORE / voting).
+  // handleNextRound draws a replacement card from the community
+  // pool to fill the just-played slot, but the draw is random so
+  // we can't know exactly which one — best-effort is to warm the
+  // top ~10 candidates from the unused pool. Any that end up
+  // getting drawn are already cached. Runs on any phase change so
+  // it fires when SCORE opens and again when VOTING opens.
+  useEffect(() => {
+    const isIdleWait = game?.phase === GAME_PHASES.ROUND_RESULTS
+      || game?.phase === GAME_PHASES.VOTING;
+    if (!isIdleWait) return;
+    const inHandIds = new Set(hand.map(h => h?.id).filter(Boolean));
+    const pool = getHandSnapples().filter(s => !inHandIds.has(s.id)).slice(0, 10);
+    pool.forEach(s => {
+      if (s?.videoUrl) {
+        prefetchVideo(s.videoUrl);
+        thumbnailService.getThumbnail(s.videoUrl);
+      }
+    });
+  }, [game?.phase, game?.currentRound]);
 
   // Reset per-round state for EVERY player whenever the round number changes.
   // Host-only handleNextRound also resets these, but guests never call it so
