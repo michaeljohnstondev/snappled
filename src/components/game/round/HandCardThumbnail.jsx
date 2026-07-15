@@ -35,35 +35,17 @@ export default function HandCardThumbnail({
   playToken = 0,
   onTogglePlay,
   onFullscreen,
+  // Optional tap handler on the username label — called with the
+  // card's creatorId when set. Callers wire this to a UserProfile
+  // navigation so tapping @username jumps to the creator's profile
+  // (with a Follow button). Nested Pressable so the card-body
+  // play/pause doesn't fire when the name is tapped.
+  onCreatorPress,
   label,
   duration,
 }) {
-  // TEMP diagnostic: when the fallback fires, encode WHY into the
-  // visible label so we can debug without console access. Suffix
-  // meaning:
-  //   -miss  = card has no creatorUsername key at all
-  //   -null  = key exists but value is null
-  //   -empty = key exists but is empty string
-  //   -"anonymous" = literal string "anonymous" stored on the doc
-  //   -other = something else falsy (undefined, 0, etc.)
-  // Suffixed with the last 4 chars of creatorId so we can look up
-  // that user in Firestore. Remove once the @anon bug is understood.
-  let username;
-  if (label) {
-    username = label;
-  } else if (card?.creatorUsername) {
-    username = `@${card.creatorUsername}`;
-  } else if (card) {
-    const cid4 = (card.creatorId || 'nocid').slice(-4);
-    let why;
-    if (!('creatorUsername' in card)) why = 'miss';
-    else if (card.creatorUsername === null) why = 'null';
-    else if (card.creatorUsername === '') why = 'empty';
-    else why = String(card.creatorUsername).slice(0, 8) || 'other';
-    username = `@anon-${why}-${cid4}`;
-  } else {
-    username = '@anon-nocard';
-  }
+  const username = label || `@${card?.creatorUsername || 'anon'}`;
+  const canTapCreator = !!onCreatorPress && !label && !!card?.creatorId;
   return (
     <View style={[styles.glowWrap, isSelected && styles.glowWrapFeatured]}>
       {/* Card body tap = pause/play the inline mini-player. The
@@ -124,7 +106,22 @@ export default function HandCardThumbnail({
               color="white"
             />
           </View>
-          <Text style={styles.username} numberOfLines={1}>{username}</Text>
+          {canTapCreator ? (
+            <Pressable
+              onPress={() => onCreatorPress(card.creatorId)}
+              hitSlop={6}
+              style={styles.usernameHit}
+            >
+              <Text
+                style={[styles.username, styles.usernameLink]}
+                numberOfLines={1}
+              >
+                {username}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.username} numberOfLines={1}>{username}</Text>
+          )}
         </View>
       </Pressable>
     </View>
@@ -232,5 +229,16 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  // Subtle cyan tint on tappable usernames so the affordance is
+  // visible without adding an icon. Matches the tappable stat
+  // number treatment we used to have on Followers/Following.
+  usernameLink: {
+    color: theme.colors.vibeBlue,
+  },
+  // Wrapper only exists to give the Pressable a hit target; visual
+  // is on the Text inside.
+  usernameHit: {
+    flexShrink: 1,
   },
 });

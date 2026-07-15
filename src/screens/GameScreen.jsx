@@ -644,6 +644,15 @@ export default function GameScreen({ navigation }) {
   // confirm dialog. Broadcasts to all players in the current game so
   // their hands auto-drop the card (unless they own it). Shared by the
   // in-game preview modals across all phases (warmup, picking, voting).
+  // Tapped @username on a card → open that creator's profile so the
+  // player can Follow them. Same navigation target as the Profile
+  // tab uses. No-op if the card is missing creatorId (shouldn't
+  // happen but keeps us safe from accidental navigate('undefined')).
+  const handleCreatorPress = useCallback((creatorId) => {
+    if (!creatorId) return;
+    navigation.navigate('UserProfile', { userId: creatorId });
+  }, [navigation]);
+
   const handleExcludeFromPool = useCallback((snappleId) => {
     if (!snappleId) return;
     showConfirm(
@@ -1555,6 +1564,7 @@ export default function GameScreen({ navigation }) {
           onClosePreview={() => setPreviewCard(null)}
           onToggleReady={(isReady) => gameService.setPlayerReady(gameId, user.uid, isReady)}
           onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp}
+          onCreatorPress={handleCreatorPress}
           isAdmin={isAdmin}
           onExcludeFromPool={handleExcludeFromPool}
         />
@@ -1599,6 +1609,7 @@ export default function GameScreen({ navigation }) {
           handlePickCard(card);
           setPreviewCard(null);
         }}
+        onCreatorPress={handleCreatorPress}
         onMulliganToggle={() => setMulliganMode(prev => !prev)}
         onMulliganSwap={handleMulliganSwap}
         onEditPromptOpen={(promptText) => {
@@ -1774,11 +1785,17 @@ export default function GameScreen({ navigation }) {
                       style={styles.votingCell}
                     >
                       <HandCardThumbnail
-                        card={{ id: cardId, videoUrl: item.videoUrl }}
-                        label="@anon"
+                        card={{
+                          id: cardId,
+                          videoUrl: item.videoUrl,
+                          creatorId: item.creatorId,
+                          creatorUsername: item.creatorUsername,
+                          muted: item.muted,
+                        }}
                         isSelected={isSelected}
                         isPlaying={isInlinePlaying}
                         playToken={isInlinePlaying ? votingInlinePlaying.token : 0}
+                        onCreatorPress={handleCreatorPress}
                         onTogglePlay={() => {
                           // Select this card as the favorite AND
                           // play it inline once. Re-tap the same

@@ -51,6 +51,7 @@ export default function PickingPhase({
   onPickCard,
   onHelp,
   onHelpEnd,
+  onCreatorPress,
   onMulliganToggle,
   onMulliganSwap,
   onEditPromptOpen,
@@ -229,6 +230,7 @@ export default function PickingPhase({
                   playToken={isInlinePlaying ? inlinePlaying.token : 0}
                   onTogglePlay={onCardTap}
                   onFullscreen={onFullscreen}
+                  onCreatorPress={onCreatorPress}
                 />
               </View>
             );
@@ -262,7 +264,7 @@ export default function PickingPhase({
           safe-area bump via the style prop. */}
       {selectedCard ? (
         <ShimmerBar
-          colors={[theme.colors.vibeGreen, theme.colors.vibeYellow]}
+          colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
           label="PLAY THIS CARD"
           onPress={() => onPickCard(selectedCard)}
         />

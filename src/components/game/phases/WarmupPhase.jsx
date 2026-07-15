@@ -30,6 +30,7 @@ export default function WarmupPhase({
   onToggleReady,
   onHelp,
   onHelpEnd,
+  onCreatorPress,
   isAdmin,
   onExcludeFromPool,
 }) {
@@ -85,6 +86,7 @@ export default function WarmupPhase({
                     setInlinePlaying({ id: null, token: 0 });
                     onPreviewCard({ ...item, _isWaiting: true });
                   }}
+                  onCreatorPress={onCreatorPress}
                 />
               </View>
             );
