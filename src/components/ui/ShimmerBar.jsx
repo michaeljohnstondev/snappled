@@ -14,7 +14,7 @@
 // Style prop lands on the outer gradient so callers can override
 // padding (e.g. bump paddingBottom for the home-bar safe area).
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Text, Pressable, Animated, StyleSheet, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -97,19 +97,27 @@ export default function ShimmerBar({
     // should still let the user scroll the hand above it).
     return inner;
   }
-  // Style spreads onto both the Pressable (so flex passes through
-  // when the bar sits inside an actionRow) and the gradient (so
-  // borderTopWidth / padding overrides land on the visual). The
-  // gradient sizes to its own padding + text — NO flex:1, which
-  // used to collapse the standalone bar to zero height because
-  // the Pressable had no explicit size to fill from.
+  // Style goes on the Pressable in full. The gradient gets the
+  // same style MINUS flex-related keys — flex:3 on the outer
+  // Pressable is right ("take 3/4 of the row"), but the same flex
+  // spread onto an inner column-direction gradient collapses it to
+  // 0 because it tries to fill a vertical dimension the Pressable
+  // hasn't decided yet. Splitting keeps both cases (standalone +
+  // split-row) rendering with correct height and full width.
+  const gradientStyle = useMemo(() => {
+    if (!style) return null;
+    const flat = StyleSheet.flatten(style) || {};
+    const { flex, flexGrow, flexShrink, flexBasis, ...rest } = flat;
+    return rest;
+  }, [style]);
+
   return (
     <Pressable onPress={onPress} style={[styles.pressWrap, style]}>
       <LinearGradient
         colors={colors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.bar, padding, style]}
+        style={[styles.bar, padding, styles.fill, gradientStyle]}
       >
         <Animated.View
           style={[
@@ -150,6 +158,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderTopWidth: 3,
     borderTopColor: '#000',
+  },
+  // alignSelf: 'stretch' fills the cross-axis of the Pressable
+  // (horizontal, since Pressable is column-direction) so the
+  // gradient always spans the Pressable's width — no matter if the
+  // Pressable is full-width standalone or flex-sized inside a row.
+  fill: {
+    alignSelf: 'stretch',
   },
   shimmer: {
     position: 'absolute',

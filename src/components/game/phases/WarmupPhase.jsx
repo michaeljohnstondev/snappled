@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import PreviewModal from '../PreviewModal';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import HandCardThumbnail from '../round/HandCardThumbnail';
+import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
 
 // Renders the warmup hand + ready controls. State lives in GameScreen;
@@ -92,17 +93,22 @@ export default function WarmupPhase({
         </View>
       </ScrollView>
 
-      {/* Ready Up bar — flush at the bottom, same shape as the other
-          primary action bars. Flips green when the local player is
-          ready. */}
-      <Pressable
-        style={[styles.readyBar, isReady && styles.readyBarReady]}
-        onPress={() => onToggleReady(!isReady)}
-      >
-        <Text style={styles.readyBarText}>
-          {isReady ? 'READY ✓' : 'READY UP'}
-        </Text>
-      </Pressable>
+      {/* Ready Up bar — blue → neon-purple ShimmerBar while
+          waiting; once tapped, locks into a non-interactive
+          green → cyan READY ✓ state. No un-ready toggle: the tap is
+          a commitment so nobody can waffle at the ready check. */}
+      {isReady ? (
+        <ShimmerBar
+          colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+          label="READY ✓"
+        />
+      ) : (
+        <ShimmerBar
+          colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
+          label="READY UP"
+          onPress={() => onToggleReady(true)}
+        />
+      )}
 
       {/* Full-bleed preview — reuses PreviewModal from picking / voting.
           No primary CTA because picking hasn't started yet; admin
@@ -205,24 +211,6 @@ const styles = StyleSheet.create({
 
   // Full-width Ready Up bar — same shape / padding as the other
   // CTA bars in the game (PLAY THIS CARD, SUBMIT VOTE).
-  readyBar: {
-    backgroundColor: theme.colors.vibeBlue,
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 3,
-    borderTopColor: '#000',
-  },
-  readyBarReady: {
-    backgroundColor: theme.colors.vibeGreen,
-  },
-  readyBarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
+  // (Legacy readyBar / readyBarReady / readyBarText removed — flush
+  // CTA is now the shared <ShimmerBar>.)
 });

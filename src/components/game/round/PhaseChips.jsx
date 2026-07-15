@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../../theme/themes';
 
 // Static base — PICK / VOTE / RESULT / SCORE always render. WARMUP
@@ -44,28 +43,17 @@ export default function PhaseChips({ phase }) {
     : BASE_STEPS;
   return (
     <View style={styles.row}>
-      {steps.map((step, i) => {
-        const isActive = step.key === activeKey;
-        return (
-          <React.Fragment key={step.key}>
-            {i > 0 && <View style={styles.divider} />}
-            {isActive ? (
-              <LinearGradient
-                colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.chipActive}
-              >
-                <Text style={styles.labelActive}>{step.label}</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.chip}>
-                <Text style={styles.label}>{step.label}</Text>
-              </View>
-            )}
-          </React.Fragment>
-        );
-      })}
+      {steps.map((step, i) => (
+        <React.Fragment key={step.key}>
+          {i > 0 && <View style={styles.divider} />}
+          <View style={[
+            styles.chip,
+            step.key === activeKey && styles.chipActive,
+          ]}>
+            <Text style={styles.label}>{step.label}</Text>
+          </View>
+        </React.Fragment>
+      ))}
     </View>
   );
 }
@@ -77,8 +65,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   // Inactive chip = cyan outline on transparent bg. Active chip =
-  // cyan → neon-purple gradient fill (matches the ShimmerBar CTA
-  // aesthetic so the whole phase strip reads as one design system).
+  // solid cyan fill. Kept simple after a gradient experiment read
+  // muddy — the CTA bars carry the gradient energy; the chips are
+  // just breadcrumbs and read cleaner with a solid accent.
   chip: {
     paddingVertical: 4,
     paddingHorizontal: 7,
@@ -88,21 +77,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   chipActive: {
-    paddingVertical: 4,
-    paddingHorizontal: 7,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    // Purple sitting between vibeBlue and vibeNeonPurple so the
-    // border ties the gradient into the rest of the strip.
-    borderColor: theme.colors.vibeNeonPurple,
+    backgroundColor: theme.colors.vibeBlue,
   },
   label: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  labelActive: {
     color: 'white',
     fontSize: 9,
     fontWeight: '800',

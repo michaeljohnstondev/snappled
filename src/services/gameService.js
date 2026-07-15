@@ -630,17 +630,22 @@ export const gameService = {
     }
   },
 
-  // Fetch random game prompts — seeds if empty. Prefers least-used prompts
-  // so games actually cycle through the full pool instead of replaying the
-  // same handful every match.
+  // Fetch random game prompts — seeds if empty. Prefers least-used
+  // prompts so games actually cycle through the full pool.
+  //
+  // Old version used orderBy('usageCount', 'asc') + limit(30) which
+  // meant Firestore's deterministic doc-ID tiebreak returned the
+  // SAME 30 candidates from the usage=0 tier every game. Pools
+  // bigger than 30 starved 70%+ of prompts until the top 30 all
+  // hit usage=1. That's the "why do I keep seeing the same prompts"
+  // bug. Fix: pull the whole pool (up to 500), bucket by usageCount
+  // tier, shuffle WITHIN tier, pull from the least-used tier first.
   async getGamePrompts(count = 5) {
     try {
-      // Order by usageCount ascending so least-used bubble up; pull a window
-      // of 30 then shuffle to add randomness without going stale.
       const q = query(
         collection(db, 'gamePrompts'),
         orderBy('usageCount', 'asc'),
-        limit(30),
+        limit(500),
       );
       let snapshot = await getDocs(q);
 
@@ -650,17 +655,32 @@ export const gameService = {
         snapshot = await getDocs(q);
       }
 
-      const candidates = [];
-      snapshot.forEach(d => candidates.push({ id: d.id, text: d.data().text }));
-      const shuffled = this._shuffle(candidates).slice(0, count);
+      // Bucket by usageCount tier.
+      const byTier = new Map();
+      snapshot.forEach(d => {
+        const usage = d.data().usageCount || 0;
+        if (!byTier.has(usage)) byTier.set(usage, []);
+        byTier.get(usage).push({ id: d.id, text: d.data().text });
+      });
 
-      // Increment usageCount for the selected prompts so next game prefers
-      // others. Fire-and-forget — don't block on it.
-      shuffled.forEach(p => {
+      // Pull from lowest-usage tier first, shuffled within tier so
+      // every equally-least-used prompt has equal odds.
+      const tiers = [...byTier.keys()].sort((a, b) => a - b);
+      const picked = [];
+      for (const t of tiers) {
+        if (picked.length >= count) break;
+        const shuffled = this._shuffle(byTier.get(t));
+        picked.push(...shuffled.slice(0, count - picked.length));
+      }
+
+      const tierSummary = tiers.map(t => `${t}:${byTier.get(t).length}`).join(' ');
+      console.log(`[GameService] getGamePrompts pool=${snapshot.size} tiers=[${tierSummary}] picked=${picked.length}`);
+
+      picked.forEach(p => {
         updateDoc(doc(db, 'gamePrompts', p.id), { usageCount: increment(1) }).catch(() => {});
       });
 
-      return shuffled.map(p => p.text);
+      return picked.map(p => p.text);
     } catch (error) {
       console.error('[GameService] Error fetching game prompts:', error);
       return DEFAULT_PROMPTS.slice(0, count);
