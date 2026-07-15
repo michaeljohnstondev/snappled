@@ -16,6 +16,8 @@ import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
 import VibeButton from '../components/ui/VibeButton';
+import ShimmerBar from '../components/ui/ShimmerBar';
+import BackChunk from '../components/ui/BackChunk';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
 import PreviewModal from '../components/game/PreviewModal';
@@ -1801,26 +1803,22 @@ export default function GameScreen({ navigation }) {
             </ScrollView>
             {favoriteCard ? (
               <View style={styles.actionRow}>
-                <Pressable
-                  style={styles.actionBackChunk}
+                <BackChunk
                   onPress={() => setFavoriteCard(null)}
-                >
-                  <Text style={styles.actionBackText}>BACK</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.submitVoteBar, styles.actionSubmitChunk]}
+                  style={styles.actionBackFlex}
+                />
+                <ShimmerBar
+                  colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+                  label="SUBMIT VOTE"
                   onPress={handleSubmitVote}
-                >
-                  <Text style={styles.submitVoteBarText}>SUBMIT VOTE</Text>
-                </Pressable>
+                  style={styles.actionSubmitChunk}
+                />
               </View>
             ) : (
-              <Pressable
-                style={[styles.submitVoteBar, styles.submitVoteBarDisabled]}
-                disabled
-              >
-                <Text style={styles.submitVoteBarText}>PICK A FAVORITE</Text>
-              </Pressable>
+              <ShimmerBar
+                colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
+                label="PICK A FAVORITE"
+              />
             )}
           </>
         )}
@@ -1835,7 +1833,6 @@ export default function GameScreen({ navigation }) {
             muted={!!previewCard.muted}
             onClose={() => setPreviewCard(null)}
             primaryLabel={hasVoted ? null : 'PICK AS FAVORITE'}
-            primaryIcon={null}
             onPrimary={() => {
               setFavoriteCard(previewCard);
               setPreviewCard(null);
@@ -3083,24 +3080,8 @@ const styles = StyleSheet.create({
   // Flush action bar — green because it's the selection CTA
   // (matches PLAY THIS CARD in picking). Consistent selection color
   // across the whole game.
-  submitVoteBar: {
-    backgroundColor: theme.colors.vibeGreen,
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 3,
-    borderTopColor: '#000',
-  },
-  // Waiting state — cyan-tinted fill + cyan top border so it reads
-  // as chrome-in-the-vibe-palette instead of a dead gray bar.
-  // Matches PickingPhase.submitBarDisabled for consistency.
-  submitVoteBarDisabled: {
-    backgroundColor: 'rgba(0, 198, 255, 0.18)',
-    borderTopColor: theme.colors.vibeBlue,
-    borderTopWidth: 3,
-  },
+  // (Legacy submitVoteBar / submitVoteBarDisabled removed — the
+  // voting CTA is now the shared <ShimmerBar>.)
   // Two-chunk submit row: 1/4 back button, 3/4 primary CTA. Same
   // full-width footprint as the plain submit bar, split by a
   // hairline black divider so both chunks read as one bar.
@@ -3112,33 +3093,14 @@ const styles = StyleSheet.create({
   },
   // Matches PreviewModal's BACK chunk — solid cyan + white text.
   // All BACK buttons across the game read as the same action now.
-  actionBackChunk: {
+  // (Legacy actionBackChunk / actionBackText removed — BACK is now
+  // the shared <BackChunk> component.)
+  actionBackFlex: {
     flex: 1,
-    paddingTop: 20,
-    paddingBottom: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.vibeBlue,
-    borderRightWidth: 2,
-    borderRightColor: '#000',
-  },
-  actionBackText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
   },
   actionSubmitChunk: {
     flex: 3,
     borderTopWidth: 0,
-  },
-  submitVoteBarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
   },
   // 2-col voting grid — mirrors PickingPhase's grid so the two
   // phases feel like the same screen with a different title.
