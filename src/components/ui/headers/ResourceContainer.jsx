@@ -1,53 +1,147 @@
-import React, { useEffect, useRef } from "react";
+// Resource bar at the top of the app. Each stat pill is press-and-
+// hold: tap-and-hold on a resource to see a brief popup explaining
+// what it is / how to get it / what it's for. Tickets stat retains
+// its tap-to-open-token-modal behavior; the popup fires on press-in
+// so a real tap still triggers the modal on press-out (short holds
+// show the tooltip and dismiss without opening).
+//
+// The level pill uses a shades-of-blue LinearGradient behind the
+// XP fill so the resource bar feels alive without the extreme
+// purple/pink energy of the CTA gradients.
+
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { levelService } from "../../../services/levelService";
 import TickingNumber from "../TickingNumber";
+import ResourceInfoPopup from "./ResourceInfoPopup";
 import theme from "../../../theme/themes";
 
-// Resource bar at the top of the app. Each numeric stat ticks rather than
-// snaps when its value changes. The trophy slot also flashes white when the
-// trophy count goes DOWN (e.g. ranked loss) so the user gets a quick
-// notification without going as loud as red.
+// Copy for each resource popup. Keep bullets short — this is a
+// glance-and-release tooltip, not a manual.
+const RESOURCE_INFO = {
+  tickets: {
+    title: 'Tickets',
+    bullets: [
+      'Used to create your own prompts',
+      'Earn from the store, leveling up, achievements, and winning games',
+    ],
+  },
+  coins: {
+    title: 'Coins',
+    bullets: [
+      'Used to buy snapples and items',
+      'Earn from leveling up, achievements, winning games, and selling snapples',
+    ],
+  },
+  trophies: {
+    title: 'Trophies',
+    bullets: [
+      'Your competitive rank across ranked games',
+      'Earn trophies by winning ranked games',
+    ],
+  },
+  // level's bullets get an inline XP-progress line prepended at render.
+  level: {
+    title: 'Level',
+    bullets: [
+      'Earn XP by creating snapples and playing games',
+      'Leveling up unlocks coin, ticket, and trophy rewards',
+    ],
+  },
+};
+
 export default function ResourceContainer({ userStats, onTokenPress }) {
   const xp = userStats.xp || 0;
   const levelInfo = levelService.getLevelInfo(xp);
-  const levelColor = levelService.getLevelColor(levelInfo.level);
+  const [popup, setPopup] = useState(null);
+
+  const openPopup = (key) => setPopup(key);
+  const closePopup = () => setPopup(null);
+
+  // Level popup bullets get the live XP progress prepended so the
+  // player sees exactly how far they are from the next level.
+  const popupContent = popup === 'level'
+    ? {
+        title: `Level ${levelInfo.level}`,
+        bullets: [
+          `${levelInfo.progressXP} / ${levelInfo.nextLevelXP} XP to Level ${levelInfo.level + 1}`,
+          ...RESOURCE_INFO.level.bullets,
+        ],
+      }
+    : popup
+      ? RESOURCE_INFO[popup]
+      : null;
 
   return (
     <View style={styles.statsRow}>
-      <Pressable style={styles.statItem} onPress={onTokenPress}>
+      <Pressable
+        style={styles.statItem}
+        onPress={onTokenPress}
+        onPressIn={() => openPopup('tickets')}
+        onPressOut={closePopup}
+      >
         <Text style={styles.iconText}>🎫</Text>
         <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
 
-      <View style={styles.statItem}>
+      <Pressable
+        style={styles.statItem}
+        onPressIn={() => openPopup('coins')}
+        onPressOut={closePopup}
+      >
         <Text style={styles.iconText}>💰</Text>
         <TickingNumber
           value={userStats.coins || 0}
           format={(n) => n.toLocaleString()}
           style={styles.statText}
         />
-      </View>
+      </Pressable>
 
       <FlashOnDecreaseSlot value={userStats.trophies || 0}>
-        <Text style={styles.iconText}>🏆</Text>
-        <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
+        <Pressable
+          style={styles.trophyPressable}
+          onPressIn={() => openPopup('trophies')}
+          onPressOut={closePopup}
+        >
+          <Text style={styles.iconText}>🏆</Text>
+          <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
+        </Pressable>
       </FlashOnDecreaseSlot>
 
-      <View style={styles.levelItem}>
-        <View style={styles.levelBg}>
-          <View
-            style={[
-              styles.levelFill,
-              {
-                width: `${Math.min(levelInfo.progress * 100, 100)}%`,
-                backgroundColor: levelColor,
-              },
-            ]}
+      <Pressable
+        style={styles.levelItem}
+        onPressIn={() => openPopup('level')}
+        onPressOut={closePopup}
+      >
+        {/* Base gradient (two shades of blue) — sits under the fill
+            so even 0% progress reads as "alive" chrome, not a dead
+            grey pill. */}
+        <LinearGradient
+          colors={['rgba(0, 100, 160, 0.35)', 'rgba(0, 198, 255, 0.28)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* XP progress fill — brighter gradient overlay that grows
+            left-to-right as XP accumulates. Same blue family but
+            more saturated so the fill line is unmissable. */}
+        <View style={[styles.levelFillWrap, { width: `${Math.min(levelInfo.progress * 100, 100)}%` }]}>
+          <LinearGradient
+            colors={['rgba(0, 198, 255, 0.9)', 'rgba(90, 230, 255, 0.9)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
           />
         </View>
         <Text style={styles.levelText}>Lvl {levelInfo.level}</Text>
-      </View>
+      </Pressable>
+
+      <ResourceInfoPopup
+        visible={!!popupContent}
+        title={popupContent?.title}
+        bullets={popupContent?.bullets}
+      />
     </View>
   );
 }
@@ -73,7 +167,7 @@ function FlashOnDecreaseSlot({ value, children }) {
   });
 
   return (
-    <Animated.View style={[styles.statItem, { backgroundColor: bg }]}>
+    <Animated.View style={[styles.statItem, { backgroundColor: bg, padding: 0 }]}>
       {children}
     </Animated.View>
   );
@@ -97,6 +191,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(0, 198, 255, 0.35)",
   },
+  // Pressable inside FlashOnDecreaseSlot's Animated.View — takes on
+  // the parent's padding so the flash bg still covers the whole pill.
+  trophyPressable: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(0, 198, 255, 0.35)",
+  },
   statText: {
     color: theme.colors.textPrimary,
     fontSize: 12,
@@ -106,39 +212,38 @@ const styles = StyleSheet.create({
   iconText: {
     fontSize: 14,
   },
-  tokenButton: {},
+  // Level pill — same footprint as the other resources but with a
+  // gradient base + brighter gradient XP fill. Border retained so it
+  // reads as part of the same resource row.
   levelItem: {
     position: 'relative',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
     overflow: 'hidden',
-    minWidth: 55,
+    minWidth: 60,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: "rgba(0, 198, 255, 0.35)",
+    borderColor: 'rgba(0, 198, 255, 0.6)',
   },
-  levelBg: {
+  levelFillWrap: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 198, 255, 0.12)',
+    overflow: 'hidden',
     borderRadius: 12,
-  },
-  levelFill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    borderRadius: 8,
-    opacity: 0.65,
   },
   levelText: {
     fontSize: 12,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-    color: theme.colors.textPrimary,
+    color: '#fff',
+    // Text shadow so the label reads on both the dim base and the
+    // brighter fill without a color swap mid-pill.
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

@@ -112,6 +112,15 @@ export const gameService = {
       };
 
       await setDoc(gameRef, gameDoc);
+      // Record the active game on the host's user doc so app-relaunch
+      // rejoin is a single read (see checkActiveGame in GameScreen)
+      // instead of a collection scan. Skipped for bots (no user doc).
+      if (hostId && !String(hostId).startsWith('bot_')) {
+        updateDoc(doc(db, 'users', hostId), {
+          activeGameId: gameRef.id,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       return { success: true, gameId: gameRef.id };
     } catch (error) {
       console.error('[GameService] Error creating game:', error);
@@ -151,6 +160,15 @@ export const gameService = {
         }),
         updatedAt: serverTimestamp(),
       });
+
+      // Mirror the active game onto the user doc — see createGame
+      // for the rationale. Bots skipped (no user doc).
+      if (userId && !String(userId).startsWith('bot_')) {
+        updateDoc(doc(db, 'users', userId), {
+          activeGameId: gameId,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      }
 
       return { success: true, gameId };
     } catch (error) {
@@ -799,6 +817,15 @@ export const gameService = {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
       const gameDoc = await getDoc(gameRef);
+      // Clear the leaver's activeGameId regardless of what happens to
+      // the game itself — the leaver is out either way. Skipped for
+      // bots (no user doc). Fire-and-forget so it can't block leave.
+      if (userId && !String(userId).startsWith('bot_')) {
+        updateDoc(doc(db, 'users', userId), {
+          activeGameId: null,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       if (!gameDoc.exists()) return;
 
       const data = gameDoc.data();

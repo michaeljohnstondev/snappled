@@ -291,20 +291,42 @@ function RoundResultsReveal({
 
         <View style={styles.resultsActions}>
           {isHost ? (
-            <VibeButton label="Next Round" onPress={onNextRound} />
+            (() => {
+              // Left-side "quit-ish" action pairs with the primary
+              // Next Round ShimmerBar into a split action row. Which
+              // one appears depends on game mode:
+              //   practice (bots)     → QUIT (leaves practice)
+              //   infinite non-prac   → END GAME (host ends for all)
+              //   fixed-round non-prac → nothing (game auto-ends)
+              const leftAction = isPractice && onQuitPractice
+                ? { label: 'QUIT', onPress: onQuitPractice }
+                : isInfinite && !isPractice && onEndGame
+                  ? { label: 'END GAME', onPress: onEndGame }
+                  : null;
+              return leftAction ? (
+                <View style={styles.actionRow}>
+                  <BackChunk
+                    onPress={leftAction.onPress}
+                    label={leftAction.label}
+                    style={styles.actionBackFlex}
+                  />
+                  <ShimmerBar
+                    colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+                    label="NEXT ROUND"
+                    onPress={onNextRound}
+                    style={styles.actionSubmitChunk}
+                  />
+                </View>
+              ) : (
+                <ShimmerBar
+                  colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+                  label="NEXT ROUND"
+                  onPress={onNextRound}
+                />
+              );
+            })()
           ) : (
             <Text style={styles.waitingText}>Next round in {timer}s...</Text>
-          )}
-          {isPractice && onQuitPractice ? (
-            <Pressable
-              style={quitPracticeStyles.btn}
-              onPress={onQuitPractice}
-            >
-              <Text style={quitPracticeStyles.btnText}>Quit Practice</Text>
-            </Pressable>
-          ) : null}
-          {isHost && isInfinite && !isPractice && (
-            <VibeButton label="End Game" onPress={onEndGame} color="red" variant="toggle" />
           )}
           <Pressable style={styles.shareResultsBtn} onPress={onShare}>
             <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
@@ -702,41 +724,65 @@ export default function GameScreen({ navigation }) {
     }, [gameId])
   );
 
+  // Detect an in-progress game to rejoin on app relaunch. Reads the
+  // user doc's `activeGameId` (a single doc read regardless of how
+  // many games exist in the collection — the old approach paginated
+  // /games with a client-side `players.some(...)` filter, which did
+  // not scale). Self-heals stale pointers: if the referenced game
+  // doesn't exist, doesn't include us, is stale (>5 min), or is a
+  // practice-with-bots game, we clear activeGameId and fall through
+  // to the normal no-game-in-progress UI.
   const checkActiveGame = async () => {
     if (!user?.uid) return;
     try {
-      const { collection: col, query: q, where, getDocs, limit: lim, deleteDoc, doc: docRef } = require('firebase/firestore');
+      const { doc: docRef, getDoc, updateDoc, deleteDoc, serverTimestamp } = require('firebase/firestore');
       const { db } = require('../services/firebase');
-      const gamesQuery = q(
-        col(db, 'games'),
-        where('phase', 'in', ['lobby', 'picking', 'voting', 'scoring', 'roundResults']),
-        lim(5)
-      );
-      const snapshot = await getDocs(gamesQuery);
-      for (const gameDoc of snapshot.docs) {
-        const data = gameDoc.data();
-        if (data.players?.some(p => p.uid === user.uid)) {
-          // Check if game is stale (older than 5 minutes with no update)
-          const updatedAt = data.updatedAt?.toDate?.() || new Date(data.updatedAt || 0);
-          const staleMins = (Date.now() - updatedAt.getTime()) / (1000 * 60);
 
-          if (staleMins > 5) {
-            console.log('[GameScreen] Cleaning up stale game:', gameDoc.id);
-            await deleteDoc(docRef(db, 'games', gameDoc.id));
-            continue;
-          }
+      const userRef = docRef(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      const activeId = userSnap.exists() ? userSnap.data().activeGameId : null;
+      if (!activeId) return;
 
-          // Active game — rejoin (but not practice bot games)
-          const hasBots = data.players.some(p => p.uid?.startsWith('bot_'));
-          if (hasBots) {
-            await deleteDoc(docRef(db, 'games', gameDoc.id));
-            continue;
-          }
+      const gameRef = docRef(db, 'games', activeId);
+      const gameSnap = await getDoc(gameRef);
+      const clearPointer = () => updateDoc(userRef, {
+        activeGameId: null,
+        updatedAt: serverTimestamp(),
+      }).catch(() => {});
 
-          setGameId(gameDoc.id);
-          return;
-        }
+      if (!gameSnap.exists()) {
+        clearPointer();
+        return;
       }
+
+      const data = gameSnap.data();
+      const stillIn = (data.players || []).some(p => p.uid === user.uid);
+      if (!stillIn) {
+        clearPointer();
+        return;
+      }
+
+      // Stale = 5+ min no updates. Delete + clear.
+      const updatedAt = data.updatedAt?.toDate?.() || new Date(data.updatedAt || 0);
+      const staleMins = (Date.now() - updatedAt.getTime()) / (1000 * 60);
+      if (staleMins > 5) {
+        console.log('[GameScreen] Cleaning up stale game:', activeId);
+        await deleteDoc(gameRef).catch(() => {});
+        clearPointer();
+        return;
+      }
+
+      // Practice games (bot players) don't restore — bots aren't real
+      // clients driving the phase machine, so a restarted session
+      // would sit forever. Nuke the game and start fresh next time.
+      const hasBots = (data.players || []).some(p => p.uid?.startsWith('bot_'));
+      if (hasBots) {
+        await deleteDoc(gameRef).catch(() => {});
+        clearPointer();
+        return;
+      }
+
+      setGameId(activeId);
     } catch (e) {
       console.error('[GameScreen] Error checking active game:', e);
     }
@@ -1873,6 +1919,7 @@ export default function GameScreen({ navigation }) {
                 submission={previewCard}
                 currentUser={user}
                 ownedSnappleIds={userCurrency.ownedSnapples || []}
+                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
                 showToast={showToast}
                 showError={showError}
               />
@@ -2032,14 +2079,16 @@ export default function GameScreen({ navigation }) {
 
         {/* Host skip — end the current round early instead of
             waiting out the scoring timer. Advances the game to the
-            SCORE (round-results) phase. */}
+            SCORE (round-results) phase. Uses the ShimmerBar CTA
+            treatment (green → cyan, same palette as PLAY THIS CARD /
+            SUBMIT VOTE) so the "ready to advance" energy is
+            consistent across the game. */}
         {isHost && (
-          <Pressable
-            style={styles.hostAdvanceBar}
+          <ShimmerBar
+            colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+            label="END ROUND"
             onPress={() => gameService.enterRoundResults(gameId)}
-          >
-            <Text style={styles.hostAdvanceBarText}>END ROUND</Text>
-          </Pressable>
+          />
         )}
 
         {/* Scoreboard modal — opened from the header podium icon.
@@ -2105,6 +2154,7 @@ export default function GameScreen({ navigation }) {
                 submission={previewCard}
                 currentUser={user}
                 ownedSnappleIds={userCurrency.ownedSnapples || []}
+                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
                 showToast={showToast}
                 showError={showError}
               />
@@ -2179,31 +2229,11 @@ export default function GameScreen({ navigation }) {
   return null;
 }
 
-// Quit Practice button — solid red fill with a vibeOrange border,
-// mirrors bvs-app's "DELETE EVENT" red variant so destructive
-// actions read the same across our apps. Orange border + white
-// text on a #CC0033 fill.
-const quitPracticeStyles = StyleSheet.create({
-  btn: {
-    backgroundColor: '#CC0033',
-    borderColor: theme.colors.vibeOrange,
-    borderWidth: 3,
-    // 13pt padding + 3pt borders + 16pt text = 48pt tall, which
-    // matches VibeButton's default variant height (~49pt from its
-    // 10pt content padding + 3pt gradient padding + 3/4pt borders).
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-});
+// (Legacy quitPracticeStyles removed — the scoreboard's Quit / End
+// Game actions are now BackChunk in a split action row with
+// NEXT ROUND. The Quit-Practice-inside-game button still lives in
+// its own place at the top of the game screen and uses its own
+// inline style there.)
 
 // Admin nuke button styling for the in-game card preview modal.
 // Visually subdued + red so it can't be mistaken for a player action.
@@ -3075,25 +3105,8 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 10, padding: 3,
   },
-  // Host skip on Scoring — same flush-bar shape as the other CTAs
-  // so it reads instantly as the primary action for whoever's hosting.
-  hostAdvanceBar: {
-    backgroundColor: theme.colors.vibeBlue,
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 3,
-    borderTopColor: '#000',
-  },
-  hostAdvanceBarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
+  // (Legacy hostAdvanceBar / hostAdvanceBarText removed — the END
+  // ROUND host-skip button is now the shared <ShimmerBar>.)
   // Flush action bar — green because it's the selection CTA
   // (matches PLAY THIS CARD in picking). Consistent selection color
   // across the whole game.
