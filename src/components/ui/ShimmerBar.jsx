@@ -57,6 +57,19 @@ export default function ShimmerBar({
 
   const padding = variant === 'compact' ? PADDING_COMPACT : PADDING_DEFAULT;
 
+  // Strip flex-related keys from the style before spreading to the
+  // inner gradient (see interactive branch below). Kept ABOVE any
+  // conditional return so hook count stays constant across renders
+  // — flipping onPress from set → undefined mid-life (e.g., READY UP
+  // → READY ✓ locking) used to trip "rendered fewer hooks than
+  // expected" when this useMemo lived below the early return.
+  const gradientStyle = useMemo(() => {
+    if (!style) return null;
+    const flat = StyleSheet.flatten(style) || {};
+    const { flex, flexGrow, flexShrink, flexBasis, ...rest } = flat;
+    return rest;
+  }, [style]);
+
   const inner = (
     <LinearGradient
       colors={colors}
@@ -98,19 +111,10 @@ export default function ShimmerBar({
     return inner;
   }
   // Style goes on the Pressable in full. The gradient gets the
-  // same style MINUS flex-related keys — flex:3 on the outer
-  // Pressable is right ("take 3/4 of the row"), but the same flex
-  // spread onto an inner column-direction gradient collapses it to
-  // 0 because it tries to fill a vertical dimension the Pressable
-  // hasn't decided yet. Splitting keeps both cases (standalone +
-  // split-row) rendering with correct height and full width.
-  const gradientStyle = useMemo(() => {
-    if (!style) return null;
-    const flat = StyleSheet.flatten(style) || {};
-    const { flex, flexGrow, flexShrink, flexBasis, ...rest } = flat;
-    return rest;
-  }, [style]);
-
+  // same style MINUS flex-related keys (see gradientStyle useMemo
+  // above) — flex:3 on the outer Pressable is right ("take 3/4 of
+  // the row"), but the same flex spread onto an inner
+  // column-direction gradient collapses it to 0.
   return (
     <Pressable onPress={onPress} style={[styles.pressWrap, style]}>
       <LinearGradient
