@@ -97,9 +97,45 @@ export default function ShimmerBar({
     // should still let the user scroll the hand above it).
     return inner;
   }
+  // Style spreads onto both the Pressable (so flex passes through
+  // when the bar sits inside an actionRow) and the gradient (so
+  // borderTopWidth / padding overrides land on the visual). The
+  // gradient sizes to its own padding + text — NO flex:1, which
+  // used to collapse the standalone bar to zero height because
+  // the Pressable had no explicit size to fill from.
   return (
-    <Pressable onPress={onPress} style={styles.pressWrap}>
-      {inner}
+    <Pressable onPress={onPress} style={[styles.pressWrap, style]}>
+      <LinearGradient
+        colors={colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.bar, padding, style]}
+      >
+        <Animated.View
+          style={[
+            styles.shimmer,
+            {
+              transform: [
+                {
+                  translateX: shimmerX.interpolate({
+                    inputRange: [-1, 1],
+                    outputRange: [-260, 260],
+                  }),
+                },
+                { rotate: '15deg' },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.shimmerInner}
+          />
+        </Animated.View>
+        <Text style={[styles.label, textStyle]}>{label}</Text>
+      </LinearGradient>
     </Pressable>
   );
 }
