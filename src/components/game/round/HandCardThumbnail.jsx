@@ -38,7 +38,32 @@ export default function HandCardThumbnail({
   label,
   duration,
 }) {
-  const username = label || `@${card?.creatorUsername || 'anon'}`;
+  // TEMP diagnostic: when the fallback fires, encode WHY into the
+  // visible label so we can debug without console access. Suffix
+  // meaning:
+  //   -miss  = card has no creatorUsername key at all
+  //   -null  = key exists but value is null
+  //   -empty = key exists but is empty string
+  //   -"anonymous" = literal string "anonymous" stored on the doc
+  //   -other = something else falsy (undefined, 0, etc.)
+  // Suffixed with the last 4 chars of creatorId so we can look up
+  // that user in Firestore. Remove once the @anon bug is understood.
+  let username;
+  if (label) {
+    username = label;
+  } else if (card?.creatorUsername) {
+    username = `@${card.creatorUsername}`;
+  } else if (card) {
+    const cid4 = (card.creatorId || 'nocid').slice(-4);
+    let why;
+    if (!('creatorUsername' in card)) why = 'miss';
+    else if (card.creatorUsername === null) why = 'null';
+    else if (card.creatorUsername === '') why = 'empty';
+    else why = String(card.creatorUsername).slice(0, 8) || 'other';
+    username = `@anon-${why}-${cid4}`;
+  } else {
+    username = '@anon-nocard';
+  }
   return (
     <View style={[styles.glowWrap, isSelected && styles.glowWrapFeatured]}>
       {/* Card body tap = pause/play the inline mini-player. The

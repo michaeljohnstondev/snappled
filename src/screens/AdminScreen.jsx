@@ -827,6 +827,52 @@ export default function AdminScreen({ navigation }) {
               } catch (e) { showError('Error', e.message); }
             }}
           />
+          <UtilButton
+            label="Fix @anon Snapples"
+            desc="Backfill creatorUsername on snapples that show as @anon by looking up each creator's user doc."
+            color={theme.colors.vibeGreen}
+            onPress={async () => {
+              try {
+                const snap = await getDocs(query(collection(db, 'snapples'), limit(500)));
+                const needsFix = [];
+                snap.forEach(d => {
+                  const data = d.data();
+                  const bad = !data.creatorUsername
+                    || data.creatorUsername === ''
+                    || data.creatorUsername === 'anonymous';
+                  if (bad && data.creatorId) {
+                    needsFix.push({ id: d.id, creatorId: data.creatorId });
+                  }
+                });
+
+                // Cache user lookups so multiple snapples from the same
+                // creator only cost one Firestore read.
+                const userCache = new Map();
+                let fixed = 0;
+                for (const s of needsFix) {
+                  let username = userCache.get(s.creatorId);
+                  if (username === undefined) {
+                    try {
+                      const ud = await getDoc(doc(db, 'users', s.creatorId));
+                      username = ud.exists()
+                        ? (ud.data().username || ud.data().displayName || null)
+                        : null;
+                    } catch (e) {
+                      username = null;
+                    }
+                    userCache.set(s.creatorId, username);
+                  }
+                  if (username) {
+                    await updateDoc(doc(db, 'snapples', s.id), {
+                      creatorUsername: username,
+                    }).catch(() => {});
+                    fixed++;
+                  }
+                }
+                showAlert('Done', `Scanned ${snap.size} snapples. Fixed ${fixed} of ${needsFix.length} @anon.`);
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
         </ScrollView>
       ) : activeTab === 'create' ? (
         <View style={styles.createSection}>

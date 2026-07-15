@@ -50,10 +50,16 @@ export function AuthProvider({ children }) {
 
           console.log('[AuthContext] User data loaded:', !!userData);
           if (userData) {
+            // Spread userData FIRST so authoritative Firebase Auth
+            // fields (uid, email, displayName) always win — a stale
+            // or empty-string field on the Firestore doc used to
+            // clobber them and break every downstream username /
+            // email lookup (including snapple.creatorUsername).
             setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
               ...userData,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || userData.email,
+              displayName: firebaseUser.displayName || userData.displayName,
             });
             setUserCurrency({
               userId: firebaseUser.uid,

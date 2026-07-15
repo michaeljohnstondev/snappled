@@ -32,11 +32,27 @@ const WISHLISTS_COLLECTION = 'wishlists';
 export const snappleService = {
   async createSnapple(snappleData) {
     try {
-      const { promptId, videoUrl, videoId, creatorId, creatorUsername } = snappleData;
-      let { prompt, category } = snappleData;
+      const { promptId, videoUrl, videoId, creatorId } = snappleData;
+      let { creatorUsername, prompt, category } = snappleData;
 
       if (!promptId || !videoUrl || !videoId || !creatorId) {
         throw new Error('Missing required snapple data');
+      }
+
+      // Auto-lookup username from the creator's user doc if the
+      // caller didn't provide one (or fell back to the "anonymous"
+      // placeholder because their in-memory user object was stale).
+      // Prevents snapples from displaying as @anon forever.
+      if (!creatorUsername || creatorUsername === 'anonymous') {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', creatorId));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            creatorUsername = data.username || data.displayName || creatorUsername || 'anonymous';
+          }
+        } catch (e) {
+          console.warn('[createSnapple] user lookup for creatorUsername failed:', e);
+        }
       }
 
       // Backfill prompt text from the prompt doc if missing or default
