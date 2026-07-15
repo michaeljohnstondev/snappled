@@ -5,7 +5,7 @@ import ResourceContainer from './ResourceContainer';
 import UserMenu from '../UserMenu';
 import theme from '../../../theme/themes';
 
-export default function HomeHeader({ userStats, onProfilePress, onTokenPress, onAdminPress, userId }) {
+export default function HomeHeader({ userStats, onProfilePress, onAdminPress, userId }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleProfilePress = () => {
@@ -28,7 +28,7 @@ export default function HomeHeader({ userStats, onProfilePress, onTokenPress, on
         </Pressable>
       </View>
       
-      <ResourceContainer userStats={userStats} onTokenPress={onTokenPress} />
+      <ResourceContainer userStats={userStats} />
 
       <UserMenu
         visible={showUserMenu}

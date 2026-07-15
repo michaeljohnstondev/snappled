@@ -1,9 +1,10 @@
-// Resource bar at the top of the app. Each stat pill is press-and-
-// hold: tap-and-hold on a resource to see a brief popup explaining
-// what it is / how to get it / what it's for. Tickets stat retains
-// its tap-to-open-token-modal behavior; the popup fires on press-in
-// so a real tap still triggers the modal on press-out (short holds
-// show the tooltip and dismiss without opening).
+// Resource bar at the top of the app. Every stat pill is press-and-
+// hold: hold on a resource to see a brief popup explaining what it
+// is / how to get it / what it's for. Release to dismiss. No tap
+// actions — the previous onTokenPress → open-token-modal shortcut
+// on tickets conflicted with the press-in popup UX (short taps
+// briefly flashed the popup then opened the modal). Store surface
+// is reachable via the store tab.
 //
 // The level pill uses a shades-of-blue LinearGradient behind the
 // XP fill so the resource bar feels alive without the extreme
@@ -51,7 +52,7 @@ const RESOURCE_INFO = {
   },
 };
 
-export default function ResourceContainer({ userStats, onTokenPress }) {
+export default function ResourceContainer({ userStats }) {
   const xp = userStats.xp || 0;
   const levelInfo = levelService.getLevelInfo(xp);
   const [popup, setPopup] = useState(null);
@@ -77,7 +78,6 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
     <View style={styles.statsRow}>
       <Pressable
         style={styles.statItem}
-        onPress={onTokenPress}
         onPressIn={() => openPopup('tickets')}
         onPressOut={closePopup}
       >
@@ -98,16 +98,15 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
         />
       </Pressable>
 
-      <FlashOnDecreaseSlot value={userStats.trophies || 0}>
-        <Pressable
-          style={styles.trophyPressable}
-          onPressIn={() => openPopup('trophies')}
-          onPressOut={closePopup}
-        >
-          <Text style={styles.iconText}>🏆</Text>
-          <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
-        </Pressable>
-      </FlashOnDecreaseSlot>
+      <Pressable
+        style={styles.statItem}
+        onPressIn={() => openPopup('trophies')}
+        onPressOut={closePopup}
+      >
+        <FlashOverlay value={userStats.trophies || 0} />
+        <Text style={styles.iconText}>🏆</Text>
+        <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
+      </Pressable>
 
       <Pressable
         style={styles.levelItem}
@@ -146,9 +145,12 @@ export default function ResourceContainer({ userStats, onTokenPress }) {
   );
 }
 
-// Wraps a stat slot so its background flashes white briefly when `value` goes
-// down. Used for trophy losses — soft notification, not punitive red.
-function FlashOnDecreaseSlot({ value, children }) {
+// FlashOverlay — absolute-positioned Animated.View that briefly
+// flashes white when `value` drops. Used for trophy losses — soft
+// notification without turning the whole pill red. Rendered INSIDE
+// the trophy Pressable (as an overlay under the icon+number) so we
+// don't need a second visual container.
+function FlashOverlay({ value }) {
   const flash = useRef(new Animated.Value(0)).current;
   const lastRef = useRef(value);
   useEffect(() => {
@@ -163,13 +165,14 @@ function FlashOnDecreaseSlot({ value, children }) {
 
   const bg = flash.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(0, 198, 255, 0.12)', 'rgba(255, 255, 255, 0.55)'],
+    outputRange: ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.55)'],
   });
 
   return (
-    <Animated.View style={[styles.statItem, { backgroundColor: bg, padding: 0 }]}>
-      {children}
-    </Animated.View>
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { backgroundColor: bg, borderRadius: 12 }]}
+    />
   );
 }
 
@@ -185,18 +188,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     backgroundColor: "rgba(0, 198, 255, 0.12)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(0, 198, 255, 0.35)",
-  },
-  // Pressable inside FlashOnDecreaseSlot's Animated.View — takes on
-  // the parent's padding so the flash bg still covers the whole pill.
-  trophyPressable: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

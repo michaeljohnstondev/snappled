@@ -1,61 +1,59 @@
 // ResourceInfoPopup — press-and-hold tooltip for a resource in the
-// top HomeHeader bar. Absolutely-positioned overlay (NOT a Modal)
-// because Modal hijacks the touch responder and would break the
-// Pressable's onPressOut → the popup would stick on screen after
-// release. This View renders in the same tree as the Pressable, so
-// the finger keeps its grip on the Pressable and release cleanly
-// fires the "hide popup" state update.
+// top HomeHeader bar. Uses a Modal so it renders above every layer
+// regardless of what parent tree clips it (the previous
+// absolutely-positioned overlay got clipped by the header's
+// natural bounds and rendered off-screen).
 //
-// Positioned to float below the resource row with a dim backdrop
-// under the card that covers the rest of the screen but stays
-// pointerEvents:'none' so nothing under it steals touches either.
+// Touch-responder note: React Native tracks in-progress touches on
+// the responder that started the gesture. A Modal appearing mid-hold
+// does NOT hijack the existing touch — the Pressable that fired
+// onPressIn keeps ownership and fires onPressOut cleanly when the
+// finger lifts. The Modal only captures NEW touches on its own
+// surface, and we set pointerEvents:'none' on the backdrop so the
+// popup can never accidentally intercept anything.
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Modal, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
 
 export default function ResourceInfoPopup({ visible, title, bullets }) {
-  if (!visible) return null;
   return (
-    <View style={styles.wrap} pointerEvents="none">
-      <View style={styles.backdrop} />
-      <View style={styles.card}>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.bulletList}>
-          {(bullets || []).map((line, i) => (
-            <View key={i} style={styles.bulletRow}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>{line}</Text>
-            </View>
-          ))}
+    <Modal
+      visible={!!visible}
+      transparent
+      animationType="fade"
+      // No-op — press-out on the underlying Pressable is what
+      // closes the popup, not a modal action.
+      onRequestClose={() => {}}
+    >
+      <View style={styles.backdrop} pointerEvents="none">
+        <View style={styles.card}>
+          <Text style={styles.title}>{title}</Text>
+          <View style={styles.bulletList}>
+            {(bullets || []).map((line, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{line}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.hint}>RELEASE TO CLOSE</Text>
         </View>
-        <Text style={styles.hint}>RELEASE TO CLOSE</Text>
       </View>
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  // Full-screen shell positioned so the popup floats below the
-  // resource row (top offset ≈ resource bar height + safe area).
-  // High zIndex + elevation so it paints above sibling content.
-  wrap: {
-    position: 'absolute',
-    top: 44,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    elevation: 9999,
-    alignItems: 'center',
-  },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
   },
   card: {
-    marginTop: 20,
-    width: '90%',
+    width: '100%',
     maxWidth: 360,
     paddingVertical: 22,
     paddingHorizontal: 22,
@@ -91,7 +89,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   bulletText: {
-    color: theme.colors.textPrimary,
+    color: '#fff',
     fontSize: 14,
     lineHeight: 20,
     flex: 1,
