@@ -29,8 +29,6 @@ export default function SnappleOverlay({
   snapples,
   initialIndex = 0,
   onClose,
-  onLike,
-  onDislike,
   onBuy,
   onReport,
   navigation,
@@ -83,9 +81,13 @@ export default function SnappleOverlay({
     buyCount: snapple?.buyCount || 0,
     currentPrice: snapple?.currentPrice || 10,
   });
+  // hasLiked / hasDisliked are derived from snapple.likedBy /
+  // snapple.dislikedBy (denormalized 2-way index on the snapple doc)
+  // — no separate Firestore fetch. Kept in local state so optimistic
+  // updates on tap feel instant; re-syncs when a new snapple opens.
   const [userInteraction, setUserInteraction] = useState({
-    hasLiked: false,
-    hasDisliked: false,
+    hasLiked: (snapple?.likedBy || []).includes(user?.uid),
+    hasDisliked: (snapple?.dislikedBy || []).includes(user?.uid),
     hasPurchased: false
   });
   // Local mirror of snapple.isPrivate so the lock badge and toggle UI
@@ -144,14 +146,14 @@ export default function SnappleOverlay({
       });
       snappleService.incrementViews(snapple.id);
 
-      // Load existing interaction state
+      // Derive interaction state from the snapple's inverse arrays —
+      // no Firestore round-trip needed. Both arrays already loaded
+      // as part of the snapple prop.
       if (user?.uid) {
-        snappleService.getUserInteraction(snapple.id, user.uid).then((interaction) => {
-          setUserInteraction({
-            hasLiked: interaction.hasLiked,
-            hasDisliked: interaction.hasDisliked,
-            hasPurchased: false,
-          });
+        setUserInteraction({
+          hasLiked: (snapple.likedBy || []).includes(user.uid),
+          hasDisliked: (snapple.dislikedBy || []).includes(user.uid),
+          hasPurchased: false,
         });
       }
     }
@@ -167,75 +169,51 @@ export default function SnappleOverlay({
     }
   };
 
-  const handleLike = async () => {
-    const wasLiked = userInteraction.hasLiked;
-    const wasDisliked = userInteraction.hasDisliked;
+  // Toggle reaction — one entry point handles like / dislike / clear.
+  // Optimistic UI: flip local state + counter, then call the batched
+  // 2-way service write. On failure, roll back.
+  const applyReaction = async (targetType) => {
+    const currentType = userInteraction.hasLiked
+      ? 'like'
+      : userInteraction.hasDisliked
+        ? 'dislike'
+        : null;
+    if (targetType === currentType) return;
+    const prevInteraction = userInteraction;
+    const prevMetrics = metrics;
 
-    if (wasLiked) {
-      // Unlike
-      setMetrics(prev => ({ ...prev, likes: prev.likes - 1 }));
-      setUserInteraction(prev => ({ ...prev, hasLiked: false }));
-      try {
-        await snappleService.unlikeSnapple(snapple.id, user.uid);
-      } catch (error) {
-        setMetrics(prev => ({ ...prev, likes: prev.likes + 1 }));
-        setUserInteraction(prev => ({ ...prev, hasLiked: true }));
-      }
-    } else {
-      // Like
-      setMetrics(prev => ({
-        ...prev,
-        likes: prev.likes + 1,
-        dislikes: wasDisliked ? prev.dislikes - 1 : prev.dislikes,
-      }));
-      setUserInteraction(prev => ({ ...prev, hasLiked: true, hasDisliked: false }));
-      try {
-        await onLike?.(snapple.id);
-      } catch (error) {
-        setMetrics(prev => ({
-          ...prev,
-          likes: prev.likes - 1,
-          dislikes: wasDisliked ? prev.dislikes + 1 : prev.dislikes,
-        }));
-        setUserInteraction(prev => ({ ...prev, hasLiked: false, hasDisliked: wasDisliked }));
-      }
+    // Compute counter deltas from the transition.
+    let dLikes = 0, dDislikes = 0;
+    if (currentType === 'like') dLikes -= 1;
+    if (currentType === 'dislike') dDislikes -= 1;
+    if (targetType === 'like') dLikes += 1;
+    if (targetType === 'dislike') dDislikes += 1;
+
+    setUserInteraction(prev => ({
+      ...prev,
+      hasLiked: targetType === 'like',
+      hasDisliked: targetType === 'dislike',
+    }));
+    setMetrics(prev => ({
+      ...prev,
+      likes: Math.max(0, prev.likes + dLikes),
+      dislikes: Math.max(0, prev.dislikes + dDislikes),
+    }));
+
+    try {
+      const result = await snappleService.setSnappleReaction(
+        snapple.id, user.uid, targetType, currentType,
+      );
+      if (!result?.success) throw new Error(result?.error || 'reaction failed');
+    } catch (e) {
+      // Roll back to whatever the state was pre-tap.
+      setUserInteraction(prevInteraction);
+      setMetrics(prevMetrics);
     }
   };
 
-  const handleDislike = async () => {
-    const wasDisliked = userInteraction.hasDisliked;
-    const wasLiked = userInteraction.hasLiked;
-
-    if (wasDisliked) {
-      // Undislike
-      setMetrics(prev => ({ ...prev, dislikes: prev.dislikes - 1 }));
-      setUserInteraction(prev => ({ ...prev, hasDisliked: false }));
-      try {
-        await snappleService.unlikeSnapple(snapple.id, user.uid);
-      } catch (error) {
-        setMetrics(prev => ({ ...prev, dislikes: prev.dislikes + 1 }));
-        setUserInteraction(prev => ({ ...prev, hasDisliked: true }));
-      }
-    } else {
-      // Dislike
-      setMetrics(prev => ({
-        ...prev,
-        dislikes: prev.dislikes + 1,
-        likes: wasLiked ? prev.likes - 1 : prev.likes,
-      }));
-      setUserInteraction(prev => ({ ...prev, hasDisliked: true, hasLiked: false }));
-      try {
-        await onDislike?.(snapple.id);
-      } catch (error) {
-        setMetrics(prev => ({
-          ...prev,
-          dislikes: prev.dislikes - 1,
-          likes: wasLiked ? prev.likes + 1 : prev.likes,
-        }));
-        setUserInteraction(prev => ({ ...prev, hasDisliked: false, hasLiked: wasLiked }));
-      }
-    }
-  };
+  const handleLike = () => applyReaction(userInteraction.hasLiked ? null : 'like');
+  const handleDislike = () => applyReaction(userInteraction.hasDisliked ? null : 'dislike');
 
   const handleBuy = () => {
     // Skip the confirm flow entirely if the user already owns this snapple —
@@ -392,14 +370,15 @@ export default function SnappleOverlay({
 
           <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={async () => {
+              // Save button is a 2-way toggle. Batched service call
+              // updates BOTH user.wishlistedSnapples AND
+              // snapple.wishlistedBy atomically; the AuthContext
+              // snapshot listener picks up the user-side change and
+              // re-renders the button state.
               const wishlisted = (userCurrency.wishlistedSnapples || []).includes(snapple.id);
-              if (wishlisted) {
-                await snappleService.removeFromWishlist(user.uid, snapple.id);
-                await updateUserCurrency({ wishlistedSnapples: (userCurrency.wishlistedSnapples || []).filter(id => id !== snapple.id) });
-              } else {
-                await snappleService.addToWishlist(user.uid, snapple.id);
-                await updateUserCurrency({ wishlistedSnapples: [...(userCurrency.wishlistedSnapples || []), snapple.id] });
-              }
+              await snappleService.setSnappleWishlist(
+                snapple.id, user.uid, !wishlisted, wishlisted,
+              );
             }}>
               <View style={[styles.buttonBg, (userCurrency.wishlistedSnapples || []).includes(snapple.id) && styles.activeBg]}>
                 <Ionicons name={(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? "bookmark" : "bookmark-outline"} size={20} color={(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? theme.colors.vibeYellow : 'white'} />

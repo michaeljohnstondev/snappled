@@ -70,6 +70,8 @@ export function AuthProvider({ children }) {
               xp: userData.profile?.xp || 0,
               ownedSnapples: userData.ownedSnapples || [],
               wishlistedSnapples: userData.wishlistedSnapples || [],
+              likedSnapples: userData.likedSnapples || [],
+              dislikedSnapples: userData.dislikedSnapples || [],
               ownedCards: userData.ownedCards || [],
             });
             setIsAuthenticated(true);
@@ -87,6 +89,8 @@ export function AuthProvider({ children }) {
                 xp: d.profile?.xp || 0,
                 ownedSnapples: d.ownedSnapples || [],
                 wishlistedSnapples: d.wishlistedSnapples || [],
+                likedSnapples: d.likedSnapples || [],
+                dislikedSnapples: d.dislikedSnapples || [],
                 ownedCards: d.ownedCards || [],
               }));
               setUser(prev => prev ? ({
@@ -171,6 +175,8 @@ export function AuthProvider({ children }) {
           level: userData.profile?.level || 1,
           ownedSnapples: userData.ownedSnapples || [],
           wishlistedSnapples: userData.wishlistedSnapples || [],
+          likedSnapples: userData.likedSnapples || [],
+          dislikedSnapples: userData.dislikedSnapples || [],
           ownedCards: userData.ownedCards || [],
         });
       }

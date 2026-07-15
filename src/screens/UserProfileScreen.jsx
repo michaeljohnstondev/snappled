@@ -90,18 +90,23 @@ export default function UserProfileScreen({ route, navigation }) {
         setOwnedSnapples([]);
       }
 
-      // Wishlist (saved). Returns [{ snappleId, snapple, ... }]
-      try {
-        const wishResult = await snappleService.getUserWishlist(userId);
-        if (wishResult?.success) {
-          const saved = (wishResult.wishlist || [])
-            .map(w => w.snapple)
-            .filter(Boolean);
-          setSavedSnapples(saved);
-        } else {
-          setSavedSnapples([]);
+      // Wishlist (saved). wishlistedSnapples is a 2-way index on the
+      // user doc — iterate ids and fetch each snapple, same pattern
+      // as Collection uses for ownedSnapples above. Newest-first via
+      // reverse (append-only writes).
+      const wishlistIds = [...(userData?.wishlistedSnapples || [])].reverse();
+      if (wishlistIds.length > 0) {
+        const saved = [];
+        for (const id of wishlistIds) {
+          try {
+            const snapResult = await snappleService.getSnapple(id);
+            if (snapResult?.success && snapResult.snapple) {
+              saved.push(snapResult.snapple);
+            }
+          } catch (e) {}
         }
-      } catch (e) {
+        setSavedSnapples(saved);
+      } else {
         setSavedSnapples([]);
       }
     } catch (error) {
@@ -302,8 +307,6 @@ export default function UserProfileScreen({ route, navigation }) {
         snapples={activeSnapples}
         initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
-        onLike={(id) => snappleService.likeSnapple(id, user?.uid)}
-        onDislike={(id) => snappleService.dislikeSnapple(id, user?.uid)}
         navigation={navigation}
       />
     </AppLayout>

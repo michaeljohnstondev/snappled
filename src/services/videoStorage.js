@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { storage, db, auth as firebaseAuth } from './firebase';
+import { storage, auth as firebaseAuth } from './firebase';
 
 // Firebase Storage bucket + REST upload host. Keep this in sync
 // with firebase.js. Used by the Android native-upload path which
@@ -130,7 +129,14 @@ async function uploadViaFirebaseSDK(sourceUri, filename, onProgress) {
 }
 
 /**
- * uploadVideo — upload video to Firebase Storage + save metadata to Firestore.
+ * uploadVideo — upload video to Firebase Storage and return the
+ * metadata the caller needs to write onto the snapple doc.
+ *
+ * NO LONGER writes to a separate `videos` Firestore collection —
+ * that collection was write-only bookkeeping nothing else read; the
+ * caller (createSnapple) now stores `filename` / `fileSize` /
+ * `mimeType` directly on the snapple doc so admin cleanup can locate
+ * the Storage object without an extra join.
  *
  * Platform routing:
  * - Android → uploadViaFileSystem (native POST via expo-file-system).
@@ -140,18 +146,20 @@ async function uploadViaFirebaseSDK(sourceUri, filename, onProgress) {
  *   Known-good on iOS; gives real streaming progress.
  *
  * Both paths do URI normalization + source-exists sanity check + a
- * force-token-refresh retry on auth failure. After the file lands,
- * we write the `videos` Firestore doc and return { id, downloadURL,
- * metadata } for the caller.
+ * force-token-refresh retry on auth failure.
  *
  * @param {string} videoUri - Local file URI of the video
- * @param {string} promptText - The prompt the video responds to
+ * @param {string} _promptText - (unused; kept for signature back-compat)
  * @param {string} userId - Uploader uid
  * @param {Function} onProgress - Progress callback (0..100) => void
+ * @returns {Promise<{ id, downloadURL, filename, fileSize, mimeType }>}
+ *   `id` is the storage-object timestamp — kept under the name `id`
+ *   for back-compat with callers that pass `uploadResult.id` as the
+ *   snapple's videoId.
  */
-export async function uploadVideo(videoUri, promptText, userId = 'anonymous', onProgress) {
+export async function uploadVideo(videoUri, _promptText, userId = 'anonymous', onProgress) {
   try {
-    console.log('[uploadVideo] start', { videoUri, promptText, userId, platform: Platform.OS });
+    console.log('[uploadVideo] start', { videoUri, userId, platform: Platform.OS });
 
     const sourceUri = normalizeIosFileUri(videoUri);
     const timestamp = Date.now();
@@ -171,82 +179,23 @@ export async function uploadVideo(videoUri, promptText, userId = 'anonymous', on
       ? await uploadViaFileSystem(sourceUri, filename, onProgress)
       : await uploadViaFirebaseSDK(sourceUri, filename, onProgress);
 
-    if (onProgress) onProgress(95);
-    console.log('[uploadVideo] file landed', uploaded);
+    if (onProgress) onProgress(100);
+    console.log('[uploadVideo] success', uploaded);
 
-    const videoMetadata = {
-      videoUrl: uploaded.downloadURL,
+    return {
+      id: String(timestamp),
+      downloadURL: uploaded.downloadURL,
       filename,
-      prompt: promptText,
-      userId,
-      createdAt: serverTimestamp(),
       fileSize: uploaded.size || info.size || 0,
       mimeType: 'video/mp4',
-      status: 'active',
     };
-    const docRef = await addDoc(collection(db, 'videos'), videoMetadata);
-    if (onProgress) onProgress(100);
-    console.log('[uploadVideo] metadata saved', docRef.id);
-
-    return { id: docRef.id, downloadURL: uploaded.downloadURL, metadata: videoMetadata };
   } catch (error) {
     console.error('[uploadVideo] failed', error);
     throw new Error(`Upload failed: ${error.message}`);
   }
 }
 
-/**
- * Get all videos for a specific prompt
- * @param {string} promptText - The prompt to filter by
- * @returns {Promise<Array>} - Array of video objects
- */
-export async function getVideosForPrompt(promptText) {
-  try {
-    const { query, where, getDocs } = await import('firebase/firestore');
-    
-    const videosQuery = query(
-      collection(db, 'videos'),
-      where('promptText', '==', promptText),
-      where('status', '==', 'active')
-    );
-    
-    const querySnapshot = await getDocs(videosQuery);
-    const videos = [];
-    
-    querySnapshot.forEach((doc) => {
-      videos.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
-    
-    return videos;
-  } catch (error) {
-    console.error('Error fetching videos:', error);
-    return [];
-  }
-}
-
-/**
- * Delete a video from storage and database
- * @param {string} videoId - Document ID of video to delete
- * @param {string} filename - Storage filename to delete
- */
-export async function deleteVideo(videoId, filename) {
-  try {
-    const { deleteObject } = await import('firebase/storage');
-    const { doc, deleteDoc } = await import('firebase/firestore');
-    
-    // Delete from storage
-    const fileRef = ref(storage, filename);
-    await deleteObject(fileRef);
-    
-    // Delete from Firestore
-    await deleteDoc(doc(db, 'videos', videoId));
-    
-    console.log('Video deleted successfully:', videoId);
-  } catch (error) {
-    console.error('Error deleting video:', error);
-    throw error;
-  }
-}
+// (Legacy `getVideosForPrompt` and `deleteVideo` removed — the
+// `videos` Firestore collection they queried is dead. Snapples own
+// their own video metadata now (filename / fileSize / mimeType);
+// snappleService.deleteSnapple handles Storage file cleanup.)

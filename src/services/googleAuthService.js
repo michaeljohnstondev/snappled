@@ -170,6 +170,8 @@ export async function ensureUserDocument(user, options = {}) {
     },
     ownedSnapples: [],
     wishlistedSnapples: [],
+    likedSnapples: [],
+    dislikedSnapples: [],
     activeDeck: null,
     profile: {
       avatarUrl: user.photoURL || null,

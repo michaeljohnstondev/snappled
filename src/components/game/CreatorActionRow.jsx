@@ -14,7 +14,7 @@ import theme from '../../theme/themes';
 // Renders the creator credit line + action buttons. Each button is
 // optimistic locally and reverts on service failure (silently — toasts
 // surface the win/lose state).
-export default function CreatorActionRow({ submission, currentUser, ownedSnappleIds, showToast, showError }) {
+export default function CreatorActionRow({ submission, currentUser, ownedSnappleIds, wishlistedSnappleIds, showToast, showError }) {
   const snappleId = submission?.snappleId || submission?.id;
   const creatorId = submission?.creatorId;
   const isMine = creatorId && creatorId === currentUser?.uid;
@@ -25,7 +25,14 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
 
   const { showConfirm } = useModal();
   const [following, setFollowing] = useState(false);
-  const [wishlisted, setWishlisted] = useState(false);
+  // Initial wishlist state derived from BOTH sides of the 2-way index:
+  // the passed-in user array (fast, live) plus the snapple's own
+  // wishlistedBy (if this component was handed a full snapple doc).
+  // Either matching = show as saved.
+  const [wishlisted, setWishlisted] = useState(
+    (!!snappleId && (wishlistedSnappleIds || []).includes(snappleId))
+    || (!!currentUser?.uid && (submission?.wishlistedBy || []).includes(currentUser.uid))
+  );
   const [owned, setOwned] = useState(!!snappleId && (ownedSnappleIds || []).includes(snappleId));
   const [busy, setBusy] = useState(false);
 
@@ -46,18 +53,21 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
     } finally { setBusy(false); }
   };
 
-  // Toggle wishlist for this snapple. Shows a toast on add.
+  // Toggle wishlist for this snapple. Batched 2-way write updates
+  // BOTH user.wishlistedSnapples AND snapple.wishlistedBy atomically.
+  // Shows a toast on add.
   const handleWishlist = async () => {
     if (busy || !snappleId || isMine) return;
     setBusy(true);
     try {
-      if (wishlisted) {
-        await snappleService.removeFromWishlist(snappleId, currentUser.uid);
-        setWishlisted(false);
-      } else {
-        await snappleService.addToWishlist(snappleId, currentUser.uid);
-        setWishlisted(true);
-        showToast?.('reward', 'Added to Wishlist', `@${submission?.creatorUsername || ''}`);
+      const result = await snappleService.setSnappleWishlist(
+        snappleId, currentUser.uid, !wishlisted, wishlisted,
+      );
+      if (result?.success) {
+        setWishlisted(!wishlisted);
+        if (!wishlisted) {
+          showToast?.('reward', 'Added to Wishlist', `@${submission?.creatorUsername || ''}`);
+        }
       }
     } finally { setBusy(false); }
   };

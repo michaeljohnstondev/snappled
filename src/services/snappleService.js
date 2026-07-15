@@ -21,18 +21,19 @@ import {
   limit,
   deleteDoc,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  writeBatch,
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
 const SNAPPLES_COLLECTION = 'snapples';
 const REPORTS_COLLECTION = 'reports';
-const WISHLISTS_COLLECTION = 'wishlists';
+const USERS_COLLECTION = 'users';
 
 export const snappleService = {
   async createSnapple(snappleData) {
     try {
-      const { promptId, videoUrl, videoId, creatorId } = snappleData;
+      const { promptId, videoUrl, videoId, creatorId, filename, fileSize, mimeType } = snappleData;
       let { creatorUsername, prompt, category } = snappleData;
 
       if (!promptId || !videoUrl || !videoId || !creatorId) {
@@ -80,18 +81,35 @@ export const snappleService = {
         promptId,
         videoId,
         videoUrl,
+        // Video file metadata — used by admin cleanup to locate the
+        // Storage object without a separate `videos` collection lookup.
+        filename: filename || null,
+        fileSize: fileSize || 0,
+        mimeType: mimeType || 'video/mp4',
         prompt,
         category: category || 'general',
 
-        // Ownership — creator owns their own snapple by default.
+        // Ownership + interaction inverse indexes. Every relationship
+        // is denormalized 2-way (mirror array on user doc):
+        //   snapple.owners        ⇄ user.ownedSnapples
+        //   snapple.wishlistedBy  ⇄ user.wishlistedSnapples
+        //   snapple.likedBy       ⇄ user.likedSnapples
+        //   snapple.dislikedBy    ⇄ user.dislikedSnapples
+        // Reads become free in both directions; the inverse index also
+        // lets `deleteSnapple` cascade cleanup to every touched user
+        // doc so wishlisters / likers don't end up with ghost ids.
         owners: [creatorId],
+        wishlistedBy: [],
+        likedBy: [],
+        dislikedBy: [],
 
-        // Engagement metrics
+        // Engagement counters — kept alongside the inverse arrays so
+        // display code can read a number without loading the array's
+        // full length. Mutations write both atomically via WriteBatch.
         likes: 0,
         dislikes: 0,
         totalVotes: 0,
         buyCount: 0,
-        wishlistCount: 0,
         reports: 0,
         gamesPlayed: 0,
         gamesWon: 0,
@@ -345,139 +363,113 @@ export const snappleService = {
     }
   },
 
-  async likeSnapple(snappleId, userId) {
+  // setSnappleReaction — single entry point for like / dislike /
+  // clear. Batched write updates BOTH sides of the 2-way index
+  // atomically (snapple.likedBy + snapple.likes counter +
+  // user.likedSnapples, same for dislikes). Caller passes
+  // `currentType` so we know what to undo — read it from
+  // snapple.likedBy?.includes(myUid) / snapple.dislikedBy?.includes(myUid)
+  // on the client, no extra Firestore read needed.
+  //
+  //   targetType  'like' | 'dislike' | null   what the user wants now
+  //   currentType 'like' | 'dislike' | null   what they had before
+  async setSnappleReaction(snappleId, userId, targetType, currentType) {
     try {
-      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-      
-      // Check if user already interacted
-      const userInteraction = await this.getUserInteraction(snappleId, userId);
-      if (userInteraction.hasLiked) {
-        return { success: false, error: 'Already liked this snapple' };
+      if (!snappleId || !userId) {
+        return { success: false, error: 'Missing snappleId or userId' };
       }
-      
-      const updates = {
-        likes: increment(1),
-        totalVotes: increment(1),
-        updatedAt: serverTimestamp()
-      };
-      
-      // If user previously disliked, remove dislike
-      if (userInteraction.hasDisliked) {
-        updates.dislikes = increment(-1);
-        updates.totalVotes = increment(0); // Net zero since we're switching
-      }
-      
-      await updateDoc(snappleRef, updates);
-      await this.setUserInteraction(snappleId, userId, 'like');
+      if (targetType === currentType) return { success: true };
 
+      const batch = writeBatch(db);
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const userRef = doc(db, USERS_COLLECTION, userId);
+      const snappleUpdates = { updatedAt: serverTimestamp() };
+      const userUpdates = { updatedAt: serverTimestamp() };
+
+      // Undo the old reaction (if any).
+      if (currentType === 'like') {
+        snappleUpdates.likedBy = arrayRemove(userId);
+        snappleUpdates.likes = increment(-1);
+        userUpdates.likedSnapples = arrayRemove(snappleId);
+      } else if (currentType === 'dislike') {
+        snappleUpdates.dislikedBy = arrayRemove(userId);
+        snappleUpdates.dislikes = increment(-1);
+        userUpdates.dislikedSnapples = arrayRemove(snappleId);
+      }
+      // Apply the new reaction (if any). Different array from the
+      // undo above so field-level conflicts can't happen.
+      if (targetType === 'like') {
+        snappleUpdates.likedBy = arrayUnion(userId);
+        snappleUpdates.likes = increment(1);
+        userUpdates.likedSnapples = arrayUnion(snappleId);
+      } else if (targetType === 'dislike') {
+        snappleUpdates.dislikedBy = arrayUnion(userId);
+        snappleUpdates.dislikes = increment(1);
+        userUpdates.dislikedSnapples = arrayUnion(snappleId);
+      }
+      // totalVotes: +1 null→reaction, -1 reaction→null, 0 switching
+      if (!currentType && targetType) snappleUpdates.totalVotes = increment(1);
+      if (currentType && !targetType) snappleUpdates.totalVotes = increment(-1);
+
+      batch.update(snappleRef, snappleUpdates);
+      batch.update(userRef, userUpdates);
+      await batch.commit();
       return { success: true };
     } catch (error) {
-      console.error('Error liking snapple:', error);
-      return { success: false, error: 'Failed to like snapple' };
+      console.error('[SnappleService] setSnappleReaction error:', error);
+      return { success: false, error: error.message || 'Failed to set reaction' };
     }
   },
 
-  async dislikeSnapple(snappleId, userId) {
-    try {
-      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-      
-      // Check if user already interacted
-      const userInteraction = await this.getUserInteraction(snappleId, userId);
-      if (userInteraction.hasDisliked) {
-        return { success: false, error: 'Already disliked this snapple' };
-      }
-      
-      const updates = {
-        dislikes: increment(1),
-        totalVotes: increment(1),
-        updatedAt: serverTimestamp()
-      };
-      
-      // If user previously liked, remove like
-      if (userInteraction.hasLiked) {
-        updates.likes = increment(-1);
-        updates.totalVotes = increment(0); // Net zero since we're switching
-      }
-      
-      await updateDoc(snappleRef, updates);
-      await this.setUserInteraction(snappleId, userId, 'dislike');
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error disliking snapple:', error);
-      return { success: false, error: 'Failed to dislike snapple' };
-    }
+  // Convenience wrappers so SnappleOverlay reads clean.
+  async likeSnapple(snappleId, userId, currentType = null) {
+    return this.setSnappleReaction(snappleId, userId, 'like', currentType);
+  },
+  async dislikeSnapple(snappleId, userId, currentType = null) {
+    return this.setSnappleReaction(snappleId, userId, 'dislike', currentType);
+  },
+  async unlikeSnapple(snappleId, userId, currentType = null) {
+    return this.setSnappleReaction(snappleId, userId, null, currentType);
   },
 
-  async addToWishlist(snappleId, userId) {
+  // setSnappleWishlist — batched 2-way write. Wanted true = save,
+  // false = unsave. Caller passes `currentlyWanted` derived from
+  // user.wishlistedSnapples?.includes(id) on the client so no extra
+  // read is needed to figure out which direction to write.
+  async setSnappleWishlist(snappleId, userId, wanted, currentlyWanted) {
     try {
-      const wishlistRef = doc(db, WISHLISTS_COLLECTION, `${userId}_${snappleId}`);
-      await setDoc(wishlistRef, {
-        userId,
-        snappleId,
-        addedAt: serverTimestamp()
-      });
-      
-      // Update snapple wishlist count
-      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-      await updateDoc(snappleRef, {
-        wishlistCount: increment(1),
-        updatedAt: serverTimestamp()
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error adding to wishlist:', error);
-      return { success: false, error: 'Failed to add to wishlist' };
-    }
-  },
-
-  async removeFromWishlist(snappleId, userId) {
-    try {
-      const wishlistRef = doc(db, WISHLISTS_COLLECTION, `${userId}_${snappleId}`);
-      await deleteDoc(wishlistRef);
-      
-      // Update snapple wishlist count
-      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-      await updateDoc(snappleRef, {
-        wishlistCount: increment(-1),
-        updatedAt: serverTimestamp()
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error removing from wishlist:', error);
-      return { success: false, error: 'Failed to remove from wishlist' };
-    }
-  },
-
-  async getUserWishlist(userId) {
-    try {
-      const q = query(
-        collection(db, WISHLISTS_COLLECTION),
-        where('userId', '==', userId),
-        orderBy('addedAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const wishlistItems = [];
-      
-      for (const doc of querySnapshot.docs) {
-        const wishlistData = doc.data();
-        const snappleResult = await this.getSnapple(wishlistData.snappleId);
-        
-        if (snappleResult.success) {
-          wishlistItems.push({
-            ...wishlistData,
-            snapple: snappleResult.snapple
-          });
-        }
+      if (!snappleId || !userId) {
+        return { success: false, error: 'Missing snappleId or userId' };
       }
-      
-      return { success: true, wishlist: wishlistItems };
+      if (!!wanted === !!currentlyWanted) return { success: true };
+
+      const batch = writeBatch(db);
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const userRef = doc(db, USERS_COLLECTION, userId);
+      if (wanted) {
+        batch.update(snappleRef, {
+          wishlistedBy: arrayUnion(userId),
+          updatedAt: serverTimestamp(),
+        });
+        batch.update(userRef, {
+          wishlistedSnapples: arrayUnion(snappleId),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        batch.update(snappleRef, {
+          wishlistedBy: arrayRemove(userId),
+          updatedAt: serverTimestamp(),
+        });
+        batch.update(userRef, {
+          wishlistedSnapples: arrayRemove(snappleId),
+          updatedAt: serverTimestamp(),
+        });
+      }
+      await batch.commit();
+      return { success: true };
     } catch (error) {
-      console.error('Error fetching user wishlist:', error);
-      return { success: false, error: 'Failed to fetch wishlist' };
+      console.error('[SnappleService] setSnappleWishlist error:', error);
+      return { success: false, error: error.message || 'Failed to save' };
     }
   },
 
@@ -614,40 +606,30 @@ export const snappleService = {
     }
   },
 
-  // Helper methods for user interactions
-  async getUserInteraction(snappleId, userId) {
+  // cleanupSnappleReferences — before deleting a snapple, iterate
+  // its inverse-index arrays (wishlistedBy, likedBy, dislikedBy,
+  // owners) and arrayRemove the snappleId from each touched user's
+  // corresponding forward-index array. Prevents ghost ids surviving
+  // on user docs after a snapple deletion. Batched per user to keep
+  // writes atomic per doc.
+  async cleanupSnappleReferences(snappleId, snappleData) {
     try {
-      // Check user's like/dislike status (stored in a separate collection)
-      const interactionRef = doc(db, 'user_interactions', `${userId}_${snappleId}`);
-      const interactionDoc = await getDoc(interactionRef);
-      
-      if (interactionDoc.exists()) {
-        const data = interactionDoc.data();
-        return {
-          hasLiked: data.type === 'like',
-          hasDisliked: data.type === 'dislike',
-          interaction: data
-        };
-      }
-      
-      return { hasLiked: false, hasDisliked: false, interaction: null };
-    } catch (error) {
-      console.error('Error checking user interaction:', error);
-      return { hasLiked: false, hasDisliked: false, interaction: null };
-    }
-  },
+      const wishlisters = snappleData.wishlistedBy || [];
+      const likers = snappleData.likedBy || [];
+      const dislikers = snappleData.dislikedBy || [];
+      const owners = snappleData.owners || [];
+      const touched = new Set([...wishlisters, ...likers, ...dislikers, ...owners]);
 
-  async setUserInteraction(snappleId, userId, type) {
-    try {
-      const interactionRef = doc(db, 'user_interactions', `${userId}_${snappleId}`);
-      await setDoc(interactionRef, {
-        userId,
-        snappleId,
-        type, // 'like' or 'dislike'
-        timestamp: serverTimestamp()
-      });
+      for (const uid of touched) {
+        const updates = { updatedAt: serverTimestamp() };
+        if (wishlisters.includes(uid)) updates.wishlistedSnapples = arrayRemove(snappleId);
+        if (likers.includes(uid)) updates.likedSnapples = arrayRemove(snappleId);
+        if (dislikers.includes(uid)) updates.dislikedSnapples = arrayRemove(snappleId);
+        if (owners.includes(uid)) updates.ownedSnapples = arrayRemove(snappleId);
+        await updateDoc(doc(db, USERS_COLLECTION, uid), updates).catch(() => {});
+      }
     } catch (error) {
-      console.error('Error setting user interaction:', error);
+      console.error('[SnappleService] cleanupSnappleReferences error:', error);
     }
   },
 
@@ -665,6 +647,13 @@ export const snappleService = {
         return { success: false, error: 'Only the creator can delete this snapple' };
       }
 
+      // Cascade: clear this snappleId out of every user's forward
+      // indexes (owned / wishlisted / liked / disliked) BEFORE deleting
+      // the doc so users don't end up with ghost ids. Runs regardless
+      // of whether there are other owners — refunded buyers still need
+      // their ownedSnapples arrays cleaned.
+      await this.cleanupSnappleReferences(snappleId, data);
+
       // Check if anyone else owns it
       const owners = (data.owners || []).filter(id => id !== userId);
       if (owners.length > 0) {
@@ -677,13 +666,16 @@ export const snappleService = {
       // Nobody else owns it — fully delete
       await deleteDoc(snappleRef);
 
-      // Also delete video from storage
+      // Also delete video from storage. Prefer the stored `filename`
+      // (full storage path we saved on the snapple doc at upload
+      // time). Fall back to the old convention (`videos/{uid}/{videoId}.mp4`)
+      // for legacy docs that don't have filename yet.
       try {
         const { ref: storageRef, deleteObject } = await import('firebase/storage');
         const { storage } = await import('./firebase');
-        if (data.videoUrl) {
-          const videoRef = storageRef(storage, `videos/${userId}/${data.videoId || ''}.mp4`);
-          await deleteObject(videoRef).catch(() => {});
+        const path = data.filename || (data.videoId ? `videos/${userId}/${data.videoId}.mp4` : null);
+        if (path) {
+          await deleteObject(storageRef(storage, path)).catch(() => {});
         }
       } catch (e) {
         console.error('[SnappleService] Error deleting video file:', e);
@@ -723,30 +715,6 @@ export const snappleService = {
       console.log(`[SnappleService] Refunded ${purchases.length} buyers for snapple ${snappleId}`);
     } catch (error) {
       console.error('[SnappleService] Error refunding buyers:', error);
-    }
-  },
-
-  async unlikeSnapple(snappleId, userId) {
-    try {
-      const interactionRef = doc(db, 'user_interactions', `${userId}_${snappleId}`);
-      const interactionDoc = await getDoc(interactionRef);
-
-      if (interactionDoc.exists()) {
-        const type = interactionDoc.data().type;
-        const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-
-        await updateDoc(snappleRef, {
-          [type === 'like' ? 'likes' : 'dislikes']: increment(-1),
-          totalVotes: increment(-1),
-          updatedAt: serverTimestamp()
-        });
-        await deleteDoc(interactionRef);
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error unliking snapple:', error);
-      return { success: false, error: 'Failed to remove interaction' };
     }
   },
 

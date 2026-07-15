@@ -83,6 +83,8 @@ export const userService = {
         },
         ownedSnapples: [],
         wishlistedSnapples: [],
+        likedSnapples: [],
+        dislikedSnapples: [],
         activeDeck: null,
         profile: {
           avatarUrl: null,
@@ -508,57 +510,10 @@ export const userService = {
     }
   },
 
-  async addToUserWishlist(userId, snappleId) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await getDoc(userRef);
+  // (Legacy addToUserWishlist / removeFromUserWishlist removed —
+  // wishlist writes now go through snappleService.setSnappleWishlist
+  // which handles both sides of the 2-way index atomically.)
 
-      if (!userDoc.exists()) {
-        return { success: false, error: "User not found" };
-      }
-
-      const currentWishlist = userDoc.data().wishlistedSnapples || [];
-      if (currentWishlist.includes(snappleId)) {
-        return { success: false, error: "Snapple already in wishlist" };
-      }
-
-      await updateDoc(userRef, {
-        wishlistedSnapples: [...currentWishlist, snappleId],
-        "stats.totalWishlistItems": increment(1),
-        updatedAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error adding to user wishlist:", error);
-      return { success: false, error: "Failed to add to wishlist" };
-    }
-  },
-
-  async removeFromUserWishlist(userId, snappleId) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await getDoc(userRef);
-
-      if (!userDoc.exists()) {
-        return { success: false, error: "User not found" };
-      }
-
-      const currentWishlist = userDoc.data().wishlistedSnapples || [];
-      const updatedWishlist = currentWishlist.filter((id) => id !== snappleId);
-
-      await updateDoc(userRef, {
-        wishlistedSnapples: updatedWishlist,
-        "stats.totalWishlistItems": increment(-1),
-        updatedAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error removing from user wishlist:", error);
-      return { success: false, error: "Failed to remove from wishlist" };
-    }
-  },
 
   async updateUserEngagementStats(userId, statType, amount = 1) {
     try {

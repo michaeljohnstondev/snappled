@@ -164,6 +164,7 @@ export default function PickingPhase({
                 submission={previewCard}
                 currentUser={user}
                 ownedSnappleIds={userCurrency.ownedSnapples || []}
+                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
                 showToast={showToast}
                 showError={showError}
               />
@@ -306,6 +307,7 @@ export default function PickingPhase({
                 submission={previewCard}
                 currentUser={user}
                 ownedSnappleIds={userCurrency.ownedSnapples || []}
+                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
                 showToast={showToast}
                 showError={showError}
               />

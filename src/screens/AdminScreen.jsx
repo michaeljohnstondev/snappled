@@ -728,12 +728,14 @@ export default function AdminScreen({ navigation }) {
                     });
                     reactivated++;
                   } else {
-                    if (data.videoId && data.creatorId) {
-                      const videoRef = sRef(storage, `videos/${data.creatorId}/${data.videoId}.mp4`);
+                    // Delete Storage file — prefer stored filename
+                    // (full path) on the snapple, fall back to the
+                    // legacy path convention for older docs.
+                    const path = data.filename
+                      || (data.videoId && data.creatorId ? `videos/${data.creatorId}/${data.videoId}.mp4` : null);
+                    if (path) {
+                      const videoRef = sRef(storage, path);
                       await deleteObject(videoRef).catch(() => {});
-                    }
-                    if (data.videoId) {
-                      await deleteDoc(doc(db, 'videos', data.videoId)).catch(() => {});
                     }
                     await deleteDoc(doc(db, 'snapples', d.id)).catch(() => {});
                     deleted++;
@@ -805,20 +807,18 @@ export default function AdminScreen({ navigation }) {
                   const data = d.data();
                   const owners = data.owners || [];
                   if (owners.length === 0 && (!data.creatorId || data.creatorId === null)) {
-                    // Delete video from storage
-                    if (data.videoUrl) {
+                    // Delete Storage file — prefer stored filename
+                    // (full path) on the snapple, fall back to legacy
+                    // path convention for older docs.
+                    const path = data.filename
+                      || (data.videoId ? `videos/${data.creatorId || 'unknown'}/${data.videoId}.mp4` : null);
+                    if (path) {
                       try {
                         const { ref: sRef, deleteObject } = require('firebase/storage');
                         const { storage } = require('../services/firebase');
-                        const videoRef = sRef(storage, `videos/${data.creatorId || 'unknown'}/${data.videoId || ''}.mp4`);
-                        await deleteObject(videoRef).catch(() => {});
+                        await deleteObject(sRef(storage, path)).catch(() => {});
                       } catch (e) {}
                     }
-                    // Delete video metadata
-                    if (data.videoId) {
-                      await deleteDoc(doc(db, 'videos', data.videoId)).catch(() => {});
-                    }
-                    // Delete snapple
                     await deleteDoc(doc(db, 'snapples', d.id));
                     deleted++;
                   }

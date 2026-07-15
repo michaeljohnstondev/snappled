@@ -189,6 +189,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
       promptId: submitPrompt.id,
       videoUrl: uploadResult.downloadURL,
       videoId: uploadResult.id,
+      // Video file metadata now lives on the snapple doc since we
+      // killed the `videos` Firestore collection. filename is the
+      // full Storage path used by cleanup on delete.
+      filename: uploadResult.filename,
+      fileSize: uploadResult.fileSize,
+      mimeType: uploadResult.mimeType,
       creatorId: user.uid,
       creatorUsername: user.username || user.email?.split('@')[0] || 'anonymous',
       prompt: submitPrompt.text || 'Snapple video',

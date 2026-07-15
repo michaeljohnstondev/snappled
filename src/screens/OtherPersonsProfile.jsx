@@ -271,8 +271,6 @@ export default function OtherPersonsProfile({ route, navigation }) {
         snapples={activeSnapples}
         initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
-        onLike={(id) => snappleService.likeSnapple(id, user?.uid)}
-        onDislike={(id) => snappleService.dislikeSnapple(id, user?.uid)}
         navigation={navigation}
       />
     </View>
