@@ -202,11 +202,24 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Local-only variant — updates state without touching Firestore.
+  // Use this for OPTIMISTIC updates when a Cloud Function (or
+  // batched arrayUnion write) is the authoritative persistence
+  // path. If we ALSO called updateUserResources here, its whole-
+  // array SET semantics would race the CF's arrayUnion writes and
+  // clobber concurrent state (this is what broke the buy flow —
+  // the rollback SET-wrote a stale ownedSnapples array back to
+  // the server and wiped legitimate ownership).
+  const updateUserCurrencyLocal = (updates) => {
+    setUserCurrency((prev) => ({ ...prev, ...updates }));
+  };
+
   const clearPendingAchievements = () => setPendingAchievements([]);
 
   const value = {
     user,
     userCurrency,
+    updateUserCurrencyLocal,
     isLoading,
     isAuthenticated,
     refreshUserCurrency,

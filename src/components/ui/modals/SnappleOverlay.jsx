@@ -32,7 +32,7 @@ export default function SnappleOverlay({
   onReport,
   navigation,
 }) {
-  const { user, userCurrency, updateUserCurrency } = useAuth();
+  const { user, userCurrency, updateUserCurrency, updateUserCurrencyLocal } = useAuth();
   const { showConfirm, showError, showAlert } = useModal();
   const playerRef = useRef(null);
   // Index into `snapples` (ignored when the caller only passed a single
@@ -80,14 +80,19 @@ export default function SnappleOverlay({
     buyCount: snapple?.buyCount || 0,
     currentPrice: snapple?.currentPrice || 10,
   });
-  // hasLiked / hasDisliked are derived from snapple.likedBy /
-  // snapple.dislikedBy (denormalized 2-way index on the snapple doc)
-  // — no separate Firestore fetch. Kept in local state so optimistic
-  // updates on tap feel instant; re-syncs when a new snapple opens.
+  // hasLiked / hasDisliked / hasPurchased are all derived from the
+  // 2-way indexes we already have loaded (snapple.likedBy /
+  // dislikedBy / owners + user.ownedSnapples) — no separate Firestore
+  // fetch needed. Kept in local state so optimistic updates on tap
+  // feel instant; re-syncs when a new snapple opens.
+  const alreadyOwnsSnapple = (s, u) => (
+    (userCurrency?.ownedSnapples || []).includes(s?.id)
+    || (s?.owners || []).includes(u?.uid)
+  );
   const [userInteraction, setUserInteraction] = useState({
     hasLiked: (snapple?.likedBy || []).includes(user?.uid),
     hasDisliked: (snapple?.dislikedBy || []).includes(user?.uid),
-    hasPurchased: false
+    hasPurchased: alreadyOwnsSnapple(snapple, user),
   });
   // Local mirror of snapple.isPrivate so the lock badge and toggle UI
   // update instantly when the creator flips it, without waiting for the
@@ -241,7 +246,11 @@ export default function SnappleOverlay({
         const prevMetrics = metrics;
         const prevInteraction = userInteraction;
 
-        updateUserCurrency({
+        // LOCAL-ONLY optimistic update. Do NOT persist via
+        // updateUserCurrency — its whole-array SET write to
+        // Firestore races the Cloud Function's arrayUnion and
+        // clobbers state. The CF is the authoritative writer.
+        updateUserCurrencyLocal({
           coins: Math.max(0, prevCoins - price),
           ownedSnapples: [...prevOwned, snapple.id],
         });
@@ -254,22 +263,40 @@ export default function SnappleOverlay({
         try {
           const result = await snappleService.purchaseSnapple(snapple.id, user?.uid);
           if (result?.success) {
-            // Server may have adjusted the new price via bonding curve;
-            // fold that in. Everything else is already optimistically
-            // applied and the onSnapshot confirmation is on its way.
+            // Server confirmed. Update currentPrice from the bonding
+            // curve if returned; AuthContext's snapshot listener will
+            // confirm coins + ownedSnapples from server truth.
             if (result.newPrice) {
               setMetrics(prev => ({ ...prev, currentPrice: result.newPrice }));
             }
+          } else if (/already own/i.test(result?.error || '')) {
+            // Server says we already own. Client's local
+            // ownedSnapples was stale (or a prior buggy rollback
+            // wiped it). Refund the optimistic coin deduction (we
+            // didn't actually pay) and SELF-HEAL: arrayUnion the
+            // snappleId back into user.ownedSnapples via a direct
+            // Firestore write (idempotent — no-op if already there,
+            // adds it back if a bad rollback removed it). Keeps the
+            // optimistic ownership add so the UI reads correctly
+            // right away.
+            updateUserCurrencyLocal({ coins: prevCoins });
+            try {
+              const { doc: docRef, updateDoc, arrayUnion } = await import('firebase/firestore');
+              const { db } = await import('../../../services/firebase');
+              await updateDoc(docRef(db, 'users', user.uid), {
+                ownedSnapples: arrayUnion(snapple.id),
+              });
+            } catch (e) { /* best-effort heal */ }
+            showAlert('Already Owned', 'You already have this snapple in your collection.', null);
           } else {
-            // Roll back — server rejected (not enough coins, race with
-            // another buyer, etc). Restore the exact pre-purchase state.
-            updateUserCurrency({ coins: prevCoins, ownedSnapples: prevOwned });
+            // Real error — roll back to pre-purchase state (local only).
+            updateUserCurrencyLocal({ coins: prevCoins, ownedSnapples: prevOwned });
             setMetrics(prevMetrics);
             setUserInteraction(prevInteraction);
             showError('Purchase Failed', result?.error || 'Something went wrong');
           }
         } catch (error) {
-          updateUserCurrency({ coins: prevCoins, ownedSnapples: prevOwned });
+          updateUserCurrencyLocal({ coins: prevCoins, ownedSnapples: prevOwned });
           setMetrics(prevMetrics);
           setUserInteraction(prevInteraction);
           showError('Purchase Failed', error.message || 'Something went wrong');

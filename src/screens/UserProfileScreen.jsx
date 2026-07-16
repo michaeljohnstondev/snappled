@@ -35,11 +35,22 @@ export default function UserProfileScreen({ route, navigation }) {
     loadProfile();
   }, [userId]);
 
+  // Re-run loadSnapples when the userCurrency arrays change so the
+  // Collection / Saved tabs live-update after a buy / save / discard.
+  // Only add live deps for own profile — viewing someone else's
+  // profile doesn't need to react to OUR array changes. AuthContext's
+  // onSnapshot listener on our user doc is what drives these updates
+  // in the first place, so Collection reflects server truth within a
+  // second of any purchase.
   useEffect(() => {
     if (userId) {
       loadSnapples();
     }
-  }, [userId]);
+  }, [
+    userId,
+    isOwnProfile ? (userCurrency?.ownedSnapples || []).length : 0,
+    isOwnProfile ? (userCurrency?.wishlistedSnapples || []).length : 0,
+  ]);
 
   const loadProfile = async () => {
     setIsLoading(true);
