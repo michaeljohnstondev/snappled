@@ -7,7 +7,7 @@
 // tabs. No Deck or Saved tabs — those are private to the owner.
 // Following count is tappable so you can drill from friend to friend.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList, Dimensions,
 } from 'react-native';
@@ -21,10 +21,12 @@ import VibeButton from '../components/ui/VibeButton';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
+import { SNAPPLE_SORT_OPTIONS, sortSnapples } from '../lib/snappleSort';
 import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 3;
+const PAGE_SIZE = 20;
 
 // Renders the target user's profile. `userId` comes from route.params;
 // if it's missing or equals the signed-in user, we bounce back to the
@@ -39,6 +41,9 @@ export default function OtherPersonsProfile({ route, navigation }) {
   const [activeTab, setActiveTab] = useState('created');
   const [createdSnapples, setCreatedSnapples] = useState([]);
   const [ownedSnapples, setOwnedSnapples] = useState([]);
+  const [sortKey, setSortKey] = useState('newest');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeTab, sortKey]);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
   // Index in the active-tab list of the tapped thumbnail, so the
   // overlay opens on the right video and lets the user swipe through.
@@ -142,13 +147,27 @@ export default function OtherPersonsProfile({ route, navigation }) {
 
   const activeSnapples = activeTab === 'created' ? createdSnapples : ownedSnapples;
 
+  // Sort → paginate. Mirrors UserProfileScreen so both profile views
+  // behave the same. Sort options + logic live in lib/snappleSort.
+  const sortedSnapples = useMemo(
+    () => sortSnapples(activeSnapples, sortKey),
+    [activeSnapples, sortKey],
+  );
+  const pagedSnapples = useMemo(
+    () => sortedSnapples.slice(0, visibleCount),
+    [sortedSnapples, visibleCount],
+  );
+  const hasMore = sortedSnapples.length > pagedSnapples.length;
+
   // Grid cell for a snapple thumbnail. Kept in the screen for now
   // since the same shape lives in UserProfileScreen — worth extracting
   // once a third caller shows up (YAGNI until then).
   // Wraps setSelectedSnapple with the tapped item's index so the
   // overlay can start on it and let the user swipe through the rest.
   const handleSnapplePress = (item) => {
-    const idx = activeSnapples.findIndex(s => s?.id === item?.id);
+    // Index into the RENDERED list (sorted + paged) so the overlay
+    // opens on the right item and can swipe through visible siblings.
+    const idx = pagedSnapples.findIndex(s => s?.id === item?.id);
     setSelectedIndex(Math.max(0, idx));
     setSelectedSnapple(item);
   };
@@ -228,6 +247,16 @@ export default function OtherPersonsProfile({ route, navigation }) {
           selectedValue={activeTab}
           onSelect={setActiveTab}
         />
+        <View style={styles.sortRow}>
+          <Text style={styles.sortLabel}>Sort by</Text>
+          <View style={styles.sortDropdown}>
+            <SectionDropdown
+              options={SNAPPLE_SORT_OPTIONS}
+              selectedValue={sortKey}
+              onSelect={setSortKey}
+            />
+          </View>
+        </View>
       </View>
     </>
   );
@@ -241,6 +270,23 @@ export default function OtherPersonsProfile({ route, navigation }) {
     </View>
   );
 
+  // "Show more" pager, same as UserProfileScreen. Bumps visibleCount
+  // by PAGE_SIZE per tap. Hidden when the whole list is on screen.
+  const renderFooter = () => {
+    if (!hasMore) return null;
+    const remaining = sortedSnapples.length - pagedSnapples.length;
+    return (
+      <Pressable
+        style={styles.showMoreBtn}
+        onPress={() => setVisibleCount(c => c + PAGE_SIZE)}
+      >
+        <Text style={styles.showMoreText}>
+          Show {Math.min(PAGE_SIZE, remaining)} more · {remaining} left
+        </Text>
+      </Pressable>
+    );
+  };
+
   return (
     <AppLayout navigation={navigation}>
       {isLoading ? (
@@ -253,13 +299,14 @@ export default function OtherPersonsProfile({ route, navigation }) {
         </View>
       ) : (
         <FlatList
-          data={activeSnapples}
+          data={pagedSnapples}
           keyExtractor={(item, index) => item?.id || `snapple-${index}`}
           renderItem={renderSnappleItem}
           numColumns={3}
           columnWrapperStyle={styles.row}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
@@ -269,7 +316,7 @@ export default function OtherPersonsProfile({ route, navigation }) {
       <SnappleOverlay
         visible={!!selectedSnapple}
         snapple={selectedSnapple}
-        snapples={activeSnapples}
+        snapples={pagedSnapples}
         initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
         navigation={navigation}
@@ -346,6 +393,38 @@ const styles = StyleSheet.create({
   statLabel: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 },
   actionSection: { paddingTop: 20 },
   tabSection: { paddingTop: 20, paddingBottom: 16 },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  sortLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  sortDropdown: {
+    flex: 1,
+  },
+  showMoreBtn: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+  },
+  showMoreText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
   row: { justifyContent: 'space-between' },
   snappleItem: {
     width: ITEM_SIZE, borderRadius: 12, overflow: 'hidden',

@@ -48,13 +48,21 @@ function PromptsStack() {
   );
 }
 
-// Inner stack for the Profile tab — keeps the bottom tab bar visible when
-// drilling into DeckBuilder.
+// Inner stack for the Profile tab — keeps the bottom tab bar visible
+// when drilling into DeckBuilder / friend profiles / follower lists.
+// OtherPersonsProfile + FollowingList are ALSO defined in the root
+// stack for callers coming from screens outside the tab navigator
+// (game, record, etc.). React Navigation resolves the closest match,
+// so navigating from within the Profile tab lands on the tab-hosted
+// versions and keeps the tab bar rendered.
 function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen name="ProfileHome" component={UserProfileScreen} />
       <Stack.Screen name="DeckBuilder" component={DeckBuilderScreen} />
+      <Stack.Screen name="OtherPersonsProfile" component={OtherPersonsProfile} />
+      <Stack.Screen name="FollowingList" component={FollowingListScreen} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} />
     </Stack.Navigator>
   );
 }

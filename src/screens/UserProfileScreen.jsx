@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,10 @@ import VibeButton from '../components/ui/VibeButton';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
+import { SNAPPLE_SORT_OPTIONS, sortSnapples } from '../lib/snappleSort';
 import theme from '../theme/themes';
+
+const PAGE_SIZE = 20;
 
 const { width: screenWidth } = Dimensions.get('window');
 // 3-col grid: 40px horizontal padding (20+20) + 20px split across 2 gaps = 10px each.
@@ -28,6 +31,12 @@ export default function UserProfileScreen({ route, navigation }) {
   const [createdSnapples, setCreatedSnapples] = useState([]);
   const [ownedSnapples, setOwnedSnapples] = useState([]);
   const [savedSnapples, setSavedSnapples] = useState([]);
+  const [sortKey, setSortKey] = useState('newest');
+  // Paginate so profiles with 100+ snapples don't dump the whole
+  // grid on mount. Reset to PAGE_SIZE any time the tab or sort
+  // changes so users see freshly-ordered results from the top.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeTab, sortKey]);
 
   const isOwnProfile = user?.uid === userId;
 
@@ -143,7 +152,9 @@ export default function UserProfileScreen({ route, navigation }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const handleSnapplePress = (snapple) => {
-    const idx = activeSnapples.findIndex(s => s?.id === snapple?.id);
+    // Index into the RENDERED list (sorted + paged) so the overlay
+    // opens on the right item and can swipe through visible siblings.
+    const idx = pagedSnapples.findIndex(s => s?.id === snapple?.id);
     setSelectedIndex(Math.max(0, idx));
     setSelectedSnapple(snapple);
   };
@@ -169,6 +180,19 @@ export default function UserProfileScreen({ route, navigation }) {
   const activeSnapples = activeTab === 'created' ? createdSnapples
     : activeTab === 'saved' ? savedSnapples
     : ownedSnapples; // collection
+
+  // Sort → paginate. Sort is memoized on the raw array + key; the
+  // page slice is derived after so "Show more" just bumps the
+  // slice bound without re-sorting.
+  const sortedSnapples = useMemo(
+    () => sortSnapples(activeSnapples, sortKey),
+    [activeSnapples, sortKey],
+  );
+  const pagedSnapples = useMemo(
+    () => sortedSnapples.slice(0, visibleCount),
+    [sortedSnapples, visibleCount],
+  );
+  const hasMore = sortedSnapples.length > pagedSnapples.length;
 
   const renderSnappleItem = ({ item }) => (
     <Pressable style={styles.snappleItem} onPress={() => handleSnapplePress(item)}>
@@ -273,9 +297,36 @@ export default function UserProfileScreen({ route, navigation }) {
             </Pressable>
           ) : null}
         </View>
+        <View style={styles.sortRow}>
+          <Text style={styles.sortLabel}>Sort by</Text>
+          <View style={styles.sortDropdown}>
+            <SectionDropdown
+              options={SNAPPLE_SORT_OPTIONS}
+              selectedValue={sortKey}
+              onSelect={setSortKey}
+            />
+          </View>
+        </View>
       </View>
     </>
   );
+
+  // "Show more" pager. Bumps the visible slice by PAGE_SIZE each tap.
+  // Nothing renders when there's nothing left to reveal.
+  const renderFooter = () => {
+    if (!hasMore) return null;
+    const remaining = sortedSnapples.length - pagedSnapples.length;
+    return (
+      <Pressable
+        style={styles.showMoreBtn}
+        onPress={() => setVisibleCount(c => c + PAGE_SIZE)}
+      >
+        <Text style={styles.showMoreText}>
+          Show {Math.min(PAGE_SIZE, remaining)} more · {remaining} left
+        </Text>
+      </Pressable>
+    );
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -299,13 +350,14 @@ export default function UserProfileScreen({ route, navigation }) {
         </View>
       ) : (
         <FlatList
-          data={activeSnapples}
+          data={pagedSnapples}
           keyExtractor={(item, index) => item?.id || `snapple-${index}`}
           renderItem={renderSnappleItem}
           numColumns={3}
           columnWrapperStyle={styles.row}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
@@ -315,7 +367,7 @@ export default function UserProfileScreen({ route, navigation }) {
       <SnappleOverlay
         visible={!!selectedSnapple}
         snapple={selectedSnapple}
-        snapples={activeSnapples}
+        snapples={pagedSnapples}
         initialIndex={selectedIndex}
         onClose={() => setSelectedSnapple(null)}
         navigation={navigation}
@@ -480,6 +532,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  // Sort control below the tab picker. Compact label + dropdown so
+  // it doesn't dominate the header. Live filter inside FlatList.
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  sortLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  sortDropdown: {
+    flex: 1,
+  },
+  // "Show more" pager. Cyan-outline button spanning the grid width,
+  // shown as the FlatList footer whenever more snapples exist beyond
+  // the current visible slice.
+  showMoreBtn: {
+    marginTop: 16,
+    marginHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+  },
+  showMoreText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   row: {
     justifyContent: 'space-between',
