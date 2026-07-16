@@ -290,51 +290,51 @@ function RoundResultsReveal({
           );
         })}
 
-        <View style={styles.resultsActions}>
-          {isHost ? (
-            (() => {
-              // Left-side "quit-ish" action pairs with the primary
-              // Next Round ShimmerBar into a split action row. Which
-              // one appears depends on game mode:
-              //   practice (bots)     → QUIT (leaves practice)
-              //   infinite non-prac   → END GAME (host ends for all)
-              //   fixed-round non-prac → nothing (game auto-ends)
-              const leftAction = isPractice && onQuitPractice
-                ? { label: 'QUIT', onPress: onQuitPractice }
-                : isInfinite && !isPractice && onEndGame
-                  ? { label: 'END GAME', onPress: onEndGame }
-                  : null;
-              return leftAction ? (
-                <View style={styles.actionRow}>
-                  <BackChunk
-                    onPress={leftAction.onPress}
-                    label={leftAction.label}
-                    style={styles.actionBackFlex}
-                  />
-                  <ShimmerBar
-                    colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
-                    label="NEXT ROUND"
-                    onPress={onNextRound}
-                    style={styles.actionSubmitChunk}
-                  />
-                </View>
-              ) : (
-                <ShimmerBar
-                  colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
-                  label="NEXT ROUND"
-                  onPress={onNextRound}
-                />
-              );
-            })()
-          ) : (
-            <Text style={styles.waitingText}>Next round in {timer}s...</Text>
-          )}
-          <Pressable style={styles.shareResultsBtn} onPress={onShare}>
-            <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
-            <Text style={styles.shareResultsText}>Share Round</Text>
-          </Pressable>
-        </View>
+        <Pressable style={styles.shareResultsBtn} onPress={onShare}>
+          <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
+          <Text style={styles.shareResultsText}>Share Round</Text>
+        </Pressable>
       </ScrollView>
+
+      {/* Flush-bottom action row — pulled OUT of the ScrollView so it
+          stays anchored at the bottom of the screen regardless of
+          scroll position (mirrors every other phase's CTA placement).
+          resultsScrollContent has bottom padding so scoreboard rows
+          can never hide behind the action row. */}
+      {isHost ? (
+        (() => {
+          const leftAction = isPractice && onQuitPractice
+            ? { label: 'QUIT', onPress: onQuitPractice }
+            : isInfinite && !isPractice && onEndGame
+              ? { label: 'END GAME', onPress: onEndGame }
+              : null;
+          return leftAction ? (
+            <View style={styles.actionRow}>
+              <BackChunk
+                onPress={leftAction.onPress}
+                label={leftAction.label}
+                style={styles.actionBackFlex}
+              />
+              <ShimmerBar
+                colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+                label="NEXT ROUND"
+                onPress={onNextRound}
+                style={styles.actionSubmitChunk}
+              />
+            </View>
+          ) : (
+            <ShimmerBar
+              colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+              label="NEXT ROUND"
+              onPress={onNextRound}
+            />
+          );
+        })()
+      ) : (
+        <View style={styles.waitingBar}>
+          <Text style={styles.waitingText}>Next round in {timer}s...</Text>
+        </View>
+      )}
     </LinearGradient>
   );
 }
@@ -3186,7 +3186,23 @@ const styles = StyleSheet.create({
   voteCounter: { color: theme.colors.textSecondary, fontSize: 14 },
   // Results
   resultsContent: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
-  resultsScrollContent: { paddingBottom: 40 },
+  // Bottom padding leaves room for the flush action row that sits
+  // OUTSIDE the ScrollView so scoreboard rows / Share button never
+  // hide behind it. ~140pt covers a two-line CTA + safe-area.
+  resultsScrollContent: { paddingBottom: 140 },
+  // Non-host waiting bar — same flush-bottom shape as the host's
+  // NEXT ROUND ShimmerBar so the layout is stable regardless of
+  // which role you have.
+  waitingBar: {
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
+    backgroundColor: 'rgba(0, 198, 255, 0.10)',
+  },
   resultRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,

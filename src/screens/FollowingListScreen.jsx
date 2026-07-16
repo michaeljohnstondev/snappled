@@ -3,9 +3,9 @@
 // ('following' | 'followers'). Each row taps into OtherPersonsProfile
 // so the caller can drill from friend to friend.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator,
+  View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
@@ -21,6 +21,17 @@ export default function FollowingListScreen({ route, navigation }) {
 
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  // Filter list client-side by username substring. Case-insensitive.
+  // Rank isn't matched because it's a discrete label and would create
+  // noisy "Rookie" matches; if users want to filter by rank later we
+  // can add a separate control.
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(u => (u.username || '').toLowerCase().includes(q));
+  }, [users, search]);
 
   useEffect(() => {
     if (!userId) return;
@@ -101,13 +112,39 @@ export default function FollowingListScreen({ route, navigation }) {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={users}
-          keyExtractor={(item) => item.uid}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        />
+        <>
+          <View style={styles.searchWrap}>
+            <Ionicons name="search" size={16} color={theme.colors.vibeBlue} />
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder={`Search ${title.toLowerCase()}...`}
+              placeholderTextColor={theme.colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {search ? (
+              <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+              </Pressable>
+            ) : null}
+          </View>
+          {filteredUsers.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No matches for "{search}"</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredUsers}
+              keyExtractor={(item) => item.uid}
+              renderItem={renderItem}
+              contentContainerStyle={styles.listContent}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
+        </>
       )}
     </View>
   );
@@ -141,6 +178,28 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   emptyText: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center' },
   listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
+  // Search pill lives just below the header. Cyan border matches the
+  // rest of the input styling in the app. Clears with an X on the
+  // right when there's text.
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  searchInput: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    padding: 0,
+  },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 12, paddingHorizontal: 14,

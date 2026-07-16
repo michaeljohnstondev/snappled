@@ -141,8 +141,12 @@ export const snappleService = {
         excludeFromPool: !!snappleData.excludeFromPool,
 
         // Pricing
-        basePrice: 10, // Starting price in coins
-        currentPrice: 10,
+        // Starting price = tier 1 price so the first buy doesn't
+        // jump 10 → 100. Snapples list at 100 and stay at 100 until
+        // buy 11 (tier 2). Cloud Function's getTierPrice takes over
+        // from there.
+        basePrice: 100,
+        currentPrice: 100,
         priceHistory: [{ price: 10, timestamp: new Date().toISOString() }],
         
         // Status
