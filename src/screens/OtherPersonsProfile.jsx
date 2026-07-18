@@ -18,6 +18,7 @@ import { levelService } from '../services/levelService';
 import { snappleService } from '../services/snappleService';
 import SectionDropdown from '../components/ui/SectionDropdown';
 import VibeButton from '../components/ui/VibeButton';
+import VibePager, { DEFAULT_PAGE_SIZE } from '../components/ui/VibePager';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
@@ -26,9 +27,9 @@ import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 3;
-// 12 = 4 rows of 3 in the snapple grid — matches UserProfileScreen so
-// both profile views paginate on the same rhythm.
-const PAGE_SIZE = 12;
+// Pull the shared default from VibePager so every paginated grid in
+// the app uses the same rhythm.
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 // Renders the target user's profile. `userId` comes from route.params;
 // if it's missing or equals the signed-in user, we bounce back to the
@@ -44,8 +45,11 @@ export default function OtherPersonsProfile({ route, navigation }) {
   const [createdSnapples, setCreatedSnapples] = useState([]);
   const [ownedSnapples, setOwnedSnapples] = useState([]);
   const [sortKey, setSortKey] = useState('newest');
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeTab, sortKey]);
+  // Search-engine style pagination via <VibePager>. Reset to page 1
+  // any time the tab or sort changes so users always see the top of
+  // the freshly-ordered list.
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => { setCurrentPage(1); }, [activeTab, sortKey]);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
   // Index in the active-tab list of the tapped thumbnail, so the
   // overlay opens on the right video and lets the user swipe through.
@@ -155,11 +159,11 @@ export default function OtherPersonsProfile({ route, navigation }) {
     () => sortSnapples(activeSnapples, sortKey),
     [activeSnapples, sortKey],
   );
+  const totalPages = Math.max(1, Math.ceil(sortedSnapples.length / PAGE_SIZE));
   const pagedSnapples = useMemo(
-    () => sortedSnapples.slice(0, visibleCount),
-    [sortedSnapples, visibleCount],
+    () => sortedSnapples.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [sortedSnapples, currentPage],
   );
-  const hasMore = sortedSnapples.length > pagedSnapples.length;
 
   // Grid cell for a snapple thumbnail. Kept in the screen for now
   // since the same shape lives in UserProfileScreen — worth extracting
@@ -272,22 +276,16 @@ export default function OtherPersonsProfile({ route, navigation }) {
     </View>
   );
 
-  // "Show more" pager, same as UserProfileScreen. Bumps visibleCount
-  // by PAGE_SIZE per tap. Hidden when the whole list is on screen.
-  const renderFooter = () => {
-    if (!hasMore) return null;
-    const remaining = sortedSnapples.length - pagedSnapples.length;
-    return (
-      <Pressable
-        style={styles.showMoreBtn}
-        onPress={() => setVisibleCount(c => c + PAGE_SIZE)}
-      >
-        <Text style={styles.showMoreText}>
-          Show {Math.min(PAGE_SIZE, remaining)} more · {remaining} left
-        </Text>
-      </Pressable>
-    );
-  };
+  // Search-engine style pager, same as UserProfileScreen. VibePager
+  // short-circuits to null on totalPages <= 1 so nothing renders when
+  // the whole list fits on one page.
+  const renderFooter = () => (
+    <VibePager
+      currentPage={currentPage}
+      totalPages={totalPages}
+      onPageChange={setCurrentPage}
+    />
+  );
 
   return (
     <AppLayout navigation={navigation}>
@@ -410,22 +408,6 @@ const styles = StyleSheet.create({
   },
   sortDropdown: {
     flex: 1,
-  },
-  showMoreBtn: {
-    marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.vibeBlue,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-  },
-  showMoreText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   row: { justifyContent: 'space-between' },
   snappleItem: {

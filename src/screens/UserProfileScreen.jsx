@@ -8,15 +8,16 @@ import { levelService } from '../services/levelService';
 import { snappleService } from '../services/snappleService';
 import SectionDropdown from '../components/ui/SectionDropdown';
 import VibeButton from '../components/ui/VibeButton';
+import VibePager, { DEFAULT_PAGE_SIZE } from '../components/ui/VibePager';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { SNAPPLE_SORT_OPTIONS, sortSnapples } from '../lib/snappleSort';
 import theme from '../theme/themes';
 
-// 12 = 4 rows of 3 in the snapple grid — keeps each "Show more" tap
-// aligned with the visual row structure (no half-empty last row).
-const PAGE_SIZE = 12;
+// Pull the shared default from VibePager so every paginated grid in
+// the app uses the same rhythm.
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 const { width: screenWidth } = Dimensions.get('window');
 // 3-col grid: 40px horizontal padding (20+20) + 20px split across 2 gaps = 10px each.
@@ -34,11 +35,11 @@ export default function UserProfileScreen({ route, navigation }) {
   const [ownedSnapples, setOwnedSnapples] = useState([]);
   const [savedSnapples, setSavedSnapples] = useState([]);
   const [sortKey, setSortKey] = useState('newest');
-  // Paginate so profiles with 100+ snapples don't dump the whole
-  // grid on mount. Reset to PAGE_SIZE any time the tab or sort
-  // changes so users see freshly-ordered results from the top.
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeTab, sortKey]);
+  // Search-engine style pagination via <VibePager>. Reset to page 1
+  // any time the tab or sort changes so users always see freshly-
+  // ordered results from the top of the new list.
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => { setCurrentPage(1); }, [activeTab, sortKey]);
 
   const isOwnProfile = user?.uid === userId;
 
@@ -184,17 +185,17 @@ export default function UserProfileScreen({ route, navigation }) {
     : ownedSnapples; // collection
 
   // Sort → paginate. Sort is memoized on the raw array + key; the
-  // page slice is derived after so "Show more" just bumps the
-  // slice bound without re-sorting.
+  // page slice is derived after so paging just slices without
+  // re-sorting.
   const sortedSnapples = useMemo(
     () => sortSnapples(activeSnapples, sortKey),
     [activeSnapples, sortKey],
   );
+  const totalPages = Math.max(1, Math.ceil(sortedSnapples.length / PAGE_SIZE));
   const pagedSnapples = useMemo(
-    () => sortedSnapples.slice(0, visibleCount),
-    [sortedSnapples, visibleCount],
+    () => sortedSnapples.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [sortedSnapples, currentPage],
   );
-  const hasMore = sortedSnapples.length > pagedSnapples.length;
 
   const renderSnappleItem = ({ item }) => (
     <Pressable style={styles.snappleItem} onPress={() => handleSnapplePress(item)}>
@@ -313,22 +314,15 @@ export default function UserProfileScreen({ route, navigation }) {
     </>
   );
 
-  // "Show more" pager. Bumps the visible slice by PAGE_SIZE each tap.
-  // Nothing renders when there's nothing left to reveal.
-  const renderFooter = () => {
-    if (!hasMore) return null;
-    const remaining = sortedSnapples.length - pagedSnapples.length;
-    return (
-      <Pressable
-        style={styles.showMoreBtn}
-        onPress={() => setVisibleCount(c => c + PAGE_SIZE)}
-      >
-        <Text style={styles.showMoreText}>
-          Show {Math.min(PAGE_SIZE, remaining)} more · {remaining} left
-        </Text>
-      </Pressable>
-    );
-  };
+  // Search-engine style pager. Renders nothing when there's only one
+  // page (VibePager short-circuits internally on totalPages <= 1).
+  const renderFooter = () => (
+    <VibePager
+      currentPage={currentPage}
+      totalPages={totalPages}
+      onPageChange={setCurrentPage}
+    />
+  );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -552,26 +546,6 @@ const styles = StyleSheet.create({
   },
   sortDropdown: {
     flex: 1,
-  },
-  // "Show more" pager. Cyan-outline button spanning the grid width,
-  // shown as the FlatList footer whenever more snapples exist beyond
-  // the current visible slice.
-  showMoreBtn: {
-    marginTop: 16,
-    marginHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.vibeBlue,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-  },
-  showMoreText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   row: {
     justifyContent: 'space-between',
