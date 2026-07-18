@@ -658,22 +658,18 @@ export const snappleService = {
       // their ownedSnapples arrays cleaned.
       await this.cleanupSnappleReferences(snappleId, data);
 
-      // Check if anyone else owns it
-      const owners = (data.owners || []).filter(id => id !== userId);
-      if (owners.length > 0) {
-        // Others own it — refund all buyers and then delete
+      // Refund any other buyers first so their coins are back before
+      // the source doc disappears.
+      const otherOwners = (data.owners || []).filter(id => id !== userId);
+      if (otherOwners.length > 0) {
         await this.refundBuyers(snappleId, data);
-        await deleteDoc(snappleRef);
-        return { success: true, note: 'Snapple deleted, buyers refunded' };
       }
 
-      // Nobody else owns it — fully delete
+      // Full nuke — doc + Storage file. Runs in both branches so the
+      // .mp4 never orphans in the bucket (used to only delete the file
+      // when nobody else owned it, which left buyer-owned videos as
+      // paid-for storage nobody could ever play).
       await deleteDoc(snappleRef);
-
-      // Also delete video from storage. Prefer the stored `filename`
-      // (full storage path we saved on the snapple doc at upload
-      // time). Fall back to the old convention (`videos/{uid}/{videoId}.mp4`)
-      // for legacy docs that don't have filename yet.
       try {
         const { ref: storageRef, deleteObject } = await import('firebase/storage');
         const { storage } = await import('./firebase');
@@ -685,7 +681,9 @@ export const snappleService = {
         console.error('[SnappleService] Error deleting video file:', e);
       }
 
-      return { success: true };
+      return otherOwners.length > 0
+        ? { success: true, note: 'Snapple deleted, buyers refunded' }
+        : { success: true };
     } catch (error) {
       console.error('Error deleting snapple:', error);
       return { success: false, error: 'Failed to delete snapple' };

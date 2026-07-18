@@ -277,9 +277,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
       }
     } catch (e) {}
 
-    // Apply the save/discard choice picked up front. Save = stays
-    // as owner + added to ownedSnapples. Discard = arrayRemove from
-    // owners; the onSnappleOwnersEmpty trigger deletes the snapple.
+    // Apply the save/discard choice picked up front. Save = stays as
+    // owner + added to ownedSnapples. Discard = arrayRemove from
+    // owners; the snapple stays live in the prompt grid until the
+    // prompt expires. At prompt-expire time, cleanupOrphanSnapples
+    // sweeps it only if nobody has owned or wishlisted it in the
+    // meantime.
     const newSnappleId = snappleResult.snappleId;
     if (saveChoice === 'discard') {
       try {
@@ -341,7 +344,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const askSaveThenSubmit = (submitPrompt) => {
     showAlert(
       'Save this snapple?',
-      'Saved snapples stay in your collection. Discarded snapples disappear unless someone else saves them.',
+      'Saved snapples stay in your collection. Discarded snapples stay live on the prompt for others to save or wishlist — they only disappear if nobody claims them by the time the prompt ends.',
       [
         { text: 'Discard', onPress: () => doSubmit(submitPrompt, 'discard') },
         { text: 'Save', onPress: () => doSubmit(submitPrompt, 'save') },

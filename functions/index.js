@@ -236,14 +236,16 @@ async function promoteAndCleanupSnapples(promptId, prompt) {
   for (const docSnap of snappleQuery.docs) {
     const data = docSnap.data();
     const owners = data.owners || [];
+    const wishlistedBy = data.wishlistedBy || [];
 
-    if (owners.length > 0) {
-      // Someone saved/bought it — keep it active and available.
+    // Keep the snapple if anyone claimed it in ANY way — owning
+    // (saved/bought) OR wishlisting. Only the creator gets a ticket
+    // reward, and only when someone actually owns it (a wishlist alone
+    // doesn't earn the ticket — it just spares the snapple).
+    if (owners.length > 0 || wishlistedBy.length > 0) {
       kept++;
 
-      // Reward the creator with a ticket (once per cleanup run) for
-      // making something at least one player wanted to keep.
-      if (data.creatorId && !rewardedAuthors.has(data.creatorId)) {
+      if (owners.length > 0 && data.creatorId && !rewardedAuthors.has(data.creatorId)) {
         rewardedAuthors.add(data.creatorId);
         const userRef = db.collection('users').doc(data.creatorId);
         await userRef.update({
@@ -561,38 +563,12 @@ async function resetPool() {
   console.log(`[Pool] Reset ${usedQuery.size} prompts`);
 }
 
-// ── Trigger: auto-fill when a live prompt is deleted ──
-// Uses a lock to prevent double-dipping with the hourly cron
-// When a snapple's owners array transitions to empty (last owner just
-// discarded), fully delete the snapple — doc, video file, and video
-// metadata. Mirrors the prompt-expire cleanup for the "Snap Chat"-style
-// deletion the user wants on last-owner removal.
-exports.onSnappleOwnersEmpty = functions.firestore
-  .document('snapples/{snappleId}')
-  .onUpdate(async (change, context) => {
-    const before = change.before.data() || {};
-    const after = change.after.data() || {};
-    const beforeOwners = before.owners || [];
-    const afterOwners = after.owners || [];
-    if (beforeOwners.length === 0) return;
-    if (afterOwners.length > 0) return;
-
-    const snappleId = context.params.snappleId;
-    const bucket = admin.storage().bucket();
-    try {
-      if (after.videoId && after.creatorId) {
-        const videoPath = `videos/${after.creatorId}/${after.videoId}.mp4`;
-        await bucket.file(videoPath).delete().catch(() => {});
-      }
-      if (after.videoId) {
-        await db.collection('videos').doc(after.videoId).delete().catch(() => {});
-      }
-      await change.after.ref.delete().catch(() => {});
-      console.log(`[OwnersEmpty] Deleted orphan snapple ${snappleId}`);
-    } catch (error) {
-      console.error(`[OwnersEmpty] Failed to delete ${snappleId}:`, error);
-    }
-  });
+// (Removed onSnappleOwnersEmpty trigger — it insta-deleted snapples the
+// moment `owners` hit zero, which broke discard: a snapple with the
+// creator's video would vanish before anyone else had a chance to save,
+// wishlist, or buy it. Cleanup now happens only at prompt-expire time
+// via cleanupOrphanSnapples, which keeps every snapple that has ≥1
+// owner OR ≥1 wishlister so no discarded-but-loved snapple gets swept.)
 
 exports.onPromptDeleted = functions.firestore
   .document('activePrompts/{promptId}')
