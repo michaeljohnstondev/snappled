@@ -20,11 +20,12 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
-// Shared default page size — 12 fits a 3-column grid as 4 clean rows,
-// which is the layout most snapple lists use. Callers can pick their
-// own if their grid has different dimensions, but import this by
-// default so pagination feels consistent across the app.
-export const DEFAULT_PAGE_SIZE = 12;
+// Shared default page size — 6 fits a 3-column grid as 2 clean rows.
+// Small enough that the whole page + pager fits comfortably on a phone
+// screen without scrolling. Callers can pick their own if their grid
+// has different dimensions, but import this by default so pagination
+// feels consistent across the app.
+export const DEFAULT_PAGE_SIZE = 6;
 
 // Compact list of pages to display. For small counts (≤7) shows all.
 // For larger, always shows first + last + a window around current,
