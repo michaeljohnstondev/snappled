@@ -10,9 +10,9 @@
 
 export const LOADING_TIPS = [
   // Snapple basics
-  { title: 'What\'s a snapple?', body: 'A short vertical video you can play as a card in the game. Record your own or collect ones other people made.' },
+  { title: 'What\'s a snapple?', body: 'A short vertical video you can play in the game. Record your own or collect ones other people made.' },
   { title: 'Play a snapple, win a round', body: 'Each round you pick the snapple in your hand that matches the prompt best. Most votes takes the round.' },
-  { title: 'Voting is anonymous', body: 'You see the cards but not who submitted them until scoring reveals it.' },
+  { title: 'Voting is anonymous', body: 'You see the snapples but not who submitted them until scoring reveals it.' },
 
   // Currency
   { title: 'How you get coins', body: 'Win rounds, complete achievements, and open your daily reward for a coin drop.' },
@@ -20,12 +20,12 @@ export const LOADING_TIPS = [
   { title: 'XP and levels', body: 'You earn XP for recording snapples and playing rounds. XP boosts unlock cosmetic tiers.' },
 
   // Deck / collection
-  { title: 'Your deck', body: 'Snapples you\'ve saved or purchased. When you play a game, cards from your deck get mixed into your hand.' },
-  { title: 'Buy other people\'s snapples', body: 'See a card you like during voting? Tap the diamond in preview to add it to your collection.' },
-  { title: 'Wishlist for later', body: 'Tap the heart in preview to save a card you might want to buy after the round.' },
+  { title: 'Your deck', body: 'Snapples you\'ve saved or purchased. When you play a game, snapples from your deck get mixed into your hand.' },
+  { title: 'Buy other people\'s snapples', body: 'See a snapple you like during voting? Tap the diamond in preview to add it to your collection.' },
+  { title: 'Wishlist for later', body: 'Tap the heart in preview to save a snapple you might want to buy after the round.' },
 
   // Rewards
-  { title: 'Round wins pay out', body: 'The card with the most votes each round earns its owner XP and coins.' },
+  { title: 'Round wins pay out', body: 'The snapple with the most votes each round earns its owner XP and coins.' },
   { title: 'Rare snapples worth more', body: 'Snapples that get played + win a lot climb in price. Grab them early.' },
   { title: 'Achievements pop as you play', body: 'Streaks, milestones, first-time actions — most give a coin + XP bump the moment they trigger.' },
 

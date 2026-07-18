@@ -1,5 +1,5 @@
 // BackChunk — the 1/4-width "BACK" pill that sits next to the
-// primary CTA (SUBMIT VOTE, PLAY THIS CARD, PICK AS FAVORITE) in
+// primary CTA (SUBMIT VOTE, PLAY THIS SNAPPLE, VOTE FAVORITE) in
 // the split action row. Static gradient (no shimmer — this is a
 // recessive action, not a primary), chevron-back icon so it reads
 // as navigation not affirmation.
@@ -14,7 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
-export default function BackChunk({ onPress, label = 'BACK', style }) {
+// showIcon defaults to true — real "back" actions want the chevron for
+// navigation semantics. Terminal actions (QUIT, END GAME) pass false so
+// the button reads as a decision, not a navigation step.
+export default function BackChunk({ onPress, label = 'BACK', style, showIcon = true }) {
   return (
     <Pressable onPress={onPress} style={[styles.wrap, style]}>
       <LinearGradient
@@ -23,7 +26,7 @@ export default function BackChunk({ onPress, label = 'BACK', style }) {
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <Ionicons name="chevron-back" size={18} color="#fff" />
+        {showIcon && <Ionicons name="chevron-back" size={18} color="#fff" />}
         <Text style={styles.label}>{label}</Text>
       </LinearGradient>
     </Pressable>

@@ -3,7 +3,7 @@
 // prompt banner, a scrollable 2-col hand grid where each thumbnail
 // shows a play button + @username, and a "YOUR CARD" section at the
 // bottom holding whatever the user has selected. A flush cyan
-// PLAY THIS CARD bar sits under it all and submits the selected
+// PLAY THIS SNAPPLE bar sits under it all and submits the selected
 // card. Tapping YOUR CARD's play icon (or tapping again in the
 // hand) opens the fullscreen PreviewModal for a proper watch.
 
@@ -26,7 +26,7 @@ import theme from '../../../theme/themes';
 // GameScreen — this component is pure render with handlers passed in.
 // New in this pass: `selectedCard` populates the YOUR CARD section
 // at the bottom; tap-in-grid = select, tap-YOUR-CARD-play = preview
-// fullscreen, PLAY THIS CARD bar submits.
+// fullscreen, PLAY THIS SNAPPLE bar submits.
 export default function PickingPhase({
   game,
   gameId,
@@ -266,13 +266,13 @@ export default function PickingPhase({
       {selectedCard ? (
         <ShimmerBar
           colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
-          label="PLAY THIS CARD"
+          label="PLAY THIS SNAPPLE"
           onPress={() => onPickCard(selectedCard)}
         />
       ) : (
         <ShimmerBar
           colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
-          label="PICK A CARD"
+          label="PICK A SNAPPLE"
         />
       )}
 
@@ -285,7 +285,7 @@ export default function PickingPhase({
           videoUrl={previewCard.videoUrl}
           muted={!!previewCard.muted}
           onClose={onClosePreview}
-          primaryLabel={previewCard._isWaiting ? null : 'PLAY THIS CARD'}
+          primaryLabel={previewCard._isWaiting ? null : 'PLAY THIS SNAPPLE'}
           onPrimary={() => onPickCard(previewCard)}
           topRightSlot={
             isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) ? (
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     borderRightColor: '#000',
   },
   actionBackText: {
-    // Matches PLAY THIS CARD typography (900 weight, 3pt tracking)
+    // Matches PLAY THIS SNAPPLE typography (900 weight, 3pt tracking)
     // just shorter + cyan so the two chunks read as one bar even
     // though they're doing different things.
     color: theme.colors.vibeBlue,

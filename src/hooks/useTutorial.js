@@ -19,14 +19,14 @@ export const TUTORIAL_TIPS = {
       "Every round starts with a prompt — a challenge like 'Trust me bro' or 'When mom says clean your room'. You'll get a hand of snapples (short videos). Your job: pick the one that best matches the prompt.",
   },
   picking: {
-    title: 'Pick Your Card',
+    title: 'Pick Your Snapple',
     body:
-      'Tap any card in your hand to preview the video. When you find the one that matches the prompt, hit PLAY THIS CARD to lock it in.',
+      'Tap any snapple in your hand to preview the video. When you find the one that matches the prompt, hit PLAY THIS SNAPPLE to lock it in.',
   },
   voting: {
     title: 'Vote For The Best',
     body:
-      "Now watch everyone's picks. Tap a card to preview, then PICK AS FAVORITE for the funniest match. You can't vote for your own card.",
+      "Now watch everyone's picks. Tap a snapple to preview, then VOTE FAVORITE for the funniest match. You can't vote for your own snapple.",
   },
   scoring: {
     title: 'How You Score',

@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
 
   // Full-width Ready Up bar — same shape / padding as the other
-  // CTA bars in the game (PLAY THIS CARD, SUBMIT VOTE).
+  // CTA bars in the game (PLAY THIS SNAPPLE, SUBMIT VOTE).
   // (Legacy readyBar / readyBarReady / readyBarText removed — flush
   // CTA is now the shared <ShimmerBar>.)
 });

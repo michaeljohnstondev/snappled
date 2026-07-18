@@ -314,6 +314,7 @@ function RoundResultsReveal({
                 onPress={leftAction.onPress}
                 label={leftAction.label}
                 style={styles.actionBackFlex}
+                showIcon={false}
               />
               <ShimmerBar
                 colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
@@ -424,7 +425,7 @@ export default function GameScreen({ navigation }) {
         bullets: [
           'Pick the snapple that best suits the prompt',
           'Tap a card to preview it fullscreen',
-          'Hit PLAY THIS CARD when you\'re locked in',
+          'Hit PLAY THIS SNAPPLE when you\'re locked in',
         ],
       });
     } else if (phase === GAME_PHASES.VOTING) {
@@ -1921,7 +1922,7 @@ export default function GameScreen({ navigation }) {
         )}
 
         {/* Card Preview Modal — full-bleed video + fat cyan action bar.
-            Voting variant swaps the CTA to PICK AS FAVORITE and hides
+            Voting variant swaps the CTA to VOTE FAVORITE and hides
             it if the user has already voted. */}
         {previewCard && previewCard._isVoting && (
           <PreviewModal
@@ -1929,7 +1930,7 @@ export default function GameScreen({ navigation }) {
             videoUrl={previewCard.videoUrl}
             muted={!!previewCard.muted}
             onClose={() => setPreviewCard(null)}
-            primaryLabel={hasVoted ? null : 'PICK AS FAVORITE'}
+            primaryLabel={hasVoted ? null : 'VOTE FAVORITE'}
             onPrimary={() => {
               setFavoriteCard(previewCard);
               setPreviewCard(null);
@@ -2114,7 +2115,7 @@ export default function GameScreen({ navigation }) {
         {/* Host skip — end the current round early instead of
             waiting out the scoring timer. Advances the game to the
             SCORE (round-results) phase. Uses the ShimmerBar CTA
-            treatment (green → cyan, same palette as PLAY THIS CARD /
+            treatment (green → cyan, same palette as PLAY THIS SNAPPLE /
             SUBMIT VOTE) so the "ready to advance" energy is
             consistent across the game. */}
         {isHost && (
@@ -3142,7 +3143,7 @@ const styles = StyleSheet.create({
   // (Legacy hostAdvanceBar / hostAdvanceBarText removed — the END
   // ROUND host-skip button is now the shared <ShimmerBar>.)
   // Flush action bar — green because it's the selection CTA
-  // (matches PLAY THIS CARD in picking). Consistent selection color
+  // (matches PLAY THIS SNAPPLE in picking). Consistent selection color
   // across the whole game.
   // (Legacy submitVoteBar / submitVoteBarDisabled removed — the
   // voting CTA is now the shared <ShimmerBar>.)

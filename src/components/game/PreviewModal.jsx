@@ -1,7 +1,7 @@
 // PreviewModal — full-bleed video preview shared by the PICKING and
 // VOTING phases. Video fills the screen, top row hosts close (+ optional
 // admin control), and a fat cyan action bar spans the bottom with the
-// phase's primary CTA (PLAY THIS CARD / PICK AS FAVORITE).
+// phase's primary CTA (PLAY THIS SNAPPLE / VOTE FAVORITE).
 //
 // Optional overlaySlot is rendered as a floating layer above the bottom
 // bar — used for CreatorActionRow (mute/report) so the user can act on
