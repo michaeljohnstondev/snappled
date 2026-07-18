@@ -59,6 +59,7 @@
         }
       ],
       "expo-apple-authentication",
+      "react-native-compressor",
       [
         "expo-build-properties",
         {

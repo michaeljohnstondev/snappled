@@ -12,11 +12,13 @@ import theme from '../../theme/themes';
 const AUTO_DISMISS_MS = 2000;
 
 // averageActiveProgress — average pct across all active items (any
-// non-terminal, non-staging status). Ignores DONE/FAILED/STAGING
-// because those get their own visual treatment.
+// non-terminal, non-staging status, including the COMPRESSING phase
+// so the toast bar advances smoothly across compress → upload).
 function averageActiveProgress(items) {
   const active = items.filter(
-    (i) => i.status === UPLOAD_STATUS.UPLOADING || i.status === UPLOAD_STATUS.FINALIZING,
+    (i) => i.status === UPLOAD_STATUS.COMPRESSING
+      || i.status === UPLOAD_STATUS.UPLOADING
+      || i.status === UPLOAD_STATUS.FINALIZING,
   );
   if (!active.length) return 0;
   const sum = active.reduce((acc, i) => acc + (i.progress || 0), 0);
@@ -46,6 +48,7 @@ export default function UploadProgressToast() {
   if (items.length === 0) return null;
 
   const failed = items.filter((i) => i.status === UPLOAD_STATUS.FAILED);
+  const compressing = items.filter((i) => i.status === UPLOAD_STATUS.COMPRESSING);
   const active = items.filter(
     (i) => i.status === UPLOAD_STATUS.UPLOADING || i.status === UPLOAD_STATUS.FINALIZING,
   );
@@ -53,6 +56,9 @@ export default function UploadProgressToast() {
   const done = items.filter((i) => i.status === UPLOAD_STATUS.DONE);
 
   const avgPct = averageActiveProgress(items);
+  // Any pre-upload phase counts as "still working, no bytes on the
+  // wire yet" for the copy fallback below.
+  const isPreUpload = compressing.length > 0 && active.length === 0;
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
@@ -88,15 +94,26 @@ export default function UploadProgressToast() {
         </View>
       ))}
 
-      {/* Single aggregated pill for staging + active + just-done uploads. */}
-      {(active.length > 0 || staging.length > 0 || done.length > 0) && (
+      {/* Single aggregated pill for staging + compressing + active +
+          just-done uploads. */}
+      {(active.length > 0 || compressing.length > 0 || staging.length > 0 || done.length > 0) && (
         <View style={styles.pill}>
-          {staging.length > 0 && active.length === 0 ? (
+          {staging.length > 0 && active.length === 0 && compressing.length === 0 ? (
             <>
               <View style={styles.spinnerDot} />
               <Text style={styles.pillText} numberOfLines={1}>
                 Preparing snapple…
               </Text>
+            </>
+          ) : isPreUpload ? (
+            <>
+              <View style={styles.spinnerDot} />
+              <Text style={styles.pillText} numberOfLines={1}>
+                Compressing… {avgPct}%
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${avgPct}%` }]} />
+              </View>
             </>
           ) : active.length > 0 ? (
             <>

@@ -70,24 +70,34 @@ const RETRY_DELAYS_MS = [1500, 4000, 10000];
 
 // Statuses the toast + retry chip react to.
 export const UPLOAD_STATUS = {
-  STAGING: 'staging',       // copying the recorded file to a safe dir
+  STAGING: 'staging',         // copying the recorded file to a safe dir
+  COMPRESSING: 'compressing', // native ffmpeg pass to shrink the file
   UPLOADING: 'uploading',
-  FINALIZING: 'finalizing', // upload done, running onSuccess callback
+  FINALIZING: 'finalizing',   // upload done, running onSuccess callback
   DONE: 'done',
   FAILED: 'failed',
 };
 
-// runUploadJob — one attempt at uploading `uploadUri` (already
-// staged). Fires onSuccess on success. Returns { ok, error }.
+// runUploadJob — one attempt at compressing + uploading `uploadUri`
+// (already staged). Fires onSuccess on success. Returns { ok, error }.
+// The uploadVideo onProgress callback delivers a phase string
+// ('compressing' | 'uploading') so we can flip the item's status
+// to match — toast copy reads "Compressing…" during ffmpeg, then
+// "Uploading…" once bytes are on the wire.
 async function runUploadJob(item, uploadUri, updateItem) {
-  updateItem(item.id, { status: UPLOAD_STATUS.UPLOADING, progress: 0, error: null });
+  updateItem(item.id, { status: UPLOAD_STATUS.COMPRESSING, progress: 0, error: null });
 
   try {
     const uploadResult = await uploadVideo(
       uploadUri,
       item.promptText,
       item.userId,
-      (pct) => updateItem(item.id, { progress: pct }),
+      (pct, phase) => {
+        const status = phase === 'uploading'
+          ? UPLOAD_STATUS.UPLOADING
+          : UPLOAD_STATUS.COMPRESSING;
+        updateItem(item.id, { progress: pct, status });
+      },
     );
 
     // Upload landed. Hand off to the caller's onSuccess for the
@@ -113,7 +123,7 @@ async function runWithRetries(item, uploadUri, updateItem) {
   for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = RETRY_DELAYS_MS[attempt - 1] || 10000;
-      updateItem(item.id, { retries: attempt, status: UPLOAD_STATUS.UPLOADING });
+      updateItem(item.id, { retries: attempt, status: UPLOAD_STATUS.COMPRESSING });
       await new Promise((r) => setTimeout(r, delay));
     }
     const result = await runUploadJob(item, uploadUri, updateItem);

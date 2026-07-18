@@ -796,6 +796,26 @@ export default function AdminScreen({ navigation }) {
             }}
           />
           <UtilButton
+            label="Backfill Compressed Videos"
+            desc="Walk up to 50 snapples, download → compress → replace the Storage file so old uploads get the same size reduction as new ones. Tap again to process the next batch."
+            color={theme.colors.vibeBlue}
+            onPress={async () => {
+              try {
+                const { backfillCompression } = await import('../lib/backfillCompression');
+                const stats = await backfillCompression();
+                const mbSaved = (stats.savedBytes / 1024 / 1024).toFixed(1);
+                showAlert(
+                  'Backfill Done',
+                  `Examined ${stats.examined}\n` +
+                  `Compressed: ${stats.compressed}\n` +
+                  `Skipped: ${stats.skipped}\n` +
+                  `Failed: ${stats.failed}\n` +
+                  `Saved: ${mbSaved} MB`,
+                );
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
             label="Clean Orphan Snapples"
             desc="Delete snapples with no owner and remove their video files"
             color={theme.colors.vibeRed}

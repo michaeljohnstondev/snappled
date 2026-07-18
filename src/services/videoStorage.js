@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage, auth as firebaseAuth } from './firebase';
+import { compressVideo } from './videoCompression';
 
 // Firebase Storage bucket + REST upload host. Keep this in sync
 // with firebase.js. Used by the Android native-upload path which
@@ -129,6 +130,24 @@ async function uploadViaFirebaseSDK(sourceUri, filename, onProgress) {
 }
 
 /**
+ * uploadRawToStorage — platform-dispatched raw upload with no
+ * compression pass. Used by the compression-backfill admin utility
+ * which needs to push an ALREADY-compressed file straight up to
+ * Firebase Storage; also useful for any future flow that wants to
+ * skip the built-in compression step in uploadVideo.
+ *
+ * @param {string} sourceUri - Local file:// URI of the file to upload
+ * @param {string} filename - Firebase Storage object path (e.g. videos/{uid}/{ts}.mp4)
+ * @param {(pct: number) => void} onProgress - 0-100 upload progress
+ * @returns {Promise<{ downloadURL: string, size: number }>}
+ */
+export async function uploadRawToStorage(sourceUri, filename, onProgress) {
+  return Platform.OS === 'android'
+    ? uploadViaFileSystem(sourceUri, filename, onProgress)
+    : uploadViaFirebaseSDK(sourceUri, filename, onProgress);
+}
+
+/**
  * uploadVideo — upload video to Firebase Storage and return the
  * metadata the caller needs to write onto the snapple doc.
  *
@@ -161,26 +180,52 @@ export async function uploadVideo(videoUri, _promptText, userId = 'anonymous', o
   try {
     console.log('[uploadVideo] start', { videoUri, userId, platform: Platform.OS });
 
-    const sourceUri = normalizeIosFileUri(videoUri);
+    const rawUri = normalizeIosFileUri(videoUri);
     const timestamp = Date.now();
     const filename = `videos/${userId}/${timestamp}.mp4`;
 
-    if (onProgress) onProgress(3);
+    // onProgress receives (pct, phase) — phase is 'compressing'
+    // during the compression pass, 'uploading' during the network
+    // upload. Callers (UploadQueueContext) map phase to toast copy.
+    if (onProgress) onProgress(2, 'compressing');
 
-    // Sanity-check the source before we spend a network round-trip.
+    // Sanity-check the source before we spend CPU / network.
     const LegacyFS = require('expo-file-system/legacy');
-    const info = await LegacyFS.getInfoAsync(sourceUri);
-    if (!info.exists || (info.size || 0) === 0) {
+    const rawInfo = await LegacyFS.getInfoAsync(rawUri);
+    if (!rawInfo.exists || (rawInfo.size || 0) === 0) {
       throw new Error('Recorded video is missing or empty. Please retake and try again.');
     }
-    console.log('[uploadVideo] source ok', { uri: sourceUri, size: info.size });
+    console.log('[uploadVideo] source ok', { uri: rawUri, size: rawInfo.size });
 
+    // Compress before upload. Native pass (react-native-compressor).
+    // Progress allocation: 2-40% for compression, 40-100% for upload.
+    // Files under the compressor's skip threshold return the raw URI
+    // unchanged, so this branch is safe on any recording.
+    const compression = await compressVideo(rawUri, (compressPct) => {
+      if (!onProgress) return;
+      onProgress(2 + Math.round((compressPct / 100) * 38), 'compressing');
+    });
+    if (onProgress) onProgress(40, 'uploading');
+
+    const sourceUri = compression.uri;
+    const info = { exists: true, size: compression.compressedSize || rawInfo.size };
+
+    // Platform routes take their own 0-100 progress and get mapped
+    // into the 40-100 outer range under the 'uploading' phase.
+    const mapUploadProgress = (pct) => {
+      if (!onProgress) return;
+      onProgress(40 + Math.round((pct / 100) * 60), 'uploading');
+    };
     const uploaded = Platform.OS === 'android'
-      ? await uploadViaFileSystem(sourceUri, filename, onProgress)
-      : await uploadViaFirebaseSDK(sourceUri, filename, onProgress);
+      ? await uploadViaFileSystem(sourceUri, filename, mapUploadProgress)
+      : await uploadViaFirebaseSDK(sourceUri, filename, mapUploadProgress);
 
-    if (onProgress) onProgress(100);
-    console.log('[uploadVideo] success', uploaded);
+    if (onProgress) onProgress(100, 'uploading');
+    console.log('[uploadVideo] success', {
+      ...uploaded,
+      compressionRatio: compression.ratio,
+      compressionSkipped: compression.skipped,
+    });
 
     return {
       id: String(timestamp),
