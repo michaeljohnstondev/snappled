@@ -14,7 +14,9 @@ import AppLayout from '../components/ui/layout/AppLayout';
 import { SNAPPLE_SORT_OPTIONS, sortSnapples } from '../lib/snappleSort';
 import theme from '../theme/themes';
 
-const PAGE_SIZE = 20;
+// 12 = 4 rows of 3 in the snapple grid — keeps each "Show more" tap
+// aligned with the visual row structure (no half-empty last row).
+const PAGE_SIZE = 12;
 
 const { width: screenWidth } = Dimensions.get('window');
 // 3-col grid: 40px horizontal padding (20+20) + 20px split across 2 gaps = 10px each.

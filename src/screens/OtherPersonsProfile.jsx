@@ -26,7 +26,9 @@ import theme from '../theme/themes';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 3;
-const PAGE_SIZE = 20;
+// 12 = 4 rows of 3 in the snapple grid — matches UserProfileScreen so
+// both profile views paginate on the same rhythm.
+const PAGE_SIZE = 12;
 
 // Renders the target user's profile. `userId` comes from route.params;
 // if it's missing or equals the signed-in user, we bounce back to the

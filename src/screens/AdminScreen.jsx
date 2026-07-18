@@ -816,6 +816,58 @@ export default function AdminScreen({ navigation }) {
             }}
           />
           <UtilButton
+            label="Version Gate"
+            desc="View / set the min required runtime version. Users on native builds below this see a forced-update screen. Set min = your version to block everyone older than you; clear to disable the gate."
+            color={theme.colors.vibeNeonPurple}
+            onPress={async () => {
+              try {
+                const Updates = require('expo-updates');
+                const currentRuntime = Updates.runtimeVersion || 'unknown';
+                const configRef = doc(db, 'system', 'appConfig');
+                const snap = await getDoc(configRef);
+                const cur = snap.exists() ? snap.data() : {};
+                const curMin = cur.minRuntimeVersion || '(none)';
+
+                showAlert(
+                  'Version Gate',
+                  `Your runtime: v${currentRuntime}\n` +
+                  `Current min: v${curMin}\n\n` +
+                  `"Set min = mine" blocks anyone on a build older than yours.\n` +
+                  `"Clear" removes the gate so nobody is blocked.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Clear',
+                      onPress: async () => {
+                        try {
+                          await setDoc(configRef, { minRuntimeVersion: null, updatedAt: new Date().toISOString() }, { merge: true });
+                          showAlert('Done', 'Gate cleared. Nobody will be blocked.');
+                        } catch (e) { showError('Error', e.message); }
+                      },
+                    },
+                    {
+                      text: 'Set min = mine',
+                      onPress: async () => {
+                        try {
+                          await setDoc(configRef, {
+                            minRuntimeVersion: currentRuntime,
+                            updateMessage: cur.updateMessage
+                              || 'A new version of Snappled is required. Please update from the store to keep playing.',
+                            androidStoreUrl: cur.androidStoreUrl
+                              || 'market://details?id=com.bigvibestudios.snappled',
+                            iosStoreUrl: cur.iosStoreUrl || null,
+                            updatedAt: new Date().toISOString(),
+                          }, { merge: true });
+                          showAlert('Done', `Min version set to v${currentRuntime}. Older builds will see the update gate on next launch.`);
+                        } catch (e) { showError('Error', e.message); }
+                      },
+                    },
+                  ],
+                );
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
             label="Clean Orphan Snapples"
             desc="Delete snapples with no owner and remove their video files"
             color={theme.colors.vibeRed}
