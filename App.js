@@ -5,11 +5,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Navigation from "./Navigation";
 import { AuthProvider } from "./src/store/AuthContext";
-import { ModalProvider } from "./src/store/ModalContext";
+import { ModalProvider, useModal } from "./src/store/ModalContext";
 import { RewardClaimProvider } from "./src/store/RewardClaimContext";
 import { UploadQueueProvider } from "./src/store/UploadQueueContext";
 import { useVersionGate } from "./src/hooks/useVersionGate";
 import UpdateRequiredScreen from "./src/components/ui/UpdateRequiredScreen";
+import { fcmService } from "./src/services/fcmServiceWrapper";
+import { notificationDisplayService } from "./src/services/notificationDisplayService";
 
 LogBox.ignoreLogs([
   "SafeAreaView has been deprecated",
@@ -23,6 +25,22 @@ const hideAndroidNavBar = () => {
     NavigationBar.setBehaviorAsync("overlay-swipe").catch(() => {});
   } catch (e) {}
 };
+
+// FcmDisplayBridge — wires notificationDisplayService.setToast to
+// ModalContext's showToast so foreground FCM messages can render as
+// in-app toasts. Lives inside ModalProvider (needs the context) but
+// renders nothing.
+function FcmDisplayBridge() {
+  const { showToast } = useModal();
+  useEffect(() => {
+    notificationDisplayService.setToast(showToast);
+    fcmService.initialize().catch((e) => console.warn("[App] fcmService init failed:", e));
+    return () => {
+      notificationDisplayService.setToast(null);
+    };
+  }, [showToast]);
+  return null;
+}
 
 export default function App() {
   const navRef = useRef(null);
@@ -63,9 +81,13 @@ export default function App() {
           ) : (
             <AuthProvider>
               <ModalProvider>
+                <FcmDisplayBridge />
                 <RewardClaimProvider>
                   <UploadQueueProvider>
-                    <NavigationContainer ref={navRef}>
+                    <NavigationContainer
+                      ref={navRef}
+                      onReady={() => fcmService.setNavigationRef(navRef.current)}
+                    >
                       <Navigation />
                     </NavigationContainer>
                   </UploadQueueProvider>

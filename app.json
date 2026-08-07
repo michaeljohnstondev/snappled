@@ -10,6 +10,7 @@
       "bundleIdentifier": "com.bigvibestudios.snappled",
       "supportsTablet": true,
       "usesAppleSignIn": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Snappled uses the camera so you can record video for prompts.",
         "NSMicrophoneUsageDescription": "Snappled uses the microphone to record audio with your videos.",
@@ -34,7 +35,8 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.bigvibestudios.snappled"
+      "package": "com.bigvibestudios.snappled",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro"
@@ -65,12 +67,21 @@
         {
           "ios": {
             "extraPods": [
-              { "name": "GoogleUtilities", "modular_headers": true },
-              { "name": "RecaptchaInterop", "modular_headers": true }
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
             ]
           }
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

@@ -808,3 +808,328 @@ exports.shuffleGameDecks = functions.https.onCall(async (data, context) => {
   await batch.commit();
   return { success: true, decks: 5, promptsPerDeck: prompts.length };
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS (FCM via @react-native-firebase/messaging on client)
+// ══════════════════════════════════════════════════════════════════════
+//
+// Rules (mirrored in src/services/CLAUDE.md from bvs-app):
+//   - FCM only. No expo-notifications, ever.
+//   - Every fan-out checks: block, mute, type-toggle, isPrivate.
+//   - Every notification writes to users/{uid}/notifications AND sends
+//     FCM push, from the SAME cloud function, so foreground clients
+//     don't have to double-write.
+
+const messagingAdmin = admin.messaging();
+
+// deliverNotification — the one place that sends FCM + writes the
+// in-app notification doc. Every fan-out below calls this. Skips if
+// the target has no FCM token, has blocked/muted the actor, or has
+// the relevant push type toggled off.
+//
+// Params:
+//   targetUserId    — recipient
+//   actorUserId     — user whose action triggered this (skipped if blocked/muted)
+//   settingsKey     — key under settings.notifications.push.* to check
+//   type            — string used by client navigation switch
+//   title, body     — user-facing notification copy
+//   data            — extra fields for client navigation (userId, snappleId, etc.)
+//   priority        — 'normal' | 'high' | 'urgent' — drives in-app color
+async function deliverNotification({
+  targetUserId, actorUserId, settingsKey, type, title, body, data = {}, priority = 'normal',
+}) {
+  if (!targetUserId || !type) return { sent: false, reason: 'missing-params' };
+
+  // Skip self-notifications entirely.
+  if (actorUserId && actorUserId === targetUserId) {
+    return { sent: false, reason: 'self' };
+  }
+
+  const targetSnap = await db.collection('users').doc(targetUserId).get();
+  if (!targetSnap.exists) return { sent: false, reason: 'no-target-doc' };
+  const target = targetSnap.data() || {};
+
+  // Block check — either side blocking kills the notification.
+  const blockedByTarget = (target.social?.blockedUsers || []).includes(actorUserId);
+  const blockedActor = (target.social?.blockedBy || []).includes(actorUserId);
+  if (blockedByTarget || blockedActor) {
+    return { sent: false, reason: 'blocked' };
+  }
+
+  // Mute check — one-way, only the target's mute matters.
+  const muted = (target.social?.mutedNotifications || []).includes(actorUserId);
+  if (muted) return { sent: false, reason: 'muted' };
+
+  // Per-type toggle check. Missing settings doc = defaults per type
+  // (newPrompts defaults OFF, all others default ON).
+  const pushPrefs = target.settings?.notifications?.push || {};
+  const defaultOn = settingsKey !== 'newPrompts';
+  const enabled = pushPrefs[settingsKey] !== undefined ? pushPrefs[settingsKey] : defaultOn;
+  if (!enabled) return { sent: false, reason: 'toggled-off' };
+
+  // Write in-app notification (owned by Cloud Functions per the CLAUDE.md
+  // pattern — no client-side write on foreground receive).
+  const notifId = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const notifRef = db.collection('users').doc(targetUserId).collection('notifications').doc(notifId);
+  await notifRef.set({
+    id: notifId,
+    type,
+    title,
+    message: body,
+    data: { ...data, actorUserId: actorUserId || null },
+    priority,
+    read: false,
+    createdAt: admin.firestore.Timestamp.now(),
+    expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+  });
+
+  // Send FCM if the target has a token.
+  const token = target.deviceInfo?.fcmToken;
+  if (!token) return { sent: false, reason: 'no-token', notifId };
+
+  try {
+    await messagingAdmin.send({
+      token,
+      notification: { title, body },
+      data: {
+        // FCM data fields must be strings.
+        type: String(type),
+        ...Object.fromEntries(
+          Object.entries({ ...data, actorUserId: actorUserId || '' })
+            .filter(([, v]) => v !== undefined && v !== null)
+            .map(([k, v]) => [k, String(v)]),
+        ),
+      },
+      android: { priority: priority === 'urgent' ? 'high' : 'normal' },
+      apns: { payload: { aps: { sound: 'default' } } },
+    });
+    return { sent: true, notifId };
+  } catch (err) {
+    console.error(`[deliverNotification] FCM send failed for ${targetUserId}:`, err.message);
+    // Clean up the token if it's no longer valid — prevents repeated
+    // fan-out failures against a dead device.
+    if (err.code === 'messaging/registration-token-not-registered'
+        || err.code === 'messaging/invalid-registration-token') {
+      await db.collection('users').doc(targetUserId).update({
+        'deviceInfo.fcmToken': null,
+        'deviceInfo.notificationsEnabled': false,
+        'deviceInfo.lastTokenUpdate': admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    }
+    return { sent: false, reason: 'fcm-error', error: err.message, notifId };
+  }
+}
+
+// resolveUsername — cheap helper for building notification copy. Falls
+// back to a short uid slice so a stale user doc never blocks a send.
+async function resolveUsername(uid) {
+  if (!uid) return 'Someone';
+  try {
+    const snap = await db.collection('users').doc(uid).get();
+    if (!snap.exists) return 'Someone';
+    const d = snap.data();
+    return d.username || d.displayName || 'Someone';
+  } catch (e) {
+    return 'Someone';
+  }
+}
+
+// ── Follow / mutual-follow ──
+// Trigger fires whenever a user doc updates. We detect the followers-
+// array growing to catch new follows without needing a separate follow
+// doc. Handles both regular new-follower and mutual-follow flavors —
+// mutual is when the newly-added follower is ALREADY in this user's
+// following list (i.e. they follow each other now).
+exports.onFollowerAdded = functions.firestore
+  .document('users/{userId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    const beforeFollowers = new Set(before.social?.followers || []);
+    const afterFollowers = new Set(after.social?.followers || []);
+
+    const newFollowerIds = [...afterFollowers].filter((id) => !beforeFollowers.has(id));
+    if (newFollowerIds.length === 0) return;
+
+    const followeeId = context.params.userId;
+    const followeeFollowing = new Set(after.social?.following || []);
+
+    for (const followerId of newFollowerIds) {
+      const isMutual = followeeFollowing.has(followerId);
+      const followerName = await resolveUsername(followerId);
+      await deliverNotification({
+        targetUserId: followeeId,
+        actorUserId: followerId,
+        settingsKey: isMutual ? 'followBack' : 'newFollower',
+        type: isMutual ? 'mutual_follow' : 'new_follower',
+        title: isMutual ? "You've got a mutual!" : 'New follower',
+        body: isMutual
+          ? `You and @${followerName} follow each other now.`
+          : `@${followerName} just followed you.`,
+        data: { userId: followerId },
+        priority: 'normal',
+      });
+    }
+  });
+
+// ── New snapple from someone I follow ──
+// Trigger fires on snapple doc create. Skips private snapples,
+// blocked/muted actors, and toggle-off followers. Debounces bursts:
+// if a follower already has an unread notification of this type from
+// this creator, we UPDATE that notification's copy instead of firing
+// a new push, so "5 uploads in 10 minutes" = 1 ping, not 5.
+exports.onNewSnapple = functions.firestore
+  .document('snapples/{snappleId}')
+  .onCreate(async (snap, context) => {
+    const snapple = snap.data() || {};
+    const snappleId = context.params.snappleId;
+
+    if (snapple.isPrivate === true) return;
+    if (snapple.isActive === false || snapple.isBanned === true) return;
+    if (!snapple.creatorId) return;
+
+    // Look up creator's followers from their user doc.
+    const creatorSnap = await db.collection('users').doc(snapple.creatorId).get();
+    if (!creatorSnap.exists) return;
+    const followers = creatorSnap.data()?.social?.followers || [];
+    if (followers.length === 0) return;
+
+    const creatorName = await resolveUsername(snapple.creatorId);
+
+    for (const followerId of followers) {
+      // Debounce check: is there already an unread new-snapple
+      // notification from this creator to this follower? If yes,
+      // update the existing one instead of firing a fresh push.
+      const debounceQuery = await db.collection('users')
+        .doc(followerId).collection('notifications')
+        .where('type', '==', 'followed_user_snapple')
+        .where('data.actorUserId', '==', snapple.creatorId)
+        .where('read', '==', false)
+        .limit(1)
+        .get();
+
+      if (!debounceQuery.empty) {
+        // Bump the existing notification's count + latest snappleId.
+        const existing = debounceQuery.docs[0];
+        const existingCount = existing.data().data?.snappleCount || 1;
+        const nextCount = existingCount + 1;
+        await existing.ref.update({
+          title: `@${creatorName}`,
+          message: `Made ${nextCount} new snapples`,
+          'data.snappleCount': nextCount,
+          'data.snappleId': snappleId, // latest one for navigation
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+        // No push — the debounce IS the "don't buzz the phone again"
+        // guarantee. The updated in-app notification is enough.
+        continue;
+      }
+
+      // Fresh notification — full send.
+      await deliverNotification({
+        targetUserId: followerId,
+        actorUserId: snapple.creatorId,
+        settingsKey: 'followedUserSnapple',
+        type: 'followed_user_snapple',
+        title: `@${creatorName}`,
+        body: 'Just made a new snapple.',
+        data: { userId: snapple.creatorId, snappleId, snappleCount: 1 },
+        priority: 'normal',
+      });
+    }
+  });
+
+// ── Prompt response-rate tracking ──
+// Every new snapple bumps its prompt's lifetime response counter in
+// promptPool. Response rate = responses / impressions, tracked so the
+// digest notification below only fires for proven high-engagement
+// prompts (not every hourly rotation — that would spam).
+exports.trackPromptResponse = functions.firestore
+  .document('snapples/{snappleId}')
+  .onCreate(async (snap) => {
+    const snapple = snap.data() || {};
+    if (!snapple.promptId) return;
+
+    // Look up the active prompt to get its textKey → promptPool link.
+    const promptSnap = await db.collection('activePrompts').doc(snapple.promptId).get();
+    if (!promptSnap.exists) return;
+    const prompt = promptSnap.data();
+    const textKey = prompt.textKey || normalizePromptText(prompt.text || '');
+    if (!textKey) return;
+
+    const poolQuery = await db.collection('promptPool')
+      .where('textKey', '==', textKey)
+      .limit(1)
+      .get();
+    if (poolQuery.empty) return;
+
+    await poolQuery.docs[0].ref.update({
+      responseCount: admin.firestore.FieldValue.increment(1),
+      lastResponseAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+// ── Prompt digest notification ──
+// Fires when a new prompt enters the active pool. Only sends if the
+// prompt has proven itself (response rate ≥ threshold and has been
+// seen at least a few times) AND we haven't notified for this prompt
+// text before (dedup via promptPool.lastNotifiedAt).
+//
+// Opt-in only — deliverNotification's settings check gates every send
+// on user.settings.notifications.push.newPrompts which defaults OFF.
+const DIGEST_MIN_IMPRESSIONS = 20;
+const DIGEST_MIN_RESPONSE_RATE = 0.30;
+const DIGEST_RENOTIFY_DAYS = 30;
+
+exports.onActivePromptCreated = functions.firestore
+  .document('activePrompts/{promptId}')
+  .onCreate(async (snap, context) => {
+    const prompt = snap.data() || {};
+    const textKey = prompt.textKey || normalizePromptText(prompt.text || '');
+    if (!textKey) return;
+
+    const poolQuery = await db.collection('promptPool')
+      .where('textKey', '==', textKey)
+      .limit(1)
+      .get();
+    if (poolQuery.empty) return;
+
+    const poolDoc = poolQuery.docs[0];
+    const pool = poolDoc.data();
+    const impressions = pool.impressionCount || pool.timesShown || 0;
+    const responses = pool.responseCount || 0;
+    const responseRate = impressions > 0 ? responses / impressions : 0;
+
+    // Quality gate.
+    if (impressions < DIGEST_MIN_IMPRESSIONS) return;
+    if (responseRate < DIGEST_MIN_RESPONSE_RATE) return;
+
+    // Dedup: skip if we notified for this prompt in the last 30 days.
+    const lastNotified = pool.lastNotifiedAt?.toMillis?.() || 0;
+    const ageMs = Date.now() - lastNotified;
+    if (lastNotified && ageMs < DIGEST_RENOTIFY_DAYS * 24 * 60 * 60 * 1000) return;
+
+    await poolDoc.ref.update({
+      lastNotifiedAt: admin.firestore.Timestamp.now(),
+    });
+
+    // Fan-out to all users. In a large-user world this needs
+    // pagination / a topic subscription pattern, but the per-user
+    // settings check (deliverNotification) keeps sends cheap: users
+    // who haven't opted in are dropped before any FCM cost.
+    const usersQuery = await db.collection('users').get();
+    const promptText = prompt.text || 'A new prompt';
+
+    for (const userDoc of usersQuery.docs) {
+      await deliverNotification({
+        targetUserId: userDoc.id,
+        actorUserId: null, // system-originated
+        settingsKey: 'newPrompts',
+        type: 'new_prompt_digest',
+        title: '🔥 Hot prompt is live',
+        body: promptText,
+        data: { promptId: context.params.promptId },
+        priority: 'normal',
+      });
+    }
+  });

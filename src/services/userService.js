@@ -123,7 +123,40 @@ export const userService = {
           snappleOpinion: {}, // User's ratings/reviews on snapples
           following: [],
           followers: [],
+          // blockedUsers — people THIS user has blocked. Symmetric with
+          // blockedBy on the target user so every fan-out check reads
+          // one field on one doc (no cross-user query).
           blockedUsers: [],
+          blockedBy: [],
+          // mutedNotifications — people whose actions this user does
+          // NOT want push notifications for. One-way (mutee doesn't
+          // know). Unlike block, the muted user still shows up in
+          // feeds / grids — mute silences pings only.
+          mutedNotifications: [],
+        },
+        settings: {
+          // Per-type push notification toggles read by every Cloud
+          // Function fan-out before sending FCM. Missing settings doc
+          // (legacy users) defaults each toggle to true except
+          // newPrompts, which is opt-in to avoid spamming.
+          notifications: {
+            push: {
+              newFollower: true,
+              followBack: true,
+              followedUserSnapple: true,
+              gameInvite: true,
+              newPrompts: false,
+            },
+          },
+        },
+        // Populated by fcmService.registerTokenForUser on first login
+        // after notification permission is granted. Cloud Functions
+        // read deviceInfo.fcmToken to send FCM messages to this device.
+        deviceInfo: {
+          fcmToken: null,
+          platform: null,
+          lastTokenUpdate: null,
+          notificationsEnabled: false,
         },
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

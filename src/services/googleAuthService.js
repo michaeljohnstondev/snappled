@@ -211,6 +211,25 @@ export async function ensureUserDocument(user, options = {}) {
       following: [],
       followers: [],
       blockedUsers: [],
+      blockedBy: [],
+      mutedNotifications: [],
+    },
+    settings: {
+      notifications: {
+        push: {
+          newFollower: true,
+          followBack: true,
+          followedUserSnapple: true,
+          gameInvite: true,
+          newPrompts: false,
+        },
+      },
+    },
+    deviceInfo: {
+      fcmToken: null,
+      platform: null,
+      lastTokenUpdate: null,
+      notificationsEnabled: false,
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

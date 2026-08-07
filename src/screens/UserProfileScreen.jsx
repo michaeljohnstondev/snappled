@@ -271,11 +271,21 @@ export default function UserProfileScreen({ route, navigation }) {
           />
         </View>
       ) : (
-        <Pressable style={styles.achievementsBtn} onPress={() => navigation.navigate('Achievements')}>
-          <Ionicons name="trophy" size={20} color={theme.colors.vibeYellow} />
-          <Text style={styles.achievementsBtnText}>Achievements</Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
-        </Pressable>
+        <View style={{ gap: 8 }}>
+          <Pressable style={styles.achievementsBtn} onPress={() => navigation.navigate('Achievements')}>
+            <Ionicons name="trophy" size={20} color={theme.colors.vibeYellow} />
+            <Text style={styles.achievementsBtnText}>Achievements</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            style={styles.achievementsBtn}
+            onPress={() => navigation.navigate('NotificationSettings')}
+          >
+            <Ionicons name="notifications" size={20} color={theme.colors.vibeBlue} />
+            <Text style={styles.achievementsBtnText}>Notification Settings</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </Pressable>
+        </View>
       )}
 
       {/* Section picker + Edit Deck. Dropdown filters the grid

@@ -5,6 +5,7 @@ import { auth, db } from "../services/firebase";
 import { userService } from "../services/userService";
 import { achievementService } from "../services/achievementService";
 import { levelService } from "../services/levelService";
+import { fcmService } from "../services/fcmServiceWrapper";
 
 const AuthContext = createContext({});
 
@@ -24,6 +25,10 @@ export function AuthProvider({ children }) {
   const [pendingAchievements, setPendingAchievements] = useState([]);
 
   const unsubUserDoc = useRef(null);
+  // Track the last-authenticated uid so logout can clear the FCM
+  // token off the correct user doc even after Firebase Auth has
+  // already dropped the credential.
+  const lastAuthedUidRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -34,6 +39,18 @@ export function AuthProvider({ children }) {
         unsubUserDoc.current();
         unsubUserDoc.current = null;
       }
+
+      // If we're transitioning from an authed user → logged out (or
+      // switching accounts), clear the FCM token off the OLD user doc
+      // so their device doesn't keep receiving pushes for the previous
+      // account. Fire-and-forget — non-fatal if it fails.
+      if (lastAuthedUidRef.current && lastAuthedUidRef.current !== firebaseUser?.uid) {
+        const previousUid = lastAuthedUidRef.current;
+        fcmService.removeTokenForUser(previousUid).catch((e) => {
+          console.warn('[AuthContext] FCM token cleanup failed:', e);
+        });
+      }
+      lastAuthedUidRef.current = firebaseUser?.uid || null;
 
       if (firebaseUser) {
         try {
@@ -75,6 +92,15 @@ export function AuthProvider({ children }) {
               ownedCards: userData.ownedCards || [],
             });
             setIsAuthenticated(true);
+
+            // Register FCM token for push notifications. Contextual —
+            // requestPermission() prompts the OS dialog the first time,
+            // then the token gets written to deviceInfo.fcmToken so
+            // Cloud Functions can push to this device. Silent no-op
+            // in Expo Go (fcmServiceWrapper picks the fallback there).
+            fcmService.registerTokenForUser(firebaseUser.uid).catch((e) => {
+              console.warn('[AuthContext] FCM token registration failed:', e);
+            });
 
             // Real-time listener for resource bar updates
             unsubUserDoc.current = onSnapshot(doc(db, 'users', firebaseUser.uid), (snap) => {

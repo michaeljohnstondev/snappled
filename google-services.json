@@ -1,0 +1,83 @@
+{
+  "project_info": {
+    "project_number": "107855342657",
+    "firebase_url": "https://snapplepark-default-rtdb.firebaseio.com",
+    "project_id": "snapplepark",
+    "storage_bucket": "snapplepark.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:107855342657:android:e07e4bbf35a5e547f5aac0",
+        "android_client_info": {
+          "package_name": "com.bigvibestudios.snappled"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "107855342657-aq98f0ke1n9ac45celh0tjbn3s57bf53.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwYOpJt00i37298ryn6MgZPjFdncwYQVA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "107855342657-aq98f0ke1n9ac45celh0tjbn3s57bf53.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "107855342657-26lrh6lcv0breonu2ffhkq19nbti8duo.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bigvibestudios.snappled"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:107855342657:android:3eb0ad7d25f2179cf5aac0",
+        "android_client_info": {
+          "package_name": "com.snapplepark"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "107855342657-aq98f0ke1n9ac45celh0tjbn3s57bf53.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwYOpJt00i37298ryn6MgZPjFdncwYQVA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "107855342657-aq98f0ke1n9ac45celh0tjbn3s57bf53.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "107855342657-26lrh6lcv0breonu2ffhkq19nbti8duo.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bigvibestudios.snappled"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
