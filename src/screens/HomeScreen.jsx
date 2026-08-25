@@ -49,6 +49,38 @@ export default function HomeScreen({ navigation, route }) {
     return unsubscribe;
   }, [navigation, selectedPrompt?.id]);
 
+  // Deep link: /snappled/s/<id> arrives here with a snappleId param.
+  // Fetch the snapple directly rather than hunting for it in the current
+  // prompt's list — a shared snapple is very often on a different prompt
+  // than whichever one this screen happened to land on.
+  useEffect(() => {
+    const deepLinkId = route?.params?.snappleId;
+    if (!deepLinkId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await snappleService.getSnapple(deepLinkId);
+        if (cancelled || !result?.success || !result.snapple) return;
+
+        const snapple = result.snapple;
+        // Move the carousel to the snapple's own prompt so closing the
+        // overlay leaves the user somewhere coherent.
+        setPrompts(prev => {
+          const match = prev.find(p => p.id === snapple.promptId);
+          if (match) setSelectedPrompt(match);
+          return prev;
+        });
+        setSelectedIndex(0);
+        setSelectedSnapple(snapple);
+      } catch (error) {
+        console.error('[HomeScreen] deep link failed:', error);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [route?.params?.snappleId]);
+
   // Fetch snapples whenever selected prompt changes
   useEffect(() => {
     if (selectedPrompt?.id) {

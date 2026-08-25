@@ -18,6 +18,30 @@ LogBox.ignoreLogs([
   "SafeAreaView has been deprecated",
 ]);
 
+// Deep links for shared snapples. A share posts
+// https://bigvibestudios.com/snappled/s/<id>; with the domain claimed in
+// app.json that opens straight to the snapple here, and falls back to the
+// web page for anyone without the app installed.
+//
+// The snappled:// prefix is kept for in-app browsers, which often refuse
+// to hand an https link over to a native app.
+const linking = {
+  prefixes: ["https://bigvibestudios.com/snappled", "snappled://"],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Prompts: {
+            screens: {
+              Snapples: "s/:snappleId",
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 const hideAndroidNavBar = () => {
   if (Platform.OS !== "android") return;
   try {
@@ -95,6 +119,7 @@ export default function App() {
                   <UploadQueueProvider>
                     <NavigationContainer
                       ref={navRef}
+                      linking={linking}
                       onReady={() => fcmService.setNavigationRef(navRef.current)}
                     >
                       <Navigation />

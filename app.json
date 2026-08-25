@@ -18,7 +18,10 @@
         "NSPhotoLibraryAddUsageDescription": "Snappled saves your recorded snapples to your photo library.",
         "NSLocationWhenInUseUsageDescription": "Snappled does not collect your location. This permission is required because the camera SDK can attach location metadata to videos.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": [
+        "applinks:bigvibestudios.com"
+      ]
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
@@ -36,7 +39,24 @@
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.bigvibestudios.snappled",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "bigvibestudios.com",
+              "pathPrefix": "/snappled/s"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro"
