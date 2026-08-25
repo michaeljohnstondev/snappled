@@ -37,7 +37,7 @@ A social gaming app where users create videos from prompts and discover amazing 
 
    ```bash
    git clone <your-repo-url>
-   cd snapple-park
+   cd snappled
    ```
 
 2. **Install dependencies**
@@ -87,7 +87,7 @@ A social gaming app where users create videos from prompts and discover amazing 
 Following CLAUDE.md conventions:
 
 ```
-snapple-park/
+snappled/
 ├── App.js                 # Root app component
 ├── Navigation.js          # Navigation configuration
 ├── app/                   # Navigation shells only
