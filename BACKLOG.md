@@ -22,12 +22,15 @@
 - [ ] Ad integration (rewarded ads for free coins)
 
 ## Social
-- [ ] Push notifications (game invites, follows, prompt expiry)
+- [x] Push notifications (game invites, follows, prompt expiry)
 - [ ] DMs / messaging between users
 - [ ] Feed of followed users' new snapples
 - [ ] Trending page
 
 ## Polish
+- [ ] Sound settings toggle (soundService.setEnabled already exists, no UI yet)
+- [ ] /snappled landing page on bigvibestudios.com — shares currently point
+      at the studio root because no download page exists yet
 - [ ] Logo / splash screen
 - [ ] Onboarding flow for new users
 - [ ] Settings screen (change username, email, notifications)
