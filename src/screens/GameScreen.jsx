@@ -36,6 +36,8 @@ import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import TutorialOverlay from '../components/game/TutorialOverlay';
 import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
+import { soundService } from '../services/soundService';
+import { shareService } from '../services/shareService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -1265,6 +1267,25 @@ export default function GameScreen({ navigation }) {
     if (!result?.success) showError('Error', result?.error || 'Failed to save prompt');
   };
 
+  // ---- SFX ------------------------------------------------------------
+  // Countdown tick over the last 5 seconds of any timed phase. Keyed on
+  // the timer value so it fires once per second rather than per render.
+  useEffect(() => {
+    if (timer >= 1 && timer <= 5) soundService.play('countdownTick');
+  }, [timer]);
+
+  // Winner sting when a new round result lands. The ref starts at whatever
+  // count was present on mount, so rejoining a game that already has
+  // results doesn't blast the sound for rounds the user never watched.
+  const roundResultCount = game?.roundResults?.length || 0;
+  const prevRoundResultCount = useRef(roundResultCount);
+  useEffect(() => {
+    if (roundResultCount > prevRoundResultCount.current) {
+      soundService.play('roundWinner');
+    }
+    prevRoundResultCount.current = roundResultCount;
+  }, [roundResultCount]);
+
   const [favoriteCard, setFavoriteCard] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
 
@@ -1281,6 +1302,7 @@ export default function GameScreen({ navigation }) {
       return;
     }
     setHasVoted(true);
+    soundService.play('voteLock');
   };
 
   const handleNextRound = async () => {
@@ -1685,7 +1707,10 @@ export default function GameScreen({ navigation }) {
         onLeave={handleLeaveGame}
         onPreviewCard={(card) => setPreviewCard(card)}
         onClosePreview={() => setPreviewCard(null)}
-        onSelectCard={(card) => setSelectedCard(card)}
+        onSelectCard={(card) => {
+          setSelectedCard(card);
+          soundService.play('cardPick');
+        }}
         onPickCard={(card) => {
           handlePickCard(card);
           setPreviewCard(null);
@@ -2214,16 +2239,12 @@ export default function GameScreen({ navigation }) {
     const lastRoundResult = game.roundResults[game.roundResults.length - 1];
     const sortedPlayers = [...game.players].sort((a, b) => b.points - a.points);
     const handleShareRound = async () => {
-      try {
-        const { Share } = require('react-native');
-        const sharePrompt = game.prompts[game.currentRound - 1] || '';
-        const winnerUid = lastRoundResult?.rankings?.[0]?.uid;
-        const winningSub = game.submissions.find(s => s.uid === winnerUid);
-        const videoUrl = winningSub?.videoUrl || '';
-        await Share.share({
-          message: `"${sharePrompt}" 🎬\n\nCheck out this round on Snappled!\n\n${videoUrl ? videoUrl + '\n\n' : ''}${sortedPlayers.map((p, i) => `#${i+1} ${p.username}`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
-        });
-      } catch (e) {}
+      const winnerUid = lastRoundResult?.rankings?.[0]?.uid;
+      await shareService.shareRound({
+        prompt: game.prompts[game.currentRound - 1] || '',
+        winningSubmission: game.submissions.find(s => s.uid === winnerUid),
+        players: sortedPlayers,
+      });
     };
     return (
       <>

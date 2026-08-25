@@ -1133,3 +1133,4 @@ exports.onActivePromptCreated = functions.firestore
       });
     }
   });
+exports.renderShareVideo = require('./shareRender').renderShareVideo;

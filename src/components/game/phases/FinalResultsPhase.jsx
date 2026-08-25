@@ -2,12 +2,14 @@
 // scoreboard and a Share button. Reached after the last round's
 // RoundResults dismisses.
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import { gameService } from '../../../services/gameService';
+import { soundService } from '../../../services/soundService';
+import { shareService } from '../../../services/shareService';
 import theme from '../../../theme/themes';
 
 // Same palette as the voting wait screen + round-results scoreboard so
@@ -43,16 +45,21 @@ export default function FinalResultsPhase({ game, selfUid, onDone, onLeave }) {
     }
   });
 
+  // Game-over sting. Empty dep array: this phase mounts exactly once
+  // per game, so the sound lands on arrival and never repeats.
+  useEffect(() => {
+    soundService.play('gameOver');
+  }, []);
+
   // Build a multi-line share string with winner + full leaderboard +
   // the winning snapple's video URL if present.
   const handleShare = async () => {
-    try {
-      const winner = rewards[0];
-      const winningSub = game.submissions.find(s => s.uid === winner?.uid);
-      await Share.share({
-        message: `🏆 Game Over on Snappled!\n\nWinner: ${winner?.username}\n${winningSub?.videoUrl ? winningSub.videoUrl + '\n\n' : '\n'}${rewards.map(p => `#${p.placement} ${p.username} — ${p.points} pts`).join('\n')}\n\n🔥 Get Snappled — snappled://`,
-      });
-    } catch (e) {}
+    const winner = rewards[0];
+    await shareService.shareGameResult({
+      rewards,
+      winningSubmission: game.submissions.find(s => s.uid === winner?.uid),
+      prompt: game.prompts?.[game.currentRound - 1],
+    });
   };
 
   return (

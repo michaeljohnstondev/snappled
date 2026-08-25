@@ -1,0 +1,234 @@
+/**
+ * shareService.js — every outbound share in the app.
+ *
+ * Before this, all three share sites posted a text blob with a raw Firebase
+ * Storage URL pasted in. Nothing attached, and the link was `snappled://`,
+ * which does nothing on a device that doesn't already have the app — i.e.
+ * for exactly the people a share is meant to reach.
+ *
+ * Now: the actual video file is attached, with the prompt as the caption.
+ * A good snapple is the ad, so the job here is to get the video itself in
+ * front of someone, with the prompt attached so it reads as a bit rather
+ * than a stray clip.
+ *
+ * Platform split, and it's deliberate:
+ *   iOS     - Share.share({ message, url }) attaches the file AND the caption.
+ *   Android - RN's Share ignores `url` entirely, so the file goes out via
+ *             expo-sharing and the caption is lost. That gap is what the
+ *             server-side burned-in overlay closes (see renderedUrl below).
+ */
+
+import { Platform, Share } from 'react-native';
+import * as Sharing from 'expo-sharing';
+
+// Where a non-user should land. No /snappled landing page exists yet —
+// point this at one the moment it ships, it's the only place to change.
+const SHARE_URL = 'https://bigvibestudios.com';
+
+const CACHE_PREFIX = 'share-';
+
+// djb2 — short stable filename per remote URL so repeat shares of the
+// same snapple reuse the cached file instead of re-downloading.
+function hashUrl(url) {
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+// How long to wait on a first-time server render before giving up and
+// sharing the un-overlaid clip. A cold function plus a transcode can run
+// past this; making the user stare at a spinner is worse than shipping
+// the plain video, and the render still completes and caches server-side
+// for the next share.
+const RENDER_TIMEOUT_MS = 12000;
+
+/**
+ * Ask the backend for a copy with the prompt burned into the frames.
+ * Cached server-side after the first call, so this is usually one fast
+ * Firestore read. Returns null on any failure — the caller then shares
+ * the original video, which is a worse ad but still a working share.
+ */
+async function requestRenderedVideo(snappleId) {
+  if (!snappleId) return null;
+  try {
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('./firebase');
+    const render = httpsCallable(functions, 'renderShareVideo');
+
+    const result = await Promise.race([
+      render({ snappleId }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('render timeout')), RENDER_TIMEOUT_MS)),
+    ]);
+    return result?.data?.url || null;
+  } catch (error) {
+    console.warn('[ShareService] render unavailable:', error?.message);
+    return null;
+  }
+}
+
+/**
+ * Pull a remote video into the cache directory so it can be attached.
+ * Returns a local file:// URI, or null if anything goes wrong — callers
+ * fall back to a text share rather than failing the whole action.
+ */
+async function cacheVideo(videoUrl) {
+  try {
+    const LegacyFS = require('expo-file-system/legacy');
+    if (!LegacyFS.cacheDirectory) return null;
+
+    const target = `${LegacyFS.cacheDirectory}${CACHE_PREFIX}${hashUrl(videoUrl)}.mp4`;
+
+    // Reuse a previous download. Storage URLs are content-addressed by
+    // token, so a hit here is genuinely the same file.
+    const existing = await LegacyFS.getInfoAsync(target);
+    if (existing.exists && existing.size > 0) return target;
+
+    const result = await LegacyFS.downloadAsync(videoUrl, target);
+    if (result?.status !== 200) return null;
+    return result.uri;
+  } catch (error) {
+    console.warn('[ShareService] cache failed:', error?.message);
+    return null;
+  }
+}
+
+/**
+ * Share a video with a caption, attaching the real file where the platform
+ * allows it. Falls back to caption-only if the download or the native
+ * sheet is unavailable, so the button always does something.
+ *
+ * @param {object}  opts
+ * @param {string}  opts.videoUrl    - remote source video
+ * @param {string}  opts.caption     - text to send alongside
+ * @param {string} [opts.renderedUrl]- pre-rendered copy with the prompt burned
+ *                                     in; preferred over videoUrl when present
+ * @param {string} [opts.dialogTitle]
+ */
+async function shareVideo({ videoUrl, caption, renderedUrl, dialogTitle = 'Share Snapple' }) {
+  const source = renderedUrl || videoUrl;
+
+  try {
+    if (!source) {
+      await Share.share({ message: caption });
+      return { success: true, attached: false };
+    }
+
+    const localUri = await cacheVideo(source);
+
+    if (localUri && Platform.OS === 'ios') {
+      await Share.share({ message: caption, url: localUri });
+      return { success: true, attached: true };
+    }
+
+    if (localUri && (await Sharing.isAvailableAsync())) {
+      await Sharing.shareAsync(localUri, {
+        mimeType: 'video/mp4',
+        dialogTitle,
+        UTI: 'public.movie',
+      });
+      return { success: true, attached: true };
+    }
+
+    // No file — send the caption with a link so it's still actionable.
+    await Share.share({ message: `${caption}\n\n${source}` });
+    return { success: true, attached: false };
+  } catch (error) {
+    // A user dismissing the share sheet lands here on some platforms.
+    // Not an error worth surfacing.
+    console.warn('[ShareService] share failed:', error?.message);
+    return { success: false, error: error?.message };
+  }
+}
+
+export const shareService = {
+  SHARE_URL,
+
+  /** Caption for a single snapple: the prompt is the hook, so it leads. */
+  buildSnappleCaption(prompt, creatorUsername) {
+    const lines = [];
+    if (prompt) lines.push(`"${prompt}"`);
+    if (creatorUsername) lines.push(`@${creatorUsername} on Snappled`);
+    else lines.push('on Snappled');
+    lines.push('');
+    lines.push(`Get the app — ${SHARE_URL}`);
+    return lines.join('\n');
+  },
+
+  /** Share one snapple from the feed / overlay. */
+  async shareSnapple(snapple) {
+    if (!snapple) return { success: false, error: 'No snapple' };
+
+    // Prefer an already-rendered copy; otherwise ask for one. Falls back
+    // to the raw clip so the button never dead-ends on a render failure.
+    const rendered =
+      snapple.sharedVideoUrl || (await requestRenderedVideo(snapple.id));
+
+    return shareVideo({
+      videoUrl: snapple.videoUrl,
+      renderedUrl: rendered,
+      caption: this.buildSnappleCaption(snapple.prompt, snapple.creatorUsername),
+      dialogTitle: 'Share Snapple',
+    });
+  },
+
+  /** Share the winning clip of a single round, with the round's prompt. */
+  async shareRound({ prompt, winningSubmission, players = [] }) {
+    const standings = [...players]
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .map((p, i) => `${i + 1}. ${p.username}`)
+      .join('\n');
+
+    const caption = [
+      prompt ? `"${prompt}"` : '',
+      winningSubmission?.creatorUsername
+        ? `Round won by @${winningSubmission.creatorUsername}`
+        : 'Round winner',
+      '',
+      standings,
+      '',
+      `Play Snappled — ${SHARE_URL}`,
+    ].filter(Boolean).join('\n');
+
+    const rendered =
+      winningSubmission?.sharedVideoUrl ||
+      (await requestRenderedVideo(winningSubmission?.snappleId));
+
+    return shareVideo({
+      videoUrl: winningSubmission?.videoUrl,
+      renderedUrl: rendered,
+      caption,
+      dialogTitle: 'Share Round',
+    });
+  },
+
+  /** Share the final scoreboard plus the winner's clip. */
+  async shareGameResult({ rewards = [], winningSubmission, prompt }) {
+    const winner = rewards[0];
+    const board = rewards
+      .map(p => `#${p.placement} ${p.username} — ${p.points} pts`)
+      .join('\n');
+
+    const caption = [
+      winner ? `${winner.username} won on Snappled` : 'Game over on Snappled',
+      prompt ? `Final prompt: "${prompt}"` : '',
+      '',
+      board,
+      '',
+      `Play Snappled — ${SHARE_URL}`,
+    ].filter(Boolean).join('\n');
+
+    const rendered =
+      winningSubmission?.sharedVideoUrl ||
+      (await requestRenderedVideo(winningSubmission?.snappleId));
+
+    return shareVideo({
+      videoUrl: winningSubmission?.videoUrl,
+      renderedUrl: rendered,
+      caption,
+      dialogTitle: 'Share Result',
+    });
+  },
+};
+
+export default shareService;

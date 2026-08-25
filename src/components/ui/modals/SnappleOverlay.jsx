@@ -6,7 +6,6 @@ import {
   Modal,
   Pressable,
   Dimensions,
-  Share
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -16,6 +15,7 @@ import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
 import { snappleService } from '../../../services/snappleService';
 import theme from '../../../theme/themes';
+import { shareService } from '../../../services/shareService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -445,11 +445,10 @@ export default function SnappleOverlay({
 
           <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={async () => {
-              try {
-                await Share.share({
-                  message: `Check out this Snapple by @${snapple.creatorUsername || 'anonymous'}: "${snapple.prompt}"`,
-                });
-              } catch (e) {}
+              // Attaches the actual video file with the prompt as the
+              // caption — a good snapple is the ad, so the clip has to
+              // travel, not just a link to it.
+              await shareService.shareSnapple(snapple);
             }}>
               <View style={styles.buttonBg}>
                 <Ionicons name="share-social" size={20} style={{ marginTop: 2, marginLeft: -2 }} color="white" />
