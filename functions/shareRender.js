@@ -218,3 +218,48 @@ exports.renderShareVideo = functions
       fs.rmSync(work, { recursive: true, force: true });
     }
   });
+
+/**
+ * getShareCard — public JSON for the web share page.
+ *
+ * The snapples collection requires auth to read, and the share page is by
+ * definition for people who do not have the app. Rather than loosen those
+ * rules, this runs on the admin SDK and hands back only the fields a
+ * public page should ever see. Private snapples are refused outright.
+ */
+exports.getShareCard = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET');
+  // The page is static and the payload is public, so let the CDN carry
+  // the load rather than paying for a function invocation per viewer.
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
+
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+
+  const snappleId = req.query.id;
+  if (!snappleId) return res.status(400).json({ error: 'Missing id.' });
+
+  try {
+    const snap = await admin.firestore()
+      .collection('snapples').doc(String(snappleId)).get();
+
+    if (!snap.exists) return res.status(404).json({ error: 'Not found.' });
+
+    const s = snap.data();
+    if (s.isPrivate) return res.status(403).json({ error: 'Private snapple.' });
+
+    return res.json({
+      id: snap.id,
+      prompt: s.prompt || '',
+      creatorUsername: s.creatorUsername || 'anonymous',
+      // Prefer the overlaid render so the web page shows the same thing
+      // that got shared to socials.
+      videoUrl: s.sharedVideoUrl || s.videoUrl || null,
+      price: s.currentPrice || s.basePrice || null,
+      owners: Array.isArray(s.owners) ? s.owners.length : 0,
+    });
+  } catch (error) {
+    console.error('[getShareCard]', snappleId, error);
+    return res.status(500).json({ error: 'Lookup failed.' });
+  }
+});

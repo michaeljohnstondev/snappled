@@ -1134,3 +1134,4 @@ exports.onActivePromptCreated = functions.firestore
     }
   });
 exports.renderShareVideo = require('./shareRender').renderShareVideo;
+exports.getShareCard = require('./shareRender').getShareCard;

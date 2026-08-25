@@ -21,9 +21,14 @@
 import { Platform, Share } from 'react-native';
 import * as Sharing from 'expo-sharing';
 
-// Where a non-user should land. No /snappled landing page exists yet —
-// point this at one the moment it ships, it's the only place to change.
-const SHARE_URL = 'https://bigvibestudios.com';
+// Where a non-user lands. The per-snapple page plays the clip and hands
+// them a download link; the bare URL is the fallback when there's no id.
+const SHARE_URL = 'https://bigvibestudios.com/snappled';
+
+// Mirrors the /snappled/s/** rewrite on bigvibestudios.com.
+function snappleUrl(snappleId) {
+  return snappleId ? `${SHARE_URL}/s/${snappleId}` : SHARE_URL;
+}
 
 const CACHE_PREFIX = 'share-';
 
@@ -145,13 +150,15 @@ export const shareService = {
   SHARE_URL,
 
   /** Caption for a single snapple: the prompt is the hook, so it leads. */
-  buildSnappleCaption(prompt, creatorUsername) {
+  buildSnappleCaption(prompt, creatorUsername, snappleId) {
     const lines = [];
     if (prompt) lines.push(`"${prompt}"`);
     if (creatorUsername) lines.push(`@${creatorUsername} on Snappled`);
     else lines.push('on Snappled');
     lines.push('');
-    lines.push(`Get the app — ${SHARE_URL}`);
+    // Deep-links to the snapple itself rather than the app front door,
+    // so a creator sharing their own work sends people to their work.
+    lines.push(`Watch it — ${snappleUrl(snappleId)}`);
     return lines.join('\n');
   },
 
@@ -167,7 +174,8 @@ export const shareService = {
     return shareVideo({
       videoUrl: snapple.videoUrl,
       renderedUrl: rendered,
-      caption: this.buildSnappleCaption(snapple.prompt, snapple.creatorUsername),
+      caption: this.buildSnappleCaption(
+        snapple.prompt, snapple.creatorUsername, snapple.id),
       dialogTitle: 'Share Snapple',
     });
   },
@@ -187,7 +195,7 @@ export const shareService = {
       '',
       standings,
       '',
-      `Play Snappled — ${SHARE_URL}`,
+      `Watch it — ${snappleUrl(winningSubmission?.snappleId)}`,
     ].filter(Boolean).join('\n');
 
     const rendered =
@@ -215,7 +223,7 @@ export const shareService = {
       '',
       board,
       '',
-      `Play Snappled — ${SHARE_URL}`,
+      `Watch it — ${snappleUrl(winningSubmission?.snappleId)}`,
     ].filter(Boolean).join('\n');
 
     const rendered =
