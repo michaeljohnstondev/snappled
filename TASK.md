@@ -49,13 +49,24 @@ Last pruned: 2026-08-25
   interactive) if direct APK downloads should verify as well.
 - **No rebuild needed** — this is server-side.
 
-### Deploy the website share page
-- **Status**: WRITTEN, NOT DEPLOYED
-- **What**: `bvs-web/public/snappled/s/index.html` plus a
-  `/snappled/s/**` rewrite in that repo's `firebase.json`.
-- **Not deployed because**: that working tree carries a lot of unrelated
-  uncommitted work, and `firebase deploy --only hosting` would push all
-  of it live. Review that repo's `git status` first.
+### Deploy the website share page + OG renderer
+- **Status**: WRITTEN AND TESTED, NOT DEPLOYED
+- **What**: `bvs-web/functions/` (new codebase) serves `/snappled/s/**`
+  with per-snapple Open Graph tags, so Facebook / WhatsApp / iMessage /
+  Discord unfurl a real thumbnail instead of a generic card. Crawlers do
+  not run JS, which is why this cannot be a static page.
+- **To ship**:
+  `cd c:\devvs-webunctions && npm install`, then
+  `firebase deploy --only functions:snappleShare,hosting`.
+- **Note**: that repo has a lot of unrelated uncommitted work, and a
+  hosting deploy pushes all of it live. Review its `git status` first.
+- **Note**: this puts a Blaze-billed function in front of share links for
+  the first time. Responses set `s-maxage=3600` so the Hosting CDN
+  absorbs repeat crawler hits.
+- **Missing**: no branded fallback OG image exists (`public/assets/` has
+  only `site.css`). Snapples whose render has not finished unfurl with no
+  image at all. Add one and set `FALLBACK_IMAGE` in
+  `bvs-web/functions/index.js`.
 
 ### New EAS build required
 - **Status**: PENDING

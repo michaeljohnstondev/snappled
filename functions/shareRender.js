@@ -66,12 +66,44 @@ function run(bin, args) {
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, args);
     let stderr = '';
-    // ffmpeg writes progress to stderr; only kept for the failure message.
+    // ffmpeg reports both progress and stream info on stderr.
     proc.stderr.on('data', d => { stderr += d.toString(); });
     proc.on('error', reject);
     proc.on('close', code => {
-      if (code === 0) return resolve();
+      if (code === 0) return resolve(stderr);
       reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-1200)}`));
+    });
+  });
+}
+
+/**
+ * Read a file's pixel dimensions. Invoking ffmpeg with no output is an
+ * error by design, but it prints the stream table first — and ffmpeg-static
+ * ships no ffprobe, so this is the available route.
+ *
+ * og:video:width / height are not decorative: Facebook sizes the player
+ * from them and will skip inline playback when they are missing.
+ */
+function probeDimensions(bin, file) {
+  return new Promise(resolve => {
+    const proc = spawn(bin, ['-i', file]);
+    let stderr = '';
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('error', () => resolve(null));
+    proc.on('close', () => {
+      const line = stderr.split('\n').find(l => l.includes('Video:'));
+      if (!line) return resolve(null);
+      // Pull the first WxH token out of the comma-separated stream line.
+      for (const chunk of line.split(',')) {
+        const token = chunk.trim().split(' ')[0];
+        const parts = token.split('x');
+        if (parts.length === 2) {
+          const w = parseInt(parts[0], 10);
+          const h = parseInt(parts[1], 10);
+          if (w > 0 && h > 0) return resolve({ width: w, height: h });
+        }
+      }
+      return resolve(null);
     });
   });
 }
@@ -149,7 +181,13 @@ exports.renderShareVideo = functions
 
     // Cache hit — the expensive path only ever runs once per snapple.
     if (snapple.sharedVideoUrl) {
-      return { url: snapple.sharedVideoUrl, cached: true };
+      return {
+        url: snapple.sharedVideoUrl,
+        thumbUrl: snapple.shareThumbUrl || null,
+        width: snapple.shareWidth || null,
+        height: snapple.shareHeight || null,
+        cached: true,
+      };
     }
 
     if (!snapple.filename) {
@@ -163,6 +201,7 @@ exports.renderShareVideo = functions
     const work = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshare-'));
     const input = path.join(work, 'in.mp4');
     const output = path.join(work, 'out.mp4');
+    const poster = path.join(work, 'poster.jpg');
     const captionFile = path.join(work, 'caption.txt');
     const markFile = path.join(work, 'mark.txt');
 
@@ -187,26 +226,71 @@ exports.renderShareVideo = functions
         output,
       ]);
 
-      const destination = `${OUTPUT_DIR}/${snappleId}.mp4`;
+      // Poster frame, taken from the OVERLAID render so the prompt is
+      // visible in the unfurl thumbnail. Seek a little past the start —
+      // frame zero of a phone recording is very often a black or
+      // half-exposed frame.
+      //
+      // 720px wide at q:v 4 lands around 60-120kb. That ceiling matters:
+      // WhatsApp quietly gives up on preview images that are too large.
+      await run(ffmpegPath, [
+        '-y', '-ss', '0.5', '-i', output,
+        '-frames:v', '1', '-q:v', '4', poster,
+      ]).catch(async () => {
+        // Clip shorter than the seek point — retake from the first frame.
+        await run(ffmpegPath, ['-y', '-i', output, '-frames:v', '1', '-q:v', '4', poster]);
+      });
+
+      const dims = await probeDimensions(ffmpegPath, output);
+
       const token = `${snappleId}-${Date.now()}`;
+
+      // One token covers both objects; they are created together and are
+      // equally public once shared.
+      const publicUrl = (dest) =>
+        `https://firebasestorage.googleapis.com/v0/b/${bucket.name}` +
+        `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+
+      const videoDest = `${OUTPUT_DIR}/${snappleId}.mp4`;
+      const posterDest = `${OUTPUT_DIR}/${snappleId}.jpg`;
+
       await bucket.upload(output, {
-        destination,
+        destination: videoDest,
         metadata: {
           contentType: 'video/mp4',
           metadata: { firebaseStorageDownloadTokens: token },
         },
       });
 
-      const url =
-        `https://firebasestorage.googleapis.com/v0/b/${bucket.name}` +
-        `/o/${encodeURIComponent(destination)}?alt=media&token=${token}`;
+      let thumbUrl = null;
+      if (fs.existsSync(poster)) {
+        await bucket.upload(poster, {
+          destination: posterDest,
+          metadata: {
+            contentType: 'image/jpeg',
+            metadata: { firebaseStorageDownloadTokens: token },
+          },
+        });
+        thumbUrl = publicUrl(posterDest);
+      }
+
+      const url = publicUrl(videoDest);
 
       await snapRef.update({
         sharedVideoUrl: url,
+        shareThumbUrl: thumbUrl,
+        shareWidth: dims ? dims.width : null,
+        shareHeight: dims ? dims.height : null,
         sharedVideoRenderedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      return { url, cached: false };
+      return {
+        url,
+        thumbUrl,
+        width: dims ? dims.width : null,
+        height: dims ? dims.height : null,
+        cached: false,
+      };
     } catch (error) {
       console.error('[renderShareVideo]', snappleId, error);
       throw new functions.https.HttpsError(
@@ -255,6 +339,11 @@ exports.getShareCard = functions.https.onRequest(async (req, res) => {
       // Prefer the overlaid render so the web page shows the same thing
       // that got shared to socials.
       videoUrl: s.sharedVideoUrl || s.videoUrl || null,
+      // Unfurl metadata. Only present once a render has run — the OG
+      // renderer degrades to a text-only card without it.
+      thumbUrl: s.shareThumbUrl || null,
+      width: s.shareWidth || null,
+      height: s.shareHeight || null,
       price: s.currentPrice || s.basePrice || null,
       owners: Array.isArray(s.owners) ? s.owners.length : 0,
     });
