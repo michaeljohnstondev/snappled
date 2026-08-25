@@ -12,6 +12,7 @@ import { useVersionGate } from "./src/hooks/useVersionGate";
 import UpdateRequiredScreen from "./src/components/ui/UpdateRequiredScreen";
 import { fcmService } from "./src/services/fcmServiceWrapper";
 import { notificationDisplayService } from "./src/services/notificationDisplayService";
+import { soundService } from "./src/services/soundService";
 
 LogBox.ignoreLogs([
   "SafeAreaView has been deprecated",
@@ -59,6 +60,14 @@ export default function App() {
       clearTimeout(t);
       sub.remove();
     };
+  }, []);
+
+  // Preload SFX players once at startup. Creating them lazily on the
+  // first tick would put decode latency on the sound that most needs
+  // to feel instant.
+  useEffect(() => {
+    soundService.init();
+    return () => soundService.unload();
   }, []);
 
   return (
