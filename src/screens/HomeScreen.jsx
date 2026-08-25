@@ -74,7 +74,13 @@ export default function HomeScreen({ navigation, route }) {
         if (!match && targetIndex != null && allPrompts[targetIndex]) {
           match = allPrompts[targetIndex];
         }
-        setSelectedPrompt(match || allPrompts[0]);
+        // Deep-link target still wins. Otherwise land on a RANDOM active
+        // prompt: allPrompts is createdAt-DESC, so [0] is always the newest
+        // one, and it stays newest for the full hour between rotations —
+        // every cold start opened on the exact same prompt.
+        const fallback =
+          allPrompts[Math.floor(Math.random() * allPrompts.length)];
+        setSelectedPrompt(match || fallback);
       }
     } catch (error) {
       console.error('[HomeScreen] Error loading prompts:', error);
