@@ -24,6 +24,39 @@ Last pruned: 2026-08-25
 - **Cost note**: 2GB / 300s per render, once per snapple. Watch the
   Functions bill if sharing gets popular.
 
+### Android App Link verification
+- **Status**: BLOCKED on a fingerprint only I cannot read
+- **What**: `public/.well-known/assetlinks.json` on bigvibestudios.com does
+  not list this app, so Android will not auto-open shared links — they
+  fall through to the web page. iOS is already configured.
+- **Needed**: the SHA-256 signing fingerprint, from
+  Play Console > Test and release > Setup > App integrity >
+  App signing key certificate. Add a second entry alongside the existing
+  `com.bigvibestudios.bvs` one:
+
+  ```json
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bigvibestudios.snappled",
+      "sha256_cert_fingerprints": ["<SHA-256 from Play Console>"]
+    }
+  }
+  ```
+
+  Include the EAS upload-key fingerprint too (`eas credentials`,
+  interactive) if direct APK downloads should verify as well.
+- **No rebuild needed** — this is server-side.
+
+### Deploy the website share page
+- **Status**: WRITTEN, NOT DEPLOYED
+- **What**: `bvs-web/public/snappled/s/index.html` plus a
+  `/snappled/s/**` rewrite in that repo's `firebase.json`.
+- **Not deployed because**: that working tree carries a lot of unrelated
+  uncommitted work, and `firebase deploy --only hosting` would push all
+  of it live. Review that repo's `git status` first.
+
 ### New EAS build required
 - **Status**: PENDING
 - **Why**: `expo-audio` and `expo-sharing` are native modules. Game sounds
