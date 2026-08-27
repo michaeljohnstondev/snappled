@@ -37,3 +37,10 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Env / signing
+.env
+.env.*
+!.env.example
+credentials.json
+credentials/
