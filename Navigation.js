@@ -25,6 +25,7 @@ import GameScreen from './src/screens/GameScreen';
 import StoreScreen from './src/screens/StoreScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -64,6 +65,7 @@ function ProfileStack() {
       <Stack.Screen name="OtherPersonsProfile" component={OtherPersonsProfile} />
       <Stack.Screen name="FollowingList" component={FollowingListScreen} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     </Stack.Navigator>
   );
@@ -150,6 +152,7 @@ export default function Navigation() {
           <Stack.Screen name="FollowingList" component={FollowingListScreen} />
           <Stack.Screen name="Game" component={GameScreen} />
           <Stack.Screen name="Achievements" component={AchievementsScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
           <Stack.Screen name="Admin" component={AdminScreen} />
         </Stack.Navigator>

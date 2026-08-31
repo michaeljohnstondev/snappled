@@ -124,6 +124,12 @@ export function AuthProvider({ children }) {
                 inventory: d.inventory || {},
                 boosts: d.boosts || {},
                 upgrades: d.upgrades || {},
+                // Keeps a rename (Settings > Username) visible everywhere
+                // immediately instead of only after the next sign-in.
+                // Falls back to the previous value so an empty field on
+                // the doc can't blank out a good name.
+                username: d.username || prev.username,
+                displayName: d.displayName || prev.displayName,
               }) : prev);
             });
 

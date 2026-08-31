@@ -279,10 +279,10 @@ export default function UserProfileScreen({ route, navigation }) {
           </Pressable>
           <Pressable
             style={styles.achievementsBtn}
-            onPress={() => navigation.navigate('NotificationSettings')}
+            onPress={() => navigation.navigate('Settings')}
           >
-            <Ionicons name="notifications" size={20} color={theme.colors.vibeBlue} />
-            <Text style={styles.achievementsBtnText}>Notification Settings</Text>
+            <Ionicons name="settings-sharp" size={20} color={theme.colors.vibeBlue} />
+            <Text style={styles.achievementsBtnText}>Settings</Text>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
           </Pressable>
         </View>
