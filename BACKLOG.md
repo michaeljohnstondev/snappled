@@ -28,12 +28,13 @@
 - [ ] Trending page
 
 ## Polish
-- [ ] Sound settings toggle (soundService.setEnabled already exists, no UI yet)
+- [x] Sound settings toggle (Settings screen)
 - [ ] /snappled landing page on bigvibestudios.com — shares currently point
       at the studio root because no download page exists yet
 - [ ] Logo / splash screen
 - [ ] Onboarding flow for new users
-- [ ] Settings screen (change username, email, notifications)
+- [x] Settings screen (username rename, notifications, sound, sign out)
+- [ ] Change email address from Settings (needs a reauth flow)
 - [ ] Google Sign-In (needs expo-auth-session + OAuth client IDs)
 - [ ] Apple Sign-In
 - [ ] Upgrade Expo SDK to fix dev client crash

@@ -8,6 +8,43 @@ Last pruned: 2026-08-25
 
 ## Active Tasks
 
+### screen: SettingsScreen — one hub for account + app settings
+- **Status**: BUILT, NOT TESTED ON DEVICE
+- **Shipped**: `src/screens/SettingsScreen.jsx` +
+  `src/components/ui/settings/SettingsRow.jsx` (switch / link / value
+  row). Reached from Profile > Settings, which replaced the old
+  Notification Settings button — notifications are now a row inside it.
+  Registered in both the Profile stack and the root stack.
+- **Live rows**: username (inline rename via `UsernameEditor` +
+  `usernameService`), email (display only), SFX on/off (wired to
+  `soundService.setEnabled`, closes out the "sound settings toggle"
+  backlog item), Notifications link, version + OTA tag, Sign Out.
+
+### helper built: username rename service
+- **Status**: BUILT, NOT TESTED ON DEVICE
+- **What**: `src/services/usernameService.js`. `changeUsername(userId, next)`
+  validates via the existing `userService.validateUsername`, writes
+  `username` (lowercased) + `displayName` on the user doc, updates the
+  Firebase Auth displayName, then fans the new handle out in batched
+  writes (400/batch) to `snapples` (creatorId), and `activePrompts` /
+  `onDeckPrompts` / `promptPool` (createdBy).
+- **Partial-failure behaviour**: the user doc write lands first and is
+  never rolled back. A failed fan-out collection comes back in
+  `staleCollections` and the screen says "Renamed, mostly" rather than
+  claiming a clean success. Saving again retries.
+- **Global state edit (logged per house rules)**: the user-doc
+  `onSnapshot` in `src/store/AuthContext.js` now also syncs `username` /
+  `displayName` onto `user`, so a rename shows up without a re-login.
+  Both fall back to the previous value so an empty doc field can't blank
+  a good name.
+- **Known gap**: comments store `username` copied off the auth profile
+  but carry no author id to query by, so existing comments keep the old
+  name. New comments are correct immediately. Backfilling needs an
+  author field added to comment docs first.
+- **Untested**: no device run yet. Worth checking on a real account that
+  (a) a taken handle is rejected, (b) an existing snapple's byline
+  actually changes, (c) a capitalisation-only change is allowed.
+
 ### Deploy the share-overlay Cloud Function
 - **Status**: BUILT, NOT DEPLOYED
 - **What**: `renderShareVideo` in `functions/shareRender.js` burns the prompt
