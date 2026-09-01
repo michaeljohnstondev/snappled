@@ -45,6 +45,10 @@ export default function UsernameEditor({
          "you've posted. Comments you've already left keep the old one."}
       </Text>
 
+      {/* Both buttons use the SAME variant on purpose. The `green`
+          variant is a nested border + fill with its own padding and a
+          10px vertical margin, so pairing it with a `toggle` left
+          Cancel visibly taller than Save. Same variant = same box. */}
       <View style={styles.actions}>
         <VibeButton
           label="Cancel"
@@ -57,7 +61,8 @@ export default function UsernameEditor({
         <VibeButton
           label={saving ? 'Saving…' : 'Save'}
           onPress={onSave}
-          variant="green"
+          variant="toggle"
+          color="green"
           disabled={saving}
           style={styles.action}
         />
