@@ -316,7 +316,6 @@ function RoundResultsReveal({
                 onPress={leftAction.onPress}
                 label={leftAction.label}
                 style={styles.actionBackFlex}
-                showIcon={false}
               />
               <ShimmerBar
                 colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
@@ -1748,6 +1747,17 @@ export default function GameScreen({ navigation }) {
       ? game.submissions
       : game.submissions.filter(s => s.uid !== user.uid);
 
+    // Scrolls with the cards rather than sitting fixed. During picking
+    // the prompt is the thing you're answering, so it's pinned; by
+    // voting you've already read it and the grid needs the height more.
+    const votingPrompt = (
+      <RoundPromptBanner
+        prompt={game.prompts[game.currentRound - 1]}
+        round={game.currentRound}
+        totalRounds={game.totalRounds || null}
+      />
+    );
+
     return (
       <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="voting" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
@@ -1757,12 +1767,6 @@ export default function GameScreen({ navigation }) {
             <Text style={styles.spectateBannerText}>Spectating — {game.players.length} players</Text>
           </View>
         )}
-
-        <RoundPromptBanner
-          prompt={game.prompts[game.currentRound - 1]}
-          round={game.currentRound}
-          totalRounds={game.totalRounds || null}
-        />
 
         {hasVoted ? (
           // Vote-submitted wait screen — unified grid of all snapples,
@@ -1808,6 +1812,7 @@ export default function GameScreen({ navigation }) {
                   contentContainerStyle={styles.pickedWaitContent}
                   showsVerticalScrollIndicator={false}
                 >
+                  {votingPrompt}
                   <VotingWaitGrid
                     submissions={game.submissions || []}
                     voters={buildVoters}
@@ -1877,6 +1882,7 @@ export default function GameScreen({ navigation }) {
               contentContainerStyle={{ paddingBottom: 16 }}
               showsVerticalScrollIndicator={false}
             >
+              {votingPrompt}
               <View style={styles.votingGrid}>
                 {votableSubmissions.map((item, i) => {
                   const isSelected = favoriteCard?.uid === item.uid;

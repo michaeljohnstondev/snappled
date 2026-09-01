@@ -1,8 +1,8 @@
 // BackChunk — the 1/4-width "BACK" pill that sits next to the
 // primary CTA (SUBMIT VOTE, PLAY THIS SNAPPLE, VOTE FAVORITE) in
 // the split action row. Static gradient (no shimmer — this is a
-// recessive action, not a primary), chevron-back icon so it reads
-// as navigation not affirmation.
+// recessive action, not a primary). Word only, no chevron: the
+// label already says BACK and the glyph just crowded it.
 //
 // Colors are the reverse of the CTA palette (purple → blue instead
 // of blue → purple) so BACK feels like the mirror of "forward" and
@@ -11,13 +11,9 @@
 import React from 'react';
 import { Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
-// showIcon defaults to true — real "back" actions want the chevron for
-// navigation semantics. Terminal actions (QUIT, END GAME) pass false so
-// the button reads as a decision, not a navigation step.
-export default function BackChunk({ onPress, label = 'BACK', style, showIcon = true }) {
+export default function BackChunk({ onPress, label = 'BACK', style }) {
   return (
     <Pressable onPress={onPress} style={[styles.wrap, style]}>
       <LinearGradient
@@ -26,7 +22,6 @@ export default function BackChunk({ onPress, label = 'BACK', style, showIcon = t
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        {showIcon && <Ionicons name="chevron-back" size={18} color="#fff" />}
         <Text style={styles.label}>{label}</Text>
       </LinearGradient>
     </Pressable>
