@@ -860,11 +860,11 @@ async function deliverNotification({
   const muted = (target.social?.mutedNotifications || []).includes(actorUserId);
   if (muted) return { sent: false, reason: 'muted' };
 
-  // Per-type toggle check. Missing settings doc = defaults per type
-  // (newPrompts defaults OFF, all others default ON).
+  // Per-type toggle check. Missing settings doc = every type ON,
+  // including newPrompts. Only an explicit `false` silences a type,
+  // so legacy users with no settings doc get the full set.
   const pushPrefs = target.settings?.notifications?.push || {};
-  const defaultOn = settingsKey !== 'newPrompts';
-  const enabled = pushPrefs[settingsKey] !== undefined ? pushPrefs[settingsKey] : defaultOn;
+  const enabled = pushPrefs[settingsKey] !== undefined ? pushPrefs[settingsKey] : true;
   if (!enabled) return { sent: false, reason: 'toggled-off' };
 
   // Write in-app notification (owned by Cloud Functions per the CLAUDE.md
@@ -1075,8 +1075,9 @@ exports.trackPromptResponse = functions.firestore
 // seen at least a few times) AND we haven't notified for this prompt
 // text before (dedup via promptPool.lastNotifiedAt).
 //
-// Opt-in only — deliverNotification's settings check gates every send
-// on user.settings.notifications.push.newPrompts which defaults OFF.
+// deliverNotification's settings check gates every send on
+// user.settings.notifications.push.newPrompts, which defaults ON —
+// the frequency caps below are what keep this from being spam.
 const DIGEST_MIN_IMPRESSIONS = 20;
 const DIGEST_MIN_RESPONSE_RATE = 0.30;
 const DIGEST_RENOTIFY_DAYS = 30;

@@ -136,16 +136,16 @@ export const userService = {
         },
         settings: {
           // Per-type push notification toggles read by every Cloud
-          // Function fan-out before sending FCM. Missing settings doc
-          // (legacy users) defaults each toggle to true except
-          // newPrompts, which is opt-in to avoid spamming.
+          // Function fan-out before sending FCM. All default ON, and a
+          // missing settings doc (legacy users) reads as ON too. Only
+          // an explicit false silences a type.
           notifications: {
             push: {
               newFollower: true,
               followBack: true,
               followedUserSnapple: true,
               gameInvite: true,
-              newPrompts: false,
+              newPrompts: true,
             },
           },
         },

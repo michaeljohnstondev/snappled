@@ -221,7 +221,7 @@ export async function ensureUserDocument(user, options = {}) {
           followBack: true,
           followedUserSnapple: true,
           gameInvite: true,
-          newPrompts: false,
+          newPrompts: true,
         },
       },
     },

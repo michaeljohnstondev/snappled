@@ -31,7 +31,7 @@ const TOGGLES = [
   { key: 'followBack', label: 'Follow-backs', desc: 'When someone you follow follows you back.' },
   { key: 'followedUserSnapple', label: 'Snapples from friends', desc: "When people you follow make new snapples. Batched if they upload several at once." },
   { key: 'gameInvite', label: 'Game invites', desc: 'When someone invites you to a game. (Coming soon)' },
-  { key: 'newPrompts', label: 'New hot prompts', desc: 'Occasional pings when a proven high-engagement prompt goes live. Off by default.' },
+  { key: 'newPrompts', label: 'New hot prompts', desc: 'Occasional pings when a proven high-engagement prompt goes live.' },
 ];
 
 export default function NotificationSettingsScreen({ navigation }) {
@@ -57,9 +57,10 @@ export default function NotificationSettingsScreen({ navigation }) {
       const push = data?.settings?.notifications?.push || {};
       const initial = {};
       TOGGLES.forEach(({ key }) => {
-        initial[key] = push[key] !== undefined
-          ? push[key]
-          : (key !== 'newPrompts'); // newPrompts defaults off
+        // Every type defaults ON. A user who has never opened this
+        // screen has no stored flags at all, so `undefined` has to
+        // read as on — same rule the Cloud Functions apply.
+        initial[key] = push[key] !== undefined ? push[key] : true;
       });
       setToggles(initial);
       setBlockedList(data?.social?.blockedUsers || []);
