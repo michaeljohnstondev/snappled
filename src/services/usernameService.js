@@ -11,11 +11,8 @@
 // is a doc the user already owns, which is what the existing Firestore
 // rules allow an authed client to update.
 //
-// KNOWN GAP: comments store `username` copied off the auth profile but
-// carry no author id to query by, so existing comments keep the old
-// name. New ones are correct the moment the auth displayName updates.
-// Backfilling them needs an author field on comments first — logged in
-// TASK.md.
+// Comments are included: they store `userId` alongside the cached
+// `username`, so they're queryable by author like everything else.
 
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
@@ -25,11 +22,17 @@ import { userService } from './userService';
 // Every place a copy of the handle lives, and how to find this user's
 // rows in it. Adding a collection that denormalises the name = add an
 // entry here, and the rename picks it up.
+// `displayCase` picks which spelling of the handle a collection caches.
+// snapples and prompts stamp `user.username` (lowercased) at create
+// time; comments stamp the auth profile's displayName. Writing the
+// wrong one would leave a renamed user cased differently from everyone
+// who hasn't renamed.
 const FANOUT_TARGETS = [
   { name: 'snapples', ownerField: 'creatorId', nameField: 'creatorUsername' },
   { name: 'activePrompts', ownerField: 'createdBy', nameField: 'creatorUsername' },
   { name: 'onDeckPrompts', ownerField: 'createdBy', nameField: 'creatorUsername' },
   { name: 'promptPool', ownerField: 'createdBy', nameField: 'creatorUsername' },
+  { name: 'comments', ownerField: 'userId', nameField: 'username', displayCase: true },
 ];
 
 // Firestore hard-caps a batch at 500 writes. 400 leaves headroom and
@@ -39,7 +42,8 @@ const BATCH_SIZE = 400;
 // renameInCollection — rewrite the cached handle on every doc one user
 // owns in a single collection. Returns how many docs it touched.
 // Throws on failure so the caller can report a partial rename.
-async function renameInCollection(target, userId, nextName) {
+async function renameInCollection(target, userId, names) {
+  const nextName = target.displayCase ? names.display : names.lower;
   const q = query(collection(db, target.name), where(target.ownerField, '==', userId));
   const snap = await getDocs(q);
   if (snap.empty) return 0;
@@ -109,11 +113,12 @@ export const usernameService = {
         });
       }
 
-      // Fan out the LOWERCASE handle: snappleService and promptService
-      // both read `user.username` when stamping creatorUsername at
-      // create time, so anything else would leave old posts cased
-      // differently from new ones.
-      const { updated, staleCollections } = await this.fanOutHandle(userId, nextLower);
+      // Each target picks its own casing via `displayCase` — see
+      // FANOUT_TARGETS. Both spellings go down so neither is guessed at.
+      const { updated, staleCollections } = await this.fanOutHandle(userId, {
+        lower: nextLower,
+        display: next,
+      });
       return { success: true, updated, staleCollections };
     } catch (error) {
       // validateUsername throws user-facing copy ("Username is already
@@ -130,15 +135,16 @@ export const usernameService = {
    * surfaces still show the old name.
    *
    * @param {string} userId
-   * @param {string} nextName the handle to stamp on each cached copy
+   * @param {{lower: string, display: string}} names both spellings of
+   *   the new handle; each target picks one via `displayCase`
    */
-  async fanOutHandle(userId, nextName) {
+  async fanOutHandle(userId, names) {
     let updated = 0;
     const staleCollections = [];
 
     for (const target of FANOUT_TARGETS) {
       try {
-        updated += await renameInCollection(target, userId, nextName);
+        updated += await renameInCollection(target, userId, names);
       } catch (error) {
         console.warn(`[UsernameService] fan-out to ${target.name} failed:`, error?.message);
         staleCollections.push(target.name);
