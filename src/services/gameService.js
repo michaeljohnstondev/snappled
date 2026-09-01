@@ -691,14 +691,24 @@ export const gameService = {
         picked.push(...shuffled.slice(0, count - picked.length));
       }
 
-      const tierSummary = tiers.map(t => `${t}:${byTier.get(t).length}`).join(' ');
-      console.log(`[GameService] getGamePrompts pool=${snapshot.size} tiers=[${tierSummary}] picked=${picked.length}`);
+      // Shuffle the SELECTED set before returning. The tier walk above
+      // fills `picked` in ascending-usage order, so picked[0] always
+      // comes from the least-used tier — and when that tier holds a
+      // single prompt, round 1 (game.prompts[0]) is the same prompt
+      // every game. Observed live: one prompt sat at usageCount 19
+      // while the other 142 were at 28-29, so every game opened on it.
+      // Least-used still decides WHICH prompts play; this decides the
+      // order they play in.
+      const order = this._shuffle(picked);
 
-      picked.forEach(p => {
+      const tierSummary = tiers.map(t => `${t}:${byTier.get(t).length}`).join(' ');
+      console.log(`[GameService] getGamePrompts pool=${snapshot.size} tiers=[${tierSummary}] picked=${order.length}`);
+
+      order.forEach(p => {
         updateDoc(doc(db, 'gamePrompts', p.id), { usageCount: increment(1) }).catch(() => {});
       });
 
-      return picked.map(p => p.text);
+      return order.map(p => p.text);
     } catch (error) {
       console.error('[GameService] Error fetching game prompts:', error);
       return DEFAULT_PROMPTS.slice(0, count);
