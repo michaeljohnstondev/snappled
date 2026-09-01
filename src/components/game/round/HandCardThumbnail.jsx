@@ -43,6 +43,10 @@ export default function HandCardThumbnail({
   onCreatorPress,
   label,
   duration,
+  // width / height. Defaults to the 4:5 the voting grid has always
+  // used. The hand rail passes 9:16 because that's the shape snapples
+  // are actually recorded in, so a big card letterboxes less.
+  aspect = 4 / 5,
 }) {
   const username = label || `@${card?.creatorUsername || 'anon'}`;
   const canTapCreator = !!onCreatorPress && !label && !!card?.creatorId;
@@ -52,7 +56,7 @@ export default function HandCardThumbnail({
           fullscreen button below opens the full modal preview
           (which also selects the card). */}
       <Pressable
-        style={[styles.card, isSelected && styles.cardFeatured]}
+        style={[styles.card, { aspectRatio: aspect }, isSelected && styles.cardFeatured]}
         onPress={onTogglePlay}
       >
         <View style={styles.videoWrap}>
@@ -160,6 +164,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: COLORS.line,
+    // Overridden per-instance by the `aspect` prop.
     aspectRatio: 4 / 5,
     backgroundColor: COLORS.surface,
   },

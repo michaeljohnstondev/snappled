@@ -1,6 +1,6 @@
 // Picking phase — mockup-driven redesign. Layout mirrors the
 // tiktok-inspired mock: phase chips + tiny timer top bar, a rich
-// prompt banner, a scrollable 2-col hand grid where each thumbnail
+// pinned prompt banner, a horizontal hand rail where each thumbnail
 // shows a play button + @username, and a "YOUR CARD" section at the
 // bottom holding whatever the user has selected. A flush cyan
 // PLAY THIS SNAPPLE bar sits under it all and submits the selected
@@ -19,6 +19,7 @@ import CreatorActionRow from '../CreatorActionRow';
 import HandCardThumbnail from '../round/HandCardThumbnail';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import RoundPromptBanner from '../round/RoundPromptBanner';
+import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
 
@@ -180,28 +181,29 @@ export default function PickingPhase({
     <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <RoundPromptBanner
-          prompt={currentPrompt}
-          round={game.currentRound}
-          totalRounds={totalRoundsShown}
-          onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
-        />
+      {/* The prompt is pinned. It used to scroll away with the grid,
+          which meant you could be choosing a card with the thing
+          you're answering off-screen. Only the cards move now. */}
+      <RoundPromptBanner
+        prompt={currentPrompt}
+        round={game.currentRound}
+        totalRounds={totalRoundsShown}
+        onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
+      />
 
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>YOUR HAND</Text>
-          <Text style={styles.sectionCount}>{hand.length} cards</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={styles.sectionHint}>
-            {mulliganMode ? 'Tap to replace' : 'Tap to select'}
-          </Text>
-        </View>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>YOUR HAND</Text>
+        <Text style={styles.sectionCount}>{hand.length} cards</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={styles.sectionHint}>
+          {mulliganMode ? 'Tap to replace' : 'Tap to select'}
+        </Text>
+      </View>
 
-        <View style={styles.grid}>
-          {hand.map((item, i) => {
+      <View style={styles.railWrap}>
+        <HandCardRail
+          cards={hand}
+          renderCard={(item) => {
             const isSelected = selectedCard?.id === item.id;
             const isInlinePlaying = inlinePlaying.id === item.id;
             // Card body tap = SELECT + play inline once. Tap the
@@ -223,23 +225,19 @@ export default function PickingPhase({
               onPreviewCard(item);
             };
             return (
-              <View key={item?.id || `hand-${i}`} style={styles.gridCell}>
-                <HandCardThumbnail
-                  card={item}
-                  isSelected={isSelected}
-                  isPlaying={isInlinePlaying}
-                  playToken={isInlinePlaying ? inlinePlaying.token : 0}
-                  onTogglePlay={onCardTap}
-                  onFullscreen={onFullscreen}
-                  onCreatorPress={onCreatorPress}
-                />
-              </View>
+              <HandCardThumbnail
+                card={item}
+                aspect={CARD_ASPECT}
+                isSelected={isSelected}
+                isPlaying={isInlinePlaying}
+                playToken={isInlinePlaying ? inlinePlaying.token : 0}
+                onTogglePlay={onCardTap}
+                onFullscreen={onFullscreen}
+                onCreatorPress={onCreatorPress}
+              />
             );
-          })}
-          {/* When the hand has an odd count, the last row has one card;
-              add a spacer cell so the leftover doesn't stretch full-width. */}
-          {hand.length % 2 === 1 && <View style={styles.gridCell} />}
-        </View>
+          }}
+        />
 
         {(user?.inventory?.mulligans || 0) > 0 && (
           <Pressable
@@ -256,8 +254,7 @@ export default function PickingPhase({
             </Text>
           </Pressable>
         )}
-
-      </ScrollView>
+      </View>
 
       {/* Flush submit bar — gradient + shimmer via ShimmerBar so the
           resting (blue → purple) and armed (green → yellow) states
@@ -452,15 +449,13 @@ const styles = StyleSheet.create({
   },
 
   // 2-col grid.
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 10,
-    marginBottom: 4,
-  },
-  gridCell: {
-    width: '50%',
-    padding: 4,
+  // Rail + mulligan occupy everything between the pinned prompt and
+  // the flush submit bar (~86pt incl. safe area). Centered so the
+  // 9:16 cards sit optically level on short screens.
+  railWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 100,
   },
 
   // Mulligan chip — carried over from the previous design.

@@ -1,17 +1,18 @@
 // Warmup phase (a.k.a. REVIEW) — shows the drawn hand before picking
-// starts. Layout matches PickingPhase (2-col HandCardThumbnail grid
-// with a YOUR HAND section header) minus the prompt banner, since
+// starts. Layout matches PickingPhase (horizontal HandCardRail with a
+// YOUR HAND section header) minus the prompt banner, since
 // the prompt reveals during PICKING. Players tap READY UP to
 // advance; host force-transitions when everyone's ready or the
 // timer hits 0.
 
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import PreviewModal from '../PreviewModal';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import HandCardThumbnail from '../round/HandCardThumbnail';
+import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
 
@@ -61,39 +62,37 @@ export default function WarmupPhase({
         caption={`${readyCount} of ${totalCount} ready`}
       />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>YOUR HAND</Text>
-          <Text style={styles.sectionCount}>{hand.length} cards</Text>
-          <View style={{ flex: 1 }} />
-          <Text style={styles.sectionHint}>Preview before picking</Text>
-        </View>
+      {/* Everything above the rail is fixed. Only the cards move, so
+          the header and section line stay put while you swipe. */}
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>YOUR HAND</Text>
+        <Text style={styles.sectionCount}>{hand.length} cards</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={styles.sectionHint}>Swipe to see the rest</Text>
+      </View>
 
-        <View style={styles.grid}>
-          {hand.map((item, i) => {
+      <View style={styles.railWrap}>
+        <HandCardRail
+          cards={hand}
+          renderCard={(item) => {
             const isInlinePlaying = inlinePlaying.id === item.id;
             return (
-              <View key={item?.id || `hand-${i}`} style={styles.gridCell}>
-                <HandCardThumbnail
-                  card={item}
-                  isPlaying={isInlinePlaying}
-                  playToken={isInlinePlaying ? inlinePlaying.token : 0}
-                  onTogglePlay={() => bumpInline(item.id)}
-                  onFullscreen={() => {
-                    setInlinePlaying({ id: null, token: 0 });
-                    onPreviewCard({ ...item, _isWaiting: true });
-                  }}
-                  onCreatorPress={onCreatorPress}
-                />
-              </View>
+              <HandCardThumbnail
+                card={item}
+                aspect={CARD_ASPECT}
+                isPlaying={isInlinePlaying}
+                playToken={isInlinePlaying ? inlinePlaying.token : 0}
+                onTogglePlay={() => bumpInline(item.id)}
+                onFullscreen={() => {
+                  setInlinePlaying({ id: null, token: 0 });
+                  onPreviewCard({ ...item, _isWaiting: true });
+                }}
+                onCreatorPress={onCreatorPress}
+              />
             );
-          })}
-          {hand.length % 2 === 1 && <View style={styles.gridCell} />}
-        </View>
-      </ScrollView>
+          }}
+        />
+      </View>
 
       {/* Ready Up bar — blue → neon-purple ShimmerBar while
           waiting; once tapped, locks into a non-interactive
@@ -165,11 +164,15 @@ const warmupAdminStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: {
-    // Enough clearance for the flush READY UP bar (~110pt tall
-    // including safe-area padding) so the last row of cards isn't
-    // hidden behind it.
-    paddingBottom: 140,
+
+  // The rail takes the space between the section head and the flush
+  // READY UP bar (~110pt incl. safe area). centering keeps the cards
+  // optically placed on short screens where the 9:16 card can't use
+  // the full height.
+  railWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 120,
   },
 
   // Section header ("YOUR HAND · N cards · Preview before picking")
@@ -199,17 +202,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // 2-col grid — mirrors picking's grid so warmup → picking feels
-  // like the same screen with a new bar underneath.
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 10,
-  },
-  gridCell: {
-    width: '50%',
-    padding: 4,
-  },
 
   // Full-width Ready Up bar — same shape / padding as the other
   // CTA bars in the game (PLAY THIS SNAPPLE, SUBMIT VOTE).
