@@ -1,4 +1,9 @@
-const functions = require('firebase-functions');
+// firebase-functions v5+ made the ROOT import the v2 API. Every
+// definition in this codebase is 1st gen (functions.firestore.document,
+// functions.https.onCall, functions.pubsub.schedule, .runWith), so it
+// imports the v1 surface explicitly. Dropping the /v1 here silently
+// swaps the whole API shape.
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
