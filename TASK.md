@@ -105,11 +105,26 @@ Last pruned: 2026-08-25
   image at all. Add one and set `FALLBACK_IMAGE` in
   `bvs-web/functions/index.js`.
 
-### New EAS build required
-- **Status**: PENDING
-- **Why**: `expo-audio` and `expo-sharing` are native modules. Game sounds
-  and file-attached sharing are both inert until a fresh build ships —
-  neither rides an OTA update.
+### Install the production build (sounds + sharing are waiting on it)
+- **Status**: BUILT AND FINISHED — not installed
+- **Correction**: this entry used to say a new build was required. It
+  isn't. `expo-audio ~55.0.18` and `expo-sharing ~55.0.24` are both in
+  `package.json` at the commits that were built, so the native side
+  already shipped:
+  - Android, production, commit `215da17`, 2026-08-25 — build
+    `f1395e2d-af1b-48cc-a5da-7cb38474f403`
+  - iOS, production, commit `378db21`, 2026-08-26 — build
+    `df18d2b5-9975-4046-b4aa-3f3895e3d820`
+- **The catch**: both are store bundles (`.aab` / `.ipa`), not
+  sideloadable. Installing means the Play internal-testing track or
+  TestFlight. For a directly installable APK, run
+  `eas build -p android --profile preview` (that profile is
+  `distribution: internal`). A preview Android build was started on
+  08-26 and canceled.
+- **Once installed**: game SFX and file-attached sharing come alive, and
+  every OTA since rides on top — the runtime version is still 1.0.1, so
+  today's update (Android `01a05a0b-65b6-7614-bcca-8b6de9db5436`)
+  applies to it unchanged.
 
 ## Watch List
 
