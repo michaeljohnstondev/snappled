@@ -45,22 +45,6 @@ Last pruned: 2026-08-25
   (a) a taken handle is rejected, (b) an existing snapple's byline
   actually changes, (c) a capitalisation-only change is allowed.
 
-### Deploy the share-overlay Cloud Function
-- **Status**: BUILT, NOT DEPLOYED
-- **What**: `renderShareVideo` in `functions/shareRender.js` burns the prompt
-  and a SNAPPLED watermark into a snapple, caches the result to
-  `shared/{snappleId}.mp4`, and writes `sharedVideoUrl` back to the doc.
-- **To ship**: `cd functions && npm install` then
-  `firebase deploy --only functions:renderShareVideo`.
-  `ffmpeg-static` fetches a platform-specific binary at install time — the
-  local copy here is the Windows build, the deploy container pulls Linux.
-- **Verified locally**: filter chain rendered against a 1080x1920 source
-  with a prompt containing an apostrophe, a colon and a `%`. Client falls
-  back to the un-overlaid clip if the call fails or exceeds 12s, so
-  sharing keeps working until this lands.
-- **Cost note**: 2GB / 300s per render, once per snapple. Watch the
-  Functions bill if sharing gets popular.
-
 ### Android App Link verification
 - **Status**: BLOCKED on a fingerprint only I cannot read
 - **What**: `public/.well-known/assetlinks.json` on bigvibestudios.com does
@@ -129,6 +113,19 @@ Last pruned: 2026-08-25
 ## Watch List
 
 Not scheduled work — known soft spots to re-check if symptoms show up.
+
+### ⏳ Node 20 runtime is being decommissioned 2026-10-30
+- **Status**: HARD DEADLINE, ~2 months out
+- **What**: every Cloud Function runs Node.js 20 (1st Gen). It was
+  deprecated 2026-04-30; after 2026-10-30 Firebase will refuse the
+  deploy entirely. Existing functions keep running, but you lose the
+  ability to ship a fix.
+- **Also flagged in the same deploy**: `firebase-functions` is on 4.9.0.
+  Anything >=5.1.0 is needed for current Extensions features, and the
+  upgrade has breaking changes — so this is a real task, not a version
+  bump.
+- **Do it before**: the next time a function change is urgent. Finding
+  this out during an incident would be the bad version.
 
 ### 📱 Server-side video transcode
 - **Status**: NOT PLANNED (client-side compression covers it for now)
