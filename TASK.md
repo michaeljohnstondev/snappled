@@ -8,6 +8,28 @@ Last pruned: 2026-08-25
 
 ## Active Tasks
 
+### screen: GameScreen — hand as a horizontal rail (warmup + picking)
+- **Status**: BUILT, NOT TESTED ON DEVICE
+- **What**: the 2-col grid put 4-6 small cards on screen; the hand is now
+  a horizontal rail showing 2 big ones, the rest a swipe away. The
+  prompt banner is pinned instead of scrolling away with the cards —
+  previously you could be choosing a card with the thing you're
+  answering off-screen.
+- **New**: `src/components/game/round/HandCardRail.jsx` — dumb layout
+  shell (sizing + snap), caller supplies the card via `renderCard`, so
+  picking keeps selection/mulligan and warmup keeps inline play.
+- **Card shape**: `HandCardThumbnail` took an optional `aspect` prop,
+  defaulting to the 4:5 it always used. The rail passes 9:16 — the shape
+  snapples are actually recorded in, so a big card is mostly video
+  rather than letterbox. Voting and results are untouched and still 4:5.
+- **Sizing**: min of two constraints — two cards across, or 42% of
+  screen height. Tall phones hit the width limit and get the intended
+  2-up; short ones shrink slightly and show ~2.1 rather than clipping a
+  card under the submit bar. Checked 375x667 through 430x932.
+- **Net**: card area up ~31% (177x221 -> 170x302 on a 390pt screen).
+- **Untested**: no device run. Worth checking the snap feel, that a
+  1-card hand doesn't look broken, and the short-screen case.
+
 ### screen: SettingsScreen — one hub for account + app settings
 - **Status**: BUILT, NOT TESTED ON DEVICE
 - **Shipped**: `src/screens/SettingsScreen.jsx` +
