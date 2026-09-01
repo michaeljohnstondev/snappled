@@ -193,7 +193,6 @@ export default function PickingPhase({
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>YOUR HAND</Text>
-        <Text style={styles.sectionCount}>{hand.length} cards</Text>
         <View style={{ flex: 1 }} />
         <Text style={styles.sectionHint}>
           {mulliganMode ? 'Tap to replace' : 'Tap to select'}
@@ -436,11 +435,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.5,
-  },
-  sectionCount: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    fontWeight: '600',
   },
   sectionHint: {
     color: theme.colors.vibeBlue,

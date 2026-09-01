@@ -62,16 +62,16 @@ export default function WarmupPhase({
         caption={`${readyCount} of ${totalCount} ready`}
       />
 
-      {/* Everything above the rail is fixed. Only the cards move, so
-          the header and section line stay put while you swipe. */}
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>YOUR HAND</Text>
-        <Text style={styles.sectionCount}>{hand.length} cards</Text>
-        <View style={{ flex: 1 }} />
-        <Text style={styles.sectionHint}>Swipe to see the rest</Text>
-      </View>
+      {/* Empty middle. The hand is held low like a poker hand rather
+          than centred in the screen, so the cards sit in thumb reach
+          directly above READY UP. */}
+      <View style={styles.spacer} />
 
-      <View style={styles.railWrap}>
+      <View style={styles.handGroup}>
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>YOUR HAND</Text>
+        </View>
+
         <HandCardRail
           cards={hand}
           renderCard={(item) => {
@@ -165,18 +165,16 @@ const warmupAdminStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // The rail takes the space between the section head and the flush
-  // READY UP bar (~110pt incl. safe area). centering keeps the cards
-  // optically placed on short screens where the 9:16 card can't use
-  // the full height.
-  railWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 120,
+  // Eats the leftover height above the hand. ShimmerBar is in normal
+  // flow, so no bottom clearance is needed — the old paddingBottom was
+  // leftover from the scroll layout and just held the cards off the bar.
+  spacer: { flex: 1 },
+  handGroup: {
+    paddingBottom: 6,
   },
 
-  // Section header ("YOUR HAND · N cards · Preview before picking")
-  // matches the shape used in picking + voting for consistency.
+  // Just the label now — the card count and the swipe hint were
+  // noise above a rail that obviously scrolls.
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -190,16 +188,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.5,
-  },
-  sectionCount: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sectionHint: {
-    color: theme.colors.vibeBlue,
-    fontSize: 12,
-    fontWeight: '700',
   },
 
 
