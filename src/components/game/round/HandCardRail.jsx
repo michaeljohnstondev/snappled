@@ -32,15 +32,17 @@ const CARDS_ACROSS = 1.5;
 //   - width: CARDS_ACROSS cards have to span the screen
 //   - height: a 9:16 card is tall, and on a short phone the full
 //     width-derived height would run past the submit bar and clip
-// 0.45 is the budget for the TIGHTEST phase — picking with a mulligan
-// row, which carries chrome warmup doesn't: safe areas + header +
-// prompt banner + section line + mulligan + submit bar run ~450pt on a
-// 390x844. Warmup has room to spare but uses the same number on
-// purpose: the hand must not resize under you when warmup hands off to
-// picking. Raise it if it reads conservative on a real device — the
-// only thing below is a clipped card, so it errs small deliberately.
+// Budget for the TIGHTEST phase — picking, which carries chrome warmup
+// doesn't (prompt banner, mulligan row, submit bar). Warmup has room to
+// spare but uses the same number on purpose: the hand must not resize
+// under you when warmup hands off to picking.
+//
+// 0.45 was a conservative first guess from estimated chrome heights;
+// checked on device there was room left over, hence 0.50. The case to
+// re-check if a card ever looks cut off is the worst one: picking, on a
+// short phone, with the mulligan row showing.
 const WIDTH_LIMITED = Math.floor((screenWidth - RAIL_PAD * 2 - GAP) / CARDS_ACROSS);
-const HEIGHT_LIMITED = Math.floor(screenHeight * 0.45 * CARD_ASPECT);
+const HEIGHT_LIMITED = Math.floor(screenHeight * 0.50 * CARD_ASPECT);
 
 export const CARD_WIDTH = Math.min(WIDTH_LIMITED, HEIGHT_LIMITED);
 // Exported so phases can reserve vertical space around the rail.

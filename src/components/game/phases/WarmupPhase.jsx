@@ -62,10 +62,11 @@ export default function WarmupPhase({
         caption={`${readyCount} of ${totalCount} ready`}
       />
 
-      {/* Empty middle. The hand is held low like a poker hand rather
-          than centred in the screen, so the cards sit in thumb reach
-          directly above READY UP. */}
-      <View style={styles.spacer} />
+      {/* Weighted spacers instead of one. The hand still sits low —
+          poker hand toward the chest, in thumb reach of READY UP — but
+          pinning it hard to the bar read as fallen-off-the-screen. 2:1
+          puts it about two thirds down, which looks deliberate. */}
+      <View style={styles.spacerTop} />
 
       <View style={styles.handGroup}>
         <View style={styles.sectionHead}>
@@ -93,6 +94,8 @@ export default function WarmupPhase({
           }}
         />
       </View>
+
+      <View style={styles.spacerBottom} />
 
       {/* Ready Up bar — blue → neon-purple ShimmerBar while
           waiting; once tapped, locks into a non-interactive
@@ -165,13 +168,12 @@ const warmupAdminStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Eats the leftover height above the hand. ShimmerBar is in normal
-  // flow, so no bottom clearance is needed — the old paddingBottom was
-  // leftover from the scroll layout and just held the cards off the bar.
-  spacer: { flex: 1 },
-  handGroup: {
-    paddingBottom: 6,
-  },
+  // Leftover height splits 2:1 around the hand, so it settles about two
+  // thirds down rather than jammed against the bar. ShimmerBar is in
+  // normal flow, so the bottom spacer is real gap, not clearance.
+  spacerTop: { flex: 2 },
+  spacerBottom: { flex: 1 },
+  handGroup: {},
 
   // Just the label now — the card count and the swipe hint were
   // noise above a rail that obviously scrolls.
