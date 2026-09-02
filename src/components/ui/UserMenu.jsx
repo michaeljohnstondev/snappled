@@ -6,7 +6,6 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
-import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 
@@ -15,8 +14,6 @@ const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 // consistent with the rest of the app — native Alert.alert was the
 // outlier breaking the punk theme.
 export default function UserMenu({ visible, onClose, onProfilePress, onAdminPress, userId }) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   const { showConfirm, showError } = useModal();
 
   // Confirm via VibeAlert, then sign the user out. AuthContext routes
@@ -61,7 +58,7 @@ export default function UserMenu({ visible, onClose, onProfilePress, onAdminPres
               <Ionicons name="person-outline" size={20} color={theme.colors.vibeBlue} />
             </View>
             <Text style={styles.menuText}>Profile</Text>
-            <Ionicons name="chevron-forward" size={16} color={t.colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
           </Pressable>
 
           {/* Admin Button — only for admins */}
@@ -73,7 +70,7 @@ export default function UserMenu({ visible, onClose, onProfilePress, onAdminPres
                   <Ionicons name="shield-outline" size={20} color={theme.colors.vibeGreen} />
                 </View>
                 <Text style={styles.menuText}>Admin</Text>
-                <Ionicons name="chevron-forward" size={16} color={t.colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
               </Pressable>
             </>
           )}
@@ -87,7 +84,7 @@ export default function UserMenu({ visible, onClose, onProfilePress, onAdminPres
               <Ionicons name="log-out-outline" size={20} color={theme.colors.vibePink} />
             </View>
             <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
-            <Ionicons name="chevron-forward" size={16} color={t.colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
           </Pressable>
         </LinearGradient>
       </View>
@@ -95,7 +92,7 @@ export default function UserMenu({ visible, onClose, onProfilePress, onAdminPres
   );
 }
 
-const makeStyles = (t) => ({
+const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
     top: 0,
@@ -132,14 +129,14 @@ const makeStyles = (t) => ({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: t.colors.inputBackground,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   menuText: {
     flex: 1,
-    color: t.colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: theme.fontWeights.medium,
   },
@@ -148,7 +145,7 @@ const makeStyles = (t) => ({
   },
   divider: {
     height: 1,
-    backgroundColor: t.colors.inputBackground,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     marginHorizontal: 16,
     marginVertical: 4,
   },

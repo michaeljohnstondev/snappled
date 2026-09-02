@@ -4,11 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ResourceContainer from './ResourceContainer';
 import UserMenu from '../UserMenu';
 import theme from '../../../theme/themes';
-import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function HomeHeader({ userStats, onProfilePress, onAdminPress, userId }) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleProfilePress = () => {
@@ -27,7 +24,7 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
     <View style={styles.header}>
       <View style={styles.profileContainer}>
         <Pressable style={styles.profileImage} onPress={handleProfilePress}>
-          <Ionicons name="person" size={20} color={t.colors.textSecondary} />
+          <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
         </Pressable>
       </View>
       
@@ -44,7 +41,7 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
   );
 }
 
-const makeStyles = (t) => ({
+const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -53,6 +50,11 @@ const makeStyles = (t) => ({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     gap: 12,
+    // Was transparent, showing the app gradient through. The resource bar
+    // is chrome and stays dark in both themes (same call as the nav bar
+    // and the in-round header), so it needs its own fill now — otherwise
+    // its white text would sit on the light background.
+    backgroundColor: theme.colors.background,
   },
   profileContainer: {
     // Remove flex: 1 to eliminate gap
@@ -61,7 +63,7 @@ const makeStyles = (t) => ({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: t.colors.inputBackground,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',

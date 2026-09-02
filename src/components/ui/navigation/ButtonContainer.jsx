@@ -1,15 +1,12 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import theme from "../../../theme/themes";
-import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 /**
  * ButtonContainer: Full-width nav bar with filled segments
  * Usage: <ButtonContainer>{buttons}</ButtonContainer>
  */
 export default function ButtonContainer({ children, style, visible = true }) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   if (!visible) return null;
 
   return (
@@ -19,11 +16,11 @@ export default function ButtonContainer({ children, style, visible = true }) {
   );
 }
 
-const makeStyles = (t) => ({
+const styles = StyleSheet.create({
   container: {
     height: 64,
     flexDirection: 'row',
-    backgroundColor: t.colors.background,
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
     overflow: 'visible',

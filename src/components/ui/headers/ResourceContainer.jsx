@@ -17,7 +17,6 @@ import { levelService } from "../../../services/levelService";
 import TickingNumber from "../TickingNumber";
 import ResourceInfoPopup from "./ResourceInfoPopup";
 import theme from "../../../theme/themes";
-import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Copy for each resource popup. Keep bullets short — this is a
 // glance-and-release tooltip, not a manual.
@@ -54,8 +53,6 @@ const RESOURCE_INFO = {
 };
 
 export default function ResourceContainer({ userStats }) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   const xp = userStats.xp || 0;
   const levelInfo = levelService.getLevelInfo(xp);
   const [popup, setPopup] = useState(null);
@@ -154,8 +151,6 @@ export default function ResourceContainer({ userStats }) {
 // the trophy Pressable (as an overlay under the icon+number) so we
 // don't need a second visual container.
 function FlashOverlay({ value }) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   const flash = useRef(new Animated.Value(0)).current;
   const lastRef = useRef(value);
   useEffect(() => {
@@ -181,7 +176,7 @@ function FlashOverlay({ value }) {
   );
 }
 
-const makeStyles = (t) => ({
+const styles = StyleSheet.create({
   statsRow: {
     flex: 1,
     flexDirection: "row",
@@ -200,7 +195,7 @@ const makeStyles = (t) => ({
     borderColor: "rgba(0, 198, 255, 0.35)",
   },
   statText: {
-    color: t.colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontSize: 12,
     fontWeight: theme.fontWeights.semiBold,
     textAlign: "center",
@@ -235,7 +230,7 @@ const makeStyles = (t) => ({
     fontSize: 12,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
-    color: t.colors.textPrimary,
+    color: '#fff',
     // Text shadow so the label reads on both the dim base and the
     // brighter fill without a color swap mid-pill.
     textShadowColor: 'rgba(0,0,0,0.6)',
