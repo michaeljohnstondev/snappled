@@ -7,7 +7,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
-import { useThemedStyles } from '../../../theme/ThemeContext';
 
 // Static base — PICK / VOTE / RESULT / SCORE always render. WARMUP
 // is prepended conditionally in the render below.
@@ -38,7 +37,6 @@ function activeKeyForPhase(phase) {
 // isn't three dim upcoming labels; the three-step strip reappears
 // once picking starts.
 export default function PhaseChips({ phase }) {
-  const styles = useThemedStyles(makeStyles);
   const activeKey = activeKeyForPhase(phase);
   const steps = phase === 'review'
     ? [{ key: 'warmup', label: 'WARMUP' }]
@@ -60,7 +58,7 @@ export default function PhaseChips({ phase }) {
   );
 }
 
-const makeStyles = (t) => ({
+const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -82,7 +80,10 @@ const makeStyles = (t) => ({
     backgroundColor: theme.colors.vibeBlue,
   },
   label: {
-    color: t.colors.textPrimary,
+    // Always white: an active chip is a solid cyan fill, and an
+    // inactive one sits on the header's dark slab. Neither surface
+    // follows the theme, so neither does this.
+    color: 'white',
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.4,

@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PhaseChips from './PhaseChips';
-import theme from '../../../theme/themes';
+import theme, { darkTheme } from '../../../theme/themes';
 import { useThemedStyles } from '../../../theme/ThemeContext';
 
 // Format seconds as m:ss so the timer reads like a real clock even
@@ -62,6 +62,11 @@ export default function RoundHeaderBar({ phase, timerSec, onHelp, onHelpEnd, cap
   );
 }
 
+// The header keeps its dark backing in BOTH themes, same call as the
+// prompt banner and the CTA bars: it's chrome, not content. That also
+// means everything inside it stays light-on-dark — the active chip is a
+// solid cyan fill, and theme-coloured text on that was unreadable.
+// Transparent in dark mode so the phase gradient shows through.
 const makeStyles = (t) => ({
   bar: {
     flexDirection: 'row',
@@ -71,6 +76,7 @@ const makeStyles = (t) => ({
     paddingBottom: 6,
     paddingHorizontal: 10,
     gap: 6,
+    backgroundColor: t.isDark ? 'transparent' : darkTheme.colors.surfaceAlt,
   },
   chipsWrap: {
     flexShrink: 1,
@@ -80,7 +86,7 @@ const makeStyles = (t) => ({
     gap: 8,
   },
   caption: {
-    color: t.colors.textMuted,
+    color: 'rgba(255,255,255,0.65)',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
@@ -95,13 +101,13 @@ const makeStyles = (t) => ({
     height: 26,
     borderRadius: 13,
     borderWidth: 1.5,
-    borderColor: t.colors.hairline,
+    borderColor: 'rgba(255,255,255,0.3)',
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   helpText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 15,
@@ -114,7 +120,7 @@ const makeStyles = (t) => ({
     paddingHorizontal: 10,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: t.colors.hairline,
+    borderColor: 'rgba(255,255,255,0.3)',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   timerDot: {
@@ -124,7 +130,7 @@ const makeStyles = (t) => ({
     backgroundColor: theme.colors.vibeRed,
   },
   timerText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
