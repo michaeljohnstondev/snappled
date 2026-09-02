@@ -158,11 +158,23 @@ export default function UserProfileScreen({ route, navigation }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const handleSnapplePress = (snapple) => {
-    // Index into the RENDERED list (sorted + paged) so the overlay
-    // opens on the right item and can swipe through visible siblings.
-    const idx = pagedSnapples.findIndex(s => s?.id === snapple?.id);
+    // Index into the FULL sorted list, not the current page, so swiping
+    // in the overlay carries on past the end of the page instead of
+    // dead-ending at 6. Costs nothing: sortedSnapples is already in
+    // memory (paging is a client-side slice) and the overlay mounts one
+    // player at a time, so a longer array downloads no extra video.
+    const idx = sortedSnapples.findIndex(s => s?.id === snapple?.id);
     setSelectedIndex(Math.max(0, idx));
     setSelectedSnapple(snapple);
+  };
+
+  // Leaving the overlay on a snapple from another page should land the
+  // grid on that page, rather than snapping back to where they started.
+  const handleOverlayClose = (lastIndex) => {
+    if (typeof lastIndex === 'number' && lastIndex >= 0) {
+      setCurrentPage(Math.floor(lastIndex / PAGE_SIZE) + 1);
+    }
+    setSelectedSnapple(null);
   };
 
   const username = profileData?.username || profileData?.email?.split('@')[0] || 'Unknown';
@@ -376,9 +388,9 @@ export default function UserProfileScreen({ route, navigation }) {
       <SnappleOverlay
         visible={!!selectedSnapple}
         snapple={selectedSnapple}
-        snapples={pagedSnapples}
+        snapples={sortedSnapples}
         initialIndex={selectedIndex}
-        onClose={() => setSelectedSnapple(null)}
+        onClose={handleOverlayClose}
         navigation={navigation}
       />
     </AppLayout>

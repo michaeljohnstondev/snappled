@@ -12,8 +12,29 @@ import { useEffect, useState } from 'react';
 //     just without the cache speedup).
 //   useCachedVideoUri(url) — hook. Returns local URI once cached, remote
 //     URL while pending. Re-renders when the cache lands.
+//   pruneCache() — enforces a size budget. See EVICTION below.
+//
+// EVICTION
+// The cache had no ceiling: every video a user ever watched accumulated
+// and nothing removed it. The only thing keeping that survivable was the
+// OS reclaiming cacheDirectory under storage pressure, which is the
+// system cleaning up after us rather than a design.
+//
+// Now a budget is enforced after each download. Eviction is oldest-file-
+// first by modification time, which is FIFO rather than true LRU — a real
+// LRU needs an access index persisted across launches, and the payoff
+// doesn't justify it here: evicting a video the user still wants costs
+// one re-download, not correctness.
 
 const CACHE_DIR = `${FileSystem.cacheDirectory}snapples/`;
+
+// Ceiling for the whole cache. 400MB holds well over a hundred short
+// clips, so a normal session never touches it; it only catches the
+// long-tail accumulation that had no bound at all before.
+const CACHE_BUDGET_BYTES = 400 * 1024 * 1024;
+// Prune down to this once over budget, so we're not re-pruning on every
+// single download once the cache is full.
+const PRUNE_TARGET_BYTES = 320 * 1024 * 1024;
 // In-memory map of URL → local URI (resolved cache hits)
 const cached = new Map();
 // In-memory map of URL → in-flight download Promise (de-dupes concurrent calls)
@@ -43,6 +64,61 @@ function notify(url, localUri) {
   if (subs) subs.forEach(fn => fn(localUri));
 }
 
+// Guard so concurrent downloads don't all kick off their own sweep.
+let pruning = false;
+
+/**
+ * Delete oldest files until the cache is under PRUNE_TARGET_BYTES.
+ * Best-effort and non-blocking: a failure here must never break playback,
+ * so every step swallows its own errors.
+ */
+export async function pruneCache() {
+  if (pruning) return;
+  pruning = true;
+  try {
+    await ensureCacheDir();
+    const names = await FileSystem.readDirectoryAsync(CACHE_DIR);
+    const files = [];
+    let total = 0;
+    for (const name of names) {
+      const uri = `${CACHE_DIR}${name}`;
+      try {
+        const info = await FileSystem.getInfoAsync(uri);
+        if (!info.exists) continue;
+        const size = info.size || 0;
+        total += size;
+        files.push({ uri, size, mtime: info.modificationTime || 0 });
+      } catch (e) { /* skip unreadable entry */ }
+    }
+    if (total <= CACHE_BUDGET_BYTES) return;
+
+    // Oldest first, deleting until under target.
+    files.sort((a, b) => a.mtime - b.mtime);
+    // Reverse-index the in-memory map once so evicted URLs can be
+    // unregistered — leaving them mapped would hand players a local URI
+    // whose file no longer exists.
+    const uriToUrl = new Map();
+    cached.forEach((localUri, u) => uriToUrl.set(localUri, u));
+
+    for (const f of files) {
+      if (total <= PRUNE_TARGET_BYTES) break;
+      try {
+        await FileSystem.deleteAsync(f.uri, { idempotent: true });
+        total -= f.size;
+        const url = uriToUrl.get(f.uri);
+        if (url) {
+          cached.delete(url);
+          notify(url, url); // subscribers fall back to the remote URL
+        }
+      } catch (e) { /* leave it; next sweep retries */ }
+    }
+  } catch (e) {
+    // Pruning is maintenance. Never let it surface.
+  } finally {
+    pruning = false;
+  }
+}
+
 export async function prefetchVideo(url) {
   if (!url) return null;
   if (cached.has(url)) return cached.get(url);
@@ -69,6 +145,9 @@ export async function prefetchVideo(url) {
       const res = await FileSystem.downloadAsync(url, localUri);
       cached.set(url, res.uri);
       notify(url, res.uri);
+      // Fire-and-forget: the caller is waiting on a video, not on
+      // housekeeping.
+      pruneCache();
       return res.uri;
     } catch (err) {
       // Silent fallback to remote URL — video still streams, just no

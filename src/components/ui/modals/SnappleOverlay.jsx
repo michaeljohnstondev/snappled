@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import SnappleVideoPlayer from '../../media/SnappleVideoPlayer';
+import { prefetchVideo } from '../../../services/videoCache';
 import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
 import { snappleService } from '../../../services/snappleService';
@@ -42,6 +43,24 @@ export default function SnappleOverlay({
   // `snapple`). Reset on open so re-tapping a grid thumbnail always
   // lands on the tapped card.
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  // Hand the index back on close so a caller that paginates can land its
+  // grid on whatever page the user swiped to. Callers that don't care
+  // just ignore the argument.
+  const handleClose = () => onClose?.(currentIndex);
+
+  // Prefetch exactly ONE snapple ahead. Swiping starts each download on
+  // arrival, so a quick swipe hits a load on every card; fetching the
+  // next one while the current is playing hides that.
+  //
+  // One, not a window: the whole point of passing the full list to this
+  // overlay was that array length costs nothing. Prefetching a range
+  // would undo that and start pulling videos the user may never reach.
+  useEffect(() => {
+    if (!visible) return;
+    const next = snapples?.[currentIndex + 1];
+    if (next?.videoUrl) prefetchVideo(next.videoUrl);
+  }, [visible, currentIndex, snapples]);
   useEffect(() => {
     if (visible) setCurrentIndex(initialIndex);
   }, [visible, initialIndex]);
@@ -337,7 +356,7 @@ export default function SnappleOverlay({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       {/* Modals render in a portal outside the app's root
           GestureHandlerRootView, so gestures inside need their own
@@ -377,7 +396,7 @@ export default function SnappleOverlay({
         </GestureDetector>
 
         {/* Close Button - top left */}
-        <Pressable style={styles.closeButton} onPress={onClose}>
+        <Pressable style={styles.closeButton} onPress={handleClose}>
           <View style={styles.buttonBg}>
             <Ionicons name="close" size={24} color="white" />
           </View>

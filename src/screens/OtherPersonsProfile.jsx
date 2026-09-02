@@ -176,7 +176,10 @@ export default function OtherPersonsProfile({ route, navigation }) {
   const handleSnapplePress = (item) => {
     // Index into the RENDERED list (sorted + paged) so the overlay
     // opens on the right item and can swipe through visible siblings.
-    const idx = pagedSnapples.findIndex(s => s?.id === item?.id);
+    // Full list, not the page — see UserProfileScreen for why this is
+    // free: paging is a client-side slice and the overlay mounts a
+    // single player regardless of how long the array is.
+    const idx = sortedSnapples.findIndex(s => s?.id === item?.id);
     setSelectedIndex(Math.max(0, idx));
     setSelectedSnapple(item);
   };
@@ -319,9 +322,14 @@ export default function OtherPersonsProfile({ route, navigation }) {
       <SnappleOverlay
         visible={!!selectedSnapple}
         snapple={selectedSnapple}
-        snapples={pagedSnapples}
+        snapples={sortedSnapples}
         initialIndex={selectedIndex}
-        onClose={() => setSelectedSnapple(null)}
+        onClose={(lastIndex) => {
+          if (typeof lastIndex === 'number' && lastIndex >= 0) {
+            setCurrentPage(Math.floor(lastIndex / PAGE_SIZE) + 1);
+          }
+          setSelectedSnapple(null);
+        }}
         navigation={navigation}
       />
     </AppLayout>
