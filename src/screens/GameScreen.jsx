@@ -31,6 +31,7 @@ import PickingPhase from '../components/game/phases/PickingPhase';
 import LoadingPhase from '../components/game/phases/LoadingPhase';
 import RoundHeaderBar from '../components/game/round/RoundHeaderBar';
 import RoundPromptBanner from '../components/game/round/RoundPromptBanner';
+import { COUNTDOWN_SECONDS } from '../components/game/CountdownOverlay';
 import HandCardThumbnail from '../components/game/round/HandCardThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import TutorialOverlay from '../components/game/TutorialOverlay';
@@ -1267,10 +1268,11 @@ export default function GameScreen({ navigation }) {
   };
 
   // ---- SFX ------------------------------------------------------------
-  // Countdown tick over the last 5 seconds of any timed phase. Keyed on
+  // Countdown tick over the last 3 seconds of any timed phase. Keyed on
   // the timer value so it fires once per second rather than per render.
+  // 3 not 5 — five ticks read as nagging rather than as a countdown.
   useEffect(() => {
-    if (timer >= 1 && timer <= 5) soundService.play('countdownTick');
+    if (timer >= 1 && timer <= COUNTDOWN_SECONDS) soundService.play('countdownTick');
   }, [timer]);
 
   // Winner sting when a new round result lands. The ref starts at whatever

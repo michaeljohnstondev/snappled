@@ -1,18 +1,23 @@
 // CountdownOverlay — big number in the middle of the screen for the
-// final 5 seconds of a phase. Non-interactive: passes taps through
+// final seconds of a phase. Non-interactive: passes taps through
 // so the video grid underneath keeps working. Parent controls when
-// to render (only pass a number when timer is 1–5).
+// to render (only pass a number in the 1..COUNTDOWN_SECONDS range).
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
 
+// How long a countdown runs. Single source of truth — the tick SFX in
+// GameScreen reads this too, so the sound and the number can't drift
+// apart. Was 5; five ticks read as nagging rather than as a countdown.
+export const COUNTDOWN_SECONDS = 3;
+
 // Render the number. Nothing renders when `seconds` is falsy or
-// out of the intended 1–5 range — cheap noop for the rest of the
+// outside the countdown window — cheap noop for the rest of the
 // round. Absolutely positioned and pointerEvents="none" so the
 // picking / voting grid underneath still receives taps.
 export default function CountdownOverlay({ seconds }) {
-  if (!seconds || seconds < 1 || seconds > 5) return null;
+  if (!seconds || seconds < 1 || seconds > COUNTDOWN_SECONDS) return null;
   return (
     <View pointerEvents="none" style={styles.wrap}>
       <View style={styles.badge}>
