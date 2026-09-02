@@ -19,6 +19,7 @@ import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { auth } from '../services/firebase';
 import { soundService } from '../services/soundService';
+import { useTheme } from '../theme/ThemeContext';
 import { usernameService } from '../services/usernameService';
 import AppLayout from '../components/ui/layout/AppLayout';
 import SettingsRow from '../components/ui/settings/SettingsRow';
@@ -34,6 +35,7 @@ const UPDATE_TAG = Updates.updateId ? Updates.updateId.slice(0, 8) : 'embed';
 export default function SettingsScreen({ navigation }) {
   const { user } = useAuth();
   const { showConfirm, showError, showToast } = useModal();
+  const { isDark, toggleTheme } = useTheme();
 
   // soundService restores the stored preference during App.js startup,
   // so reading it synchronously on mount is already accurate here.
@@ -146,6 +148,14 @@ export default function SettingsScreen({ navigation }) {
           desc="Card picks, vote locks and win stings during a game. Vibration stays on either way."
           value={sfxEnabled}
           onValueChange={handleSfxToggle}
+        />
+        <SettingsRow
+          icon={isDark ? 'moon' : 'sunny'}
+          iconColor={theme.colors.vibeYellow}
+          label="Light theme"
+          desc="Flips the background and text. Game screens first — the rest of the app is still dark only."
+          value={!isDark}
+          onValueChange={toggleTheme}
         />
         <SettingsRow
           icon="notifications"

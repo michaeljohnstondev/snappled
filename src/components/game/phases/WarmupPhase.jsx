@@ -15,6 +15,7 @@ import HandCardThumbnail from '../round/HandCardThumbnail';
 import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Renders the warmup hand + ready controls. State lives in GameScreen;
 // only local inline-play state lives here.
@@ -35,6 +36,8 @@ export default function WarmupPhase({
   isAdmin,
   onExcludeFromPool,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isReady = !!readyMap?.[selfUid];
   const readyCount = (players || []).filter(p => readyMap?.[p.uid]).length;
   const totalCount = (players || []).length;
@@ -51,7 +54,7 @@ export default function WarmupPhase({
   };
 
   return (
-    <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       {/* Chips-only header — no prompt banner during warmup. Ready
           count rides in the caption slot next to the WARMUP chip. */}
       <RoundHeaderBar
@@ -164,7 +167,7 @@ const warmupAdminStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
 
   // Leftover height splits evenly, centring the hand. ShimmerBar is in
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.5,

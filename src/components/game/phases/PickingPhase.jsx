@@ -22,6 +22,7 @@ import RoundPromptBanner from '../round/RoundPromptBanner';
 import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Renders the picking phase. All state and async work lives in
 // GameScreen — this component is pure render with handlers passed in.
@@ -72,6 +73,9 @@ export default function PickingPhase({
   // card that's currently playing = pause (unmounts the player so
   // the thumbnail shows again). Token increment on swap forces a
   // fresh mount so the video starts from frame 0.
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
   const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
   const bumpInline = (id) => {
     setInlinePlaying(prev => {
@@ -82,7 +86,7 @@ export default function PickingPhase({
 
   if (hand.length === 0) {
     return (
-      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+      <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
         <View style={styles.loadingHand}>
           <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
           <Text style={styles.loadingHandText}>Drawing your hand...</Text>
@@ -98,7 +102,7 @@ export default function PickingPhase({
     const submittedCount = (game.submissions || []).length;
     const totalCount = (game.players || []).length;
     return (
-      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+      <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
         <RoundPromptBanner
           prompt={currentPrompt}
@@ -178,7 +182,7 @@ export default function PickingPhase({
 
   // Pre-pick screen — chips, prompt, hand grid, YOUR CARD, submit bar.
   return (
-    <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
 
       {/* The prompt is pinned. It used to scroll away with the grid,
@@ -384,7 +388,11 @@ const pickingAdminStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+// Whites split two ways here. Text that sits on the app background
+// (section titles, player rows, the loading line) becomes a token and
+// follows the theme. The edit-prompt modal keeps its literals — it's a
+// dark slab with its own gradient, same reasoning as the action bars.
+const makeStyles = (t) => ({
   container: { flex: 1 },
   scrollContent: {
     // Enough clearance for the flush action bar at the bottom
@@ -431,7 +439,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.5,
@@ -504,7 +512,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   yourCardEmptyText: {
-    color: 'rgba(255,255,255,0.55)',
+    color: t.colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -560,7 +568,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   yourPickLabel: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1.5,
@@ -570,7 +578,7 @@ const styles = StyleSheet.create({
     width: 180,
   },
   pickProgressText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -581,10 +589,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.3)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: t.colors.divider,
   },
   playerStatusName: {
-    color: 'white', fontSize: 13, fontWeight: '600', flex: 1,
+    color: t.colors.textPrimary, fontSize: 13, fontWeight: '600', flex: 1,
   },
   playerStatusNameMe: { color: theme.colors.vibeBlue },
   playerStatusLabel: {
@@ -616,7 +624,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   editPromptInput: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -643,7 +651,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editPromptBtnText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 14,
     fontWeight: 'bold',
     letterSpacing: 0.5,

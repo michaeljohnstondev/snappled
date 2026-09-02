@@ -11,12 +11,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import SnappleThumbnailImg from '../../ui/SnappleThumbnail';
 import PreviewPlayer from '../PreviewPlayer';
 import theme from '../../../theme/themes';
+import { useThemedStyles } from '../../../theme/ThemeContext';
 
-// Base palette for the card chrome. surface = card fill, line =
-// neon purple accent border on the unselected state, glow =
-// selected state accent (green = "picked").
+// Card chrome. line = neon purple accent border on the unselected
+// state, glow = selected state accent (green = "picked"). Both are
+// accents and stay put across themes; only the surface follows.
 const COLORS = {
-  surface: '#141A33',
   line: theme.colors.vibeNeonPurple,
   glow: theme.colors.vibeGreen,
 };
@@ -48,6 +48,7 @@ export default function HandCardThumbnail({
   // are actually recorded in, so a big card letterboxes less.
   aspect = 4 / 5,
 }) {
+  const styles = useThemedStyles(makeStyles);
   const username = label || `@${card?.creatorUsername || 'anon'}`;
   const canTapCreator = !!onCreatorPress && !label && !!card?.creatorId;
   return (
@@ -132,13 +133,18 @@ export default function HandCardThumbnail({
   );
 }
 
-const styles = StyleSheet.create({
+// Everything white in here sits ON TOP OF VIDEO — the duration badge,
+// the play button, the username — each over its own dark scrim with a
+// text shadow. Those stay white in both themes: the surface underneath
+// them is the video, not the app background. Only the card fill follows
+// the theme.
+const makeStyles = (t) => ({
   // Outer wrapper carries the drop-shadow on iOS / elevation on
   // Android. Needs an opaque background for iOS to render the
   // shadow at all.
   glowWrap: {
     borderRadius: 20,
-    backgroundColor: COLORS.surface,
+    backgroundColor: t.colors.surface,
   },
   glowWrapFeatured: {
     shadowColor: COLORS.glow,
@@ -166,7 +172,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
     // Overridden per-instance by the `aspect` prop.
     aspectRatio: 4 / 5,
-    backgroundColor: COLORS.surface,
+    backgroundColor: t.colors.surface,
   },
   cardFeatured: {
     borderWidth: 2,
@@ -175,7 +181,7 @@ const styles = StyleSheet.create({
   videoWrap: { flex: 1 },
   placeholder: {
     flex: 1,
-    backgroundColor: COLORS.surface,
+    backgroundColor: t.colors.surface,
   },
   durationBadge: {
     position: 'absolute',

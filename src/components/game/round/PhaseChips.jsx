@@ -7,6 +7,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
+import { useThemedStyles } from '../../../theme/ThemeContext';
 
 // Static base — PICK / VOTE / RESULT / SCORE always render. WARMUP
 // is prepended conditionally in the render below.
@@ -37,6 +38,7 @@ function activeKeyForPhase(phase) {
 // isn't three dim upcoming labels; the three-step strip reappears
 // once picking starts.
 export default function PhaseChips({ phase }) {
+  const styles = useThemedStyles(makeStyles);
   const activeKey = activeKeyForPhase(phase);
   const steps = phase === 'review'
     ? [{ key: 'warmup', label: 'WARMUP' }]
@@ -58,7 +60,7 @@ export default function PhaseChips({ phase }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,7 +82,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.vibeBlue,
   },
   label: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.4,

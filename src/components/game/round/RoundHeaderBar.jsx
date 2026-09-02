@@ -8,6 +8,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PhaseChips from './PhaseChips';
 import theme from '../../../theme/themes';
+import { useThemedStyles } from '../../../theme/ThemeContext';
 
 // Format seconds as m:ss so the timer reads like a real clock even
 // on 60s+ phases without wrapping past 60.
@@ -26,6 +27,7 @@ function formatTimer(sec) {
 // on press-out so the help text appears while the finger's down
 // and disappears when it lifts.
 export default function RoundHeaderBar({ phase, timerSec, onHelp, onHelpEnd, caption }) {
+  const styles = useThemedStyles(makeStyles);
   const showTimer = typeof timerSec === 'number' && timerSec > 0;
   // Real safe-area inset so chips clear the status bar / notch on
   // every device without a fat hardcoded padding. Fallback to 8 for
@@ -60,7 +62,7 @@ export default function RoundHeaderBar({ phase, timerSec, onHelp, onHelpEnd, cap
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -78,7 +80,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   caption: {
-    color: 'rgba(255,255,255,0.65)',
+    color: t.colors.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
@@ -93,13 +95,13 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: t.colors.hairline,
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   helpText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 15,
@@ -112,7 +114,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: t.colors.hairline,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   timerDot: {
@@ -122,7 +124,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.vibeRed,
   },
   timerText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
