@@ -62,10 +62,9 @@ export default function WarmupPhase({
         caption={`${readyCount} of ${totalCount} ready`}
       />
 
-      {/* Weighted spacers instead of one. The hand still sits low —
-          poker hand toward the chest, in thumb reach of READY UP — but
-          pinning it hard to the bar read as fallen-off-the-screen. 2:1
-          puts it about two thirds down, which looks deliberate. */}
+      {/* Equal spacers — the hand sits centred. Started pinned to the
+          READY UP bar, which read as fallen off the screen, then 2:1
+          which was still low. Centre it is. */}
       <View style={styles.spacerTop} />
 
       <View style={styles.handGroup}>
@@ -168,10 +167,9 @@ const warmupAdminStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Leftover height splits 2:1 around the hand, so it settles about two
-  // thirds down rather than jammed against the bar. ShimmerBar is in
+  // Leftover height splits evenly, centring the hand. ShimmerBar is in
   // normal flow, so the bottom spacer is real gap, not clearance.
-  spacerTop: { flex: 2 },
+  spacerTop: { flex: 1 },
   spacerBottom: { flex: 1 },
   handGroup: {},
 
