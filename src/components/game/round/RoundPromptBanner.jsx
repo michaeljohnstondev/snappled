@@ -99,7 +99,7 @@ const makeStyles = (t) => ({
     letterSpacing: 1,
   },
   promptText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 24,
     fontWeight: '800',
     lineHeight: 30,

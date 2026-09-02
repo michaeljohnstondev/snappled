@@ -183,7 +183,7 @@ const makeStyles = (t) => ({
     overflow: 'hidden',
   },
   text: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: theme.fonts.main,

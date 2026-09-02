@@ -67,7 +67,7 @@ const makeStyles = (t) => ({
     textTransform: 'uppercase',
   },
   title: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: 2,
@@ -76,7 +76,7 @@ const makeStyles = (t) => ({
     marginBottom: 14,
   },
   body: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',

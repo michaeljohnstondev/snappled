@@ -102,14 +102,14 @@ const makeStyles = (t) => ({
     marginBottom: 16,
   },
   title: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 22,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    color: t.colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -125,7 +125,7 @@ const makeStyles = (t) => ({
     alignItems: 'center',
   },
   balanceLabel: {
-    color: t.colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
     fontWeight: theme.fontWeights.semiBold,
     marginBottom: 4,
@@ -160,7 +160,7 @@ const makeStyles = (t) => ({
     alignItems: 'center',
   },
   secondaryBtnText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 15,
     fontWeight: theme.fontWeights.bold,
   },

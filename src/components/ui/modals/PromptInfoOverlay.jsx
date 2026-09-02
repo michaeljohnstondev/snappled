@@ -658,7 +658,7 @@ const makeStyles = (t) => ({
     fontWeight: theme.fontWeights.semiBold,
   },
   followButtonTextActive: {
-    color: t.colors.textPrimary,
+    color: 'white',
   },
   interactionRow: {
     flexDirection: "row",
@@ -726,7 +726,7 @@ const makeStyles = (t) => ({
     fontSize: 14,
     fontWeight: theme.fontWeights.bold,
     textAlign: "center",
-    color: t.colors.textPrimary,
+    color: 'white',
   },
   actionsSection: {
     marginBottom: 60, // Increased margin for scrollview

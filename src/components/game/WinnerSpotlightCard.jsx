@@ -83,12 +83,12 @@ const makeStyles = (t) => ({
     letterSpacing: 1.5,
   },
   player: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 13,
     fontWeight: 'bold',
   },
   creator: {
-    color: t.colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 10,
   },
   voterChipRow: {
@@ -106,7 +106,7 @@ const makeStyles = (t) => ({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   voterChipText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
   },

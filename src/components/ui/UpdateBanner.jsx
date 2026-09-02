@@ -59,7 +59,7 @@ const makeStyles = (t) => ({
   },
   text: {
     flex: 1,
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 13,
     fontWeight: '600',
   },

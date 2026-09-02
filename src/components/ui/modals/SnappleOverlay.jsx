@@ -727,7 +727,7 @@ const makeStyles = (t) => ({
     marginBottom: 2,
   },
   actionCount: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 11,
     fontWeight: theme.fontWeights.semiBold,
     textAlign: 'center',
@@ -761,7 +761,7 @@ const makeStyles = (t) => ({
     zIndex: 10,
   },
   creatorName: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',

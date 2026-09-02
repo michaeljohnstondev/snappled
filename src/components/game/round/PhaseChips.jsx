@@ -24,8 +24,6 @@ const BASE_STEPS = [
 // Which chip should be highlighted for a given game.phase. Scoring
 // and Round Results are now separate chips.
 function activeKeyForPhase(phase) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   if (phase === 'review') return 'warmup';
   if (phase === 'picking') return 'picking';
   if (phase === 'voting') return 'voting';
@@ -88,7 +86,11 @@ const makeStyles = (t) => ({
     // Always white: an active chip is a solid cyan fill, and an
     // inactive one sits on the header's dark slab. Neither surface
     // follows the theme, so neither does this.
-    color: t.colors.textPrimary,
+    // ALWAYS white — never tokenise this. An active chip is a solid
+    // cyan fill and an inactive one sits on the header's dark slab;
+    // neither surface follows the theme. A scripted pass turned this
+    // into textPrimary once already and the chips went invisible.
+    color: 'white',
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.4,

@@ -159,7 +159,7 @@ const makeStyles = (t) => ({
   },
   message: {
     fontSize: 16,
-    color: t.colors.textPrimary,
+    color: 'white',
     lineHeight: 24,
     fontFamily: theme.fonts.main,
   },

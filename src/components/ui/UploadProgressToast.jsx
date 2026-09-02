@@ -16,8 +16,6 @@ const AUTO_DISMISS_MS = 2000;
 // non-terminal, non-staging status, including the COMPRESSING phase
 // so the toast bar advances smoothly across compress → upload).
 function averageActiveProgress(items) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   const active = items.filter(
     (i) => i.status === UPLOAD_STATUS.COMPRESSING
       || i.status === UPLOAD_STATUS.UPLOADING
@@ -31,8 +29,6 @@ function averageActiveProgress(items) {
 // truncate — clip long error messages so the failed chip doesn't
 // blow up to full-screen height on a giant Firebase stack.
 function truncate(str, n) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
   if (!str) return '';
   return str.length > n ? `${str.slice(0, n - 1)}…` : str;
 }
@@ -179,7 +175,7 @@ const makeStyles = (t) => ({
     backgroundColor: theme.colors.vibeBlue,
   },
   pillText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
@@ -210,7 +206,7 @@ const makeStyles = (t) => ({
     flex: 1,
   },
   failedText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -226,7 +222,7 @@ const makeStyles = (t) => ({
     borderRadius: 12,
   },
   retryText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,

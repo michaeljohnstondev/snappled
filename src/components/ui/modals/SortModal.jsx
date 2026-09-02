@@ -73,7 +73,7 @@ const makeStyles = (t) => ({
     gap: 8,
   },
   title: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
@@ -94,7 +94,7 @@ const makeStyles = (t) => ({
     backgroundColor: 'rgba(0, 198, 255, 0.1)',
   },
   optionText: {
-    color: t.colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     fontWeight: theme.fontWeights.semiBold,
   },

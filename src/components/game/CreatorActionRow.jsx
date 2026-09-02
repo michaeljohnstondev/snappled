@@ -208,7 +208,7 @@ const makeStyles = (t) => ({
     backgroundColor: 'rgba(0,198,255,0.18)',
   },
   railLabel: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,

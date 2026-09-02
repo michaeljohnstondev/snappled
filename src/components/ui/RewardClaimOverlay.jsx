@@ -217,7 +217,7 @@ const makeStyles = (t) => ({
     textAlign: 'center',
   },
   modalSubtitle: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 16,
     marginTop: 4,
     textAlign: 'center',
@@ -241,7 +241,7 @@ const makeStyles = (t) => ({
     fontSize: 24,
   },
   rewardAmount: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -249,7 +249,7 @@ const makeStyles = (t) => ({
     color: 'rgba(255,255,255,0.85)',
   },
   modalHint: {
-    color: t.colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
     marginTop: 18,
     letterSpacing: 1,
@@ -267,7 +267,7 @@ const makeStyles = (t) => ({
     fontSize: 28,
   },
   flyAmount: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 11,
     fontWeight: 'bold',
     marginTop: -2,

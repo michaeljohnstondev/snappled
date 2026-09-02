@@ -51,7 +51,7 @@ const makeStyles = (t) => ({
     textTransform: 'uppercase',
   },
   prompt: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',

@@ -63,7 +63,7 @@ const makeStyles = (t) => ({
     backgroundColor: 'rgba(10, 26, 42, 0.95)',
   },
   title: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 3,
@@ -72,7 +72,7 @@ const makeStyles = (t) => ({
     marginBottom: 12,
   },
   sub: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
@@ -96,7 +96,7 @@ const makeStyles = (t) => ({
     fontWeight: '900',
   },
   bulletText: {
-    color: t.colors.textPrimary,
+    color: 'white',
     fontSize: 15,
     lineHeight: 22,
     flex: 1,
