@@ -59,11 +59,12 @@ export default function HandCardRail({ cards = [], renderCard, keyExtractor }) {
       data={cards}
       horizontal
       showsHorizontalScrollIndicator={false}
-      // Snap so a swipe always lands on a card boundary — a rail that
-      // stops mid-card reads as broken on a screen with a timer on it.
-      snapToInterval={CARD_WIDTH + GAP}
-      snapToAlignment="start"
-      decelerationRate="fast"
+      // Free scrolling, no snap. Snapping to a card boundary fought the
+      // flick on a long hand — every swipe braked hard and browsing 8
+      // cards took 8 swipes. The cost is that the rail can rest with a
+      // half card at both edges; the win is that it feels like a reel
+      // you flick through instead of a ratchet.
+      decelerationRate="normal"
       contentContainerStyle={styles.content}
       keyExtractor={keyExtractor || ((item, i) => item?.id || `hand-${i}`)}
       renderItem={({ item, index }) => (
