@@ -8,6 +8,36 @@ Last pruned: 2026-08-25
 
 ## Active Tasks
 
+### Light theme — game screens (phase 1 of the rollout)
+- **Status**: WARMUP + PICKING DONE, REST OF THE GAME STILL DARK
+- **Approach**: NOT tracker's semantic light palette (rejected — too much
+  of a redesign). This inverts background + text and leaves every vibe*
+  accent hue exactly as it was.
+- **Infra**: `src/theme/themes.js` now exports `darkTheme` / `lightTheme` /
+  `themes`; `src/theme/ThemeContext.js` ported from tracker (dark/light/
+  system, AsyncStorage, `useThemedStyles` factory cache). `ThemeProvider`
+  wraps the tree in App.js. Toggle lives in Settings.
+- **Key compatibility trick**: `export default` is still the DARK theme, so
+  all ~85 unconverted files keep rendering exactly as before. The migration
+  can land file by file with no flag day.
+- **Deliberately left dark** (user's call): the prompt banner, ShimmerBar
+  CTAs (READY UP / SUBMIT / PLAY THIS SNAPPLE) and BackChunk. They carry
+  their own gradient fills and read fine on either background.
+- **Also left white on purpose**: overlay text on video (duration badge,
+  play button, @username on a card). Those sit over video with a dark
+  scrim, not over the app background.
+- **Converted**: WarmupPhase, PickingPhase, HandCardThumbnail,
+  RoundHeaderBar, PhaseChips.
+- **NOT converted — the visible gap**: `GameScreen.jsx` (24 hardcoded
+  literals) renders VOTING / SCORING / ROUND_RESULTS directly, so toggling
+  to light gives light warmup+picking and dark voting+results mid-game.
+  That inconsistency is the next thing to close.
+- **Then**: LobbyPhase, LoadingPhase, FinalResultsPhase, the overlays, and
+  eventually the other ~76 app files (~244 hardcoded literals total).
+- **Watch for**: vibeGreen #00FF41 and vibeCyan #00FFFF have little
+  contrast on a light surface. Fine as borders/fills, thin as text. If it
+  bites, darken only the accents used as text.
+
 ### screen: GameScreen — hand as a horizontal rail (warmup + picking)
 - **Status**: BUILT, NOT TESTED ON DEVICE
 - **What**: the 2-col grid put 4-6 small cards on screen; the hand is now
