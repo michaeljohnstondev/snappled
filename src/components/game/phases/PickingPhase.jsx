@@ -444,12 +444,13 @@ const styles = StyleSheet.create({
 
   // 2-col grid.
   // Rail + mulligan occupy everything between the pinned prompt and
-  // the flush submit bar (~86pt incl. safe area). Centered so the
-  // 9:16 cards sit optically level on short screens.
+  // the submit bar. ShimmerBar is in normal flow, not overlaid, so no
+  // clearance is needed — the old paddingBottom: 100 was left over from
+  // the scroll layout and was eating height the cards can now use.
   railWrap: {
     flex: 1,
     justifyContent: 'center',
-    paddingBottom: 100,
+    paddingBottom: 8,
   },
 
   // Mulligan chip — carried over from the previous design.

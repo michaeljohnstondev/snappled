@@ -17,23 +17,30 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const RAIL_PAD = 12;
 const GAP = 10;
-// A sliver of the third card stays visible so the rail reads as
-// scrollable without needing a scrollbar or a hint arrow.
-const PEEK = 16;
 
 // 9:16 — what the camera records, so a big card is mostly video
-// instead of letterbox.
+// instead of letterbox. Never varied: the ratio is what makes the
+// card read as a phone video rather than a tile.
 export const CARD_ASPECT = 9 / 16;
 
+// How many cards span the screen. 1.5 rather than 2 — the half card
+// hanging off the right edge is also the scroll affordance, so the
+// bigger card and the "there's more" signal come from the same thing.
+const CARDS_ACROSS = 1.5;
+
 // Two constraints, take the tighter one:
-//   - width: two cards plus the peek have to fit across the screen
+//   - width: CARDS_ACROSS cards have to span the screen
 //   - height: a 9:16 card is tall, and on a short phone the full
 //     width-derived height would run past the submit bar and clip
-// Tall screens hit the width limit and get the intended 2-up. Short
-// ones shrink a little and show slightly more than two, which is a far
-// better failure than a card with its bottom cut off.
-const WIDTH_LIMITED = Math.floor((screenWidth - RAIL_PAD * 2 - GAP - PEEK) / 2);
-const HEIGHT_LIMITED = Math.floor(screenHeight * 0.42 * CARD_ASPECT);
+// 0.45 is the budget for the TIGHTEST phase — picking with a mulligan
+// row, which carries chrome warmup doesn't: safe areas + header +
+// prompt banner + section line + mulligan + submit bar run ~450pt on a
+// 390x844. Warmup has room to spare but uses the same number on
+// purpose: the hand must not resize under you when warmup hands off to
+// picking. Raise it if it reads conservative on a real device — the
+// only thing below is a clipped card, so it errs small deliberately.
+const WIDTH_LIMITED = Math.floor((screenWidth - RAIL_PAD * 2 - GAP) / CARDS_ACROSS);
+const HEIGHT_LIMITED = Math.floor(screenHeight * 0.45 * CARD_ASPECT);
 
 export const CARD_WIDTH = Math.min(WIDTH_LIMITED, HEIGHT_LIMITED);
 // Exported so phases can reserve vertical space around the rail.
