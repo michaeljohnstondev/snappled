@@ -8,10 +8,13 @@ import React from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import PreviewPlayer from './PreviewPlayer';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Renders one big winner card with a 9:16 aspect, vibe-blue glow border,
 // and overlay labels (winner/tie + player + creator + voters).
 export default function WinnerSpotlightCard({ submission, player, isTie, anim, voters }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Animated.View
       style={[
@@ -48,7 +51,7 @@ export default function WinnerSpotlightCard({ submission, player, isTie, anim, v
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   card: {
     width: 150,
     aspectRatio: 9 / 16,
@@ -80,12 +83,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   player: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: 'bold',
   },
   creator: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 10,
   },
   voterChipRow: {
@@ -103,7 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   voterChipText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 10,
     fontWeight: 'bold',
   },

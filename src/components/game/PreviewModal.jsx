@@ -14,6 +14,7 @@ import PreviewPlayer from './PreviewPlayer';
 import ShimmerBar from '../ui/ShimmerBar';
 import BackChunk from '../ui/BackChunk';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Render the modal. When `primaryLabel` is null the bottom action bar
 // is hidden (used by the post-pick wait-screen preview where the card
@@ -28,6 +29,8 @@ export default function PreviewModal({
   topRightSlot,
   overlaySlot,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -61,7 +64,7 @@ export default function PreviewModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   root: {
     flex: 1,
     backgroundColor: '#000',

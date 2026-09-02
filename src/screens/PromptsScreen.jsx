@@ -10,10 +10,13 @@ import { promptService } from '../services/promptService';
 import { promptRotationService } from '../services/promptRotationService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function PromptsScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency, pendingAchievements, clearPendingAchievements } = useAuth();
   const { showToast } = useModal();
 
@@ -322,7 +325,7 @@ export default function PromptsScreen({ navigation }) {
         {showLoadingState ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
             <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
+            <Text style={{ color: t.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
           </View>
         ) : (
         <ScrollView
@@ -418,7 +421,7 @@ export default function PromptsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -435,7 +438,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 28,
     fontWeight: theme.fontWeights.bold,
   },
@@ -451,7 +454,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   timerLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 11,
     fontWeight: theme.fontWeights.semiBold,
   },
@@ -461,7 +464,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   createCardText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
   },
@@ -489,7 +492,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   promptText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.medium,
     lineHeight: 20,

@@ -17,8 +17,11 @@ import theme from '../theme/themes';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { signInWithGoogle, signInWithApple, ensureUserDocument } from '../services/googleAuthService';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function LandingScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -148,7 +151,7 @@ export default function LandingScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={theme.colors.backgroundGradient}
+        colors={t.colors.backgroundGradient}
         style={styles.container}
       >
         <ScrollView
@@ -208,7 +211,7 @@ export default function LandingScreen({ navigation }) {
                   <Ionicons
                     name={showPassword ? 'eye-off' : 'eye'}
                     size={20}
-                    color={theme.colors.textSecondary}
+                    color={t.colors.textSecondary}
                   />
                 </Pressable>
               </View>
@@ -279,7 +282,7 @@ export default function LandingScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -296,7 +299,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 48,
     fontFamily: theme.fonts.bold,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     textAlign: 'center',
   },
   formContainer: {
@@ -308,7 +311,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontFamily: theme.fonts.main,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.sm || 8,
     fontWeight: '600',
   },
@@ -352,12 +355,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signupText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
     fontFamily: theme.fonts.main,
   },
   forgotText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
@@ -370,10 +373,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: t.colors.inputBackground,
   },
   dividerText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     marginHorizontal: 16,
   },
@@ -396,13 +399,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.vibeBlue,
   },
   appleLogo: {
-    color: '#ffffff',
+    color: t.colors.textPrimary,
     fontSize: 20,
     marginRight: 10,
     marginTop: -2,
   },
   appleButtonText: {
-    color: '#ffffff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
   },

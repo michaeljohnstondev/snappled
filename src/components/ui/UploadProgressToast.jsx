@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUploadQueue, UPLOAD_STATUS } from '../../store/UploadQueueContext';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const AUTO_DISMISS_MS = 2000;
 
@@ -15,6 +16,8 @@ const AUTO_DISMISS_MS = 2000;
 // non-terminal, non-staging status, including the COMPRESSING phase
 // so the toast bar advances smoothly across compress → upload).
 function averageActiveProgress(items) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const active = items.filter(
     (i) => i.status === UPLOAD_STATUS.COMPRESSING
       || i.status === UPLOAD_STATUS.UPLOADING
@@ -28,11 +31,15 @@ function averageActiveProgress(items) {
 // truncate — clip long error messages so the failed chip doesn't
 // blow up to full-screen height on a giant Firebase stack.
 function truncate(str, n) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!str) return '';
   return str.length > n ? `${str.slice(0, n - 1)}…` : str;
 }
 
 export default function UploadProgressToast() {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { items, retryUpload, dismissUpload } = useUploadQueue();
 
   // Auto-dismiss any DONE items after AUTO_DISMISS_MS. Failed items
@@ -141,7 +148,7 @@ export default function UploadProgressToast() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   // Anchored just above the tab bar. AppLayout sits inside the tab
   // navigator's screen area so bottom: 12 is the gap between the
   // pill and the top of the tab bar.
@@ -172,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.vibeBlue,
   },
   pillText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
@@ -203,7 +210,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   failedText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -219,7 +226,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   retryText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,

@@ -12,8 +12,11 @@ import React from 'react';
 import { Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function BackChunk({ onPress, label = 'BACK', style }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={[styles.wrap, style]}>
       <LinearGradient
@@ -28,7 +31,7 @@ export default function BackChunk({ onPress, label = 'BACK', style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrap: {
     // Parent supplies flex sizing (usually flex: 1 next to a flex:3
     // ShimmerBar). The gradient inside fills whatever we get.
@@ -45,7 +48,7 @@ const styles = StyleSheet.create({
     borderRightColor: '#000',
   },
   label: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 2.5,

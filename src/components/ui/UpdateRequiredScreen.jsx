@@ -13,6 +13,7 @@ import { View, Text, Pressable, StyleSheet, Platform, Linking } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Fire the OS store deep link. Falls back to the web store URL if the
 // native store app can't handle the market:// scheme (rare — happens
@@ -41,8 +42,10 @@ export default function UpdateRequiredScreen({
   androidStoreUrl,
   iosStoreUrl,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <View style={styles.card}>
         <View style={styles.iconWrap}>
           <Ionicons name="cloud-download" size={56} color={theme.colors.vibeBlue} />
@@ -56,7 +59,7 @@ export default function UpdateRequiredScreen({
             <Text style={styles.versionChipLabel}>You have</Text>
             <Text style={styles.versionChipValue}>v{currentVersion}</Text>
           </View>
-          <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
+          <Ionicons name="arrow-forward" size={20} color={t.colors.textSecondary} />
           <View style={[styles.versionChip, styles.versionChipTarget]}>
             <Text style={styles.versionChipLabel}>Need</Text>
             <Text style={[styles.versionChipValue, { color: theme.colors.vibeGreen }]}>
@@ -84,7 +87,7 @@ export default function UpdateRequiredScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -113,14 +116,14 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   title: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 3,
     marginBottom: 12,
   },
   message: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -136,7 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
@@ -146,13 +149,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 255, 65, 0.08)',
   },
   versionChipLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 10,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   versionChipValue: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: '800',
     marginTop: 2,
@@ -170,7 +173,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   updateBtnText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 3,

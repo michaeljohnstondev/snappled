@@ -21,6 +21,7 @@ import { muteService } from '../services/muteService';
 import { fcmService } from '../services/fcmServiceWrapper';
 import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 // Static toggle list. Each entry maps to a boolean at
 // user.settings.notifications.push.{key}. Server reads the same
@@ -35,6 +36,8 @@ const TOGGLES = [
 ];
 
 export default function NotificationSettingsScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user } = useAuth();
   const { showAlert, showError, showConfirm } = useModal();
 
@@ -219,6 +222,8 @@ export default function NotificationSettingsScreen({ navigation }) {
 // a username asynchronously so the list can render immediately with a
 // placeholder while userService catches up.
 function PeopleRow({ uid, actionLabel, onPress }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [username, setUsername] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -239,11 +244,11 @@ function PeopleRow({ uid, actionLabel, onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { padding: 20, paddingBottom: 60 },
   h1: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 1.5,
@@ -269,20 +274,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 68, 68, 0.08)',
     marginBottom: 8,
   },
-  permTitle: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  permBody: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
+  permTitle: { color: t.colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  permBody: { color: t.colors.textSecondary, fontSize: 12, marginTop: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: t.colors.divider,
   },
   rowText: { flex: 1, paddingRight: 12 },
-  rowLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  rowDesc: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
+  rowLabel: { color: t.colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  rowDesc: { color: t.colors.textSecondary, fontSize: 12, marginTop: 2 },
   emptyText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
     paddingVertical: 8,
@@ -292,9 +297,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: t.colors.divider,
   },
-  peopleUsername: { color: '#fff', fontSize: 14, fontWeight: '600', flex: 1 },
+  peopleUsername: { color: t.colors.textPrimary, fontSize: 14, fontWeight: '600', flex: 1 },
   actionBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,

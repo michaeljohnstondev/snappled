@@ -3,8 +3,11 @@ import { Pressable, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function RecordNavButton({ onPress }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.wrapper}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.button, { opacity: pressed ? 0.85 : 1 }]}>
@@ -21,7 +24,7 @@ export default function RecordNavButton({ onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrapper: {
     flex: 1,
     alignItems: 'center',
@@ -44,6 +47,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: theme.colors.background,
+    borderColor: t.colors.background,
   },
 });

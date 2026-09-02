@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { View, FlatList, Dimensions, StyleSheet } from 'react-native';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -54,6 +55,8 @@ export const CARD_HEIGHT = Math.round(CARD_WIDTH / CARD_ASPECT);
  * @param {Function} keyExtractor optional; defaults to card.id
  */
 export default function HandCardRail({ cards = [], renderCard, keyExtractor }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <FlatList
       data={cards}
@@ -76,7 +79,7 @@ export default function HandCardRail({ cards = [], renderCard, keyExtractor }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   content: {
     paddingHorizontal: RAIL_PAD,
     // Vertical room for the selected card's glow shadow, which draws

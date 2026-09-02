@@ -24,6 +24,7 @@ import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { SNAPPLE_SORT_OPTIONS, sortSnapples } from '../lib/snappleSort';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 3;
@@ -35,6 +36,8 @@ const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 // if it's missing or equals the signed-in user, we bounce back to the
 // tabbed own-profile screen instead of double-rendering.
 export default function OtherPersonsProfile({ route, navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user } = useAuth();
   const targetUserId = route?.params?.userId;
 
@@ -325,8 +328,8 @@ export default function OtherPersonsProfile({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
+const makeStyles = (t) => ({
+  container: { flex: 1, backgroundColor: t.colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 1.5,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { color: theme.colors.textSecondary, fontSize: 16 },
+  errorText: { color: t.colors.textSecondary, fontSize: 16 },
   listContent: { paddingHorizontal: 20, paddingBottom: 40 },
   profileSection: { alignItems: 'center', paddingVertical: 24 },
   avatar: {
@@ -362,7 +365,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   username: {
-    color: theme.colors.textPrimary, fontSize: 22,
+    color: t.colors.textPrimary, fontSize: 22,
     fontWeight: theme.fontWeights.bold, marginBottom: 4,
   },
   badgeRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
@@ -386,11 +389,11 @@ const styles = StyleSheet.create({
   },
   statItem: { alignItems: 'center', flex: 1 },
   statNumber: {
-    color: theme.colors.textPrimary, fontSize: 20,
+    color: t.colors.textPrimary, fontSize: 20,
     fontWeight: theme.fontWeights.bold,
   },
   // Cyan tint on the tappable count so users know it's actionable.
-  statLabel: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 },
+  statLabel: { color: t.colors.textSecondary, fontSize: 12, marginTop: 4 },
   actionSection: { paddingTop: 20 },
   tabSection: { paddingTop: 20, paddingBottom: 16 },
   sortRow: {
@@ -400,7 +403,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   sortLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -422,11 +425,11 @@ const styles = StyleSheet.create({
   },
   snappleInfo: { padding: 8, gap: 4 },
   snapplePrompt: {
-    color: theme.colors.textPrimary, fontSize: 12,
+    color: t.colors.textPrimary, fontSize: 12,
     fontWeight: theme.fontWeights.medium,
   },
   snappleStats: { flexDirection: 'row', gap: 12 },
-  snappleStat: { color: theme.colors.textSecondary, fontSize: 10 },
+  snappleStat: { color: t.colors.textSecondary, fontSize: 10 },
   emptyContainer: { paddingVertical: 60, alignItems: 'center' },
-  emptyText: { color: theme.colors.textSecondary, fontSize: 14 },
+  emptyText: { color: t.colors.textSecondary, fontSize: 14 },
 });

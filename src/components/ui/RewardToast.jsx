@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const TOAST_TYPES = {
   level_up: { icon: 'arrow-up-circle', color: '#00C6FF', label: 'LEVEL UP!' },
@@ -12,6 +13,8 @@ const TOAST_TYPES = {
 };
 
 export default function RewardToast({ visible, type = 'reward', title, subtitle, onDismiss, autoDismiss = 4000 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const slideAnim = useRef(new Animated.Value(-150)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -67,7 +70,7 @@ export default function RewardToast({ visible, type = 'reward', title, subtitle,
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     position: 'absolute',
     top: 50,
@@ -107,12 +110,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginTop: 2,
   },
   subtitle: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     marginTop: 2,
   },
   tapHint: {

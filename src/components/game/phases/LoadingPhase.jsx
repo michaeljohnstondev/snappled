@@ -11,6 +11,7 @@ import { prefetchVideo } from '../../../services/videoCache';
 import { thumbnailService } from '../../../services/thumbnailService';
 import { pickRandomTip } from '../../../lib/loadingTips';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Max time we'll sit on the loading screen before advancing anyway.
 // A stuck CDN request or a bad URL shouldn't be able to hold the
@@ -28,6 +29,8 @@ const MIN_DISPLAY_MS = 1500;
 // "done" so a broken URL doesn't stall the whole flow). A parallel
 // timeout fires onLoaded regardless after MAX_WAIT_MS.
 export default function LoadingPhase({ hand, onLoaded }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const total = hand?.length || 0;
   const [doneCount, setDoneCount] = useState(0);
   const [firedOnce, setFiredOnce] = useState(false);
@@ -123,7 +126,7 @@ export default function LoadingPhase({ hand, onLoaded }) {
   return (
     <Pressable style={styles.container} onPress={nextTip}>
       <LinearGradient
-        colors={theme.colors.gameBackgroundGradient}
+        colors={t.colors.gameBackgroundGradient}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.pctBlock}>
@@ -142,7 +145,7 @@ export default function LoadingPhase({ hand, onLoaded }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
     width: '70%',
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: t.colors.inputBackground,
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   tipTitle: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
@@ -188,7 +191,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tipBody: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',

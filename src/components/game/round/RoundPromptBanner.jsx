@@ -8,6 +8,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Render the banner. `round` is 1-based; `totalRounds` is optional
 // (0 or null = infinite mode, hides the "OF M" suffix). `subtitle`
@@ -23,6 +24,8 @@ export default function RoundPromptBanner({
   onEdit,
   onDelete,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const roundText = totalRounds
     ? `ROUND ${round} OF ${totalRounds}`
     : `ROUND ${round}`;
@@ -56,7 +59,7 @@ export default function RoundPromptBanner({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   card: {
     flexDirection: 'row',
     marginHorizontal: 12,
@@ -96,7 +99,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   promptText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 24,
     fontWeight: '800',
     lineHeight: 30,

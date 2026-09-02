@@ -5,8 +5,11 @@ import VibeInput from '../ui/VibeInput';
 import { validateComment } from '../../lib/commentUtils';
 import theme from '../../theme/themes';
 import { Keyboard } from 'react-native';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const AddCommentInput = ({ onAddComment, submitting, disabled }) => {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [comment, setComment] = useState('');
 
   const handleSubmit = async () => {
@@ -56,7 +59,7 @@ const AddCommentInput = ({ onAddComment, submitting, disabled }) => {
           colors={
             canSubmit
               ? theme.colors.buttonGradient
-              : [theme.colors.inputBorder, theme.colors.inputBorder]
+              : [t.colors.inputBorder, t.colors.inputBorder]
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -75,7 +78,7 @@ const AddCommentInput = ({ onAddComment, submitting, disabled }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     marginTop: 16,
     marginBottom: 8,
@@ -106,7 +109,7 @@ const styles = StyleSheet.create({
     minWidth: 70,
   },
   postButtonText: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 14,
     fontWeight: '600',
     fontFamily: theme.fonts.main,
@@ -115,7 +118,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   disabledText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
   },
 });
 

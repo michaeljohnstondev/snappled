@@ -18,6 +18,7 @@ import NavButton from "../navigation/NavButton";
 import { useAuth } from "../../../store/AuthContext";
 import { userService } from "../../../services/userService";
 import theme from "../../../theme/themes";
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 
 export default function PromptInfoOverlay({
@@ -35,6 +36,8 @@ export default function PromptInfoOverlay({
   navigation,
   onRefresh,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
   const { user } = useAuth();
   const isAdmin = ADMIN_UIDS.includes(user?.uid);
@@ -310,7 +313,7 @@ export default function PromptInfoOverlay({
       onRequestClose={onClose}
     >
       <LinearGradient
-        colors={theme.colors.modalGradient}
+        colors={t.colors.modalGradient}
         style={styles.overlay}
       >
         <ScrollView
@@ -386,7 +389,7 @@ export default function PromptInfoOverlay({
             <View style={styles.userInfoRow}>
               {/* Profile Image Placeholder */}
               <View style={styles.profileImagePlaceholder}>
-                <Ionicons name="person" size={16} color={theme.colors.textSecondary} />
+                <Ionicons name="person" size={16} color={t.colors.textSecondary} />
               </View>
 
               <Pressable onPress={() => onVisitProfile?.(prompt.createdBy)}>
@@ -441,7 +444,7 @@ export default function PromptInfoOverlay({
                     <Ionicons
                       name="thumbs-up"
                       size={18}
-                      color={userInteraction.hasLiked ? "white" : theme.colors.textPrimary}
+                      color={userInteraction.hasLiked ? "white" : t.colors.textPrimary}
                     />
                     <Text
                       style={[
@@ -449,7 +452,7 @@ export default function PromptInfoOverlay({
                         {
                           color: userInteraction.hasLiked
                             ? "white"
-                            : theme.colors.textPrimary,
+                            : t.colors.textPrimary,
                         },
                       ]}
                     >
@@ -477,7 +480,7 @@ export default function PromptInfoOverlay({
                     <Ionicons
                       name="thumbs-down"
                       size={18}
-                      color={userInteraction.hasDisliked ? "white" : theme.colors.textPrimary}
+                      color={userInteraction.hasDisliked ? "white" : t.colors.textPrimary}
                     />
                     <Text
                       style={[
@@ -485,7 +488,7 @@ export default function PromptInfoOverlay({
                         {
                           color: userInteraction.hasDisliked
                             ? "white"
-                            : theme.colors.textPrimary,
+                            : t.colors.textPrimary,
                         },
                       ]}
                     >
@@ -549,7 +552,7 @@ export default function PromptInfoOverlay({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   overlay: {
     flex: 1,
   },
@@ -655,7 +658,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semiBold,
   },
   followButtonTextActive: {
-    color: 'white',
+    color: t.colors.textPrimary,
   },
   interactionRow: {
     flexDirection: "row",
@@ -723,7 +726,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.fontWeights.bold,
     textAlign: "center",
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
   },
   actionsSection: {
     marginBottom: 60, // Increased margin for scrollview

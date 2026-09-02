@@ -10,6 +10,7 @@ import UpdateBanner from '../UpdateBanner';
 import UploadProgressToast from '../UploadProgressToast';
 import { useAppUpdate } from '../../../hooks/useAppUpdate';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 const APP_VERSION = Constants.expoConfig?.version || '?';
 const UPDATE_TAG = Updates.updateId
@@ -26,6 +27,8 @@ const UPDATE_TAG = Updates.updateId
  * The bottom nav bar is now handled by BottomTabNavigator at the root.
  */
 export default function AppLayout({ navigation, children, hideHeader = false }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
   // OTA: silently downloads new bundles on launch + foreground and
   // surfaces a Restart banner the moment one is ready, so users never
@@ -45,7 +48,7 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
   const handleAdminPress = () => navigation?.navigate('Admin');
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {!hideHeader && (
           <HomeHeader
@@ -69,7 +72,7 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   content: { flex: 1 },

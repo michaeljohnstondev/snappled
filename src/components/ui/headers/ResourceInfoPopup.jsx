@@ -15,8 +15,11 @@
 import React from 'react';
 import { View, Text, Modal, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function ResourceInfoPopup({ visible, title, bullets }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Modal
       visible={!!visible}
@@ -44,7 +47,7 @@ export default function ResourceInfoPopup({ visible, title, bullets }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 26, 42, 0.96)',
   },
   title: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 2,
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   bulletText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 14,
     lineHeight: 20,
     flex: 1,

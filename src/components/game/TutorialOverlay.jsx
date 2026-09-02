@@ -10,10 +10,13 @@
 import React from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Render the tip. Renders nothing if `tip` is falsy (idle state).
 // title / body come from useTutorial's TUTORIAL_TIPS content dictionary.
 export default function TutorialOverlay({ tip, onDismiss }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!tip) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
@@ -30,7 +33,7 @@ export default function TutorialOverlay({ tip, onDismiss }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.88)',
@@ -64,7 +67,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: 2,
@@ -73,7 +76,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   body: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',

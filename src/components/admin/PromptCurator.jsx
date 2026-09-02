@@ -26,6 +26,7 @@ import {
   deletePrompt,
 } from '../../services/promptAdminService';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const SWIPE_THRESHOLD = screenWidth * 0.3;
@@ -34,6 +35,8 @@ const SWIPE_OFF_SCREEN = screenWidth * 1.2;
 // Toggle between the two collections the curator supports. Mirror the
 // UI tab strip styling so it doesn't feel out of place.
 function CollectionToggle({ value, onChange }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const options = [
     { key: 'gamePrompts', label: 'Game' },
     { key: 'promptPool', label: 'Snapple' },
@@ -60,6 +63,8 @@ function CollectionToggle({ value, onChange }) {
 
 // Edit modal — pre-fills with current text. Saves on enter or button.
 function EditPromptModal({ visible, initialText, onCancel, onSave }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [text, setText] = useState(initialText || '');
   useEffect(() => { setText(initialText || ''); }, [initialText]);
   if (!visible) return null;
@@ -74,7 +79,7 @@ function EditPromptModal({ visible, initialText, onCancel, onSave }) {
             onChangeText={setText}
             multiline
             autoFocus
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={t.colors.textSecondary}
           />
           <View style={styles.modalButtons}>
             <Pressable style={styles.modalCancel} onPress={onCancel}>
@@ -98,6 +103,8 @@ function EditPromptModal({ visible, initialText, onCancel, onSave }) {
 // whether to fire delete / keep based on threshold. Tap delegated to
 // parent via onTap so the edit modal lives one level up.
 function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const tx = useSharedValue(0);
 
   // Reanimated 4 dropped useAnimatedGestureHandler — use the new
@@ -166,6 +173,8 @@ function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
 // All-done splash. Reload pulls a fresh list (e.g. after a seed
 // script run added more, or admin wants a second pass).
 function DonePane({ reviewedCount, onReload }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.donePane}>
       <Ionicons name="checkmark-circle" size={64} color={theme.colors.vibeGreen} />
@@ -177,6 +186,8 @@ function DonePane({ reviewedCount, onReload }) {
 }
 
 export default function PromptCurator() {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [collectionName, setCollectionName] = useState('gamePrompts');
   const [deck, setDeck] = useState([]);
   const [index, setIndex] = useState(0);
@@ -286,7 +297,7 @@ export default function PromptCurator() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1, paddingHorizontal: 16 },
 
   toggleWrap: {
@@ -310,7 +321,7 @@ const styles = StyleSheet.create({
   toggleBtnTextActive: { color: '#000' },
 
   progressRow: { alignItems: 'center', marginBottom: 12 },
-  progressText: { color: theme.colors.textSecondary, fontSize: 13 },
+  progressText: { color: t.colors.textSecondary, fontSize: 13 },
 
   deckArea: {
     flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 24,
@@ -336,7 +347,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -384,8 +395,8 @@ const styles = StyleSheet.create({
   },
 
   donePane: { alignItems: 'center', gap: 12 },
-  doneTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  doneSub: { color: theme.colors.textSecondary, fontSize: 14, marginBottom: 8 },
+  doneTitle: { color: t.colors.textPrimary, fontSize: 22, fontWeight: 'bold' },
+  doneSub: { color: t.colors.textSecondary, fontSize: 14, marginBottom: 8 },
 
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
@@ -397,10 +408,10 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   modalTitle: {
-    color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 12,
+    color: t.colors.textPrimary, fontSize: 16, fontWeight: 'bold', marginBottom: 12,
   },
   modalInput: {
-    color: '#fff', fontSize: 15, minHeight: 100,
+    color: t.colors.textPrimary, fontSize: 15, minHeight: 100,
     borderRadius: 12, padding: 12,
     textAlignVertical: 'top',
     borderWidth: 2, borderColor: theme.colors.vibeBlue,
@@ -411,7 +422,7 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)',
   },
-  modalCancelText: { color: '#fff', fontWeight: 'bold' },
+  modalCancelText: { color: t.colors.textPrimary, fontWeight: 'bold' },
   modalSave: {
     flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
     backgroundColor: theme.colors.vibeBlue,

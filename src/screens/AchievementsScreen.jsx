@@ -9,8 +9,11 @@ import { useModal } from '../store/ModalContext';
 import { achievementService } from '../services/achievementService';
 import { levelService } from '../services/levelService';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function AchievementsScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user } = useAuth();
   const { showToast } = useModal();
   const [earnedIds, setEarnedIds] = useState(new Set());
@@ -66,7 +69,7 @@ export default function AchievementsScreen({ navigation }) {
   const earnedCount = allAchievements.filter(a => earnedIds.has(a.id)).length;
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>
           <View style={styles.backBg}>
@@ -140,7 +143,7 @@ export default function AchievementsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -152,7 +155,7 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   headerTitle: {
-    fontSize: 20, fontWeight: theme.fontWeights.bold, color: theme.colors.textPrimary,
+    fontSize: 20, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,
   },
   counter: {
     fontSize: 14, fontWeight: theme.fontWeights.bold, color: theme.colors.vibeYellow,
@@ -161,7 +164,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingBottom: 12,
   },
   progressBg: {
-    height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+    height: 6, borderRadius: 3, backgroundColor: t.colors.inputBackground, overflow: 'hidden',
   },
   progressFill: {
     height: '100%', borderRadius: 3, backgroundColor: theme.colors.vibeYellow,
@@ -183,7 +186,7 @@ const styles = StyleSheet.create({
     fontSize: 16, fontWeight: theme.fontWeights.bold, color: theme.colors.vibeBlue,
   },
   groupCount: {
-    fontSize: 13, fontWeight: theme.fontWeights.bold, color: theme.colors.textSecondary,
+    fontSize: 13, fontWeight: theme.fontWeights.bold, color: t.colors.textSecondary,
   },
 
   // Cards
@@ -202,13 +205,13 @@ const styles = StyleSheet.create({
     flex: 1, marginLeft: 10,
   },
   name: {
-    fontSize: 15, fontWeight: theme.fontWeights.bold, color: theme.colors.textPrimary,
+    fontSize: 15, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,
   },
   nameNext: {
-    fontSize: 15, fontWeight: theme.fontWeights.bold, color: theme.colors.textSecondary,
+    fontSize: 15, fontWeight: theme.fontWeights.bold, color: t.colors.textSecondary,
   },
   desc: {
-    fontSize: 12, color: theme.colors.textSecondary, marginTop: 2,
+    fontSize: 12, color: t.colors.textSecondary, marginTop: 2,
   },
   rewardList: {
     alignItems: 'flex-end', gap: 2, marginLeft: 10,

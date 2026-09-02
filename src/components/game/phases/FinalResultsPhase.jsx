@@ -11,6 +11,7 @@ import { gameService } from '../../../services/gameService';
 import { soundService } from '../../../services/soundService';
 import { shareService } from '../../../services/shareService';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Same palette as the voting wait screen + round-results scoreboard so
 // player colors stay consistent across all three.
@@ -29,6 +30,8 @@ const VOTER_PALETTE = [
 // game (reward claim, navigation back to lobby, etc.) — passed in as
 // onDone since that side of the game lifecycle stays in GameScreen.
 export default function FinalResultsPhase({ game, selfUid, onDone, onLeave }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const rewards = gameService.calculateRewards(game.players);
 
   // Per-player color map — self locks to vibeGreen, others cycle through
@@ -63,7 +66,7 @@ export default function FinalResultsPhase({ game, selfUid, onDone, onLeave }) {
   };
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
         {/* Close X — exits to the main menu the same as the old
             in-round header button did. Kept subtle in the corner so
@@ -79,7 +82,7 @@ export default function FinalResultsPhase({ game, selfUid, onDone, onLeave }) {
 
       <View style={styles.content}>
         {rewards.map((p, i) => {
-          const color = playerColors.get(p.uid) || theme.colors.textSecondary;
+          const color = playerColors.get(p.uid) || t.colors.textSecondary;
           const isMe = p.uid === selfUid;
           return (
             <View
@@ -110,7 +113,7 @@ export default function FinalResultsPhase({ game, selfUid, onDone, onLeave }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -139,8 +142,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
     marginBottom: 8,
   },
-  placement: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
-  name: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },
+  placement: { color: t.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
+  name: { color: t.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },
   total: { color: theme.colors.vibeBlue, fontSize: 14, fontWeight: 'bold' },
   actions: { marginTop: 24, gap: 12 },
   shareBtn: {

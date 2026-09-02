@@ -17,8 +17,11 @@ import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
 import { validatePrompt, PROMPT_MAX_LENGTH } from '../utils/promptFilter';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function CreatePromptScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency, updateUserCurrency } = useAuth();
   const { showAlert, showSuccess, showError } = useModal();
   const [promptText, setPromptText] = useState('');
@@ -85,7 +88,7 @@ export default function CreatePromptScreen({ navigation }) {
 
   return (
     <LinearGradient
-      colors={theme.colors.backgroundGradient}
+      colors={t.colors.backgroundGradient}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -150,7 +153,7 @@ export default function CreatePromptScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -169,14 +172,14 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
   },
   title: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 24,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 12,
@@ -204,7 +207,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   balanceText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   inputLabel: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.semiBold,
     marginBottom: 12,
@@ -221,7 +224,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
   },
   characterCount: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     textAlign: 'right',
     marginTop: 8,

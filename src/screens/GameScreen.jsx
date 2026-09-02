@@ -39,6 +39,7 @@ import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
 import { soundService } from '../services/soundService';
 import { shareService } from '../services/shareService';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -71,6 +72,8 @@ const VOTER_PALETTE = [
 // soft fade so the moment feels announced rather than printed. Idempotent
 // — re-mounted each round when SCORING phase enters.
 function ScoringWinnerBanner({ isTie, names, votes }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const ty = React.useRef(new Animated.Value(-40)).current;
   const op = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
@@ -128,6 +131,8 @@ function VotingWaitGrid({
   // 8-column-ish centered flex-wrap for the voting wait screen.
   variant = 'wait',
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const nameOpacity = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!allVotedIn) return;
@@ -154,7 +159,7 @@ function VotingWaitGrid({
     <View style={gridStyle}>
       {(submissions || []).map((sub, i) => {
         const player = (players || []).find(p => p.uid === sub.uid);
-        const color = playerColors.get(sub.uid) || theme.colors.textSecondary;
+        const color = playerColors.get(sub.uid) || t.colors.textSecondary;
         const isMe = sub.uid === selfUid;
         const picker = allVotedIn && player ? {
           name: player.username,
@@ -197,6 +202,8 @@ function RoundResultsReveal({
   isHost, isPractice, onNextRound, onShare, onEndGame, onLeave,
   onHelp, onHelpEnd, onQuitPractice, selfUid,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isInfinite = totalRounds === 0;
 
   // Per-player color — same as voting wait + scoreboard so colors are
@@ -259,7 +266,7 @@ function RoundResultsReveal({
   }, []);
 
   return (
-    <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="roundResults" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
 
       <ScrollView contentContainerStyle={styles.resultsScrollContent} showsVerticalScrollIndicator={false}>
@@ -268,7 +275,7 @@ function RoundResultsReveal({
         {orderedPlayers.map((p, i) => {
           const earned = earnedByUid[p.uid] || 0;
           const displayed = displayedPoints[p.uid] ?? p.points;
-          const color = playerColors.get(p.uid) || theme.colors.textSecondary;
+          const color = playerColors.get(p.uid) || t.colors.textSecondary;
           const isMe = p.uid === selfUid;
           return (
             <Reanimated.View
@@ -344,6 +351,8 @@ function RoundResultsReveal({
 
 // ── Main Game Screen ──
 export default function GameScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
   const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
   const isAdmin = ADMIN_UIDS.includes(user?.uid);
@@ -1611,7 +1620,7 @@ export default function GameScreen({ navigation }) {
           )}
 
           <Pressable style={styles.spectateBtn} onPress={handleSpectate}>
-            <Ionicons name="eye" size={16} color={theme.colors.textSecondary} />
+            <Ionicons name="eye" size={16} color={t.colors.textSecondary} />
             <Text style={styles.spectateText}>Spectate a Game</Text>
           </Pressable>
         </View>
@@ -1761,7 +1770,7 @@ export default function GameScreen({ navigation }) {
     );
 
     return (
-      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+      <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="voting" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
         {isSpectating && (
           <View style={styles.spectateBanner}>
@@ -1801,7 +1810,7 @@ export default function GameScreen({ navigation }) {
               return ids.map(vid => ({
                 uid: vid,
                 name: (game.players || []).find(p => p.uid === vid)?.username || vid?.slice(0, 4),
-                color: playerColors.get(vid) || theme.colors.textSecondary,
+                color: playerColors.get(vid) || t.colors.textSecondary,
                 isMe: vid === user?.uid,
               }));
             };
@@ -1838,7 +1847,7 @@ export default function GameScreen({ navigation }) {
                           key={p.uid}
                           style={[
                             styles.waitingOnName,
-                            { color: playerColors.get(p.uid) || theme.colors.textSecondary },
+                            { color: playerColors.get(p.uid) || t.colors.textSecondary },
                           ]}
                         >
                           {p.username}{idx < pending.length - 1 ? ', ' : ''}
@@ -2020,7 +2029,7 @@ export default function GameScreen({ navigation }) {
                 <Pressable style={styles.scoreboardCard} onPress={() => {}}>
                   <Text style={styles.scoreboardTitle}>SCOREBOARD</Text>
                   {scoreboardPlayers.map((p, i) => {
-                    const color = colorsSb.get(p.uid) || theme.colors.textSecondary;
+                    const color = colorsSb.get(p.uid) || t.colors.textSecondary;
                     const voted = votedUidsSb.has(p.uid);
                     const isMe = p.uid === user?.uid;
                     return (
@@ -2033,7 +2042,7 @@ export default function GameScreen({ navigation }) {
                         <Ionicons
                           name={voted ? 'checkmark-circle' : 'time-outline'}
                           size={16}
-                          color={voted ? theme.colors.vibeGreen : theme.colors.textSecondary}
+                          color={voted ? theme.colors.vibeGreen : t.colors.textSecondary}
                         />
                       </View>
                     );
@@ -2088,7 +2097,7 @@ export default function GameScreen({ navigation }) {
       return ids.map(vid => ({
         uid: vid,
         name: (game.players || []).find(p => p.uid === vid)?.username || vid?.slice(0, 4),
-        color: playerColors.get(vid) || theme.colors.textSecondary,
+        color: playerColors.get(vid) || t.colors.textSecondary,
         isMe: vid === user?.uid,
       }));
     };
@@ -2099,7 +2108,7 @@ export default function GameScreen({ navigation }) {
     const topVotes = rankings.find(r => r.placement === 1)?.votes ?? 0;
 
     return (
-      <LinearGradient colors={theme.colors.gameBackgroundGradient} style={styles.container}>
+      <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
 
         {/* Prompt banner during scoring — winner banner removed per
@@ -2172,7 +2181,7 @@ export default function GameScreen({ navigation }) {
                 <Pressable style={styles.scoreboardCard} onPress={() => {}}>
                   <Text style={styles.scoreboardTitle}>SCOREBOARD</Text>
                   {scoreboardPlayers.map((p, i) => {
-                    const color = playerColors.get(p.uid) || theme.colors.textSecondary;
+                    const color = playerColors.get(p.uid) || t.colors.textSecondary;
                     const isMe = p.uid === user?.uid;
                     return (
                       <View key={p.uid} style={[styles.scoreboardRow, { borderLeftColor: color }]}>
@@ -2344,7 +2353,7 @@ const scoringStyles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   winnerNames: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 2,
@@ -2373,7 +2382,7 @@ const scoringStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -2397,7 +2406,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   timerText: {
-    color: theme.colors.textPrimary, fontSize: 16, fontWeight: theme.fontWeights.bold,
+    color: t.colors.textPrimary, fontSize: 16, fontWeight: theme.fontWeights.bold,
     minWidth: 48, textAlign: 'center',
     backgroundColor: 'rgba(0, 198, 255, 0.15)',
     borderRadius: 8, borderWidth: 1, borderColor: theme.colors.vibeBlue,
@@ -2412,7 +2421,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2, textTransform: 'uppercase',
   },
   lobbySubtitle: {
-    color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20,
+    color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20,
     maxWidth: 280,
   },
   deckChoice: {
@@ -2428,7 +2437,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,198,255,0.1)',
   },
   deckOptionText: {
-    color: theme.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
+    color: t.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
   },
   deckOptionTextActive: {
     color: theme.colors.vibeBlue,
@@ -2462,7 +2471,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,198,255,0.12)',
   },
   roundsOptionText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -2483,14 +2492,14 @@ const styles = StyleSheet.create({
     marginTop: 16, paddingVertical: 10,
   },
   spectateText: {
-    color: theme.colors.textSecondary, fontSize: 14, fontWeight: theme.fontWeights.medium,
+    color: t.colors.textSecondary, fontSize: 14, fontWeight: theme.fontWeights.medium,
   },
   lobbyButtons: { width: '100%', gap: 12, marginTop: 16 },
   customMenu: { width: '100%', gap: 10, paddingLeft: 20 },
   warningText: {
     color: theme.colors.vibeRed, fontSize: 13, textAlign: 'center', marginTop: 8,
   },
-  waitingText: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
+  waitingText: { color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   // Picking
   promptBanner: {
     marginHorizontal: 16, marginTop: 12, marginBottom: 12, padding: 20, borderRadius: 16,
@@ -2498,17 +2507,17 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   promptText: {
-    color: 'white', fontSize: 18, fontWeight: theme.fontWeights.bold,
+    color: t.colors.textPrimary, fontSize: 18, fontWeight: theme.fontWeights.bold,
     textAlign: 'center', lineHeight: 24,
   },
   editPromptInput: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
     lineHeight: 24,
     minHeight: 60,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: 8,
     padding: 8,
   },
@@ -2564,7 +2573,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editPromptBtnText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -2572,7 +2581,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, marginBottom: 8, gap: 12, paddingHorizontal: 16,
   },
   pickInstruction: {
-    color: theme.colors.textSecondary, fontSize: 13, textAlign: 'center',
+    color: t.colors.textSecondary, fontSize: 13, textAlign: 'center',
   },
   pickedWaitWrap: {
     flex: 1,
@@ -2603,12 +2612,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   yourPickCreator: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 11,
     marginTop: 6,
   },
   pickProgressText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -2626,10 +2635,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: t.colors.divider,
   },
   playerStatusName: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
@@ -2638,7 +2647,7 @@ const styles = StyleSheet.create({
     color: theme.colors.vibeBlue,
   },
   playerStatusLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 11,
   },
   playerStatusLabelDone: {
@@ -2646,7 +2655,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   playerStatusScore: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: 'bold',
     minWidth: 50,
@@ -2683,7 +2692,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   skipWaitText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -2768,7 +2777,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: t.colors.divider,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   // Bottom action row on the voting wait screen — hamburger + count
@@ -2792,7 +2801,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,198,255,0.4)',
   },
   waitingOnLabel: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: 'bold',
   },
@@ -2807,7 +2816,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   waitingOnPrefix: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
   },
   waitingOnName: {
@@ -2850,13 +2859,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   scoreboardPlace: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 14,
     fontWeight: 'bold',
     width: 28,
   },
   scoreboardName: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
@@ -2878,7 +2887,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
   },
   scoreboardCloseText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: 'bold',
   },
@@ -2969,7 +2978,7 @@ const styles = StyleSheet.create({
   },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingHand: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingHandText: { color: theme.colors.textSecondary, fontSize: 14 },
+  loadingHandText: { color: t.colors.textSecondary, fontSize: 14 },
   submittedCount: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
   revealGrid: {
     paddingHorizontal: 16,
@@ -2996,7 +3005,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.7)',
   },
   revealCardName: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 10,
     fontWeight: '600',
     textAlign: 'center',
@@ -3010,7 +3019,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   voterLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 9,
     textAlign: 'center',
     marginTop: 4,
@@ -3032,7 +3041,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   voterChipText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 9,
     fontWeight: 'bold',
   },
@@ -3088,7 +3097,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   waitingSub: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     marginBottom: 18,
   },
@@ -3129,7 +3138,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.7)',
   },
   slotName: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
@@ -3213,7 +3222,7 @@ const styles = StyleSheet.create({
   },
   swipeHintLeft: { color: theme.colors.vibeRed, fontSize: 14, fontWeight: 'bold' },
   swipeHintRight: { color: theme.colors.vibeGreen, fontSize: 14, fontWeight: 'bold' },
-  voteCounter: { color: theme.colors.textSecondary, fontSize: 14 },
+  voteCounter: { color: t.colors.textSecondary, fontSize: 14 },
   // Results
   resultsContent: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   // Bottom padding leaves room for the flush action row that sits
@@ -3238,11 +3247,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 12,
     marginBottom: 8,
   },
-  resultPlacement: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
+  resultPlacement: { color: t.colors.textPrimary, fontSize: 20, fontWeight: 'bold', width: 36 },
   resultInfo: { flex: 1 },
-  resultName: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold },
-  resultCard: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 },
-  resultRoundPts: { color: theme.colors.textSecondary, fontSize: 14, fontWeight: 'bold' },
+  resultName: { color: t.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold },
+  resultCard: { color: t.colors.textSecondary, fontSize: 11, marginTop: 2 },
+  resultRoundPts: { color: t.colors.textSecondary, fontSize: 14, fontWeight: 'bold' },
   resultRoundPtsEarned: { color: theme.colors.vibeGreen, fontSize: 16 },
   resultTotal: { color: theme.colors.vibeBlue, fontSize: 14, fontWeight: 'bold' },
   resultCoins: { color: theme.colors.vibeYellow, fontSize: 14, fontWeight: 'bold' },

@@ -12,8 +12,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/themes';
 import { notificationService } from '../../services/notificationService';
 import { auth } from '../../services/firebase';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function NotificationBell({ style }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -171,7 +174,7 @@ export default function NotificationBell({ style }) {
         onRequestClose={() => setShowModal(false)}
       >
         <LinearGradient
-          colors={theme.colors.backgroundGradient}
+          colors={t.colors.backgroundGradient}
           style={styles.modalContainer}
         >
           {/* Header */}
@@ -210,7 +213,7 @@ export default function NotificationBell({ style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   bellContainer: {
     position: 'relative',
     padding: 8,
@@ -229,10 +232,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.background,
+    borderColor: t.colors.background,
   },
   badgeText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -250,7 +253,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
   },
   headerActions: {
     flexDirection: 'row',
@@ -264,13 +267,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   markAllText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: '600',
   },
   closeText: {
     fontSize: 20,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     padding: 4,
   },
   listContent: {
@@ -280,13 +283,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: theme.sizes.spacing?.md || 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: theme.sizes.borderRadius || 12,
     marginBottom: theme.sizes.spacing?.md || 16,
     position: 'relative',
   },
   unreadNotification: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: t.colors.inputBackground,
     borderLeftWidth: 3,
     borderLeftColor: theme.colors.primary,
   },
@@ -303,18 +306,18 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: 4,
   },
   notificationMessage: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     lineHeight: 18,
     marginBottom: 6,
   },
   notificationTime: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     opacity: 0.7,
   },
   unreadDot: {
@@ -338,12 +341,12 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     textAlign: 'center',
     opacity: 0.8,
     lineHeight: 20,

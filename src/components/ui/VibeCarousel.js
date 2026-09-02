@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function VibeCarousel({ data, renderItem }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [isScrolling, setIsScrolling] = useState(false);
 
   return (
@@ -36,7 +39,7 @@ export default function VibeCarousel({ data, renderItem }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     marginBottom: 0,
     alignItems: 'center',

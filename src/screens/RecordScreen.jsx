@@ -7,10 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BasicCameraView from '../components/media/BasicCameraView';
 import RecordingControls from '../components/media/RecordingControls';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function RecordScreen({ route }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [cameraRef, setCameraRef] = useState(null);
@@ -222,7 +225,7 @@ export default function RecordScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -271,7 +274,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   screenTitle: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
@@ -302,7 +305,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   recordingText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: theme.fontWeights.bold,
   },
@@ -317,7 +320,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   countdownText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 180,
     fontWeight: '900',
     textShadowColor: 'rgba(0,0,0,0.6)',
@@ -325,7 +328,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 12,
   },
   closeText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   promptText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 20,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',

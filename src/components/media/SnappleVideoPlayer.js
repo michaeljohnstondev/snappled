@@ -12,8 +12,10 @@ import React, { useImperativeHandle, forwardRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useCachedVideoUri, invalidateCachedVideo } from '../../services/videoCache';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const SnappleVideoPlayer = forwardRef(({ snapple, style, muted }, ref) => {
+  const styles = useThemedStyles(makeStyles);
   // Explicit `muted` prop wins; otherwise fall back to the snapple's
   // own field so legacy callers that don't pass `muted` still respect
   // the creator's mute setting.
@@ -83,7 +85,7 @@ const SnappleVideoPlayer = forwardRef(({ snapple, style, muted }, ref) => {
 SnappleVideoPlayer.displayName = 'SnappleVideoPlayer';
 export default SnappleVideoPlayer;
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     backgroundColor: '#000',

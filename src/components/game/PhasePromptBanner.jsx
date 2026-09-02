@@ -8,12 +8,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Render the shared banner. `instruction` is the verb-line shown
 // above the prompt in punchy uppercase. `prompt` is the round's
 // prompt text itself. Children render below and are used by admins
 // for the Edit/Delete row on the picking phase.
 export default function PhasePromptBanner({ instruction, prompt, children }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.banner}>
       {instruction ? (
@@ -25,7 +28,7 @@ export default function PhasePromptBanner({ instruction, prompt, children }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   // Edge-to-edge banner — tightened to eat the least vertical space
   // possible while still clearing the status bar and staying legible.
   // Top inset is a status-bar allowance; bottom is intentionally
@@ -48,7 +51,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   prompt: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',

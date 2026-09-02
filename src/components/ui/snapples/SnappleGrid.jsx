@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import SnappleThumbnail from '../SnappleThumbnail';
 import SortModal from '../modals/SortModal';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 2;
@@ -44,6 +45,8 @@ export default function SnappleGrid({
   ascending: externalAscending,
   hideSort = false,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [selectedSnapple, setSelectedSnapple] = useState(null);
   const [sortBy, setSortBy] = useState(externalSortBy || 'time');
   const [ascending, setAscending] = useState(externalAscending || false);
@@ -86,7 +89,7 @@ export default function SnappleGrid({
 
   const getEngagementColor = (likes, dislikes) => {
     const total = likes + dislikes;
-    if (total === 0) return theme.colors.textSecondary;
+    if (total === 0) return t.colors.textSecondary;
     
     const ratio = likes / total;
     if (ratio >= 0.8) return theme.colors.vibeGreen;
@@ -144,7 +147,7 @@ export default function SnappleGrid({
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="videocam-off" size={48} color={theme.colors.textSecondary} />
+      <Ionicons name="videocam-off" size={48} color={t.colors.textSecondary} />
       <Text style={styles.emptyTitle}>No Snapples Yet</Text>
       <Text style={styles.emptySubtitle}>
         Be the first to create a Snapple for this prompt!
@@ -203,7 +206,7 @@ export default function SnappleGrid({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -217,12 +220,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: theme.fontWeights.bold,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontWeight: theme.fontWeights.medium,
   },
   sortRow: {
@@ -307,7 +310,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   creatorText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 11,
     fontWeight: theme.fontWeights.semiBold,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyTitle: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.semiBold,
     textAlign: 'center',
@@ -339,7 +342,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptySubtitle: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,

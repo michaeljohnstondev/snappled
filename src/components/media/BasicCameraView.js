@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useIsFocused } from '@react-navigation/native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const AnimatedCamera = Animated.createAnimatedComponent(Camera);
 
@@ -24,6 +25,8 @@ export default function BasicCameraView({
   mode = 'video',
   style,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { hasPermission: cameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
   const { hasPermission: microphonePermission, requestPermission: requestMicrophonePermission } = useMicrophonePermission();
   const [isReady, setIsReady] = useState(false);
@@ -176,7 +179,7 @@ export default function BasicCameraView({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -187,13 +190,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorTitle: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   errorText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },

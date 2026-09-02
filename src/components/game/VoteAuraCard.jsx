@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import SnappleThumbnailImg from '../ui/SnappleThumbnail';
 import PreviewPlayer from './PreviewPlayer';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // voters: [{ uid, name, color, isMe }, ...] in vote-arrival order
 // picker (optional): { name, color, isMe, opacity? } — when present,
@@ -32,6 +33,7 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
   // card in the grid lines up regardless of individual vote count.
   maxRingCount = 0,
 }) {
+  const styles = useThemedStyles(makeStyles);
   const pulse = useRef(new Animated.Value(0)).current;
   const prevCountRef = useRef(voters?.length || 0);
 
@@ -223,7 +225,7 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
 
 export default VoteAuraCard;
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   // No hard-coded width anymore — the wrap fills whatever cell the
   // parent grid provides. Callers control size + margin via the
   // outer cell so we can drop the same card into a small

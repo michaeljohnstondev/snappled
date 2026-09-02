@@ -10,11 +10,14 @@ import { userService } from '../../services/userService';
 import { snappleService } from '../../services/snappleService';
 import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Renders the creator credit line + action buttons. Each button is
 // optimistic locally and reverts on service failure (silently — toasts
 // surface the win/lose state).
 export default function CreatorActionRow({ submission, currentUser, ownedSnappleIds, wishlistedSnappleIds, showToast, showError }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const snappleId = submission?.snappleId || submission?.id;
   const creatorId = submission?.creatorId;
   const isMine = creatorId && creatorId === currentUser?.uid;
@@ -180,7 +183,7 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
 // vertically with a small caption below each. Backgrounds are
 // darkened just enough to keep the icons legible over any video
 // frame without turning into a full opaque bar.
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   rail: {
     flexDirection: 'column',
     alignItems: 'center',
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,198,255,0.18)',
   },
   railLabel: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,

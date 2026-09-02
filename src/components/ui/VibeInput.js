@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const VibeInput = forwardRef(({
   placeholder,
@@ -25,6 +26,7 @@ const VibeInput = forwardRef(({
   maxLength,
   ...otherProps
 }, ref) => {
+  const styles = useThemedStyles(makeStyles);
   return (
     <TextInput
       ref={ref}
@@ -61,7 +63,7 @@ VibeInput.displayName = 'VibeInput';
 
 export default VibeInput;
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   input: {
     borderWidth: 3,
     borderColor: theme.colors.vibeBlue,
@@ -69,7 +71,7 @@ const styles = StyleSheet.create({
     padding: theme.sizes.inputPadding,
     fontSize: 16,
     fontFamily: theme.fonts.main,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   completedInput: {

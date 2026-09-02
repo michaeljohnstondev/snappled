@@ -3,6 +3,7 @@ import { Modal, View, Text, StyleSheet, Pressable, Dimensions } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import VibeButton from './VibeButton';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -14,6 +15,8 @@ export default function VibeModal({
   onClose,
   type = 'info' // 'info', 'confirm', 'error', 'success'
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const getTypeColor = () => {
     switch (type) {
       case 'error': return '#FF4444';
@@ -116,7 +119,7 @@ export function VibeConfirm(title, message, onConfirm, onCancel) {
   };
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.8)',
@@ -156,7 +159,7 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 16,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     lineHeight: 24,
     fontFamily: theme.fonts.main,
   },

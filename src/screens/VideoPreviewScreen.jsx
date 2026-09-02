@@ -17,8 +17,11 @@ import { promptService } from '../services/promptService';
 import { achievementService } from '../services/achievementService';
 import { levelService } from '../services/levelService';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function VideoPreviewScreen({ route, navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { recordedVideo, cameraFacing } = route.params || {};
   const initialPrompt = route.params?.prompt;
   const { user, userCurrency, updateUserCurrency } = useAuth();
@@ -443,7 +446,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
         </View>
       ) : (
         <View style={styles.errorContainer}>
-          <Ionicons name="videocam-off" size={64} color={theme.colors.textSecondary} />
+          <Ionicons name="videocam-off" size={64} color={t.colors.textSecondary} />
           <Text style={styles.errorText}>No video to preview</Text>
         </View>
       )}
@@ -539,7 +542,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
             <View style={styles.pickerHeader}>
               <Text style={styles.pickerTitle}>Pick a Prompt</Text>
               <Pressable onPress={() => setShowPromptPicker(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <Ionicons name="close" size={24} color={t.colors.textPrimary} />
               </Pressable>
             </View>
 
@@ -559,7 +562,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                   <TextInput
                     style={styles.promptInput}
                     placeholder="Enter your prompt..."
-                    placeholderTextColor={theme.colors.textSecondary}
+                    placeholderTextColor={t.colors.textSecondary}
                     value={newPromptText}
                     onChangeText={setNewPromptText}
                     autoFocus
@@ -586,7 +589,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
                 activePrompts.map(p => (
                   <Pressable key={p.id} style={styles.promptOption} onPress={() => handlePickPrompt(p)}>
                     <Text style={styles.promptOptionText} numberOfLines={2}>{p.text}</Text>
-                    <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                    <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
                   </Pressable>
                 ))
               )}
@@ -598,7 +601,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -630,7 +633,7 @@ const styles = StyleSheet.create({
   },
   promptIndicatorText: {
     flex: 1,
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 13,
   },
   pickerOverlay: {
@@ -655,7 +658,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   pickerTitle: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -681,7 +684,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   charCounter: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     textAlign: 'right',
     marginTop: 4,
@@ -693,7 +696,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   createPromptTitle: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: 'bold',
   },
@@ -709,7 +712,7 @@ const styles = StyleSheet.create({
   },
   promptInput: {
     width: '100%',
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     minHeight: 80,
     borderRadius: 12,
@@ -729,7 +732,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontWeight: 'bold',
     fontSize: 15,
   },
@@ -766,7 +769,7 @@ const styles = StyleSheet.create({
   },
   promptOptionText: {
     flex: 1,
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 14,
   },
   video: {
@@ -788,7 +791,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   errorText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
@@ -865,13 +868,13 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   closeText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   playText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',

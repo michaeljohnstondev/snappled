@@ -4,8 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import ResourceContainer from './ResourceContainer';
 import UserMenu from '../UserMenu';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function HomeHeader({ userStats, onProfilePress, onAdminPress, userId }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleProfilePress = () => {
@@ -24,7 +27,7 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
     <View style={styles.header}>
       <View style={styles.profileContainer}>
         <Pressable style={styles.profileImage} onPress={handleProfilePress}>
-          <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
+          <Ionicons name="person" size={20} color={t.colors.textSecondary} />
         </Pressable>
       </View>
       
@@ -41,7 +44,7 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -58,7 +61,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: t.colors.inputBackground,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',

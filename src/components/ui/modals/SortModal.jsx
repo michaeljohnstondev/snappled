@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 const SORT_OPTIONS = [
   { label: 'Hot', value: 'hot' },
@@ -12,6 +13,8 @@ const SORT_OPTIONS = [
 ];
 
 export default function SortModal({ visible, onClose, sortBy, ascending, onSelect }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -52,7 +55,7 @@ export default function SortModal({ visible, onClose, sortBy, ascending, onSelec
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -62,7 +65,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: '100%',
-    backgroundColor: theme.colors.background,
+    backgroundColor: t.colors.background,
     borderRadius: 12,
     borderWidth: 3,
     borderColor: theme.colors.vibeBlue,
@@ -70,7 +73,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
@@ -91,7 +94,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 198, 255, 0.1)',
   },
   optionText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     fontWeight: theme.fontWeights.semiBold,
   },

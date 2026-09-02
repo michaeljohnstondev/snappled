@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import { gameService } from '../../../services/gameService';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 // Renders the lobby UI. All state stays in GameScreen — handlers passed in.
 export default function LobbyPhase({
@@ -21,9 +22,11 @@ export default function LobbyPhase({
   onStartGame,
   onSetRounds,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const totalRounds = game?.totalRounds ?? 5;
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={onLeave}>
           <View style={styles.backBg}>
@@ -102,7 +105,7 @@ export default function LobbyPhase({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -148,7 +151,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   subtitle: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -167,14 +170,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   avatarText: { color: theme.colors.vibeBlue, fontSize: 16, fontWeight: 'bold' },
-  playerName: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },
+  playerName: { color: t.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1 },
   hostBadge: {
     color: theme.colors.vibeYellow, fontSize: 10, fontWeight: 'bold',
     backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
   },
   buttons: { width: '100%', gap: 12, marginTop: 16 },
-  waiting: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
-  gameCode: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 16 },
+  waiting: { color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
+  gameCode: { color: t.colors.textSecondary, fontSize: 12, marginTop: 16 },
   roundsPicker: {
     alignItems: 'center',
     marginTop: 16,
@@ -204,7 +207,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,198,255,0.12)',
   },
   roundsOptionText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
     color: theme.colors.vibeBlue,
   },
   roundsReadonly: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 13,
     marginTop: 16,
     fontStyle: 'italic',

@@ -19,6 +19,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Shared default page size — 6 fits a 3-column grid as 2 clean rows.
 // Small enough that the whole page + pager fits comfortably on a phone
@@ -46,6 +47,8 @@ function buildPageList(currentPage, totalPages) {
 }
 
 export default function VibePager({ currentPage, totalPages, onPageChange }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!totalPages || totalPages <= 1) return null;
   const pages = buildPageList(currentPage, totalPages);
   const canPrev = currentPage > 1;
@@ -82,6 +85,7 @@ export default function VibePager({ currentPage, totalPages, onPageChange }) {
 // PageNumber — single number pill. Active variant is a solid vibeBlue
 // fill so it reads as "you are here" at a scan-glance.
 function PageNumber({ page, active, onPress }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -96,6 +100,8 @@ function PageNumber({ page, active, onPress }) {
 // PagerChip — the prev / next arrow buttons. Disabled at the edges
 // (page 1 back-arrow / last-page forward-arrow) with muted styling.
 function PagerChip({ icon, disabled, onPress }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -106,13 +112,13 @@ function PagerChip({ icon, disabled, onPress }) {
       <Ionicons
         name={icon}
         size={18}
-        color={disabled ? theme.colors.textSecondary : theme.colors.vibeBlue}
+        color={disabled ? t.colors.textSecondary : theme.colors.vibeBlue}
       />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrap: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -155,11 +161,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipDisabled: {
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: t.colors.divider,
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
   },
   ellipsis: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     fontWeight: '700',
     marginHorizontal: 2,

@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const VibeAutoComplete = React.memo(
   ({ suggestions, onSelect, visible, showCount = false }) => {
+    const styles = useThemedStyles(makeStyles);
     if (!visible || !suggestions.length) return null;
 
     return (
@@ -38,17 +40,17 @@ const VibeAutoComplete = React.memo(
   }
 );
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   autocompleteContainer: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
     zIndex: 1000,
-    backgroundColor: theme.colors.background,
+    backgroundColor: t.colors.background,
     borderRadius: theme.sizes.borderRadius,
     borderWidth: 1,
-    borderColor: theme.colors.inputBorder,
+    borderColor: t.colors.inputBorder,
     maxHeight: 240,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -59,7 +61,7 @@ const styles = StyleSheet.create({
   suggestionItem: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.inputBorder,
+    borderBottomColor: t.colors.inputBorder,
   },
   suggestionContent: {
     flexDirection: 'row',
@@ -67,13 +69,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   suggestionText: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontFamily: theme.fonts.main,
     flex: 1,
   },
   suggestionCount: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     fontFamily: theme.fonts.main,
     marginLeft: 8,

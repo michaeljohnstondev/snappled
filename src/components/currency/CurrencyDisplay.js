@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function CurrencyDisplay({ 
   coins = 0, 
@@ -11,6 +12,8 @@ export default function CurrencyDisplay({
   showReceived = false,
   layout = 'horizontal' // 'horizontal' or 'vertical'
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const containerStyle = layout === 'vertical' ? styles.verticalContainer : styles.horizontalContainer;
 
   return (
@@ -52,7 +55,7 @@ export default function CurrencyDisplay({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   horizontalContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,12 +83,12 @@ const styles = StyleSheet.create({
   currencyAmount: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     lineHeight: 16,
   },
   currencyLabel: {
     fontSize: 10,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     lineHeight: 12,
   },
 });

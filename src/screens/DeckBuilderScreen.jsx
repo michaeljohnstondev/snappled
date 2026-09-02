@@ -11,12 +11,15 @@ import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import SortModal from '../components/ui/modals/SortModal';
 import AppLayout from '../components/ui/layout/AppLayout';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 56) / 3;
 const MAX_DECK_SIZE = 100;
 
 export default function DeckBuilderScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency, updateUserCurrency } = useAuth();
   const [activeTab, setActiveTab] = useState('deck');
   const [ownedSnapples, setOwnedSnapples] = useState([]);
@@ -296,7 +299,7 @@ export default function DeckBuilderScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -319,7 +322,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.vibeBlue,
   },
   headerTitle: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.bold,
   },
@@ -353,13 +356,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   replaceText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: theme.fontWeights.semiBold,
     flex: 1,
   },
   cancelText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 13,
     fontWeight: theme.fontWeights.semiBold,
     marginLeft: 12,
@@ -422,14 +425,14 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   pillTextRemove: {
-    color: 'white',
+    color: t.colors.textPrimary,
   },
   emptyContainer: {
     paddingVertical: 60,
     alignItems: 'center',
   },
   emptyText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
   },
 });

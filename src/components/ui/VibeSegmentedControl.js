@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const VibeSegmentedControl = ({ options, selectedValue, onSelect, style }) => {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.container, style]}>
       {options.map((option, index) => (
@@ -35,7 +37,7 @@ const VibeSegmentedControl = ({ options, selectedValue, onSelect, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flexDirection: 'row',
     backgroundColor: 'transparent',
@@ -50,8 +52,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: theme.sizes.borderRadius,
     borderWidth: 1,
-    borderColor: theme.colors.inputBorder,
-    backgroundColor: theme.colors.background,
+    borderColor: t.colors.inputBorder,
+    backgroundColor: t.colors.background,
     minWidth: 60,
   },
   firstSegment: {
@@ -68,11 +70,11 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontFamily: theme.fonts.main,
   },
   selectedSegmentText: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontWeight: '600',
   },
 });

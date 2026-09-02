@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
 import VibeAlert from "../ui/VibeAlert";
 import theme from "../../theme/themes";
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function RecordingControls({
   cameraRef,
@@ -15,6 +16,8 @@ export default function RecordingControls({
   onCountdownChange,
   maxDuration = 10,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [canStopManually, setCanStopManually] = useState(false);
   // Countdown before recording starts. We fire the native start at the
   // "1" tick so vision-camera's ~1s encoder setup overlaps the last
@@ -246,7 +249,7 @@ export default function RecordingControls({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     alignItems: "center",
     justifyContent: "center",

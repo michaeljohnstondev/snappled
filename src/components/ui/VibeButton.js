@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 /**
  * VibeButton with variants:
@@ -25,6 +26,8 @@ export default function VibeButton({
   color = 'blue',
   disabled = false,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const buttonText = label || children;
 
   const getColorValues = (colorName) => {
@@ -152,7 +155,7 @@ export default function VibeButton({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   // Default variant styles
   outerBorder: {
     borderBottomWidth: 4,
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   text: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: theme.fonts.main,

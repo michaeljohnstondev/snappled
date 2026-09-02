@@ -1,8 +1,11 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function NavButton({ title = "test", onPress, style, active = false }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -22,7 +25,7 @@ export default function NavButton({ title = "test", onPress, style, active = fal
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   button: {
     flex: 1,
     height: '100%',

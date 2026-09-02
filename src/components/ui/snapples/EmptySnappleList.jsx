@@ -3,11 +3,14 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../VibeButton';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function EmptySnappleList({ onCreateSnapple }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.container}>
-      <Ionicons name="videocam-off" size={48} color={theme.colors.textSecondary} />
+      <Ionicons name="videocam-off" size={48} color={t.colors.textSecondary} />
       <Text style={styles.title}>No Snapples Yet</Text>
       <Text style={styles.subtitle}>
         Be the first to create a Snapple for this prompt!
@@ -22,7 +25,7 @@ export default function EmptySnappleList({ onCreateSnapple }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -32,7 +35,7 @@ const styles = StyleSheet.create({
     paddingBottom: 120, // Account for nav bar space to center properly
   },
   title: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.semiBold,
     textAlign: 'center',
@@ -40,7 +43,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,

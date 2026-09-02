@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // How long a countdown runs. Single source of truth — the tick SFX in
 // GameScreen reads this too, so the sound and the number can't drift
@@ -17,6 +18,8 @@ export const COUNTDOWN_SECONDS = 3;
 // round. Absolutely positioned and pointerEvents="none" so the
 // picking / voting grid underneath still receives taps.
 export default function CountdownOverlay({ seconds }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!seconds || seconds < 1 || seconds > COUNTDOWN_SECONDS) return null;
   return (
     <View pointerEvents="none" style={styles.wrap}>
@@ -27,7 +30,7 @@ export default function CountdownOverlay({ seconds }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -45,7 +48,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   number: {
-    color: '#fff',
+    // On the dark badge above, not the app background — stays white.
+    color: 'white',
     fontSize: 96,
     fontWeight: '900',
     letterSpacing: 2,

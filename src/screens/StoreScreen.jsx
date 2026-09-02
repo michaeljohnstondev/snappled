@@ -8,6 +8,7 @@ import { useModal } from '../store/ModalContext';
 import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const BOOST_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -50,6 +51,8 @@ const DECK_BIG_INCREMENT = 25;
 const DECK_BIG_PRICE = 10000;
 
 export default function StoreScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
   const { showConfirm, showAlert } = useModal();
   const [activeSection, setActiveSection] = useState('bundles');
@@ -306,7 +309,7 @@ export default function StoreScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: {
@@ -321,7 +324,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24, fontWeight: theme.fontWeights.bold,
-    color: theme.colors.textPrimary, marginBottom: 4,
+    color: t.colors.textPrimary, marginBottom: 4,
   },
   balanceRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -330,10 +333,10 @@ const styles = StyleSheet.create({
     fontSize: 14, fontWeight: theme.fontWeights.bold, color: theme.colors.vibeYellow,
   },
   balanceIcon: {
-    fontSize: 12, color: theme.colors.textSecondary,
+    fontSize: 12, color: t.colors.textSecondary,
   },
   balanceDivider: {
-    fontSize: 12, color: theme.colors.textSecondary, marginHorizontal: 4,
+    fontSize: 12, color: t.colors.textSecondary, marginHorizontal: 4,
   },
   tabScroll: {
     flexGrow: 0, marginBottom: 12,
@@ -343,13 +346,13 @@ const styles = StyleSheet.create({
   },
   tab: {
     paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 2, borderColor: t.colors.divider,
   },
   tabActive: {
     backgroundColor: 'rgba(0,198,255,0.15)', borderColor: theme.colors.vibeBlue,
   },
   tabText: {
-    fontSize: 13, fontWeight: theme.fontWeights.bold, color: theme.colors.textSecondary,
+    fontSize: 13, fontWeight: theme.fontWeights.bold, color: t.colors.textSecondary,
   },
   tabTextActive: {
     color: theme.colors.vibeBlue,
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   bundleName: {
-    fontSize: 20, fontWeight: theme.fontWeights.bold, color: '#fff', marginBottom: 8,
+    fontSize: 20, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary, marginBottom: 8,
   },
   bundleDetails: {
     flexDirection: 'row', gap: 16, marginBottom: 14,
@@ -378,7 +381,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tagText: {
-    fontSize: 11, fontWeight: theme.fontWeights.bold, color: '#fff',
+    fontSize: 11, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,
   },
 
   // Packs
@@ -394,7 +397,7 @@ const styles = StyleSheet.create({
     fontSize: 12, color: theme.colors.vibeYellow, fontWeight: theme.fontWeights.bold,
   },
   packAmount: {
-    fontSize: 16, fontWeight: theme.fontWeights.bold, color: theme.colors.textPrimary,
+    fontSize: 16, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,
   },
   packRight: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -407,7 +410,7 @@ const styles = StyleSheet.create({
     borderRadius: 10, borderWidth: 2, borderColor: theme.colors.vibeBlue,
   },
   priceBtnText: {
-    fontSize: 14, fontWeight: theme.fontWeights.bold, color: '#fff',
+    fontSize: 14, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,
   },
 
   // Cosmetics
@@ -424,10 +427,10 @@ const styles = StyleSheet.create({
     flex: 1, marginLeft: 12,
   },
   cosmeticName: {
-    fontSize: 15, fontWeight: theme.fontWeights.bold, color: theme.colors.textPrimary,
+    fontSize: 15, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,
   },
   cosmeticDesc: {
-    fontSize: 12, color: theme.colors.textSecondary, marginTop: 2,
+    fontSize: 12, color: t.colors.textSecondary, marginTop: 2,
   },
   cosmeticPrice: {
     backgroundColor: 'rgba(0,0,0,0.3)', paddingHorizontal: 12, paddingVertical: 6,

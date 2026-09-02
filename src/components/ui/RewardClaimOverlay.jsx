@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, Pressable, Animated, Dimensions, Modal,
 } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -29,6 +30,8 @@ const ICON = {
 // once the entire animation completes (so the provider can resolve and pop the
 // next item off the queue).
 export default function RewardClaimOverlay({ mode, rewards, title, subtitle, commit, onDone }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const [phase, setPhase] = useState(mode === 'modal' ? 'modal' : 'flying');
 
@@ -121,6 +124,8 @@ export default function RewardClaimOverlay({ mode, rewards, title, subtitle, com
 }
 
 function RewardLine({ icon, amount, suffix = '' }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isLoss = amount < 0;
   return (
     <View style={styles.rewardLine}>
@@ -135,6 +140,8 @@ function RewardLine({ icon, amount, suffix = '' }) {
 // Single flying icon — arcs from screen center up to its target slot in the
 // resource bar.
 function FlyingIcon({ type, amount, indexInRow, total }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const startX = screenWidth * (0.5 + (indexInRow - (total - 1) / 2) * 0.08);
   const startY = screenHeight * 0.5;
   const targetX = screenWidth * (SLOT_X[type] || 0.5);
@@ -181,7 +188,7 @@ function FlyingIcon({ type, amount, indexInRow, total }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   fullscreen: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
@@ -210,7 +217,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalSubtitle: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     marginTop: 4,
     textAlign: 'center',
@@ -228,13 +235,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: t.colors.inputBackground,
   },
   rewardIcon: {
     fontSize: 24,
   },
   rewardAmount: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
   },
   modalHint: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     marginTop: 18,
     letterSpacing: 1,
@@ -260,7 +267,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   flyAmount: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 11,
     fontWeight: 'bold',
     marginTop: -2,

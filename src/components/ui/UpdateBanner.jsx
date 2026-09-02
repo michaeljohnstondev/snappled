@@ -10,11 +10,14 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Props:
 //   visible:  show/hide the banner (driven by useAppUpdate's isUpdateReady)
 //   onRestart: called when the user taps Restart (Updates.reloadAsync)
 export default function UpdateBanner({ visible, onRestart }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!visible) return null;
   return (
     <View style={styles.banner} pointerEvents="box-none">
@@ -31,7 +34,7 @@ export default function UpdateBanner({ visible, onRestart }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   banner: {
     position: 'absolute',
     top: 0,
@@ -56,7 +59,7 @@ const styles = StyleSheet.create({
   },
   text: {
     flex: 1,
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },

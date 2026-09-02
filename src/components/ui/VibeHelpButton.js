@@ -1,7 +1,9 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const VibeHelpButton = ({ onPress, style, size = 'normal' }) => {
+  const styles = useThemedStyles(makeStyles);
   const buttonStyle = size === 'small' ? styles.smallButton : styles.button;
   const textStyle = size === 'small' ? styles.smallText : styles.text;
 
@@ -17,6 +19,7 @@ const VibeHelpButton = ({ onPress, style, size = 'normal' }) => {
 };
 
 const VibeHelpTextButton = ({ onPress, style, label = 'Need help?' }) => {
+  const styles = useThemedStyles(makeStyles);
   return (
     <TouchableOpacity
       style={[styles.textButton, style]}
@@ -28,7 +31,7 @@ const VibeHelpTextButton = ({ onPress, style, label = 'Need help?' }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   button: {
     width: 32,
     height: 32,
@@ -51,12 +54,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   text: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
   },
   smallText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: 'bold',
   },

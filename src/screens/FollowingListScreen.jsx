@@ -11,11 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 // Render the list. Loads the target user's social array, hydrates each
 // uid into { uid, username, level, ... } via userService.getUserData,
 // and shows a tappable row per person.
 export default function FollowingListScreen({ route, navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user } = useAuth();
   const { userId, type = 'following' } = route?.params || {};
 
@@ -85,7 +88,7 @@ export default function FollowingListScreen({ route, navigation }) {
         <Text style={styles.username}>@{item.username}</Text>
         <Text style={styles.rank}>{item.rank}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+      <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
     </Pressable>
   );
 
@@ -120,13 +123,13 @@ export default function FollowingListScreen({ route, navigation }) {
               value={search}
               onChangeText={setSearch}
               placeholder={`Search ${title.toLowerCase()}...`}
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor={t.colors.textSecondary}
               autoCapitalize="none"
               autoCorrect={false}
             />
             {search ? (
               <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+                <Ionicons name="close-circle" size={18} color={t.colors.textSecondary} />
               </Pressable>
             ) : null}
           </View>
@@ -150,8 +153,8 @@ export default function FollowingListScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
+const makeStyles = (t) => ({
+  container: { flex: 1, backgroundColor: t.colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  emptyText: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center' },
+  emptyText: { color: t.colors.textSecondary, fontSize: 14, textAlign: 'center' },
   listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
   // Search pill lives just below the header. Cyan border matches the
   // rest of the input styling in the app. Clears with an X on the
@@ -196,7 +199,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 14,
     padding: 0,
   },
@@ -219,10 +222,10 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1 },
   username: {
-    color: theme.colors.textPrimary, fontSize: 15,
+    color: t.colors.textPrimary, fontSize: 15,
     fontWeight: theme.fontWeights.bold,
   },
   rank: {
-    color: theme.colors.textSecondary, fontSize: 12, marginTop: 2,
+    color: t.colors.textSecondary, fontSize: 12, marginTop: 2,
   },
 });

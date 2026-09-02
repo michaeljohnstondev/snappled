@@ -17,6 +17,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { Text, Pressable, Animated, StyleSheet, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const PADDING_DEFAULT = { paddingTop: 20, paddingBottom: 30 };
 const PADDING_COMPACT = { paddingTop: 14, paddingBottom: 16 };
@@ -34,6 +35,8 @@ export default function ShimmerBar({
   style,
   textStyle,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   // Diagonal light-band that sweeps left → right, pauses, then jumps
   // back to the left invisibly. Duration + delay tuned so the sweep
   // reads as satin sheen instead of a loading placeholder.
@@ -152,7 +155,7 @@ export default function ShimmerBar({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   pressWrap: {
     // No self-styling; the inner gradient owns the height + fill.
   },
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 3,

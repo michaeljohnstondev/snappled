@@ -11,8 +11,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function SectionDropdown({ options, selectedValue, onSelect, style }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [open, setOpen] = useState(false);
   const current = options.find(o => o.value === selectedValue) || options[0];
 
@@ -65,7 +68,7 @@ export default function SectionDropdown({ options, selectedValue, onSelect, styl
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrap: {
     // Parent controls positioning; the wrap is just a passthrough.
   },
@@ -82,7 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   triggerText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
     flex: 1,
@@ -114,7 +117,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 198, 255, 0.12)',
   },
   itemText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

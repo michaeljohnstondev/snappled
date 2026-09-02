@@ -11,8 +11,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../store/AuthContext';
 import { formatTimestamp } from '../../lib/commentUtils';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const CommentItem = ({ comment, onDelete }) => {
+  const styles = useThemedStyles(makeStyles);
   const { currentUserId } = useAuth();
   const isOwner = currentUserId === comment.userId;
 
@@ -129,7 +131,7 @@ const CommentItem = ({ comment, onDelete }) => {
 const RADIUS = 14;
 const BORDER_THICKNESS = 2;
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrapper: {
     width: '100%',
     paddingHorizontal: 4,
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 2,
@@ -196,13 +198,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   deleteButtonText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
     lineHeight: 18,
   },
   content: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '400',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function VibeButtonPlain({
   label,
@@ -9,6 +10,8 @@ export default function VibeButtonPlain({
   textStyle,
   numberOfLines = 0,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={[styles.button, style]}>
       <Text
@@ -21,7 +24,7 @@ export default function VibeButtonPlain({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   button: {
     borderWidth: 3,
     borderColor: theme.colors.vibeBlue,
@@ -32,7 +35,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   text: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontFamily: theme.fonts.main,
   },

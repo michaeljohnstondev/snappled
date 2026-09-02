@@ -4,8 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function CustomTabBar({ state, descriptors, navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   // Lift the tab bar above the Android gesture-nav home-swipe zone (~16-32px)
   // so taps near the bottom of the tab don't fight with the system gesture.
@@ -60,10 +63,10 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.background,
+    backgroundColor: t.colors.background,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
     overflow: 'visible',
@@ -110,6 +113,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: theme.colors.background,
+    borderColor: t.colors.background,
   },
 });

@@ -17,8 +17,11 @@ import theme from "../theme/themes";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { signInWithGoogle, signInWithApple, ensureUserDocument } from "../services/googleAuthService";
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function LoginScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -175,7 +178,7 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <LinearGradient
-        colors={theme.colors.backgroundGradient}
+        colors={t.colors.backgroundGradient}
         style={styles.container}
       >
         <ScrollView
@@ -187,7 +190,7 @@ export default function LoginScreen({ navigation }) {
             <Ionicons
               name="chevron-back"
               size={28}
-              color={theme.colors.textPrimary}
+              color={t.colors.textPrimary}
             />
           </Pressable>
 
@@ -248,7 +251,7 @@ export default function LoginScreen({ navigation }) {
                   <Ionicons
                     name={showPassword ? "eye-off" : "eye"}
                     size={20}
-                    color={theme.colors.textSecondary}
+                    color={t.colors.textSecondary}
                   />
                 </Pressable>
               </View>
@@ -326,7 +329,7 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -349,13 +352,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "bold",
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.md || 16,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     textAlign: "center",
     lineHeight: 22,
     paddingHorizontal: 20,
@@ -368,7 +371,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.sm || 8,
     fontWeight: "600",
   },
@@ -421,7 +424,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   signupText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
   },
   signupLink: {
@@ -431,7 +434,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   forgotText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: "center",
     marginTop: 12,

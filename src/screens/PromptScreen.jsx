@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../components/ui/VibeButton';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 // Time-based prompts that change every hour
 const hourlyPrompts = [
@@ -34,6 +35,8 @@ const hourlyPrompts = [
 ];
 
 export default function PromptScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [currentPrompt, setCurrentPrompt] = useState('');
   const [timeUntilNext, setTimeUntilNext] = useState('');
   const [promptNumber, setPromptNumber] = useState(0);
@@ -104,7 +107,7 @@ export default function PromptScreen({ navigation }) {
 
   return (
     <LinearGradient
-      colors={theme.colors.backgroundGradient}
+      colors={t.colors.backgroundGradient}
       style={styles.container}
     >
       <View style={styles.header}>
@@ -112,7 +115,7 @@ export default function PromptScreen({ navigation }) {
         <View style={styles.promptMeta}>
           <Text style={styles.promptNumber}>Prompt #{promptNumber}</Text>
           <View style={styles.timerContainer}>
-            <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
+            <Ionicons name="time-outline" size={16} color={t.colors.textSecondary} />
             <Text style={styles.timer}>Next in {timeUntilNext}</Text>
           </View>
         </View>
@@ -158,7 +161,7 @@ export default function PromptScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
     padding: theme.sizes.spacing?.lg || 24,
@@ -172,7 +175,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -185,13 +188,13 @@ const styles = StyleSheet.create({
   },
   promptNumber: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontWeight: '600',
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: t.colors.inputBackground,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -199,12 +202,12 @@ const styles = StyleSheet.create({
   },
   timer: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontWeight: '600',
   },
   promptCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: theme.sizes.borderRadius || 12,
     padding: theme.sizes.spacing?.xl || 32,
     marginVertical: theme.sizes.spacing?.lg || 24,
@@ -220,7 +223,7 @@ const styles = StyleSheet.create({
   promptText: {
     fontSize: 22,
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     textAlign: 'center',
     lineHeight: 30,
     letterSpacing: 0.5,
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontWeight: '500',
   },
   buttonGroup: {

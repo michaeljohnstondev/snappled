@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -25,6 +26,8 @@ const getPromptGradient = (index) => {
 };
 
 export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect, onPromptPress, rightAccessory }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const isScrolling = useRef(false);
@@ -238,7 +241,7 @@ export default function PromptCarousel({ prompts, selectedPrompt, onPromptSelect
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     height: 180,
     marginBottom: 16,
@@ -263,7 +266,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   promptText: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.medium,
     lineHeight: 20,
@@ -302,12 +305,12 @@ const styles = StyleSheet.create({
     height: 140,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: 16,
     margin: 20,
   },
   emptyText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
     fontWeight: theme.fontWeights.medium,
   },

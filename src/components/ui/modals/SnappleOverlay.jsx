@@ -16,6 +16,7 @@ import { useModal } from '../../../store/ModalContext';
 import { snappleService } from '../../../services/snappleService';
 import theme from '../../../theme/themes';
 import { shareService } from '../../../services/shareService';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -32,6 +33,8 @@ export default function SnappleOverlay({
   onReport,
   navigation,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency, updateUserCurrency, updateUserCurrencyLocal } = useAuth();
   const { showConfirm, showError, showAlert } = useModal();
   const playerRef = useRef(null);
@@ -667,7 +670,7 @@ export default function SnappleOverlay({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   overlay: {
     flex: 1,
     backgroundColor: '#000',
@@ -724,7 +727,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   actionCount: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 11,
     fontWeight: theme.fontWeights.semiBold,
     textAlign: 'center',
@@ -758,7 +761,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   creatorName: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',

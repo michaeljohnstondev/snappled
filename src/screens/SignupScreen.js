@@ -6,8 +6,11 @@ import VibeInput from '../components/ui/VibeInput';
 import theme from '../theme/themes';
 import { userService } from '../services/userService';
 import { signInWithGoogle, signInWithApple, ensureUserDocument } from '../services/googleAuthService';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function SignupScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -131,7 +134,7 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <LinearGradient
-      colors={theme.colors.backgroundGradient}
+      colors={t.colors.backgroundGradient}
       style={styles.container}
     >
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
@@ -259,7 +262,7 @@ export default function SignupScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -275,13 +278,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.md || 16,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     paddingHorizontal: 20,
@@ -294,19 +297,19 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.sm || 8,
     fontWeight: '500',
   },
   termsContainer: {
     marginTop: theme.sizes.spacing?.lg || 24,
     padding: theme.sizes.spacing?.md || 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: theme.sizes.borderRadius || 12,
   },
   termsText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     lineHeight: 20,
     textAlign: 'center',
   },
@@ -327,7 +330,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loginText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
   },
   loginButton: {
@@ -350,13 +353,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.vibeBlue,
   },
   appleLogo: {
-    color: '#ffffff',
+    color: t.colors.textPrimary,
     fontSize: 20,
     marginRight: 10,
     marginTop: -2,
   },
   appleButtonText: {
-    color: '#ffffff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
   },

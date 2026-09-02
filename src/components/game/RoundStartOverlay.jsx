@@ -7,6 +7,7 @@
 import React from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Render the overlay. `title` is the big graffiti-thick headline
 // (e.g. "60 SECONDS TO PICK"). Body copy can be either `sub` (one
@@ -16,6 +17,8 @@ import theme from '../../theme/themes';
 // Renders nothing when `visible` is false so the game plays through
 // underneath without a flicker.
 export default function RoundStartOverlay({ visible, title, sub, bullets, onDismiss }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
@@ -40,7 +43,7 @@ export default function RoundStartOverlay({ visible, title, sub, bullets, onDism
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.88)',
@@ -60,7 +63,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 26, 42, 0.95)',
   },
   title: {
-    color: 'white',
+    color: t.colors.textPrimary,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 3,
@@ -69,7 +72,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sub: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
@@ -93,7 +96,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   bulletText: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
     flex: 1,

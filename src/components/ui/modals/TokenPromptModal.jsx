@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function TokenPromptModal({
   visible,
@@ -10,6 +11,8 @@ export default function TokenPromptModal({
   userTokens = 0,
   navigation,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const handleCreatePrompt = () => {
     onCreatePrompt?.();
     onClose();
@@ -66,7 +69,7 @@ export default function TokenPromptModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -99,14 +102,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 22,
     fontWeight: theme.fontWeights.bold,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -114,7 +117,7 @@ const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: t.colors.divider,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -122,7 +125,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   balanceLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     fontWeight: theme.fontWeights.semiBold,
     marginBottom: 4,
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnText: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: theme.fontWeights.bold,
   },

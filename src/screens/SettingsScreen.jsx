@@ -19,12 +19,12 @@ import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { auth } from '../services/firebase';
 import { soundService } from '../services/soundService';
-import { useTheme } from '../theme/ThemeContext';
 import { usernameService } from '../services/usernameService';
 import AppLayout from '../components/ui/layout/AppLayout';
 import SettingsRow from '../components/ui/settings/SettingsRow';
 import UsernameEditor from '../components/ui/settings/UsernameEditor';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const APP_VERSION = Constants.expoConfig?.version || '?';
 // OTA bundle id. 'embed' means they're running the JS that shipped
@@ -33,9 +33,10 @@ const APP_VERSION = Constants.expoConfig?.version || '?';
 const UPDATE_TAG = Updates.updateId ? Updates.updateId.slice(0, 8) : 'embed';
 
 export default function SettingsScreen({ navigation }) {
+  const { theme: t, isDark, toggleTheme } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user } = useAuth();
   const { showConfirm, showError, showToast } = useModal();
-  const { isDark, toggleTheme } = useTheme();
 
   // soundService restores the stored preference during App.js startup,
   // so reading it synchronously on mount is already accurate here.
@@ -187,10 +188,10 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   scroll: { padding: 20, paddingBottom: 60 },
   h1: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 2,

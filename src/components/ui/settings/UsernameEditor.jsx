@@ -12,6 +12,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import VibeInput from '../VibeInput';
 import VibeButton from '../VibeButton';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function UsernameEditor({
   value,
@@ -21,6 +22,8 @@ export default function UsernameEditor({
   saving = false,
   error,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>Username</Text>
@@ -71,22 +74,22 @@ export default function UsernameEditor({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   wrap: {
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: t.colors.divider,
   },
   label: {
-    color: '#fff',
+    color: t.colors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 8,
   },
-  hint: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 6 },
+  hint: { color: t.colors.textSecondary, fontSize: 12, marginTop: 6 },
   error: { color: theme.colors.vibeRed, fontSize: 12, marginTop: 6, fontWeight: '600' },
   note: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 11,
     lineHeight: 15,
     marginTop: 8,

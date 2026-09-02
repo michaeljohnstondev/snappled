@@ -2,8 +2,10 @@ import React from 'react';
 import { FlatList, View, Text, StyleSheet } from 'react-native';
 import CommentItem from './CommentItem';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const CommentList = ({ comments, loading, onDeleteComment }) => {
+  const styles = useThemedStyles(makeStyles);
   const renderComment = ({ item }) => (
     <CommentItem comment={item} onDelete={onDeleteComment} />
   );
@@ -42,7 +44,7 @@ const CommentList = ({ comments, loading, onDeleteComment }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   list: {},
   contentContainer: {
     paddingVertical: 8,
@@ -56,7 +58,7 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   emptyText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     fontFamily: theme.fonts.main,

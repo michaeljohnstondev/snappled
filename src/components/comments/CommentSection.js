@@ -4,8 +4,10 @@ import { useComments } from '../../hooks/useComments';
 import CommentList from './CommentList';
 import AddCommentInput from './AddCommentInput';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 const CommentSection = ({ eventId }) => {
+  const styles = useThemedStyles(makeStyles);
   const {
     comments,
     loading,
@@ -69,7 +71,7 @@ const CommentSection = ({ eventId }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -83,12 +85,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontFamily: theme.fonts.main,
   },
   commentCount: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontFamily: theme.fonts.main,
   },
 });

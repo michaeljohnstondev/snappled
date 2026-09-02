@@ -13,6 +13,7 @@ import VibeInput from '../ui/VibeInput';
 import CurrencyDisplay from './CurrencyDisplay';
 import theme from '../../theme/themes';
 import { currencyService } from '../../services/currencyService';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function PurchaseModal({ 
   visible, 
@@ -22,6 +23,8 @@ export default function PurchaseModal({
   userCurrency = {},
   onPurchaseComplete
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [quantity, setQuantity] = useState('1');
   const [isLoading, setIsLoading] = useState(false);
   const [pricing, setPricing] = useState(null);
@@ -260,10 +263,10 @@ export default function PurchaseModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: t.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -276,14 +279,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
   },
   closeButton: {
     padding: 8,
   },
   closeText: {
     fontSize: 20,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
   },
   content: {
     flex: 1,
@@ -292,7 +295,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.md || 16,
   },
   currencySection: {
@@ -302,24 +305,24 @@ const styles = StyleSheet.create({
     marginBottom: theme.sizes.spacing?.xl || 32,
   },
   snappleInfo: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: t.colors.inputBackground,
     padding: theme.sizes.spacing?.md || 16,
     borderRadius: theme.sizes.borderRadius || 12,
   },
   snappleTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: 4,
   },
   snappleCreator: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     marginBottom: 8,
   },
   snappleStats: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
   },
   quantitySection: {
     marginBottom: theme.sizes.spacing?.xl || 32,
@@ -341,11 +344,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
   },
   presetButtonText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontWeight: '500',
   },
   presetButtonTextSelected: {
-    color: theme.colors.background,
+    color: t.colors.background,
   },
   quantityInput: {
     marginBottom: theme.sizes.spacing?.md || 16,
@@ -369,14 +372,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   paymentOptionText: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 14,
   },
   costSection: {
     marginBottom: theme.sizes.spacing?.xl || 32,
   },
   costDetails: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: t.colors.inputBackground,
     padding: theme.sizes.spacing?.md || 16,
     borderRadius: theme.sizes.borderRadius || 12,
   },
@@ -393,23 +396,23 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   costLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
   },
   costValue: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 14,
   },
   discount: {
     color: theme.colors.success || '#4ade80',
   },
   totalLabel: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
   totalValue: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -436,7 +439,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: 'transparent',
-    borderColor: theme.colors.textSecondary,
+    borderColor: t.colors.textSecondary,
     borderWidth: 1,
   },
   purchaseButton: {

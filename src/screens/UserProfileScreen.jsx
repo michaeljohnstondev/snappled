@@ -14,6 +14,7 @@ import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { SNAPPLE_SORT_OPTIONS, sortSnapples } from '../lib/snappleSort';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 // Pull the shared default from VibePager so every paginated grid in
 // the app uses the same rhythm.
@@ -24,6 +25,8 @@ const { width: screenWidth } = Dimensions.get('window');
 const ITEM_SIZE = (screenWidth - 60) / 3;
 
 export default function UserProfileScreen({ route, navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
   // Default to current user if no userId param (e.g. when navigating via Profile tab)
   const userId = route?.params?.userId || user?.uid;
@@ -275,7 +278,7 @@ export default function UserProfileScreen({ route, navigation }) {
           <Pressable style={styles.achievementsBtn} onPress={() => navigation.navigate('Achievements')}>
             <Ionicons name="trophy" size={20} color={theme.colors.vibeYellow} />
             <Text style={styles.achievementsBtnText}>Achievements</Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
           </Pressable>
           <Pressable
             style={styles.achievementsBtn}
@@ -283,7 +286,7 @@ export default function UserProfileScreen({ route, navigation }) {
           >
             <Ionicons name="settings-sharp" size={20} color={theme.colors.vibeBlue} />
             <Text style={styles.achievementsBtnText}>Settings</Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
           </Pressable>
         </View>
       )}
@@ -382,7 +385,7 @@ export default function UserProfileScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -406,7 +409,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.vibeBlue,
   },
   headerTitle: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 18,
     fontWeight: theme.fontWeights.bold,
   },
@@ -416,7 +419,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
   },
   listContent: {
@@ -444,7 +447,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   username: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 22,
     fontWeight: theme.fontWeights.bold,
     marginBottom: 4,
@@ -480,12 +483,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNumber: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 20,
     fontWeight: theme.fontWeights.bold,
   },
   statLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     marginTop: 4,
   },
@@ -506,7 +509,7 @@ const styles = StyleSheet.create({
   },
   achievementsBtnText: {
     flex: 1,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 16,
     fontWeight: theme.fontWeights.semiBold,
   },
@@ -548,7 +551,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   sortLabel: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -582,7 +585,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   snapplePrompt: {
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     fontSize: 12,
     fontWeight: theme.fontWeights.medium,
   },
@@ -591,7 +594,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   snappleStat: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 10,
   },
   emptyContainer: {
@@ -599,7 +602,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
   },
 });

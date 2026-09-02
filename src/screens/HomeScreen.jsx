@@ -14,8 +14,11 @@ import { promptRotationService } from '../services/promptRotationService';
 import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export default function HomeScreen({ navigation, route }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
   
   // State
@@ -437,7 +440,7 @@ export default function HomeScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -445,7 +448,7 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12,
   },
   loadingText: {
-    color: theme.colors.textSecondary, fontSize: 14,
+    color: t.colors.textSecondary, fontSize: 14,
   },
   safeArea: {
     flex: 1,

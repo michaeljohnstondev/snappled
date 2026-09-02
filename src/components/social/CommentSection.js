@@ -16,6 +16,7 @@ import VibeButton from '../ui/VibeButton';
 import theme from '../../theme/themes';
 import { commentService } from '../../services/commentService';
 import { auth } from '../../services/firebase';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 export default function CommentSection({ 
   visible, 
@@ -23,6 +24,8 @@ export default function CommentSection({
   snappleId,
   snappleTitle = "Snapple"
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -323,7 +326,7 @@ export default function CommentSection({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <LinearGradient
-          colors={theme.colors.backgroundGradient}
+          colors={t.colors.backgroundGradient}
           style={styles.container}
         >
           {/* Header */}
@@ -372,7 +375,7 @@ export default function CommentSection({
             <TextInput
               style={styles.textInput}
               placeholder={replyingTo ? `Reply to @${replyingTo.username}...` : "Add a comment..."}
-              placeholderTextColor={theme.colors.textSecondary}
+              placeholderTextColor={t.colors.textSecondary}
               value={newComment}
               onChangeText={setNewComment}
               multiline
@@ -397,7 +400,7 @@ export default function CommentSection({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
@@ -415,11 +418,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
   },
   subtitle: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     opacity: 0.8,
   },
   closeButton: {
@@ -427,7 +430,7 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: 20,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
   },
   commentsList: {
     flex: 1,
@@ -437,7 +440,7 @@ const styles = StyleSheet.create({
   },
   commentContainer: {
     marginBottom: theme.sizes.spacing?.lg || 24,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: theme.sizes.borderRadius || 12,
     padding: theme.sizes.spacing?.md || 16,
   },
@@ -454,18 +457,18 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     opacity: 0.7,
   },
   editedLabel: {
     fontSize: 10,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     opacity: 0.6,
     fontStyle: 'italic',
   },
   commentText: {
     fontSize: 16,
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -481,7 +484,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: t.colors.inputBackground,
   },
   likedButton: {
     backgroundColor: 'rgba(255, 107, 107, 0.2)',
@@ -491,7 +494,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontWeight: '500',
   },
   likedText: {
@@ -510,7 +513,7 @@ const styles = StyleSheet.create({
   replyContainer: {
     marginBottom: 12,
     padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: t.colors.inputBackground,
     borderRadius: 8,
   },
   emptyState: {
@@ -524,12 +527,12 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: t.colors.textPrimary,
     marginBottom: 4,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     opacity: 0.8,
   },
   replyIndicator: {
@@ -538,14 +541,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.sizes.spacing?.lg || 24,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: t.colors.inputBackground,
   },
   replyText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 14,
   },
   cancelReply: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 16,
     padding: 4,
   },
@@ -559,8 +562,8 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    color: theme.colors.textPrimary,
+    backgroundColor: t.colors.inputBackground,
+    color: t.colors.textPrimary,
     padding: 16,
     borderRadius: 20,
     fontSize: 16,

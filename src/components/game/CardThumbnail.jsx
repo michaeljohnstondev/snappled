@@ -8,10 +8,12 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useCachedVideoUri } from '../../services/videoCache';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Plays a paused first-frame thumbnail for a hand card. Uses the cached
 // video URI when available so subsequent rounds reuse the local file.
 export const CardThumbnail = React.memo(function CardThumbnail({ videoUrl }) {
+  const styles = useThemedStyles(makeStyles);
   const cachedUri = useCachedVideoUri(videoUrl);
   const player = useVideoPlayer(cachedUri, (p) => {
     p.loop = false;
@@ -34,6 +36,7 @@ export const CardThumbnail = React.memo(function CardThumbnail({ videoUrl }) {
 // all spin up their video players at the same instant. Shows a spinner
 // while waiting.
 export const CardThumbnailDelayed = React.memo(function CardThumbnailDelayed({ videoUrl, delay = 0 }) {
+  const styles = useThemedStyles(makeStyles);
   const [mounted, setMounted] = useState(delay === 0);
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export const CardThumbnailDelayed = React.memo(function CardThumbnailDelayed({ v
   return <CardThumbnail videoUrl={videoUrl} />;
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   placeholder: {
     backgroundColor: 'rgba(0,198,255,0.05)',
     justifyContent: 'center',

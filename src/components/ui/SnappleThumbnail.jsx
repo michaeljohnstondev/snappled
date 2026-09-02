@@ -12,10 +12,13 @@ import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { thumbnailService } from '../../services/thumbnailService';
 import theme from '../../theme/themes';
+import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Resolves and renders a thumbnail for a single videoUrl. Loading
 // state shows a spinner; error/unavailable shows a placeholder icon.
 export default function SnappleThumbnail({ videoUrl, style }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [thumbnailUri, setThumbnailUri] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -68,7 +71,7 @@ export default function SnappleThumbnail({ videoUrl, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   placeholder: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',

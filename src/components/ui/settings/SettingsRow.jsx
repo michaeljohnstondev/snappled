@@ -14,6 +14,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Switch, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../../theme/themes';
+import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 export default function SettingsRow({
   icon,
@@ -27,6 +28,8 @@ export default function SettingsRow({
   disabled = false,
   destructive = false,
 }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const isSwitch = typeof value === 'boolean';
   // A switch row must not also swallow taps as navigation — the
   // Switch owns the gesture, so only non-switch rows get pressable.
@@ -71,21 +74,21 @@ export default function SettingsRow({
         <Ionicons
           name="chevron-forward"
           size={18}
-          color={theme.colors.textSecondary}
+          color={t.colors.textSecondary}
         />
       ) : null}
     </Wrapper>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: t.colors.divider,
   },
   rowPressed: { backgroundColor: 'rgba(0,198,255,0.06)' },
   iconChip: {
@@ -93,21 +96,21 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 10,
     borderWidth: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: t.colors.inputBackground,
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: { flex: 1, paddingRight: 8 },
-  label: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  label: { color: t.colors.textPrimary, fontSize: 15, fontWeight: '700' },
   labelDestructive: { color: theme.colors.vibePink },
   desc: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
     lineHeight: 16,
   },
   valueText: {
-    color: theme.colors.textSecondary,
+    color: t.colors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
     maxWidth: 140,

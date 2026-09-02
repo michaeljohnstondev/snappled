@@ -11,6 +11,7 @@ import { useModal } from '../store/ModalContext';
 import VibeButton from '../components/ui/VibeButton';
 import PromptCurator from '../components/admin/PromptCurator';
 import theme from '../theme/themes';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 function UtilButton({ label, desc, color, onPress }) {
   const [running, setRunning] = useState(false);
@@ -41,6 +42,9 @@ const utilStyles = StyleSheet.create({
 // Add or remove a permabanned prompt text. Banned texts are keyed by their
 // normalized textKey so case/punctuation drift doesn't slip past the filter.
 function BanPromptCard({ showAlert, showError }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const banInputStyles = useThemedStyles(makeBanInputStyles);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -103,10 +107,10 @@ function BanPromptCard({ showAlert, showError }) {
   );
 }
 
-const banInputStyles = StyleSheet.create({
+const makeBanInputStyles = (t) => ({
   input: {
-    color: 'white', fontSize: 14, paddingHorizontal: 12, paddingVertical: 10,
-    borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    color: t.colors.textPrimary, fontSize: 14, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 8, backgroundColor: t.colors.inputBackground,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginTop: 8,
   },
   row: { flexDirection: 'row', gap: 8, marginTop: 8 },
@@ -121,6 +125,8 @@ const banInputStyles = StyleSheet.create({
 const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 
 export default function AdminScreen({ navigation }) {
+  const { theme: t } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const { user } = useAuth();
   const { showConfirm, showAlert, showError } = useModal();
   const [activeTab, setActiveTab] = useState('prompts');
@@ -354,7 +360,7 @@ export default function AdminScreen({ navigation }) {
 
   if (!isAdmin) {
     return (
-      <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+      <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
         <View style={styles.center}>
           <Ionicons name="lock-closed" size={48} color={theme.colors.vibeRed} />
           <Text style={styles.deniedText}>Admin access required</Text>
@@ -396,7 +402,7 @@ export default function AdminScreen({ navigation }) {
                   <Ionicons name="checkmark" size={20} color={theme.colors.vibeGreen} />
                 </Pressable>
                 <Pressable onPress={() => setEditingId(null)}>
-                  <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                  <Ionicons name="close" size={20} color={t.colors.textSecondary} />
                 </Pressable>
               </View>
             ) : (
@@ -494,7 +500,7 @@ export default function AdminScreen({ navigation }) {
                   <Ionicons name="checkmark" size={20} color={theme.colors.vibeGreen} />
                 </Pressable>
                 <Pressable style={styles.grantBtn} onPress={() => { setGrantUserId(null); setGrantCoins(''); setGrantTickets(''); }}>
-                  <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                  <Ionicons name="close" size={20} color={t.colors.textSecondary} />
                 </Pressable>
               </View>
             ) : (
@@ -532,7 +538,7 @@ export default function AdminScreen({ navigation }) {
   };
 
   return (
-    <LinearGradient colors={theme.colors.backgroundGradient} style={styles.container}>
+    <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>
           <View style={styles.backBg}>
@@ -921,7 +927,7 @@ export default function AdminScreen({ navigation }) {
             value={newPromptText}
             onChangeText={setNewPromptText}
             placeholder={promptType === 'snapple' ? "Write a snapple creation prompt..." : "Write a game card prompt..."}
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={t.colors.textSecondary}
             multiline
           />
           <Pressable style={styles.createBtn} onPress={handleAddPrompt}>
@@ -966,7 +972,7 @@ export default function AdminScreen({ navigation }) {
                 value={newPromptText}
                 onChangeText={setNewPromptText}
                 placeholder="Add new prompt..."
-                placeholderTextColor={theme.colors.textSecondary}
+                placeholderTextColor={t.colors.textSecondary}
                 onSubmitEditing={async () => {
                   if (!newPromptText.trim()) return;
                   const cols = { live: 'activePrompts', ondeck: 'onDeckPrompts', pool: 'promptPool', game: 'gamePrompts' };
@@ -1131,7 +1137,7 @@ export default function AdminScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => ({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -1143,7 +1149,7 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: theme.colors.vibeBlue,
   },
   headerTitle: {
-    color: theme.colors.textPrimary, fontSize: 18, fontWeight: theme.fontWeights.bold,
+    color: t.colors.textPrimary, fontSize: 18, fontWeight: theme.fontWeights.bold,
   },
   menuTrigger: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1152,19 +1158,19 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     marginHorizontal: 16, marginBottom: 12,
-    backgroundColor: theme.colors.background, borderRadius: 12,
+    backgroundColor: t.colors.background, borderRadius: 12,
     borderWidth: 2, borderColor: theme.colors.vibeBlue,
     overflow: 'hidden',
   },
   dropdownItem: {
     paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1, borderBottomColor: t.colors.divider,
   },
   dropdownItemActive: {
     backgroundColor: 'rgba(0,198,255,0.1)',
   },
   dropdownText: {
-    color: theme.colors.textSecondary, fontSize: 15, fontWeight: theme.fontWeights.semiBold,
+    color: t.colors.textSecondary, fontSize: 15, fontWeight: theme.fontWeights.semiBold,
   },
   dropdownTextActive: {
     color: theme.colors.vibeBlue,
@@ -1174,13 +1180,13 @@ const styles = StyleSheet.create({
   },
   subTab: {
     flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: t.colors.divider,
   },
   subTabActive: {
     borderColor: theme.colors.vibeBlue, backgroundColor: 'rgba(0,198,255,0.1)',
   },
   subTabText: {
-    color: theme.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
+    color: t.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
   },
   subTabTextActive: {
     color: theme.colors.vibeBlue,
@@ -1188,17 +1194,17 @@ const styles = StyleSheet.create({
   promptRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: t.colors.divider,
     paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6,
   },
   promptTitle: {
-    flex: 1, color: theme.colors.textPrimary, fontSize: 13,
+    flex: 1, color: t.colors.textPrimary, fontSize: 13,
   },
   promptActions: {
     flexDirection: 'row', gap: 12, alignItems: 'center',
   },
   promptEditInput: {
-    flex: 1, color: theme.colors.textPrimary, fontSize: 13,
+    flex: 1, color: t.colors.textPrimary, fontSize: 13,
     borderWidth: 1, borderColor: theme.colors.vibeBlue, borderRadius: 6,
     paddingHorizontal: 8, paddingVertical: 4,
   },
@@ -1206,7 +1212,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12,
   },
   inlineInput: {
-    flex: 1, color: theme.colors.textPrimary, fontSize: 14,
+    flex: 1, color: t.colors.textPrimary, fontSize: 14,
     borderWidth: 2, borderColor: theme.colors.vibeBlue, borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.3)', paddingHorizontal: 12, paddingVertical: 8,
   },
@@ -1221,28 +1227,28 @@ const styles = StyleSheet.create({
   },
   deckDragHandle: { paddingRight: 4 },
   deckContent: { flex: 1 },
-  deckText: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.medium, marginBottom: 4 },
+  deckText: { color: t.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.medium, marginBottom: 4 },
   deckTime: { color: theme.colors.vibeBlue, fontSize: 11 },
   deckCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 2, borderColor: t.colors.divider,
     paddingVertical: 14, paddingHorizontal: 12, marginBottom: 8,
   },
   deckCardSwapping: {
     borderColor: theme.colors.vibeGreen, backgroundColor: 'rgba(0,255,65,0.1)',
   },
   deckIndex: {
-    color: theme.colors.textSecondary, fontSize: 12, fontWeight: 'bold', width: 24,
+    color: t.colors.textSecondary, fontSize: 12, fontWeight: 'bold', width: 24,
   },
   deckContent: { flex: 1 },
-  deckText: { color: theme.colors.textPrimary, fontSize: 14, marginBottom: 3 },
+  deckText: { color: t.colors.textPrimary, fontSize: 14, marginBottom: 3 },
   deckTime: { color: theme.colors.vibeBlue, fontSize: 11 },
   utilsSection: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   list: { paddingHorizontal: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  deniedText: { color: theme.colors.textSecondary, fontSize: 16, marginTop: 12 },
-  emptyText: { color: theme.colors.textSecondary, fontSize: 14 },
+  deniedText: { color: t.colors.textSecondary, fontSize: 16, marginTop: 12 },
+  emptyText: { color: t.colors.textSecondary, fontSize: 14 },
   card: {
     backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12,
     borderWidth: 2, borderColor: theme.colors.vibeBlue,
@@ -1252,7 +1258,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6,
   },
   cardTitle: {
-    color: theme.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1,
+    color: t.colors.textPrimary, fontSize: 14, fontWeight: theme.fontWeights.semiBold, flex: 1,
   },
   badge: {
     color: theme.colors.vibeBlue, fontSize: 10, fontWeight: 'bold',
@@ -1265,17 +1271,17 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   cardMeta: { gap: 2, marginBottom: 8 },
-  metaText: { color: theme.colors.textSecondary, fontSize: 11 },
+  metaText: { color: t.colors.textSecondary, fontSize: 11 },
   cardActions: { flexDirection: 'row', gap: 10 },
   actionBtn: {
     paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: t.colors.divider,
   },
-  actionBtnText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: theme.fontWeights.semiBold },
+  actionBtnText: { color: t.colors.textSecondary, fontSize: 12, fontWeight: theme.fontWeights.semiBold },
   actionBtnTextGreen: { color: theme.colors.vibeGreen, fontSize: 12, fontWeight: theme.fontWeights.semiBold },
   actionBtnTextRed: { color: theme.colors.vibeRed, fontSize: 12, fontWeight: theme.fontWeights.semiBold },
   editInput: {
-    flex: 1, color: theme.colors.textPrimary, fontSize: 14,
+    flex: 1, color: t.colors.textPrimary, fontSize: 14,
     borderWidth: 2, borderColor: theme.colors.vibeBlue, borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 10,
     fontFamily: theme.fonts.main,
@@ -1288,13 +1294,13 @@ const styles = StyleSheet.create({
   },
   createTypeBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 2, borderColor: t.colors.divider,
   },
   createTypeBtnActive: {
     borderColor: theme.colors.vibeBlue, backgroundColor: 'rgba(0,198,255,0.1)',
   },
   createTypeText: {
-    color: theme.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
+    color: t.colors.textSecondary, fontSize: 13, fontWeight: theme.fontWeights.semiBold,
   },
   createTypeTextActive: {
     color: theme.colors.vibeBlue,
@@ -1302,7 +1308,7 @@ const styles = StyleSheet.create({
   createInput: {
     borderWidth: 3, borderColor: theme.colors.vibeBlue, borderRadius: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 14,
-    color: theme.colors.textPrimary, fontSize: 16, minHeight: 100,
+    color: t.colors.textPrimary, fontSize: 16, minHeight: 100,
     textAlignVertical: 'top',
   },
   createBtn: {
@@ -1313,7 +1319,7 @@ const styles = StyleSheet.create({
     color: theme.colors.vibeBlue, fontSize: 16, fontWeight: theme.fontWeights.bold,
   },
   createHint: {
-    color: theme.colors.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18,
+    color: t.colors.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18,
   },
   seedSection: {
     marginTop: 20, gap: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 20,
@@ -1324,9 +1330,9 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: { color: theme.colors.vibeRed, fontSize: 12, fontWeight: 'bold' },
   userActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)' },
-  actionBtnLabel: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: t.colors.inputBackground },
+  actionBtnLabel: { color: t.colors.textSecondary, fontSize: 12, fontWeight: '600' },
   grantRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  grantInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: theme.colors.textPrimary, fontSize: 13 },
+  grantInput: { flex: 1, backgroundColor: t.colors.inputBackground, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: t.colors.textPrimary, fontSize: 13 },
   grantBtn: { padding: 6 },
 });
