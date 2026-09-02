@@ -1,6 +1,26 @@
 import { Platform } from 'react-native';
 
-const theme = {
+/**
+ * themes.js — the dark palette (original, unchanged) and a light one.
+ *
+ * The light theme is deliberately NOT a full redesign. It inverts the two
+ * things that carry the whole look — the background and the text — and leaves
+ * every vibe* accent hue exactly where it was, so a card border that was neon
+ * cyan is still neon cyan.
+ *
+ * What that buys: nothing shifts hue, and the app stays recognisably itself.
+ * What it costs: accents tuned for a dark surface (vibeGreen #00FF41,
+ * vibeCyan #00FFFF) have little contrast against a light one. They're fine as
+ * borders and fills, thin as text. If that bites, darken the specific accents
+ * used for text rather than reworking the palette.
+ *
+ * `export default` is still the DARK theme. Every file that hasn't been
+ * converted to useThemedStyles yet imports that default and keeps rendering
+ * exactly as it did — the two themes can coexist mid-migration.
+ */
+
+const darkTheme = {
+  isDark: true,
   colors: {
     background: '#001020',
     backgroundGradient: ['#001020', '#001840', '#002060'],
@@ -14,6 +34,16 @@ const theme = {
     // Modal background — deeper than backgroundGradient, with a vibeBlue
     // glow corner so overlay modals don't read as plain dark slabs.
     modalGradient: ['#0A0420', '#1A0840', '#06182E', '#001020'],
+
+
+    // Surfaces + lines that used to be hardcoded per-file. Tokenised so a
+    // theme swap actually reaches them.
+    surface: '#141A33',
+    surfaceAlt: '#0A0E1F',
+    divider: 'rgba(255,255,255,0.06)',
+    hairline: 'rgba(255,255,255,0.10)',
+    textOnSurface: '#FFFFFF',
+    textMuted: 'rgba(255,255,255,0.6)',
 
     textPrimary: '#FFFFFF',
     textSecondary: '#778DA9',
@@ -107,4 +137,50 @@ const theme = {
   // UI Restrictions: NO glow effects - Use sharp neon borders instead
 };
 
-export default theme;
+
+// ---------------------------------------------------------------------------
+// Light — background and text inverted, accents untouched.
+// ---------------------------------------------------------------------------
+
+const lightTheme = {
+  ...darkTheme,
+  isDark: false,
+  colors: {
+    ...darkTheme.colors,
+
+    background: '#F4F7FB',
+    // Same three-stop shape as dark so gradients keep their direction and
+    // the layout reads identically — only the values are lifted.
+    backgroundGradient: ['#FFFFFF', '#F1F5FB', '#E6EDF7'],
+    // The in-round gradient stays flatter than the default one, same as dark,
+    // so the card surface still reads as a lift rather than blending in.
+    gameBackgroundGradient: ['#FDFEFF', '#F4F7FC', '#EAF0F8'],
+    modalGradient: ['#FFFFFF', '#F4F0FF', '#EEF4FA', '#F4F7FB'],
+
+    textPrimary: '#0A1220',
+    textSecondary: '#5A6B80',
+    textOnSurface: '#0A1220',
+    textMuted: 'rgba(10,18,32,0.6)',
+
+    surface: '#FFFFFF',
+    surfaceAlt: '#EEF2F8',
+    divider: 'rgba(10,18,32,0.10)',
+    hairline: 'rgba(10,18,32,0.16)',
+
+    inputBorder: '#C3CCD9',
+    inputBackground: 'rgba(10,18,32,0.04)',
+
+    headerBackground: '#F4F7FB',
+    statusBarBackground: '#F4F7FB',
+
+    white: '#FFFFFF',
+    black: '#000000',
+  },
+};
+
+export const themes = { dark: darkTheme, light: lightTheme };
+export { darkTheme, lightTheme };
+
+// Unconverted files import this. Keeping it on dark means the migration can
+// land file by file without a flag day.
+export default darkTheme;

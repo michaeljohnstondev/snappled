@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Navigation from "./Navigation";
 import { AuthProvider } from "./src/store/AuthContext";
+import { ThemeProvider } from "./src/theme/ThemeContext";
 import { ModalProvider, useModal } from "./src/store/ModalContext";
 import { RewardClaimProvider } from "./src/store/RewardClaimContext";
 import { UploadQueueProvider } from "./src/store/UploadQueueContext";
@@ -112,6 +113,7 @@ export default function App() {
               iosStoreUrl={gateResult.iosStoreUrl}
             />
           ) : (
+            <ThemeProvider>
             <AuthProvider>
               <ModalProvider>
                 <FcmDisplayBridge />
@@ -128,6 +130,7 @@ export default function App() {
                 </RewardClaimProvider>
               </ModalProvider>
             </AuthProvider>
+            </ThemeProvider>
           )}
         </View>
       </SafeAreaProvider>
