@@ -2698,26 +2698,10 @@ const makeStyles = (t) => ({
   },
   // 5s reveal stage on round results — grid of submissions with picker
   // names + colors underneath.
-  revealGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    gap: 8,
-  },
   revealCardWrap: {
     width: 100,
     alignItems: 'center',
     margin: 4,
-  },
-  revealCard: {
-    width: 100,
-    aspectRatio: 9 / 16,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 3,
-    backgroundColor: '#000',
   },
   revealCardWinner: {
     borderWidth: 4,
@@ -3066,10 +3050,6 @@ const makeStyles = (t) => ({
     fontWeight: 'bold',
     letterSpacing: 1.5,
     marginBottom: 4,
-  },
-  handGrid: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
   },
   reviewCard: {
     width: (screenWidth - 32 - 12) / 2,
