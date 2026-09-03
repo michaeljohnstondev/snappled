@@ -379,19 +379,6 @@ export default function PromptsScreen({ navigation }) {
                     <Text style={styles.promptText} numberOfLines={3}>
                       {prompt.text || prompt.prompt || 'Create something amazing!'}
                     </Text>
-
-                    {/* Stats */}
-                    <View style={styles.statsRow}>
-                      <Text style={styles.statText}>
-                        👁 {prompt.totalViews || 0}
-                      </Text>
-                      <Text style={styles.statText}>
-                        👍 {prompt.likeCount || 0}
-                      </Text>
-                      <Text style={styles.statText}>
-                        📹 {prompt.participantCount || 0}
-                      </Text>
-                    </View>
                   </View>
                 </LinearGradient>
               </Pressable>
@@ -498,17 +485,6 @@ const makeStyles = (t) => ({
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  statText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    fontWeight: theme.fontWeights.medium,
   },
   lockoutBadge: {
     color: theme.colors.vibeRed,

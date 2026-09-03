@@ -8,8 +8,31 @@ Last pruned: 2026-08-25
 
 ## Active Tasks
 
+### No app icon or splash — needs a BUILD, not an OTA
+- **Status**: NOT STARTED, blocks the next store submission
+- **What's missing**: `app.json` has no `icon` and no `splash`, and
+  `android.adaptiveIcon` carries only a `backgroundColor` — no
+  `foregroundImage`. `assets/images/` is empty. The app currently ships
+  with Expo's default icon.
+- **Sequencing matters**: an icon is baked into the binary, so it CANNOT
+  ride an OTA. It needs a fresh EAS build, which means it's worth
+  batching with any other native change rather than spending a build on
+  its own.
+- **Store needs**: both stores require a real icon; Play also wants a
+  512x512 and a feature graphic.
+
+### Game SFX are placeholders
+- **Status**: known, owner is doing better audio
+- `scripts/generateSounds.js` says so in its own header — square/saw
+  through a soft-clip stage, "placeholders with intent". Swapping is a
+  drop-in: overwrite the five files in `assets/sounds/`, nothing
+  references anything but the filenames.
+- The set isn't balanced either (game-over.wav is 113KB against
+  card-pick.wav's 5KB).
+
 ### Light theme — full app rollout
-- **Status**: ALL SCREENS CONVERTED, NOT TESTED ON DEVICE
+- **Status**: SHIPPED BUT PARKED — looks rough in places on device,
+  owner is setting it aside for now. Needs specific screen names to fix.
 - **Approach**: not tracker's semantic light palette (rejected). Inverts
   background + text; every vibe* accent hue is untouched.
 - **Infra**: `theme/themes.js` exports darkTheme / lightTheme / themes;
