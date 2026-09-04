@@ -34,6 +34,16 @@ const FONT_PATH = require.resolve(
 );
 
 const OUTPUT_DIR = 'shared';
+
+// Short stable id for a caption, so a render of the same text reuses the
+// same Storage object instead of transcoding again. djb2 — collisions are
+// irrelevant here; the worst case is two captions sharing a cache slot,
+// and the caption is re-burned from the request either way.
+function hashText(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
 // Roughly what fits across a 720px-wide frame at the caption size below.
 const WRAP_CHARS = 26;
 const MAX_LINES = 3;
@@ -175,6 +185,14 @@ exports.renderShareVideo = functions
       );
     }
 
+    // Optional caption override. A snapple carries the prompt it was
+    // recorded for, but it gets REPLAYED against other prompts — a game
+    // round is a different prompt entirely. Sharing a round used to burn
+    // in the snapple's original prompt, which is the wrong caption for
+    // the thing being shared.
+    const promptOverride =
+      data && typeof data.promptText === 'string' ? data.promptText.trim() : '';
+
     const db = admin.firestore();
     const snapRef = db.collection('snapples').doc(snappleId);
     const snap = await snapRef.get();
@@ -183,9 +201,17 @@ exports.renderShareVideo = functions
     }
 
     const snapple = snap.data();
+    const basePrompt = snapple.prompt || '';
+    // Only treat it as an override when it actually differs, so a caller
+    // that helpfully passes the same text still gets the shared cache.
+    const usingOverride = !!promptOverride && promptOverride !== basePrompt;
+    const effectivePrompt = usingOverride ? promptOverride : basePrompt;
 
     // Cache hit — the expensive path only ever runs once per snapple.
-    if (snapple.sharedVideoUrl) {
+    // Skipped for overrides: sharedVideoUrl is the render of the snapple's
+    // OWN prompt, and handing that back for a round share is exactly the
+    // bug this override exists to fix.
+    if (!usingOverride && snapple.sharedVideoUrl) {
       return {
         url: snapple.sharedVideoUrl,
         thumbUrl: snapple.shareThumbUrl || null,
@@ -256,8 +282,11 @@ exports.renderShareVideo = functions
         `https://firebasestorage.googleapis.com/v0/b/${bucket.name}` +
         `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
 
-      const videoDest = `${OUTPUT_DIR}/${snappleId}.mp4`;
-      const posterDest = `${OUTPUT_DIR}/${snappleId}.jpg`;
+      // Overrides get their own object so a round render never clobbers
+      // the snapple's canonical one (or vice versa).
+      const variant = usingOverride ? `-${hashText(promptOverride)}` : '';
+      const videoDest = `${OUTPUT_DIR}/${snappleId}${variant}.mp4`;
+      const posterDest = `${OUTPUT_DIR}/${snappleId}${variant}.jpg`;
 
       await bucket.upload(output, {
         destination: videoDest,
@@ -281,13 +310,18 @@ exports.renderShareVideo = functions
 
       const url = publicUrl(videoDest);
 
-      await snapRef.update({
-        sharedVideoUrl: url,
-        shareThumbUrl: thumbUrl,
-        shareWidth: dims ? dims.width : null,
-        shareHeight: dims ? dims.height : null,
-        sharedVideoRenderedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      // Only the canonical render is recorded on the doc. An override is
+      // one caption among many, so writing it here would make the next
+      // plain share serve a round's caption.
+      if (!usingOverride) {
+        await snapRef.update({
+          sharedVideoUrl: url,
+          shareThumbUrl: thumbUrl,
+          shareWidth: dims ? dims.width : null,
+          shareHeight: dims ? dims.height : null,
+          sharedVideoRenderedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
 
       return {
         url,

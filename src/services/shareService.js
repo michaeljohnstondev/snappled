@@ -49,11 +49,15 @@ const RENDER_TIMEOUT_MS = 12000;
 
 /**
  * Ask the backend for a copy with the prompt burned into the frames.
+ * `promptText` overrides which caption gets burned — a snapple replayed in
+ * a game round is answering that ROUND's prompt, not the one it was
+ * recorded for, and the burned-in text is the only thing that survives an
+ * Android share (see the platform note at the top of this file).
  * Cached server-side after the first call, so this is usually one fast
  * Firestore read. Returns null on any failure — the caller then shares
  * the original video, which is a worse ad but still a working share.
  */
-async function requestRenderedVideo(snappleId) {
+async function requestRenderedVideo(snappleId, promptText) {
   if (!snappleId) return null;
   try {
     const { httpsCallable } = await import('firebase/functions');
@@ -61,7 +65,7 @@ async function requestRenderedVideo(snappleId) {
     const render = httpsCallable(functions, 'renderShareVideo');
 
     const result = await Promise.race([
-      render({ snappleId }),
+      render({ snappleId, promptText: promptText || undefined }),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('render timeout')), RENDER_TIMEOUT_MS)),
     ]);
@@ -198,9 +202,13 @@ export const shareService = {
       `Watch it — ${snappleUrl(winningSubmission?.snappleId)}`,
     ].filter(Boolean).join('\n');
 
-    const rendered =
-      winningSubmission?.sharedVideoUrl ||
-      (await requestRenderedVideo(winningSubmission?.snappleId));
+    // Deliberately NOT falling back to winningSubmission.sharedVideoUrl:
+    // that's the render of the snapple's own prompt, which is the wrong
+    // caption for a round. Ask for this round's prompt instead.
+    const rendered = await requestRenderedVideo(
+      winningSubmission?.snappleId,
+      prompt,
+    );
 
     return shareVideo({
       videoUrl: winningSubmission?.videoUrl,
@@ -226,9 +234,12 @@ export const shareService = {
       `Watch it — ${snappleUrl(winningSubmission?.snappleId)}`,
     ].filter(Boolean).join('\n');
 
-    const rendered =
-      winningSubmission?.sharedVideoUrl ||
-      (await requestRenderedVideo(winningSubmission?.snappleId));
+    // Same reasoning as shareRound — burn the prompt that was actually
+    // being answered, not the snapple's original.
+    const rendered = await requestRenderedVideo(
+      winningSubmission?.snappleId,
+      prompt,
+    );
 
     return shareVideo({
       videoUrl: winningSubmission?.videoUrl,
