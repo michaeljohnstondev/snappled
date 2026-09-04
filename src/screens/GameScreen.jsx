@@ -150,7 +150,7 @@ function VotingWaitGrid({
   inlinePlayingId, playToken, onTogglePlay, onFullscreen,
   // Reactions are only wired on the scoring grid. Left undefined
   // elsewhere, the bar simply isn't rendered.
-  reactions, myUid, onReact, reactionsDisabled,
+  reactions, myUid, onReact, reactionsDisabled, reactionsMode, reactorsFor,
   // "large" = 2-col grid with big cards (SCORING screen), matches
   // the picking/voting hand grid. Anything else = the older
   // 8-column-ish centered flex-wrap for the voting wait screen.
@@ -212,11 +212,13 @@ function VotingWaitGrid({
               onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
               onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
             />
-            {onReact && (
+            {reactionsMode && (
               <ReactionBar
+                mode={reactionsMode}
                 counts={countsFor(reactions, sub.uid)}
                 mine={mineFor(reactions, sub.uid, myUid)}
-                onReact={(key) => onReact(sub.uid, key)}
+                reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
+                onReact={onReact ? (key) => onReact(sub.uid, key) : undefined}
                 disabled={reactionsDisabled}
               />
             )}
@@ -662,13 +664,19 @@ export default function GameScreen({ navigation }) {
     if (!gameId) lastBotReadyScheduleRef.current = null;
   }, [gameId]);
 
-  // Bots react during scoring. This is the part that makes the feature
-  // visible at all right now: with no concurrent players, a grid where
-  // nothing ever reacts feels more dead than one with no reactions.
+  // Bots react during VOTING, which is where reactions are now given —
+  // so their tallies are already on the cards by the time the results
+  // screen summarises them. Reacting at scoring would have meant counts
+  // popping in after the reveal.
+  //
+  // This is also what makes the feature visible at all today: with no
+  // concurrent players, a results screen that never shows a reaction
+  // feels deader than one with no reactions at all.
+  //
   // Host-only so six clients don't each write the same bot's emote.
   const lastBotReactRef = useRef(null);
   useEffect(() => {
-    if (!game || game.phase !== GAME_PHASES.SCORING) return undefined;
+    if (!game || game.phase !== GAME_PHASES.VOTING) return undefined;
     if (game.hostId !== user?.uid) return undefined;
     const key = `${game.currentRound}`;
     if (lastBotReactRef.current === key) return undefined;
@@ -678,21 +686,18 @@ export default function GameScreen({ navigation }) {
     const subs = game.submissions || [];
     if (!bots.length || !subs.length) return undefined;
 
-    // Winner-weighted: a bot is likelier to react to the round winner, so
-    // the reactions read as a reaction to the result rather than noise.
-    const winnerUid = (game.roundResults?.[game.roundResults.length - 1]
-      ?.rankings || []).find(r => r.placement === 1)?.uid;
+    // No winner exists yet during voting — that's the point, reactions
+    // are opinions formed before the result. So targets are just random
+    // across the submissions.
 
     bots.forEach((bot, i) => {
       // Not every bot every round, or it looks scripted.
       if (Math.random() < 0.35) return;
-      const target = (winnerUid && Math.random() < 0.6)
-        ? winnerUid
-        : subs[Math.floor(Math.random() * subs.length)].uid;
+      const target = subs[Math.floor(Math.random() * subs.length)].uid;
       const emoji = REACTIONS[Math.floor(Math.random() * REACTIONS.length)].key;
-      // Staggered well past the 700ms rank reshuffle so emotes land on
-      // settled cards instead of moving ones.
-      const delay = 1400 + i * 400 + Math.floor(Math.random() * 900);
+      // Spread across the voting window so reactions trickle in like
+      // people watching, rather than all landing at once.
+      const delay = 2000 + i * 900 + Math.floor(Math.random() * 2500);
       const tid = setTimeout(() => {
         gameService.addReaction(gameId, bot.uid, target, emoji).catch(() => {});
       }, delay);
@@ -2052,6 +2057,16 @@ export default function GameScreen({ navigation }) {
                           setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true });
                         }}
                       />
+                      {/* Picker lives here, not on the results screen:
+                          you react to a snapple while you're actually
+                          watching and judging it. No counts shown — the
+                          room's opinion would lead the vote. */}
+                      <ReactionBar
+                        mode="picker"
+                        mine={mineFor(game.reactions, item.uid, user?.uid)}
+                        onReact={(key) => handleReact(item.uid, key)}
+                        disabled={reactionCooling}
+                      />
                     </View>
                   );
                 })}
@@ -2219,6 +2234,19 @@ export default function GameScreen({ navigation }) {
       }));
     };
 
+    // Who sent a given reaction. Same shape and the same colour source as
+    // buildVoters, so a player reads as the same colour whether they
+    // voted for a snapple or laughed at it.
+    const reactorsFor = (subUid, emojiKey) => {
+      const ids = (game.reactions?.[subUid]?.[emojiKey]) || [];
+      return ids.map(uid => ({
+        uid,
+        name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
+        color: playerColors.get(uid) || t.colors.textSecondary,
+        isMe: uid === user?.uid,
+      }));
+    };
+
     // Snapples land in submission order, then reshuffle into rank order a
     // beat later — the same trick the scoreboard uses, where rows reorder
     // as the points tick up. Sorting immediately would just render the
@@ -2264,8 +2292,8 @@ export default function GameScreen({ navigation }) {
               variant="large"
               reactions={game.reactions}
               myUid={user?.uid}
-              onReact={handleReact}
-              reactionsDisabled={reactionCooling}
+              reactionsMode="summary"
+              reactorsFor={reactorsFor}
               submissions={rankedSubmissions}
               voters={buildVoters}
               players={game.players || []}

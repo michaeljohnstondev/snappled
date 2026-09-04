@@ -12,7 +12,7 @@
 // free text or voice — and five choices fit under a card without
 // crowding the vote auras already drawn around it.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
 
@@ -27,16 +27,68 @@ export const REACTIONS = [
 ];
 
 /**
- * @param {Object} counts     { [key]: number } — tallies to display
+ * Two modes, and the split is deliberate.
+ *
+ * 'picker' (voting) — all five, NO counts. You react to a snapple while
+ *   you're judging it, without seeing what everyone else thought first.
+ *   Showing tallies here would let the room's opinion lead the vote.
+ * 'summary' (scoring) — only what was actually given, with counts. The
+ *   tally is part of the result, and dropping the unused emoji is what
+ *   makes it fit under a card in a two-column grid.
+ *
+ * @param {Object} counts     { [key]: number } — tallies
  * @param {Object} mine       { [key]: boolean } — which ones this user sent
- * @param {Function} onReact  (key) => void
+ * @param {Function} onReact  (key) => void; omitted in summary mode
  * @param {boolean} disabled  true while the cooldown is running
+ * @param {'picker'|'summary'} mode
+ * @param {Function} reactors (key) => [{uid, name, color, isMe}] — who sent
+ *   that emoji. Summary mode only; tapping a chip reveals the names.
  */
-export default function ReactionBar({ counts = {}, mine = {}, onReact, disabled }) {
+export default function ReactionBar({
+  counts = {}, mine = {}, onReact, disabled, mode = 'picker', reactors,
+}) {
+  const isSummary = mode === 'summary';
+  // Which chip is expanded. Attribution is on demand rather than always
+  // on: colouring the chips themselves would collide with the vote auras
+  // already drawn around this card in the same player colours, and a
+  // chip holding three reactors can only carry one colour anyway.
+  const [openKey, setOpenKey] = useState(null);
+  const openList = openKey && reactors ? reactors(openKey) : null;
+  const shown = isSummary
+    ? REACTIONS.filter(({ key }) => (counts[key] || 0) > 0)
+    : REACTIONS;
+
+  // Nothing given yet — render nothing rather than an empty strip holding
+  // vertical space under every card.
+  if (isSummary && shown.length === 0) return null;
+
   return (
-    <View style={styles.row}>
-      {REACTIONS.map(({ key, glyph }) => {
+    <View>
+      <View style={styles.row}>
+      {shown.map(({ key, glyph }) => {
         const count = counts[key] || 0;
+        if (isSummary) {
+          // One reactor = the colour is unambiguous, so show it for free.
+          // Several = fall back to neutral rather than picking a winner.
+          const who = reactors ? reactors(key) : [];
+          const solo = who.length === 1 ? who[0] : null;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => setOpenKey(openKey === key ? null : key)}
+              style={[
+                styles.chip,
+                mine[key] && styles.chipMine,
+                solo && { borderColor: solo.color },
+                openKey === key && styles.chipOpen,
+              ]}
+              hitSlop={4}
+            >
+              <Text style={styles.glyph}>{glyph}</Text>
+              <Text style={styles.count}>{count}</Text>
+            </Pressable>
+          );
+        }
         return (
           <Pressable
             key={key}
@@ -52,10 +104,19 @@ export default function ReactionBar({ counts = {}, mine = {}, onReact, disabled 
             hitSlop={4}
           >
             <Text style={styles.glyph}>{glyph}</Text>
-            {count > 0 && <Text style={styles.count}>{count}</Text>}
           </Pressable>
         );
       })}
+      </View>
+      {openList && openList.length > 0 && (
+        <View style={styles.whoRow}>
+          {openList.map((r, i) => (
+            <Text key={r.uid || i} style={[styles.whoName, { color: r.color }]}>
+              {r.isMe ? 'you' : r.name}
+            </Text>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -86,6 +147,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,255,65,0.12)',
   },
   chipDim: { opacity: 0.45 },
+  chipOpen: { backgroundColor: 'rgba(0,0,0,0.8)' },
+  whoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  whoName: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
   glyph: { fontSize: 14 },
   count: {
     color: 'white',
