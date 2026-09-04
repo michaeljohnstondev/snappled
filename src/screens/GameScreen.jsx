@@ -19,6 +19,7 @@ import { userService } from '../services/userService';
 import VibeButton from '../components/ui/VibeButton';
 import ShimmerBar from '../components/ui/ShimmerBar';
 import BackChunk from '../components/ui/BackChunk';
+import ReactionBar, { REACTIONS } from '../components/game/ReactionBar';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
 import PreviewModal from '../components/game/PreviewModal';
@@ -119,6 +120,27 @@ function ScoringWinnerBanner({ isTie, names, votes }) {
 // Optional props:
 //   winnerUids (Set):    submission.uid values to crown (SCORING phase)
 //   pointsByUid (Map):   submission.uid → pointsEarned chip (SCORING phase)
+// reactions[submissionUid][key] is an array of uids; the card only needs
+// a tally and whether this user is in it.
+function countsFor(reactions, subUid) {
+  const forSub = (reactions || {})[subUid] || {};
+  const out = {};
+  REACTIONS.forEach(({ key }) => {
+    const list = forSub[key];
+    if (list && list.length) out[key] = list.length;
+  });
+  return out;
+}
+
+function mineFor(reactions, subUid, myUid) {
+  const forSub = (reactions || {})[subUid] || {};
+  const out = {};
+  REACTIONS.forEach(({ key }) => {
+    out[key] = !!(forSub[key] || []).includes(myUid);
+  });
+  return out;
+}
+
 function VotingWaitGrid({
   submissions, voters, players, playerColors, selfUid, allVotedIn,
   onPressCard, winnerUids, pointsByUid,
@@ -126,6 +148,9 @@ function VotingWaitGrid({
   // the picking/voting hand cards (tap = play once inline, expand
   // chip = fullscreen preview).
   inlinePlayingId, playToken, onTogglePlay, onFullscreen,
+  // Reactions are only wired on the scoring grid. Left undefined
+  // elsewhere, the bar simply isn't rendered.
+  reactions, myUid, onReact, reactionsDisabled,
   // "large" = 2-col grid with big cards (SCORING screen), matches
   // the picking/voting hand grid. Anything else = the older
   // 8-column-ish centered flex-wrap for the voting wait screen.
@@ -187,6 +212,14 @@ function VotingWaitGrid({
               onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
               onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
             />
+            {onReact && (
+              <ReactionBar
+                counts={countsFor(reactions, sub.uid)}
+                mine={mineFor(reactions, sub.uid, myUid)}
+                onReact={(key) => onReact(sub.uid, key)}
+                disabled={reactionsDisabled}
+              />
+            )}
           </Reanimated.View>
         );
       })}
@@ -410,6 +443,28 @@ export default function GameScreen({ navigation }) {
   // because hooks can't be declared inside the phase branch that uses it.
   // Reset per round, or round 2 would open already-sorted.
   const [showRanked, setShowRanked] = useState(false);
+
+  // Reaction throttle. A game is ONE Firestore doc and Firestore sustains
+  // roughly a write per second per document — picks, votes and round
+  // transitions already land here. Six players tapping freely would
+  // contend and slow the whole game, not just the emotes. Clash Royale
+  // rate-limits its emotes for the same reason, and it doubles as spam
+  // control.
+  const REACTION_COOLDOWN_MS = 2000;
+  const lastReactionAtRef = useRef(0);
+  const [reactionCooling, setReactionCooling] = useState(false);
+
+  const handleReact = useCallback((submissionUid, emojiKey) => {
+    const now = Date.now();
+    if (now - lastReactionAtRef.current < REACTION_COOLDOWN_MS) return;
+    lastReactionAtRef.current = now;
+    setReactionCooling(true);
+    setTimeout(() => setReactionCooling(false), REACTION_COOLDOWN_MS);
+    // Fire and forget: arrayUnion makes a repeat a no-op, and a dropped
+    // emote is not worth interrupting a round for.
+    gameService.addReaction(gameId, user?.uid, submissionUid, emojiKey)
+      .catch(() => {});
+  }, [gameId, user?.uid]);
   useEffect(() => {
     if (game?.phase !== GAME_PHASES.SCORING) {
       setShowRanked(false);
@@ -605,6 +660,49 @@ export default function GameScreen({ navigation }) {
 
   useEffect(() => {
     if (!gameId) lastBotReadyScheduleRef.current = null;
+  }, [gameId]);
+
+  // Bots react during scoring. This is the part that makes the feature
+  // visible at all right now: with no concurrent players, a grid where
+  // nothing ever reacts feels more dead than one with no reactions.
+  // Host-only so six clients don't each write the same bot's emote.
+  const lastBotReactRef = useRef(null);
+  useEffect(() => {
+    if (!game || game.phase !== GAME_PHASES.SCORING) return undefined;
+    if (game.hostId !== user?.uid) return undefined;
+    const key = `${game.currentRound}`;
+    if (lastBotReactRef.current === key) return undefined;
+    lastBotReactRef.current = key;
+
+    const bots = (game.players || []).filter(p => p.uid?.startsWith('bot_'));
+    const subs = game.submissions || [];
+    if (!bots.length || !subs.length) return undefined;
+
+    // Winner-weighted: a bot is likelier to react to the round winner, so
+    // the reactions read as a reaction to the result rather than noise.
+    const winnerUid = (game.roundResults?.[game.roundResults.length - 1]
+      ?.rankings || []).find(r => r.placement === 1)?.uid;
+
+    bots.forEach((bot, i) => {
+      // Not every bot every round, or it looks scripted.
+      if (Math.random() < 0.35) return;
+      const target = (winnerUid && Math.random() < 0.6)
+        ? winnerUid
+        : subs[Math.floor(Math.random() * subs.length)].uid;
+      const emoji = REACTIONS[Math.floor(Math.random() * REACTIONS.length)].key;
+      // Staggered well past the 700ms rank reshuffle so emotes land on
+      // settled cards instead of moving ones.
+      const delay = 1400 + i * 400 + Math.floor(Math.random() * 900);
+      const tid = setTimeout(() => {
+        gameService.addReaction(gameId, bot.uid, target, emoji).catch(() => {});
+      }, delay);
+      pendingBotTimeoutsRef.current.push(tid);
+    });
+    return undefined;
+  }, [gameId, game?.phase, game?.currentRound, game?.hostId, user?.uid]);
+
+  useEffect(() => {
+    if (!gameId) lastBotReactRef.current = null;
   }, [gameId]);
 
   // Incremental video + thumbnail prefetch — concurrent (forEach
@@ -2164,6 +2262,10 @@ export default function GameScreen({ navigation }) {
           >
             <VotingWaitGrid
               variant="large"
+              reactions={game.reactions}
+              myUid={user?.uid}
+              onReact={handleReact}
+              reactionsDisabled={reactionCooling}
               submissions={rankedSubmissions}
               voters={buildVoters}
               players={game.players || []}

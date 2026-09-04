@@ -106,6 +106,7 @@ export const gameService = {
         prompts: [],
         submissions: [],
         votes: {},
+        reactions: {},
         roundResults: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -244,6 +245,7 @@ export const gameService = {
         prompts: prompts,
         submissions: [],
         votes: {},
+        reactions: {},
         ready: {}, // fresh ready map for the warmup screen
         reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
         updatedAt: serverTimestamp(),
@@ -485,6 +487,7 @@ export const gameService = {
         prompts: nextPrompts,
         submissions: [],
         votes: {},
+        reactions: {},
         pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
@@ -586,6 +589,7 @@ export const gameService = {
         phase: GAME_PHASES.PICKING,
         submissions: [],
         votes: {},
+        reactions: {},
         pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
@@ -644,6 +648,42 @@ export const gameService = {
       return { success: true };
     } catch (error) {
       console.error('[GameService] Error starting picking:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Add one player's emoji reaction to one submission.
+  //
+  // Shape mirrors `votes`: reactions[submissionUid][emojiKey] = [uids].
+  // Keys are ASCII ('laugh', 'fire'), not the emoji characters —
+  // Firestore field paths would need escaping otherwise, and the glyph
+  // can change without a migration.
+  //
+  // arrayUnion makes a repeat tap a no-op rather than a double count, so
+  // this is safe to call optimistically.
+  //
+  // Reactions are per-round: nextRound clears them alongside submissions
+  // and votes. Nothing is written to the snapple itself — these are a
+  // moment in a game, not engagement history.
+  //
+  // NOTE ON WRITE VOLUME: a game is one Firestore document, and Firestore
+  // sustains roughly one write per second per document. Picks, votes and
+  // round transitions already write here. Callers MUST throttle per
+  // player (GameScreen does, REACTION_COOLDOWN_MS) or contention will
+  // slow the whole game, not just the reactions.
+  async addReaction(gameId, userId, submissionUid, emojiKey) {
+    try {
+      if (!gameId || !userId || !submissionUid || !emojiKey) {
+        return { success: false, error: 'Missing reaction fields' };
+      }
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      await updateDoc(gameRef, {
+        [`reactions.${submissionUid}.${emojiKey}`]: arrayUnion(userId),
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] addReaction error:', error);
       return { success: false, error: error.message };
     }
   },
