@@ -168,7 +168,12 @@ function VotingWaitGrid({
           opacity: nameOpacity,
         } : null;
         return (
-          <View key={sub.snappleId || `sub-${i}`} style={cellStyle}>
+          <Reanimated.View
+            key={sub.snappleId || `sub-${i}`}
+            layout={LinearTransition.springify().damping(12).stiffness(90)}
+            collapsable={false}
+            style={cellStyle}
+          >
             <VoteAuraCard
               submission={sub}
               voters={voters(sub.uid)}
@@ -182,7 +187,7 @@ function VotingWaitGrid({
               onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
               onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
             />
-          </View>
+          </Reanimated.View>
         );
       })}
     </View>
@@ -399,6 +404,20 @@ export default function GameScreen({ navigation }) {
   }, [tutorialTip, roundAlert]);
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
+
+  // Scoring reveal: the grid renders in submission order, then flips to
+  // rank order after a beat so the cards visibly reshuffle. Lives up here
+  // because hooks can't be declared inside the phase branch that uses it.
+  // Reset per round, or round 2 would open already-sorted.
+  const [showRanked, setShowRanked] = useState(false);
+  useEffect(() => {
+    if (game?.phase !== GAME_PHASES.SCORING) {
+      setShowRanked(false);
+      return undefined;
+    }
+    const id = setTimeout(() => setShowRanked(true), 700);
+    return () => clearTimeout(id);
+  }, [game?.phase, game?.currentRound]);
   const [previewCard, setPreviewCard] = useState(null);
   // Which voting card is playing inline (mini-player inside the
   // thumbnail). Token increments per tap so tapping the same card
@@ -2102,6 +2121,22 @@ export default function GameScreen({ navigation }) {
       }));
     };
 
+    // Snapples land in submission order, then reshuffle into rank order a
+    // beat later — the same trick the scoreboard uses, where rows reorder
+    // as the points tick up. Sorting immediately would just render the
+    // final order with nothing to watch; the delay is what makes it read
+    // as a result being revealed rather than a list being drawn.
+    const voteCount = (uid) => (game.votes?.[uid] || []).length;
+    const rankedSubmissions = showRanked
+      ? [...(game.submissions || [])].sort((a, b) => {
+        const diff = voteCount(b.uid) - voteCount(a.uid);
+        // Ties fall back to points earned, then hold their original order
+        // so the shuffle never looks random.
+        if (diff !== 0) return diff;
+        return (pointsByUid.get(b.uid) || 0) - (pointsByUid.get(a.uid) || 0);
+      })
+      : (game.submissions || []);
+
     const winnerNames = rankings
       .filter(r => r.placement === 1)
       .map(r => (game.players || []).find(p => p.uid === r.uid)?.username || 'Anon');
@@ -2129,7 +2164,7 @@ export default function GameScreen({ navigation }) {
           >
             <VotingWaitGrid
               variant="large"
-              submissions={game.submissions || []}
+              submissions={rankedSubmissions}
               voters={buildVoters}
               players={game.players || []}
               playerColors={playerColors}
