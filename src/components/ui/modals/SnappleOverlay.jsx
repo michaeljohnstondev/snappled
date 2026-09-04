@@ -6,6 +6,7 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -48,6 +49,20 @@ export default function SnappleOverlay({
   // grid on whatever page the user swiped to. Callers that don't care
   // just ignore the argument.
   const handleClose = () => onClose?.(currentIndex);
+
+  // Same pending state as the round-share button. The server burns the
+  // prompt into the video before the sheet opens, which takes seconds —
+  // an unlabelled wait reads as a dead button and gets tapped again.
+  const [sharing, setSharing] = useState(false);
+  const handleShare = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      await shareService.shareSnapple(snapple);
+    } finally {
+      setSharing(false);
+    }
+  };
 
   // Prefetch exactly ONE snapple ahead. Swiping starts each download on
   // arrival, so a quick swipe hits a load on every card; fetching the
@@ -466,17 +481,16 @@ export default function SnappleOverlay({
           </View>
 
           <View style={styles.actionGroup}>
-            <Pressable style={styles.actionButton} onPress={async () => {
-              // Attaches the actual video file with the prompt as the
-              // caption — a good snapple is the ad, so the clip has to
-              // travel, not just a link to it.
-              await shareService.shareSnapple(snapple);
-            }}>
-              <View style={styles.buttonBg}>
-                <Ionicons name="share-social" size={20} style={{ marginTop: 2, marginLeft: -2 }} color="white" />
+            <Pressable style={styles.actionButton} onPress={handleShare}>
+              <View style={[styles.buttonBg, sharing && { opacity: 0.6 }]}>
+                {sharing ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Ionicons name="share-social" size={20} style={{ marginTop: 2, marginLeft: -2 }} color="white" />
+                )}
               </View>
             </Pressable>
-            <Text style={styles.actionCount}>Share</Text>
+            <Text style={styles.actionCount}>{sharing ? 'Preparing…' : 'Share'}</Text>
           </View>
 
           {(snapple.creatorId === user?.uid || (userCurrency.ownedSnapples || []).includes(snapple.id)) ? (

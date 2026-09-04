@@ -41,11 +41,15 @@ function hashUrl(url) {
 }
 
 // How long to wait on a first-time server render before giving up and
-// sharing the un-overlaid clip. A cold function plus a transcode can run
-// past this; making the user stare at a spinner is worse than shipping
-// the plain video, and the render still completes and caches server-side
-// for the next share.
-const RENDER_TIMEOUT_MS = 12000;
+// sharing the un-overlaid clip. A cold function plus a download plus an
+// ffmpeg transcode plus an upload routinely ran past the old 12s, which
+// is why a first share so often came out with no burned-in prompt.
+//
+// Raised now that callers show a pending state — an unexplained 12s
+// freeze had to be short, but a visible "Preparing…" can honestly ask
+// for longer. The render still caches server-side either way, so a
+// second share of the same clip is instant.
+const RENDER_TIMEOUT_MS = 22000;
 
 /**
  * Ask the backend for a copy with the prompt burned into the frames.

@@ -246,6 +246,20 @@ function RoundResultsReveal({
   const styles = useThemedStyles(makeStyles);
   const isInfinite = totalRounds === 0;
 
+  // Sharing can take many seconds — the server burns the prompt into the
+  // video before the sheet opens. Without a pending state the button
+  // looked dead and people tapped it repeatedly, firing a second render.
+  const [sharing, setSharing] = useState(false);
+  const handleSharePress = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      await onShare?.();
+    } finally {
+      setSharing(false);
+    }
+  };
+
   // Per-player color — same as voting wait + scoreboard so colors are
   // consistent across all surfaces.
   const playerColors = React.useMemo(() => {
@@ -340,9 +354,18 @@ function RoundResultsReveal({
           );
         })}
 
-        <Pressable style={styles.shareResultsBtn} onPress={onShare}>
-          <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
-          <Text style={styles.shareResultsText}>Share Round</Text>
+        <Pressable
+          style={[styles.shareResultsBtn, sharing && { opacity: 0.6 }]}
+          onPress={handleSharePress}
+        >
+          {sharing ? (
+            <ActivityIndicator size="small" color={theme.colors.vibeBlue} />
+          ) : (
+            <Ionicons name="share-social" size={16} color={theme.colors.vibeBlue} />
+          )}
+          <Text style={styles.shareResultsText}>
+            {sharing ? 'Preparing…' : 'Share Round'}
+          </Text>
         </Pressable>
       </ScrollView>
 
