@@ -52,7 +52,7 @@ const OUTPUT_DIR = 'shared';
 // Renders are cached per snapple, so without this a tweak would only
 // ever show on clips nobody had shared yet — every existing one would
 // keep serving the old framing forever.
-const LAYOUT_VERSION = 3;
+const LAYOUT_VERSION = 4;
 
 // Short stable id for a caption, so a render of the same text reuses the
 // same Storage object instead of transcoding again. djb2 — collisions are
@@ -283,8 +283,17 @@ exports.renderShareVideo = functions
         '-i', input,
         '-vf', buildFilter(captionFile, markFile),
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '24',
+        // 'veryfast' + crf 24 was a visibly lossy second generation on
+        // top of an already-compressed 406x720 upload. 'fast' + crf 22
+        // buys real quality for a modest size increase and only a couple
+        // of seconds of render time — which matters, because the client
+        // gives up at 22s and a slower preset would blow through it.
+        //
+        // Size is the hard constraint, not time: at 1.68MB a share was
+        // refused outright by SMS/MMS. Don't drop crf below ~21 without
+        // checking what the output actually weighs.
+        '-preset', 'fast',
+        '-crf', '22',
         '-c:a', 'aac',
         '-b:a', '128k',
         // faststart puts the index up front so the clip previews without
