@@ -3,6 +3,12 @@
     "name": "Snappled",
     "slug": "snapple-park",
     "version": "1.0.1",
+    "icon": "./assets/images/icon-apple.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#001020"
+    },
     "orientation": "portrait",
     "scheme": "snappled",
     "userInterfaceStyle": "automatic",
@@ -30,6 +36,7 @@
         "backgroundColor": "#00000000"
       },
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon-android.png",
         "backgroundColor": "#001020"
       },
       "permissions": [
@@ -100,7 +107,13 @@
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/messaging",
+      [
+        "@react-native-firebase/messaging",
+        {
+          "android_notification_icon": "./assets/images/notification-icon.png",
+          "android_notification_color": "#00C6FF"
+        }
+      ],
       "expo-secure-store",
       "expo-audio",
       "expo-sharing"
