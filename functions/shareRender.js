@@ -201,6 +201,72 @@ function buildFilter(captionFile, markFile) {
   ].join(',');
 }
 
+
+/**
+ * ensureSharePoster — extract ONE frame so a shared link unfurls with a
+ * thumbnail instead of a bare text card.
+ *
+ * This replaces the full video render for share purposes. Burning the
+ * prompt into every frame cost 5-30s of transcode and existed only
+ * because Android strips the caption off an attached file. Now that
+ * shares are links, the prompt travels as og:title and all the page
+ * needs is a picture — which is a single -frames:v 1 grab, about a
+ * second, no re-encode.
+ *
+ * Best-effort throughout: a snapple with no poster still shares fine,
+ * it just unfurls without an image.
+ */
+async function ensureSharePoster(snappleId, snapple) {
+  if (!snappleId || !snapple) return null;
+  if (snapple.shareThumbUrl) return snapple.shareThumbUrl;
+
+  const bucket = admin.storage().bucket();
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'snapposter-'));
+  const input = path.join(work, 'in.mp4');
+  const poster = path.join(work, 'poster.jpg');
+
+  try {
+    if (snapple.filename) {
+      await bucket.file(snapple.filename).download({ destination: input });
+    } else if (snapple.videoUrl) {
+      const res = await fetch(snapple.videoUrl);
+      if (!res.ok) throw new Error(`source fetch failed: ${res.status}`);
+      fs.writeFileSync(input, Buffer.from(await res.arrayBuffer()));
+    } else {
+      return null;
+    }
+
+    // One frame a second in, so it isn't a black lead-in frame.
+    await run(ffmpegPath, [
+      '-y', '-ss', '1', '-i', input, '-frames:v', '1', '-q:v', '3', poster,
+    ]);
+    if (!fs.existsSync(poster)) return null;
+
+    const token = `${snappleId}-${Date.now()}`;
+    const dest = `${OUTPUT_DIR}/${snappleId}-poster.jpg`;
+    await bucket.upload(poster, {
+      destination: dest,
+      metadata: {
+        contentType: 'image/jpeg',
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}`
+      + `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+
+    await admin.firestore().collection('snapples').doc(snappleId)
+      .update({ shareThumbUrl: url });
+    return url;
+  } catch (error) {
+    console.warn('[ensureSharePoster]', snappleId, error.message);
+    return null;
+  } finally {
+    try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) {}
+  }
+}
+
+exports.ensureSharePoster = ensureSharePoster;
+
 exports.renderShareVideo = functions
   // Transcoding is CPU-bound; 2GB buys proportionally more CPU on GCF and
   // a 10s clip lands in a few seconds rather than timing out.

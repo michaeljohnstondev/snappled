@@ -58,10 +58,7 @@ export default function SnappleOverlay({
     if (sharing) return;
     setSharing(true);
     try {
-      const res = await shareService.shareSnapple(snapple);
-      if (res?.captionCopied) {
-        showToast?.('info', 'Caption copied', 'Paste it into the message');
-      }
+      await shareService.shareSnapple(snapple);
     } finally {
       setSharing(false);
     }

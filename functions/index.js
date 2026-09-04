@@ -993,6 +993,13 @@ exports.onNewSnapple = functions.firestore
     if (snapple.isActive === false || snapple.isBanned === true) return;
     if (!snapple.creatorId) return;
 
+    // Grab a poster frame now so a share link unfurls with a thumbnail
+    // the moment anyone shares it, rather than making them wait for one.
+    // Fire-and-forget: this must never hold up the follower fan-out
+    // below, and a missing poster only costs an image on the card.
+    require('./shareRender').ensureSharePoster(snappleId, snapple)
+      .catch(e => console.warn('[onNewSnapple] poster failed:', e.message));
+
     // Look up creator's followers from their user doc.
     const creatorSnap = await db.collection('users').doc(snapple.creatorId).get();
     if (!creatorSnap.exists) return;
