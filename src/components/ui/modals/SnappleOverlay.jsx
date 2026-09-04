@@ -38,7 +38,7 @@ export default function SnappleOverlay({
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { user, userCurrency, updateUserCurrency, updateUserCurrencyLocal } = useAuth();
-  const { showConfirm, showError, showAlert } = useModal();
+  const { showConfirm, showError, showAlert, showToast } = useModal();
   const playerRef = useRef(null);
   // Index into `snapples` (ignored when the caller only passed a single
   // `snapple`). Reset on open so re-tapping a grid thumbnail always
@@ -58,7 +58,10 @@ export default function SnappleOverlay({
     if (sharing) return;
     setSharing(true);
     try {
-      await shareService.shareSnapple(snapple);
+      const res = await shareService.shareSnapple(snapple);
+      if (res?.captionCopied) {
+        showToast?.('info', 'Caption copied', 'Paste it into the message');
+      }
     } finally {
       setSharing(false);
     }

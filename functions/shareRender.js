@@ -25,6 +25,19 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+// ffmpeg-static is PINNED to 5.2.0 (binary release b6.0) on purpose.
+//
+// 5.3.0 ships release b6.1.1, whose linux-x64 build has no `drawtext`
+// filter — it isn't compiled with libfreetype. Every render in
+// production failed in ~1.7s with "No such filter: 'drawtext'" and a
+// 500, and the client silently fell back to the un-overlaid clip, so
+// the overlay never worked once while sharing appeared fine.
+//
+// It passed local testing because the WINDOWS binary of the same
+// package does have drawtext. Verified by string-scanning both linux
+// builds: b6.0 contains 'drawtext', b6.1.1 does not.
+//
+// So: do not bump this without checking the linux binary first.
 const ffmpegPath = require('ffmpeg-static');
 
 // Anton — heavy condensed sans. Holds up at small sizes over busy video,

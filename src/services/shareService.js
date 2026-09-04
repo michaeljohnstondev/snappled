@@ -14,12 +14,22 @@
  * Platform split, and it's deliberate:
  *   iOS     - Share.share({ message, url }) attaches the file AND the caption.
  *   Android - RN's Share ignores `url` entirely, so the file goes out via
- *             expo-sharing and the caption is lost. That gap is what the
- *             server-side burned-in overlay closes (see renderedUrl below).
+ *             expo-sharing and the caption is lost. Two things cover that
+ *             gap: the server-side burned-in overlay (see renderedUrl
+ *             below), and copying the caption to the clipboard so it's
+ *             one paste away in the receiving app's own caption field.
+ *
+ * On the clipboard: Android's share intent does have a text slot
+ * (EXTRA_TEXT alongside EXTRA_STREAM), but expo-sharing doesn't expose
+ * it AND WhatsApp — the likeliest destination — ignores it for media,
+ * preferring its own caption box. The clipboard sidesteps whether the
+ * receiving app honours caption extras at all, because it works with any
+ * app that has a text field.
  */
 
 import { Platform, Share } from 'react-native';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 
 // Where a non-user lands. The per-snapple page plays the clip and hands
 // them a download link; the bare URL is the fallback when there's no id.
@@ -122,6 +132,20 @@ async function shareVideo({ videoUrl, caption, renderedUrl, dialogTitle = 'Share
   const source = renderedUrl || videoUrl;
 
   try {
+    // Copy BEFORE the sheet opens, so the paste chip most Android
+    // keyboards show for freshly-copied text is already armed when the
+    // caption field takes focus. Best-effort: a clipboard failure must
+    // never block the share itself.
+    let copied = false;
+    if (Platform.OS === 'android' && caption) {
+      try {
+        await Clipboard.setStringAsync(caption);
+        copied = true;
+      } catch (e) {
+        console.warn('[ShareService] clipboard copy failed:', e?.message);
+      }
+    }
+
     if (!source) {
       await Share.share({ message: caption });
       return { success: true, attached: false };
@@ -140,7 +164,7 @@ async function shareVideo({ videoUrl, caption, renderedUrl, dialogTitle = 'Share
         dialogTitle,
         UTI: 'public.movie',
       });
-      return { success: true, attached: true };
+      return { success: true, attached: true, captionCopied: copied };
     }
 
     // No file — send the caption with a link so it's still actionable.

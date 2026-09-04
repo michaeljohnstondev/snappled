@@ -2445,11 +2445,17 @@ export default function GameScreen({ navigation }) {
     const sortedPlayers = [...game.players].sort((a, b) => b.points - a.points);
     const handleShareRound = async () => {
       const winnerUid = lastRoundResult?.rankings?.[0]?.uid;
-      await shareService.shareRound({
+      const res = await shareService.shareRound({
         prompt: game.prompts[game.currentRound - 1] || '',
         winningSubmission: game.submissions.find(s => s.uid === winnerUid),
         players: sortedPlayers,
       });
+      // Android can't put text in the share sheet alongside a file, so
+      // the caption goes to the clipboard instead — useless unless we
+      // say so.
+      if (res?.captionCopied) {
+        showToast('info', 'Caption copied', 'Paste it into the message');
+      }
     };
     return (
       <>
