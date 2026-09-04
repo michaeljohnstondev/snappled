@@ -26,6 +26,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "associatedDomains": [
+        "applinks:snappled.com",
         "applinks:bigvibestudios.com"
       ]
     },
@@ -52,6 +53,11 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
+            {
+              "scheme": "https",
+              "host": "snappled.com",
+              "pathPrefix": "/s"
+            },
             {
               "scheme": "https",
               "host": "bigvibestudios.com",

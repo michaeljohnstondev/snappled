@@ -24,7 +24,10 @@ import { Share } from 'react-native';
 
 // Where a non-user lands. The per-snapple page plays the clip and hands
 // them a download link; the bare URL is the fallback when there's no id.
-const SHARE_URL = 'https://bigvibestudios.com/snappled';
+//
+// Own domain rather than a studio subpath: this string is seen by every
+// share recipient, so it's the most public text in the product.
+const SHARE_URL = 'https://snappled.com';
 
 // Mirrors the /snappled/s/** rewrite on bigvibestudios.com.
 function snappleUrl(snappleId) {
