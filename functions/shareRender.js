@@ -48,6 +48,12 @@ const FONT_PATH = require.resolve(
 
 const OUTPUT_DIR = 'shared';
 
+// Bump when the burned-in LAYOUT changes (position, size, colour).
+// Renders are cached per snapple, so without this a tweak would only
+// ever show on clips nobody had shared yet — every existing one would
+// keep serving the old framing forever.
+const LAYOUT_VERSION = 3;
+
 // Short stable id for a caption, so a render of the same text reuses the
 // same Storage object instead of transcoding again. djb2 — collisions are
 // irrelevant here; the worst case is two captions sharing a cache slot,
@@ -148,7 +154,13 @@ function probeDimensions(bin, file) {
 function buildFilter(captionFile, markFile) {
   const esc = p => p.replace(/\\/g, '/').replace(/:/g, '\\:');
   return [
-    'scale=720:-2',
+    // Cap at 720 wide, never UPSCALE. This was 'scale=720:-2', which
+    // blew a 406x720 phone clip up to 720x1276 — triple the pixels, a
+    // file nearly twice the size of the original (0.96MB -> 1.76MB), and
+    // no added detail, since upscaling invents nothing. The bloat pushed
+    // shares past what SMS/MMS will carry, so Google Messages refused to
+    // send them outright.
+    "scale='min(720,iw)':-2",
     [
       `drawtext=textfile='${esc(captionFile)}'`,
       `fontfile='${esc(FONT_PATH)}'`,
@@ -157,25 +169,34 @@ function buildFilter(captionFile, markFile) {
       // "100% unhinged energy" is enough to blank the whole caption.
       'expansion=none',
       'fontcolor=white',
-      'fontsize=34',
+      // Proportional: 34/720 of the width, so it reads the same at any
+      // source size now that we no longer normalise everything to 720.
+      'fontsize=w*0.047',
       'line_spacing=8',
       'box=1',
       'boxcolor=black@0.55',
       'boxborderw=18',
       'x=(w-text_w)/2',
-      'y=48',
+      // Not near the top: WhatsApp (and most messengers) overlay their
+      // own chrome there — toolbar, frame scrubber, download/edit
+      // buttons — and it sat right on the caption. Just above centre
+      // clears both that and the caption bar at the bottom, while
+      // staying off the subject's face more than dead centre would.
+      'y=h*0.38',
     ].join(':'),
     [
       `drawtext=textfile='${esc(markFile)}'`,
       `fontfile='${esc(FONT_PATH)}'`,
       'expansion=none',
       'fontcolor=white@0.85',
-      'fontsize=22',
+      'fontsize=w*0.031',
       'box=1',
       'boxcolor=black@0.4',
       'boxborderw=10',
       'x=w-text_w-28',
-      'y=h-text_h-28',
+      // Lifted off the very bottom edge for the same reason — the
+      // receiving app's caption field sits there.
+      'y=h-text_h-96',
     ].join(':'),
   ].join(',');
 }
@@ -224,7 +245,9 @@ exports.renderShareVideo = functions
     // Skipped for overrides: sharedVideoUrl is the render of the snapple's
     // OWN prompt, and handing that back for a round share is exactly the
     // bug this override exists to fix.
-    if (!usingOverride && snapple.sharedVideoUrl) {
+    if (!usingOverride
+        && snapple.sharedVideoUrl
+        && snapple.shareLayoutVersion === LAYOUT_VERSION) {
       return {
         url: snapple.sharedVideoUrl,
         thumbUrl: snapple.shareThumbUrl || null,
@@ -298,8 +321,11 @@ exports.renderShareVideo = functions
       // Overrides get their own object so a round render never clobbers
       // the snapple's canonical one (or vice versa).
       const variant = usingOverride ? `-${hashText(promptOverride)}` : '';
-      const videoDest = `${OUTPUT_DIR}/${snappleId}${variant}.mp4`;
-      const posterDest = `${OUTPUT_DIR}/${snappleId}${variant}.jpg`;
+      // Layout version rides in the filename too, so a re-render writes a
+      // new object instead of racing the CDN's copy of the old one.
+      const v = `-v${LAYOUT_VERSION}`;
+      const videoDest = `${OUTPUT_DIR}/${snappleId}${variant}${v}.mp4`;
+      const posterDest = `${OUTPUT_DIR}/${snappleId}${variant}${v}.jpg`;
 
       await bucket.upload(output, {
         destination: videoDest,
@@ -329,6 +355,7 @@ exports.renderShareVideo = functions
       if (!usingOverride) {
         await snapRef.update({
           sharedVideoUrl: url,
+          shareLayoutVersion: LAYOUT_VERSION,
           shareThumbUrl: thumbUrl,
           shareWidth: dims ? dims.width : null,
           shareHeight: dims ? dims.height : null,
