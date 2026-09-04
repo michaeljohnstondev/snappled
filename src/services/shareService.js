@@ -198,10 +198,18 @@ export const shareService = {
   async shareSnapple(snapple) {
     if (!snapple) return { success: false, error: 'No snapple' };
 
-    // Prefer an already-rendered copy; otherwise ask for one. Falls back
-    // to the raw clip so the button never dead-ends on a render failure.
+    // Falls back to the raw clip so the button never dead-ends on a
+    // render failure.
     const rendered =
-      snapple.sharedVideoUrl || (await requestRenderedVideo(snapple.id));
+      // Always ask the function; never short-circuit on the URL cached on
+      // the doc. That shortcut meant the client served its own stale copy
+      // and the function was never invoked, so a layout change on the
+      // server could never reach an already-rendered snapple — the cache
+      // check it added was simply never consulted.
+      //
+      // Costs nothing: when the render is current the function returns
+      // the same URL from a single Firestore read, ~100ms.
+      await requestRenderedVideo(snapple.id);
 
     return shareVideo({
       videoUrl: snapple.videoUrl,
