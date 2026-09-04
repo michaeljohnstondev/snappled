@@ -30,8 +30,18 @@ import { Share } from 'react-native';
 const SHARE_URL = 'https://snappled.com';
 
 // Mirrors the /snappled/s/** rewrite on bigvibestudios.com.
-function snappleUrl(snappleId) {
-  return snappleId ? `${SHARE_URL}/s/${snappleId}` : SHARE_URL;
+/**
+ * Link to one snapple. `prompt` is optional and only passed for GAME
+ * shares: a snapple gets replayed against other prompts, so a round
+ * share is answering that round's prompt, not the one the clip was
+ * recorded for. The page reads ?p= and uses it for the card title and
+ * the caption drawn over the video — same clip, right context, nothing
+ * re-rendered.
+ */
+function snappleUrl(snappleId, prompt) {
+  if (!snappleId) return SHARE_URL;
+  const base = `${SHARE_URL}/s/${snappleId}`;
+  return prompt ? `${base}?p=${encodeURIComponent(prompt)}` : base;
 }
 
 
@@ -124,7 +134,7 @@ export const shareService = {
       '',
       standings,
       '',
-      `Watch it — ${snappleUrl(winningSubmission?.snappleId)}`,
+      `Watch it — ${snappleUrl(winningSubmission?.snappleId, prompt)}`,
     ].filter(Boolean).join('\n');
 
     return shareVideo({
@@ -146,7 +156,7 @@ export const shareService = {
       '',
       board,
       '',
-      `Watch it — ${snappleUrl(winningSubmission?.snappleId)}`,
+      `Watch it — ${snappleUrl(winningSubmission?.snappleId, prompt)}`,
     ].filter(Boolean).join('\n');
 
     return shareVideo({

@@ -4,11 +4,6 @@
     "slug": "snapple-park",
     "version": "1.0.1",
     "icon": "./assets/images/icon-apple.png",
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#001020"
-    },
     "orientation": "portrait",
     "scheme": "snappled",
     "userInterfaceStyle": "automatic",
@@ -122,7 +117,21 @@
       ],
       "expo-secure-store",
       "expo-audio",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#001020",
+          "image": "./assets/images/icon-android.png",
+          "imageWidth": 320,
+          "resizeMode": "contain",
+          "ios": {
+            "image": "./assets/images/splash.png",
+            "resizeMode": "cover",
+            "backgroundColor": "#001020"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
