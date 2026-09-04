@@ -52,7 +52,7 @@ const OUTPUT_DIR = 'shared';
 // Renders are cached per snapple, so without this a tweak would only
 // ever show on clips nobody had shared yet — every existing one would
 // keep serving the old framing forever.
-const LAYOUT_VERSION = 4;
+const LAYOUT_VERSION = 5;
 
 // Short stable id for a caption, so a render of the same text reuses the
 // same Storage object instead of transcoding again. djb2 — collisions are
@@ -257,10 +257,14 @@ exports.renderShareVideo = functions
       };
     }
 
-    if (!snapple.filename) {
+    // Older snapples predate `filename` being stored on the doc. They
+    // still have a public videoUrl, so fall back to fetching that rather
+    // than refusing outright — a missing field was returning 400 and
+    // leaving those clips permanently un-overlaid.
+    if (!snapple.filename && !snapple.videoUrl) {
       throw new functions.https.HttpsError(
         'failed-precondition',
-        'Snapple has no stored video file to render.'
+        'Snapple has no video to render.'
       );
     }
 
@@ -273,7 +277,15 @@ exports.renderShareVideo = functions
     const markFile = path.join(work, 'mark.txt');
 
     try {
-      await bucket.file(snapple.filename).download({ destination: input });
+      if (snapple.filename) {
+        await bucket.file(snapple.filename).download({ destination: input });
+      } else {
+        const res = await fetch(snapple.videoUrl);
+        if (!res.ok) {
+          throw new Error(`source fetch failed: ${res.status}`);
+        }
+        fs.writeFileSync(input, Buffer.from(await res.arrayBuffer()));
+      }
 
       fs.writeFileSync(captionFile, wrapText(snapple.prompt).join('\n'), 'utf8');
       fs.writeFileSync(markFile, 'SNAPPLED', 'utf8');

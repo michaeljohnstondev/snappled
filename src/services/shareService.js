@@ -55,11 +55,15 @@ function hashUrl(url) {
 // ffmpeg transcode plus an upload routinely ran past the old 12s, which
 // is why a first share so often came out with no burned-in prompt.
 //
-// Raised now that callers show a pending state — an unexplained 12s
-// freeze had to be short, but a visible "Preparing…" can honestly ask
-// for longer. The render still caches server-side either way, so a
-// second share of the same clip is instant.
-const RENDER_TIMEOUT_MS = 22000;
+// Raised twice. 12s was chosen when the wait was invisible; 22s once
+// callers showed a pending state. Measured renders then came in at
+// 13-22s — one logged 22028ms and lost the race by 28 milliseconds,
+// which is exactly the "share worked but the overlay is missing" case.
+// 45s leaves real headroom rather than sitting on the boundary.
+//
+// The wait is only ever paid once per clip+caption: the render caches
+// server-side, so a repeat share returns in ~60ms.
+const RENDER_TIMEOUT_MS = 45000;
 
 /**
  * Ask the backend for a copy with the prompt burned into the frames.
