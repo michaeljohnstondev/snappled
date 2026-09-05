@@ -228,6 +228,53 @@ export const gameService = {
 
   // Find an open game to join
   /**
+   * Claim the game's display.
+   *
+   * The point of writing this to the game doc is that every client then
+   * reads ONE fact — is there a screen — instead of each deciding for
+   * itself. Without it, "play the video on the TV instead" becomes an
+   * `unless there's a TV` branch in every phase component, which is the
+   * retrofit worth avoiding.
+   *
+   * `attached: false` is the default, and the default is exactly today's
+   * behaviour: phones play their own video. That's what keeps remote
+   * play working when nobody has a television.
+   */
+  async claimDisplay(gameId, displayId) {
+    if (!gameId || !displayId) return { success: false };
+    try {
+      await updateDoc(doc(db, GAMES_COLLECTION, gameId), {
+        display: { attached: true, displayId, claimedAt: new Date().toISOString() },
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] claimDisplay error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /** Release it, so phones go back to playing video themselves. */
+  async releaseDisplay(gameId, displayId) {
+    if (!gameId) return { success: false };
+    try {
+      const snap = await getDoc(doc(db, GAMES_COLLECTION, gameId));
+      // Only the display that claimed it may release it — otherwise a
+      // stale tab closing would blank a TV someone else just connected.
+      if (snap.exists() && snap.data().display?.displayId !== displayId) {
+        return { success: true, skipped: true };
+      }
+      await updateDoc(doc(db, GAMES_COLLECTION, gameId), {
+        display: { attached: false },
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
    * Resolve a join code to a game id. Used by the TV page and, later, by
    * join-by-code in the app. Returns null rather than throwing so a typo
    * is an ordinary "not found" rather than an error state.

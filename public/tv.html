@@ -8,10 +8,14 @@
 <!--
   Snappled TV — a big-screen view of a game in progress.
 
-  It is a READ-ONLY subscriber. The whole game lives in one Firestore
-  document that the phones already write to and watch, so a television is
-  just another client rendering that document larger. Nothing here
-  advances a round, scores anything, or writes at all.
+  The whole game lives in one Firestore document that the phones already
+  write to and watch, so a television is just another client rendering
+  that document larger. It never advances a round or scores anything.
+
+  It does write ONE thing: a display claim, so every client can read a
+  single fact — is there a screen — rather than each deciding for itself.
+  Without that, "play the video on the TV" becomes an `unless there's a
+  TV` branch in every phase of the app.
 
   Auth is anonymous. The Firestore rules require a signed-in caller, and
   a TV has no account — so the join code is what actually gates which
@@ -69,6 +73,28 @@
   }
   .player .pts { color: var(--green); font-size: 1.5vw; font-variant-numeric: tabular-nums; }
   .hidden { display: none; }
+
+  /* Lobby join aid. A QR beats reading a URL aloud across a room, and
+     it's the cheapest install funnel there is: the screen already has
+     everyone's attention. */
+  .joinbox { display: flex; gap: 3vw; align-items: center; margin-top: 3vh; }
+  .qr { background: #fff; padding: 1vw; border-radius: 1vw; line-height: 0; }
+  .qr img { width: 14vw; height: 14vw; display: block; }
+  .qr-cap { color: var(--muted); font-size: 1.3vw; margin-top: 1vh; text-align: center; }
+
+  /* Tiles size to the SPACE, not to a guess about the device. A TV and a
+     laptop both report ~1920 CSS px and both can hold eight; a phone
+     opening this page gets one or two. Same code, sane everywhere. */
+  .reel { display: grid; gap: 1vw; margin-top: 2vh; }
+  .tile {
+    position: relative; aspect-ratio: 9 / 16; background: var(--surface);
+    border: 2px solid var(--line); border-radius: 1vw; overflow: hidden;
+  }
+  .tile video { width: 100%; height: 100%; object-fit: cover; }
+  .tile .who {
+    position: absolute; left: 0.6vw; bottom: 0.6vw; font-size: 1.2vw;
+    font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  }
 </style>
 </head>
 <body>
@@ -87,8 +113,16 @@
   <section id="room" class="hidden">
     <div class="phase" id="phase">Lobby</div>
     <div class="prompt" id="prompt">Waiting for the round to start…</div>
-    <div class="joincode">Join code · <strong id="shown-code"></strong></div>
-    <div class="players" id="players"></div>
+    <div class="joinbox">
+      <div>
+        <div class="qr" id="qr"></div>
+        <div class="qr-cap">Get the app</div>
+      </div>
+      <div style="flex:1">
+        <div class="joincode">Join code · <strong id="shown-code"></strong></div>
+        <div class="players" id="players"></div>
+      </div>
+    </div>
   </section>
 
 </div>
@@ -97,7 +131,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, signInAnonymously }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, getDoc, onSnapshot }
+import { getFirestore, doc, getDoc, onSnapshot, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // Same project the app writes to. These values are public by design —
@@ -113,6 +147,36 @@ const app = initializeApp({
 const db = getFirestore(app);
 
 const el = (id) => document.getElementById(id);
+
+// Identifies THIS screen, so a stale tab closing can't blank a TV that
+// someone else has since connected.
+const displayId = Math.random().toString(36).slice(2, 10);
+
+/**
+ * How many tiles fit — a function of space, not of device type. A TV and
+ * a laptop both report ~1920 CSS px and both hold eight; a phone opening
+ * this page gets two. Nothing here sniffs a user agent, so hardware
+ * neither of us anticipated still degrades sensibly.
+ */
+function tileColumns() {
+  const w = window.innerWidth;
+  if (w < 700) return 2;
+  if (w < 1100) return 3;
+  if (w < 1600) return 4;
+  return 5;
+}
+
+/**
+ * QR to the site. Rendered by an image service rather than shipping a
+ * generator: this page has one job and a dependency for a static image
+ * isn't worth the bytes.
+ */
+function renderQr() {
+  const url = 'https://snappled.com/';
+  el('qr').innerHTML =
+    '<img alt="Download Snappled" src="https://api.qrserver.com/v1/create-qr-code/'
+    + '?size=400x400&margin=0&data=' + encodeURIComponent(url) + '">';
+}
 const PHASE_LABEL = {
   LOBBY: 'Lobby', LOADING: 'Loading', REVIEW: 'Warmup', PICKING: 'Picking',
   VOTING: 'Voting', SCORING: 'Scoring', ROUND_RESULTS: 'Round results',
@@ -158,6 +222,22 @@ async function connect() {
     if (!codeSnap.exists()) throw new Error('No game with that code.');
 
     const gameId = codeSnap.data().gameId;
+
+    // Tell the game a screen is here. Phones read this one fact and stop
+    // playing video themselves; with no TV attached the field is absent
+    // and everything behaves exactly as it does today.
+    await updateDoc(doc(db, 'games', gameId), {
+      display: { attached: true, displayId, claimedAt: new Date().toISOString() },
+    });
+    // Best-effort release. Only clears the claim if it's still ours, so
+    // closing a stale tab can't blank a TV someone else just connected.
+    window.addEventListener('pagehide', () => {
+      updateDoc(doc(db, 'games', gameId), { display: { attached: false } })
+        .catch(() => {});
+    });
+
+    renderQr();
+
     // Live from here on: the phones write, this redraws.
     onSnapshot(doc(db, 'games', gameId), (snap) => {
       if (snap.exists()) renderGame(snap.data(), code);
