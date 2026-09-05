@@ -20,14 +20,22 @@ LogBox.ignoreLogs([
 ]);
 
 // Deep links for shared snapples. A share posts
-// https://bigvibestudios.com/snappled/s/<id>; with the domain claimed in
-// app.json that opens straight to the snapple here, and falls back to the
-// web page for anyone without the app installed.
+// https://snappled.com/s/<id>; with the domain claimed in app.json that
+// opens straight to the snapple here, and falls back to the web page for
+// anyone without the app installed.
+//
+// bigvibestudios.com/snappled stays listed so links shared before the
+// move to snappled.com still open the app rather than the browser.
 //
 // The snappled:// prefix is kept for in-app browsers, which often refuse
-// to hand an https link over to a native app.
+// to hand an https link over to a native app. The share page's "Open in
+// Snappled" button uses exactly that form.
 const linking = {
-  prefixes: ["https://bigvibestudios.com/snappled", "snappled://"],
+  prefixes: [
+    "https://snappled.com",
+    "https://bigvibestudios.com/snappled",
+    "snappled://",
+  ],
   config: {
     screens: {
       Main: {
