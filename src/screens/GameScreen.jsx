@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, FlatList, Dimensions,
-  ActivityIndicator, Animated, Modal, TextInput, ScrollView,
+  ActivityIndicator, Animated, Modal, TextInput, ScrollView, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -1701,7 +1701,14 @@ export default function GameScreen({ navigation }) {
     return (
       <AppLayout navigation={navigation} active="play">
         <View style={styles.lobbyContent}>
-          <Ionicons name="game-controller" size={64} color={theme.colors.vibeBlue} />
+          {/* The real mark, not a stock controller glyph. Uses the
+              adaptive-icon asset because it's the S on transparency —
+              it sits on the gradient without a plate behind it. */}
+          <Image
+            source={require('../../assets/images/icon-android.png')}
+            style={styles.lobbyMark}
+            resizeMode="contain"
+          />
           <Text style={styles.lobbyTitle}>Snappled</Text>
 
           {/* Deck choice */}
@@ -2630,6 +2637,11 @@ const makeStyles = (t) => ({
   // Lobby
   lobbyContent: {
     flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingTop: 16, paddingBottom: 80, gap: 16,
+  },
+  lobbyMark: {
+    width: 132,
+    height: 132,
+    marginBottom: 4,
   },
   lobbyTitle: {
     color: theme.colors.vibeBlue, fontSize: 32, fontWeight: theme.fontWeights.bold,

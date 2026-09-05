@@ -202,8 +202,14 @@ function renderGame(data, code) {
   el('qr-wrap').classList.toggle('hidden', !showQr);
 
   // Round 0 is the lobby, and prompts are 1-indexed against currentRound.
+  // In the lobby there's nothing to wait for except people — saying
+  // "waiting for the round to start" there is just wrong, since the
+  // round starts when the host says so, not on its own.
   const prompt = (data.prompts || [])[(data.currentRound || 0) - 1];
-  el('prompt').textContent = prompt || 'Waiting for the round to start…';
+  const waiting = data.phase === 'LOBBY'
+    ? 'Waiting on players to join…'
+    : 'Waiting for the round to start…';
+  el('prompt').textContent = prompt || waiting;
 
   el('players').innerHTML = '';
   [...(data.players || [])]
