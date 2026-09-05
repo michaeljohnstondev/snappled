@@ -126,8 +126,9 @@ export const shareService = {
       .map((p, i) => `${i + 1}. ${p.username}`)
       .join('\n');
 
+    // No prompt line: the link carries it as the card's title via ?p=.
+    // The standings below are the part a card can't show, so they stay.
     const caption = [
-      prompt ? `"${prompt}"` : '',
       winningSubmission?.creatorUsername
         ? `Round won by @${winningSubmission.creatorUsername}`
         : 'Round winner',
@@ -151,8 +152,9 @@ export const shareService = {
       .join('\n');
 
     const caption = [
+      // Same reasoning as shareRound: the prompt is the card's title via
+      // ?p=, so repeating it here says it twice in one message.
       winner ? `${winner.username} won on Snappled` : 'Game over on Snappled',
-      prompt ? `Final prompt: "${prompt}"` : '',
       '',
       board,
       '',
