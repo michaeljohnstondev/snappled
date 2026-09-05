@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import {
   Camera,
   useCameraDevice,
@@ -135,10 +135,38 @@ export default function BasicCameraView({
   }, [isReady, device, cameraPermission]);
 
   if (!cameraPermission || !microphonePermission) {
+    // One button, two outcomes. Ask first: on a fresh install the OS
+    // still shows its dialog and the user never leaves the app. If the
+    // permission is blocked ("don't ask again", or a reinstall that
+    // reset it), the request resolves false WITHOUT showing anything —
+    // and that silent no-op is what used to strand people on this
+    // screen with instructions and no way to act on them. Falling
+    // through to openSettings lands them on this app's settings page
+    // rather than making them hunt for it.
+    const handleGrant = async () => {
+      try {
+        const cam = cameraPermission || await requestCameraPermission();
+        const mic = microphonePermission
+          || (mode === 'video' ? await requestMicrophonePermission() : true);
+        if (!cam || !mic) await Linking.openSettings();
+      } catch (e) {
+        Linking.openSettings().catch(() => {});
+      }
+    };
+
+    const missing = !cameraPermission && !microphonePermission
+      ? 'Camera and microphone'
+      : !cameraPermission ? 'Camera' : 'Microphone';
+
     return (
       <View style={[styles.container, style, styles.center]}>
-        <Text style={styles.errorTitle}>Camera Permission Required</Text>
-        <Text style={styles.errorText}>Please enable camera access in settings.</Text>
+        <Text style={styles.errorTitle}>{missing} access needed</Text>
+        <Text style={styles.errorText}>
+          {"Snappled records straight to the prompt — it can't do that without this."}
+        </Text>
+        <Pressable style={styles.permBtn} onPress={handleGrant}>
+          <Text style={styles.permBtnText}>Grant access</Text>
+        </Pressable>
       </View>
     );
   }
@@ -188,6 +216,21 @@ const makeStyles = (t) => ({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  permBtn: {
+    marginTop: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: 'rgba(0,198,255,0.12)',
+  },
+  permBtnText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
   errorTitle: {
     color: t.colors.textPrimary,
