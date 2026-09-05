@@ -19,6 +19,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
 // key = what's stored in Firestore, glyph = what's drawn. Keeping them
@@ -45,6 +46,9 @@ export const REACTIONS = [
  * @param {Function} onReact  (key) => void; omitted in summary mode
  * @param {boolean} disabled  true while the cooldown is running
  * @param {'picker'|'summary'} mode
+ * @param {boolean} vertical stack the chips instead of laying them in a
+ *   row — used in the big player, where the actions live on a rail down
+ *   the right edge and a horizontal strip would cut across the video.
  * @param {boolean} collapsible picker only — render a single toggle that
  *   opens the set, instead of a permanent row. Used in the two-column
  *   voting grid, where five chips under every card crowded the vote auras
@@ -54,7 +58,7 @@ export const REACTIONS = [
  */
 export default function ReactionBar({
   counts = {}, mine = {}, onReact, disabled, mode = 'picker', reactors,
-  collapsible = false,
+  collapsible = false, vertical = false,
 }) {
   const isSummary = mode === 'summary';
   const [open, setOpen] = useState(false);
@@ -77,6 +81,11 @@ export default function ReactionBar({
 
   if (collapsed) {
     const anyMine = REACTIONS.some(({ key }) => mine[key]);
+    // A grey outlined face with a +, not one of the emoji. Showing a real
+    // emoji here made the toggle look like a fifth choice you were picking
+    // — greyscale reads as chrome, and the + says it opens something.
+    // Colour is the only thing that changes once you've reacted, so the
+    // control never moves or relabels under your thumb.
     return (
       <View style={styles.row}>
         <Pressable
@@ -84,7 +93,12 @@ export default function ReactionBar({
           style={[styles.chip, anyMine && styles.chipMine]}
           hitSlop={6}
         >
-          <Text style={styles.glyph}>{anyMine ? '✓' : '☺'}</Text>
+          <Ionicons
+            name="happy-outline"
+            size={15}
+            color={anyMine ? theme.colors.vibeGreen : 'rgba(255,255,255,0.65)'}
+          />
+          <Text style={[styles.plus, anyMine && styles.plusMine]}>+</Text>
         </Pressable>
       </View>
     );
@@ -92,7 +106,7 @@ export default function ReactionBar({
 
   return (
     <View>
-      <View style={styles.row}>
+      <View style={[styles.row, vertical && styles.rowVertical]}>
       {shown.map(({ key, glyph }) => {
         const count = counts[key] || 0;
         if (isSummary) {
@@ -120,7 +134,12 @@ export default function ReactionBar({
         return (
           <Pressable
             key={key}
-            onPress={() => onReact?.(key)}
+            onPress={() => {
+              onReact?.(key);
+              // Not while dimmed: GameScreen drops that tap, and closing
+              // on a reaction that never landed reads as a success.
+              if (collapsible && !disabled) setOpen(false);
+            }}
             // Not `disabled` — the button stays pressable and just dims,
             // because a dead control reads as broken while a dimmed one
             // reads as "not yet". The tap is dropped in GameScreen.
@@ -150,6 +169,7 @@ export default function ReactionBar({
 }
 
 const styles = StyleSheet.create({
+  rowVertical: { flexDirection: 'column' },
   row: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -189,6 +209,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   glyph: { fontSize: 14 },
+  plus: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '900',
+    marginLeft: -1,
+  },
+  plusMine: { color: theme.colors.vibeGreen },
   count: {
     color: 'white',
     fontSize: 11,

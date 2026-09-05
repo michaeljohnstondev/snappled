@@ -330,7 +330,6 @@ function RoundResultsReveal({
           const earned = earnedByUid[p.uid] || 0;
           const displayed = displayedPoints[p.uid] ?? p.points;
           const color = playerColors.get(p.uid) || t.colors.textSecondary;
-          const isMe = p.uid === selfUid;
           return (
             <Reanimated.View
               key={p.uid}
@@ -338,18 +337,23 @@ function RoundResultsReveal({
               collapsable={false}
               style={[styles.resultRow, { borderLeftWidth: 5, borderLeftColor: color }]}
             >
-              <Text style={styles.resultPlacement}>#{i + 1}</Text>
+              {/* Whole row in the player's colour. Rows reorder as the
+                  points tick up, so colour is what lets you follow your
+                  own row through the swap rather than re-reading names.
+                  The isMe green override is gone — the colour map
+                  already assigns self vibeGreen. */}
+              <Text style={[styles.resultPlacement, { color }]}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
-                <Text style={[styles.resultName, isMe && { color: theme.colors.vibeGreen }]}>
+                <Text style={[styles.resultName, { color }]}>
                   {p.username}
                 </Text>
               </View>
               {earned > 0 && (
-                <Text style={[styles.resultRoundPts, styles.resultRoundPtsEarned]}>
+                <Text style={[styles.resultRoundPts, styles.resultRoundPtsEarned, { color }]}>
                   +{earned}
                 </Text>
               )}
-              <Text style={styles.resultTotal}>{displayed} pts</Text>
+              <Text style={[styles.resultTotal, { color }]}>{displayed} pts</Text>
             </Reanimated.View>
           );
         })}
@@ -1967,6 +1971,20 @@ export default function GameScreen({ navigation }) {
               }));
             };
 
+            // Same shape and colour source as buildVoters, so a player
+            // reads as one colour whether they voted for a snapple or
+            // laughed at it. Local because playerColors is — the scoring
+            // screen builds its own map from its own player order.
+            const reactorsFor = (subUid, emojiKey) => {
+              const ids = (game.reactions?.[subUid]?.[emojiKey]) || [];
+              return ids.map(uid => ({
+                uid,
+                name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
+                color: playerColors.get(uid) || t.colors.textSecondary,
+                isMe: uid === user?.uid,
+              }));
+            };
+
             const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
             return (
               <View style={styles.pickedWaitWrap}>
@@ -1976,7 +1994,15 @@ export default function GameScreen({ navigation }) {
                   showsVerticalScrollIndicator={false}
                 >
                   {votingPrompt}
+                  {/* Summary, not picker: you've already voted, so a
+                      tally can't lead your vote — and the bar renders
+                      nothing until someone actually reacts, so cards
+                      with none look exactly as they do now. */}
                   <VotingWaitGrid
+                    reactions={game.reactions}
+                    myUid={user?.uid}
+                    reactionsMode="summary"
+                    reactorsFor={reactorsFor}
                     submissions={game.submissions || []}
                     voters={buildVoters}
                     players={game.players || []}
@@ -2104,19 +2130,16 @@ export default function GameScreen({ navigation }) {
                 {votableSubmissions.length % 2 === 1 && <View style={styles.votingCell} />}
               </View>
             </ScrollView>
+            {/* No back button once you've picked. Deselecting isn't a
+                thing anyone needs — tapping a different card moves the
+                vote — and a back button next to SUBMIT VOTE invited
+                exactly the misread it sounds like: leaving the round. */}
             {favoriteCard ? (
-              <View style={styles.actionRow}>
-                <BackChunk
-                  onPress={() => setFavoriteCard(null)}
-                  style={styles.actionBackFlex}
-                />
-                <ShimmerBar
-                  colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
-                  label="SUBMIT VOTE"
-                  onPress={handleSubmitVote}
-                  style={styles.actionSubmitChunk}
-                />
-              </View>
+              <ShimmerBar
+                colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+                label="SUBMIT VOTE"
+                onPress={handleSubmitVote}
+              />
             ) : (
               <ShimmerBar
                 colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
@@ -2175,6 +2198,7 @@ export default function GameScreen({ navigation }) {
                   wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
                   showToast={showToast}
                   showError={showError}
+                  prompt={game.prompts?.[game.currentRound - 1]}
                 />
                 {/* React while actually watching it, not just from the
                     grid. No counts here for the same reason as the grid
@@ -2182,6 +2206,7 @@ export default function GameScreen({ navigation }) {
                     would lead the vote. */}
                 <ReactionBar
                   mode="picker"
+                  vertical
                   mine={mineFor(game.reactions, previewCard.uid, user?.uid)}
                   onReact={(key) => handleReact(previewCard.uid, key)}
                   disabled={reactionCooling}
@@ -2219,14 +2244,19 @@ export default function GameScreen({ navigation }) {
                   {scoreboardPlayers.map((p, i) => {
                     const color = colorsSb.get(p.uid) || t.colors.textSecondary;
                     const voted = votedUidsSb.has(p.uid);
-                    const isMe = p.uid === user?.uid;
                     return (
                       <View key={p.uid} style={[styles.scoreboardRow, { borderLeftColor: color }]}>
-                        <Text style={styles.scoreboardPlace}>#{i + 1}</Text>
-                        <Text style={[styles.scoreboardName, isMe && { color: theme.colors.vibeGreen }]} numberOfLines={1}>
+                        {/* Whole row in the player's colour, not just
+                            the left bar — same colour they wear in the
+                            vote auras and reaction names, so a row is
+                            identifiable at a glance. The old isMe green
+                            override was redundant: the colour map
+                            already assigns self vibeGreen. */}
+                        <Text style={[styles.scoreboardPlace, { color }]}>#{i + 1}</Text>
+                        <Text style={[styles.scoreboardName, { color }]} numberOfLines={1}>
                           {p.username}
                         </Text>
-                        <Text style={styles.scoreboardPts}>{p.points || 0} pts</Text>
+                        <Text style={[styles.scoreboardPts, { color }]}>{p.points || 0} pts</Text>
                         <Ionicons
                           name={voted ? 'checkmark-circle' : 'time-outline'}
                           size={16}
@@ -2403,14 +2433,19 @@ export default function GameScreen({ navigation }) {
                   <Text style={styles.scoreboardTitle}>SCOREBOARD</Text>
                   {scoreboardPlayers.map((p, i) => {
                     const color = playerColors.get(p.uid) || t.colors.textSecondary;
-                    const isMe = p.uid === user?.uid;
                     return (
                       <View key={p.uid} style={[styles.scoreboardRow, { borderLeftColor: color }]}>
-                        <Text style={styles.scoreboardPlace}>#{i + 1}</Text>
-                        <Text style={[styles.scoreboardName, isMe && { color: theme.colors.vibeGreen }]} numberOfLines={1}>
+                        {/* Whole row in the player's colour, not just
+                            the left bar — same colour they wear in the
+                            vote auras and reaction names, so a row is
+                            identifiable at a glance. The old isMe green
+                            override was redundant: the colour map
+                            already assigns self vibeGreen. */}
+                        <Text style={[styles.scoreboardPlace, { color }]}>#{i + 1}</Text>
+                        <Text style={[styles.scoreboardName, { color }]} numberOfLines={1}>
                           {p.username}
                         </Text>
-                        <Text style={styles.scoreboardPts}>{p.points || 0} pts</Text>
+                        <Text style={[styles.scoreboardPts, { color }]}>{p.points || 0} pts</Text>
                       </View>
                     );
                   })}
@@ -2455,6 +2490,7 @@ export default function GameScreen({ navigation }) {
                 wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
                 showToast={showToast}
                 showError={showError}
+                prompt={game.prompts?.[game.currentRound - 1]}
               />
             }
           />

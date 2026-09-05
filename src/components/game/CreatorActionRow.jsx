@@ -8,6 +8,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { userService } from '../../services/userService';
 import { snappleService } from '../../services/snappleService';
+import { shareService } from '../../services/shareService';
 import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
@@ -15,7 +16,7 @@ import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 // Renders the creator credit line + action buttons. Each button is
 // optimistic locally and reverts on service failure (silently — toasts
 // surface the win/lose state).
-export default function CreatorActionRow({ submission, currentUser, ownedSnappleIds, wishlistedSnappleIds, showToast, showError }) {
+export default function CreatorActionRow({ submission, currentUser, ownedSnappleIds, wishlistedSnappleIds, showToast, showError, prompt }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const snappleId = submission?.snappleId || submission?.id;
@@ -113,16 +114,33 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
     } finally { setBusy(false); }
   };
 
+  // Share a link to this snapple. `prompt` is the ROUND's prompt when
+  // this rail is on a game player — the clip is answering that, not the
+  // prompt it was recorded for, and the share page takes the override.
+  const handleShare = async () => {
+    if (busy || !snappleId) return;
+    setBusy(true);
+    try {
+      await shareService.shareSnapple(
+        { ...submission, id: snappleId }, prompt);
+    } finally { setBusy(false); }
+  };
+
   // Creator name hidden in-phase per user request — all snapples are
   // currently the user's own anyway, so showing "by @me" everywhere is
   // confusing. Will return once the pool is more diverse.
   // Bail entirely when there'd be no buttons to render (own snapple
   // or missing creatorId). Otherwise the wrap's semi-transparent
   // black bg shows through as a mystery rectangle over the video.
+  // Share is the exception: it targets the snapple, not its creator, so
+  // it's just as valid on your own. Private ones are excluded — that link
+  // renders "this snapple is private" to whoever opens it.
   const hasActions = !isMine && !!creatorId;
-  if (!hasActions) return null;
+  const canShare = !!snappleId && !isPrivate;
+  if (!hasActions && !canShare) return null;
   return (
     <View style={styles.rail}>
+      {hasActions && (
       <Pressable
         style={styles.railBtn}
         onPress={handleFollow}
@@ -137,7 +155,8 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
         </View>
         <Text style={styles.railLabel}>{following ? 'Following' : 'Follow'}</Text>
       </Pressable>
-      {!isPrivate && (
+      )}
+      {hasActions && !isPrivate && (
         <Pressable
           style={styles.railBtn}
           onPress={handleWishlist}
@@ -153,7 +172,7 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
           <Text style={styles.railLabel}>{wishlisted ? 'Saved' : 'Save'}</Text>
         </Pressable>
       )}
-      {!isPrivate && (
+      {hasActions && !isPrivate && (
         <Pressable
           style={styles.railBtn}
           onPress={handleBuy}
@@ -165,6 +184,19 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
           <Text style={styles.railLabel}>{owned ? 'Owned' : 'Buy'}</Text>
         </Pressable>
       )}
+      {canShare && (
+        <Pressable
+          style={styles.railBtn}
+          onPress={handleShare}
+          disabled={busy}
+        >
+          <View style={styles.railIcon}>
+            <Ionicons name="arrow-redo-outline" size={22} color="white" />
+          </View>
+          <Text style={styles.railLabel}>Share</Text>
+        </Pressable>
+      )}
+      {hasActions && (
       <Pressable
         style={styles.railBtn}
         onPress={handleReport}
@@ -175,6 +207,7 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
         </View>
         <Text style={styles.railLabel}>Report</Text>
       </Pressable>
+      )}
     </View>
   );
 }

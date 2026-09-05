@@ -109,12 +109,18 @@ export const shareService = {
   },
 
   /** Share one snapple from the feed / overlay. */
-  async shareSnapple(snapple) {
+  /**
+   * @param {Object} snapple
+   * @param {string} [promptOverride] the round's prompt when sharing from
+   *   inside a game — a snapple gets replayed against other prompts, so
+   *   the one it was recorded for is the wrong caption there.
+   */
+  async shareSnapple(snapple, promptOverride) {
     if (!snapple) return { success: false, error: 'No snapple' };
 
     return shareVideo({
       caption: this.buildSnappleCaption(
-        snapple.prompt, snapple.creatorUsername, snapple.id),
+        promptOverride, snapple.creatorUsername, snapple.id),
       dialogTitle: 'Share Snapple',
     });
   },
