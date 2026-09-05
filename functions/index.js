@@ -1056,6 +1056,34 @@ exports.onNewSnapple = functions.firestore
 // promptPool. Response rate = responses / impressions, tracked so the
 // digest notification below only fires for proven high-engagement
 // prompts (not every hourly rotation — that would spam).
+// Delete a snapple's share poster along with the snapple.
+//
+// The client deletes the snapple doc and its own video, but the poster
+// lives under shared/ and is written by ensureSharePoster with admin
+// rights, so the client cannot remove it. Left alone it outlives the
+// snapple forever: a real one was found orphaned in the bucket weeks
+// after its doc was deleted.
+//
+// A trigger rather than client code, so it fires no matter who does the
+// deleting - the owner, an admin tool, or a future cleanup job. The path
+// is deterministic (see OUTPUT_DIR in shareRender.js), so nothing needs
+// to be read back to find it. Best-effort: a snapple whose poster was
+// never generated has nothing to remove, and failing to tidy a JPEG must
+// never surface as a failed delete.
+exports.onSnappleDeleted = functions.firestore
+  .document('snapples/{snappleId}')
+  .onDelete(async (snapshot, context) => {
+    const file = `shared/${context.params.snappleId}-poster.jpg`;
+    try {
+      await admin.storage().bucket().file(file).delete();
+    } catch (e) {
+      // 404 is the normal case for a snapple that never got a poster.
+      if (e.code !== 404) {
+        console.warn('[onSnappleDeleted] poster cleanup failed:', file, e.message);
+      }
+    }
+  });
+
 exports.trackPromptResponse = functions.firestore
   .document('snapples/{snappleId}')
   .onCreate(async (snap) => {
