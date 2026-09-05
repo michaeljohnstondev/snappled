@@ -4,11 +4,18 @@
 // phase's primary CTA (PLAY THIS SNAPPLE / VOTE FAVORITE).
 //
 // Optional overlaySlot is rendered as a floating layer above the bottom
-// bar — used for CreatorActionRow (mute/report) so the user can act on
-// the previewed card without leaving the modal.
+// bar — used for CreatorActionRow (mute/report) and the reaction bar, so
+// the user can act on the previewed card without leaving the modal.
+//
+// Pass onNext/onPrev to make it swipeable: during voting you want to go
+// through everyone's snapples without dropping back to the grid between
+// each one. Matches the vertical swipe SnappleOverlay already uses, so
+// the gesture means the same thing in both players.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import PreviewPlayer from './PreviewPlayer';
 import ShimmerBar from '../ui/ShimmerBar';
@@ -28,12 +35,34 @@ export default function PreviewModal({
   onPrimary,
   topRightSlot,
   overlaySlot,
+  onNext,
+  onPrev,
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
+
+  // Vertical swipe moves between snapples. activeOffsetY/failOffsetX are
+  // the same thresholds SnappleOverlay uses, so a horizontal drag never
+  // steals the gesture from the video's own controls.
+  const swipe = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-15, 15])
+        .failOffsetX([-30, 30])
+        .onEnd((e) => {
+          if (e.translationY < -80 && onNext) runOnJS(onNext)();
+          else if (e.translationY > 80 && onPrev) runOnJS(onPrev)();
+        }),
+    [onNext, onPrev],
+  );
+
+  // After the hooks, not before — an early return above them changes hook
+  // order between renders.
   if (!visible) return null;
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <GestureDetector gesture={swipe}>
       <View style={styles.root}>
         <PreviewPlayer videoUrl={videoUrl} muted={!!muted} />
 
@@ -60,6 +89,7 @@ export default function PreviewModal({
           </View>
         ) : null}
       </View>
+      </GestureDetector>
     </Modal>
   );
 }

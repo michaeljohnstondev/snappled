@@ -2086,6 +2086,7 @@ export default function GameScreen({ navigation }) {
                           room's opinion would lead the vote. */}
                       <ReactionBar
                         mode="picker"
+                        collapsible
                         mine={mineFor(game.reactions, item.uid, user?.uid)}
                         onReact={(key) => handleReact(item.uid, key)}
                         disabled={reactionCooling}
@@ -2121,12 +2122,24 @@ export default function GameScreen({ navigation }) {
         {/* Card Preview Modal — full-bleed video + fat cyan action bar.
             Voting variant swaps the CTA to VOTE FAVORITE and hides
             it if the user has already voted. */}
-        {previewCard && previewCard._isVoting && (
+        {previewCard && previewCard._isVoting && (() => {
+          // Swipe moves through the same list the grid shows, so the big
+          // player is a way to watch the whole round rather than a
+          // detour you have to back out of for every card.
+          const list = votableSubmissions;
+          const at = list.findIndex(x => x.uid === previewCard.uid);
+          const step = (d) => {
+            const nextItem = list[at + d];
+            if (nextItem) setPreviewCard({ ...nextItem, _isVoting: true });
+          };
+          return (
           <PreviewModal
             visible
             videoUrl={previewCard.videoUrl}
             muted={!!previewCard.muted}
             onClose={() => setPreviewCard(null)}
+            onNext={at >= 0 && at < list.length - 1 ? () => step(1) : undefined}
+            onPrev={at > 0 ? () => step(-1) : undefined}
             primaryLabel={hasVoted ? null : 'VOTE FAVORITE'}
             onPrimary={() => {
               setFavoriteCard(previewCard);
@@ -2147,17 +2160,30 @@ export default function GameScreen({ navigation }) {
               ) : null
             }
             overlaySlot={
-              <CreatorActionRow
-                submission={previewCard}
-                currentUser={user}
-                ownedSnappleIds={userCurrency.ownedSnapples || []}
-                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
-                showToast={showToast}
-                showError={showError}
-              />
+              <>
+                <CreatorActionRow
+                  submission={previewCard}
+                  currentUser={user}
+                  ownedSnappleIds={userCurrency.ownedSnapples || []}
+                  wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
+                  showToast={showToast}
+                  showError={showError}
+                />
+                {/* React while actually watching it, not just from the
+                    grid. No counts here for the same reason as the grid
+                    picker: seeing the room's opinion before you vote
+                    would lead the vote. */}
+                <ReactionBar
+                  mode="picker"
+                  mine={mineFor(game.reactions, previewCard.uid, user?.uid)}
+                  onReact={(key) => handleReact(previewCard.uid, key)}
+                  disabled={reactionCooling}
+                />
+              </>
             }
           />
-        )}
+          );
+        })()}
 
         {/* Scoreboard modal — opens from the wait-screen Scoreboard
             button. Shows the current standings sorted by score, with a

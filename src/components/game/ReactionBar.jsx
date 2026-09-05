@@ -45,13 +45,22 @@ export const REACTIONS = [
  * @param {Function} onReact  (key) => void; omitted in summary mode
  * @param {boolean} disabled  true while the cooldown is running
  * @param {'picker'|'summary'} mode
+ * @param {boolean} collapsible picker only — render a single toggle that
+ *   opens the set, instead of a permanent row. Used in the two-column
+ *   voting grid, where five chips under every card crowded the vote auras
+ *   already drawn around them.
  * @param {Function} reactors (key) => [{uid, name, color, isMe}] — who sent
  *   that emoji. Summary mode only; tapping a chip reveals the names.
  */
 export default function ReactionBar({
   counts = {}, mine = {}, onReact, disabled, mode = 'picker', reactors,
+  collapsible = false,
 }) {
   const isSummary = mode === 'summary';
+  const [open, setOpen] = useState(false);
+  // Summary is never collapsed: on the results screen the tallies ARE
+  // the content, so hiding them behind a tap would bury the result.
+  const collapsed = collapsible && !isSummary && !open;
   // Which chip is expanded. Attribution is on demand rather than always
   // on: colouring the chips themselves would collide with the vote auras
   // already drawn around this card in the same player colours, and a
@@ -65,6 +74,21 @@ export default function ReactionBar({
   // Nothing given yet — render nothing rather than an empty strip holding
   // vertical space under every card.
   if (isSummary && shown.length === 0) return null;
+
+  if (collapsed) {
+    const anyMine = REACTIONS.some(({ key }) => mine[key]);
+    return (
+      <View style={styles.row}>
+        <Pressable
+          onPress={() => setOpen(true)}
+          style={[styles.chip, anyMine && styles.chipMine]}
+          hitSlop={6}
+        >
+          <Text style={styles.glyph}>{anyMine ? '✓' : '☺'}</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View>
