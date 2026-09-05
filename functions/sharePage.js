@@ -34,7 +34,7 @@ const TEMPLATE = fs.readFileSync(
 // beside a thumbnail, and after a "by @creator — " prefix, and WhatsApp
 // truncates the card description hard.
 const DESCRIPTION =
-  'A meme caught or created. Play yours against random prompts — everyone votes.';
+  'A meme caught or created on camera. Play yours for random prompts — vote to see who wins.';
 
 /** Escape for use inside a double-quoted HTML attribute. */
 function attr(value) {
