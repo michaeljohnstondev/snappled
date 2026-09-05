@@ -92,6 +92,16 @@ const mb = (b) => (b / 1048576).toFixed(1);
     }
     if (size <= THRESHOLD_BYTES) continue;
 
+    // Never re-encode something this script already encoded. Lossy ->
+    // lossy is generational loss: a second pass throws away detail the
+    // first pass already discarded, and it compounds every run. The
+    // size threshold catches most of it, but a clip that landed above
+    // it would otherwise be re-crushed on every invocation.
+    if (data.compressedBytes) {
+      console.log(`skip ${docSnap.id}: already compressed by this script`);
+      continue;
+    }
+
     considered++;
     if (!APPLY) {
       console.log(`would compress ${docSnap.id}  ${mb(size)}MB  ${objPath}`);

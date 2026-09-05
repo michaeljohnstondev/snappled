@@ -226,7 +226,7 @@ function VotingWaitGrid({
             key={sub.snappleId || `sub-${i}`}
             layout={LinearTransition.springify().damping(12).stiffness(90)}
             collapsable={false}
-            style={cellStyle}
+            style={[cellStyle, reactionsMode && styles.cellWithReactions]}
           >
             <VoteAuraCard
               submission={sub}
@@ -241,15 +241,24 @@ function VotingWaitGrid({
               onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
               onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
             />
+            {/* Straddles the card's bottom edge rather than sitting
+                under it. Below the card the tally read as a separate
+                caption belonging to the layout; half on the clip it
+                reads as a reaction TO that clip - and it stops the
+                emoji stealing a row of height from every card in the
+                grid. The cell carries bottom padding to make room for
+                the half that hangs off. */}
             {reactionsMode && (
-              <ReactionBar
-                mode={reactionsMode}
-                counts={countsFor(reactions, sub.uid)}
-                mine={mineFor(reactions, sub.uid, myUid)}
-                reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
-                onReact={onReact ? (key) => onReact(sub.uid, key) : undefined}
-                disabled={reactionsDisabled}
-              />
+              <View style={styles.reactionOverlay} pointerEvents="box-none">
+                <ReactionBar
+                  mode={reactionsMode}
+                  counts={countsFor(reactions, sub.uid)}
+                  mine={mineFor(reactions, sub.uid, myUid)}
+                  reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
+                  onReact={onReact ? (key) => onReact(sub.uid, key) : undefined}
+                  disabled={reactionsDisabled}
+                />
+              </View>
             )}
           </Reanimated.View>
         );
@@ -3230,6 +3239,22 @@ const makeStyles = (t) => ({
     width: '50%',
     paddingHorizontal: 10,
     paddingVertical: 12,
+  },
+  // Room for the half of the reaction bar that hangs off the card, so
+  // it doesn't land on the row beneath.
+  cellWithReactions: {
+    paddingBottom: 26,
+  },
+  // Pinned to the cell's bottom and pulled up so the chips sit ACROSS
+  // the card's edge. box-none on the wrapper: it spans the full width
+  // and would otherwise swallow taps meant for the card behind it,
+  // while the chips themselves stay tappable.
+  reactionOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 12,
+    alignItems: 'center',
   },
   // Vote-wait top row: YOUR VOTE on the left, aura grid wrapping on the
   // right. Pulls all videos up next to the user's pick so eyes don't have
