@@ -209,9 +209,20 @@ const makeStyles = (t) => ({
     backgroundColor: theme.colors.vibeBlue,
     borderRadius: 3,
   },
+  // The tip is a card, not loose text on the gradient — it's the one
+  // thing here you can interact with, and a surface says so. Themed
+  // surface + a vibeBlue edge, matching the scoreboard's treatment so
+  // it reads as the same family of panel.
   tipBlock: {
     alignItems: 'center',
     maxWidth: 340,
+    backgroundColor: t.colors.surface,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 14,
   },
   tipTitle: {
     color: t.colors.textPrimary,
@@ -227,7 +238,7 @@ const makeStyles = (t) => ({
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   tipHint: {
     color: theme.colors.vibeBlue,

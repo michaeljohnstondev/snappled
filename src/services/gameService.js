@@ -65,6 +65,33 @@ const PICK_TIME = 60000; // 60 seconds to pick — matches the "60s to pick" rou
 const VOTE_TIME = 60000; // 60 seconds to vote — matches the "60s to vote" round-start alert
 const MAX_PLAYERS = 8;
 
+/**
+ * Colour slots, one per seat, matching VOTER_PALETTE in GameScreen and
+ * PLAYER_COLORS in public/tv.html.
+ *
+ * A player's colour is STORED on them at join, not derived from where
+ * they sit in the players array. leaveGame splices the array, so an
+ * index-derived colour would shift every player after the leaver —
+ * mid-game, on every phone and on the television at once, and the
+ * leaver's colour would be silently handed to someone else.
+ *
+ * A leaver's slot is released and the next joiner takes the lowest
+ * free one, which is what makes drop-in/drop-out work: colours get
+ * reused without ever colliding among players actually in the room.
+ */
+const PLAYER_COLOR_SLOTS = MAX_PLAYERS;
+
+/** Lowest colour slot not currently held by anyone in `players`. */
+function nextColorIndex(players) {
+  const taken = new Set((players || []).map(p => p.colorIndex));
+  for (let i = 0; i < PLAYER_COLOR_SLOTS; i++) {
+    if (!taken.has(i)) return i;
+  }
+  // Only reachable if MAX_PLAYERS is raised above the palette; sharing
+  // a colour beats refusing the join.
+  return (players || []).length % PLAYER_COLOR_SLOTS;
+}
+
 export const GAME_PHASES = {
   LOBBY: 'lobby',
   // Loading — pre-download every video in the drawn hand before the
@@ -143,6 +170,9 @@ export const gameService = {
           username: hostUsername,
           points: 0,
           connected: true,
+          // See PLAYER_COLOR_SLOTS — a colour that belongs to the
+          // player, not to their position in this array.
+          colorIndex: 0,
         }],
         prompts: [],
         submissions: [],
@@ -181,34 +211,42 @@ export const gameService = {
   async joinGame(gameId, userId, username) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
-      const gameDoc = await getDoc(gameRef);
 
-      if (!gameDoc.exists()) {
-        return { success: false, error: 'Game not found' };
-      }
+      // Transactional because the colour slot is chosen by READING the
+      // other players. arrayUnion could append blindly; picking a free
+      // slot cannot — two people tapping join at once would both read
+      // the same state, pick the same slot, and land the exact colour
+      // collision this is here to prevent. A party game makes that
+      // race routine, not theoretical.
+      const outcome = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(gameRef);
+        if (!snap.exists()) return { success: false, error: 'Game not found' };
 
-      const data = gameDoc.data();
-      if (data.phase !== GAME_PHASES.LOBBY) {
-        return { success: false, error: 'Game already in progress' };
-      }
+        const data = snap.data();
+        if (data.phase !== GAME_PHASES.LOBBY) {
+          return { success: false, error: 'Game already in progress' };
+        }
+        if ((data.players || []).length >= MAX_PLAYERS) {
+          return { success: false, error: 'Game is full' };
+        }
+        if ((data.players || []).some(p => p.uid === userId)) {
+          return { success: true, gameId }; // Already in game
+        }
 
-      if (data.players.length >= MAX_PLAYERS) {
-        return { success: false, error: 'Game is full' };
-      }
-
-      if (data.players.some(p => p.uid === userId)) {
-        return { success: true, gameId }; // Already in game
-      }
-
-      await updateDoc(gameRef, {
-        players: arrayUnion({
-          uid: userId,
-          username,
-          points: 0,
-          connected: true,
-        }),
-        updatedAt: serverTimestamp(),
+        tx.update(gameRef, {
+          players: [...(data.players || []), {
+            uid: userId,
+            username,
+            points: 0,
+            connected: true,
+            colorIndex: nextColorIndex(data.players),
+          }],
+          updatedAt: serverTimestamp(),
+        });
+        return { success: true, gameId };
       });
+
+      if (!outcome.success) return outcome;
 
       // Mirror the active game onto the user doc — see createGame
       // for the rationale. Bots skipped (no user doc).

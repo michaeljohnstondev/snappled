@@ -230,10 +230,12 @@ function renderGame(data, code) {
   el('prompt').textContent = prompt || waiting;
 
   el('players').innerHTML = '';
-  // Colour comes from the player's index in the UNSORTED array, so it
-  // survives the reorder as scores change — the same reason the app
-  // builds its map before sorting.
-  const seat = new Map((data.players || []).map((p, i) => [p.uid, i]));
+  // Colour is the slot stored on the player at join, so it holds still
+  // when someone leaves mid-game — a splice would otherwise recolour
+  // everyone after them, live, on the biggest screen in the room.
+  // Array position is a fallback for games that predate colorIndex.
+  const seat = new Map((data.players || []).map(
+    (p, i) => [p.uid, Number.isInteger(p.colorIndex) ? p.colorIndex : i]));
   [...(data.players || [])]
     .sort((a, b) => (b.points || 0) - (a.points || 0))
     .forEach((p) => {

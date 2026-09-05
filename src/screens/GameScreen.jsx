@@ -69,26 +69,31 @@ const VOTER_PALETTE = [
 ];
 
 /**
- * Who is what colour. Derived purely from position in game.players —
- * the same document every client reads — so a player wears one colour
- * on every phone in the room AND on the television.
+ * Who is what colour. Read from the colorIndex stored on each player at
+ * join, so it is identical on every phone in the room AND on the
+ * television, and it does not move when someone leaves.
  *
- * This used to paint self vibeGreen and cycle the palette for everyone
- * else, which meant each phone painted a DIFFERENT player green and no
- * two screens agreed. That was survivable while the game only ever
- * looked at itself; a shared display makes it a contradiction.
+ * Two rules this replaced, both wrong:
+ *  - self in vibeGreen, palette for the rest: each phone painted a
+ *    DIFFERENT player green, so no two screens agreed. Survivable
+ *    while the game only looked at itself; a shared display makes it
+ *    a contradiction.
+ *  - straight array position: leaveGame splices the array, so every
+ *    player after the leaver changed colour mid-game and the leaver's
+ *    colour was handed to someone else.
  *
- * Self is still findable without a reserved colour: VoteAuraCard bolds
- * your name and the reactor lists say "you".
+ * Position is kept only as a fallback for games that were already in
+ * flight when colorIndex shipped — those players have no slot stored
+ * and would otherwise all collapse onto one colour.
  *
- * The palette holds MAX_PLAYERS entries, so the modulo only wraps if
- * that cap is ever raised — at which point two players share a colour
- * rather than anything breaking.
+ * Self is findable without a reserved colour: VoteAuraCard bolds your
+ * name and the reactor lists say "you".
  */
 function buildPlayerColors(players) {
   const map = new Map();
   (players || []).forEach((p, i) => {
-    map.set(p.uid, VOTER_PALETTE[i % VOTER_PALETTE.length]);
+    const slot = Number.isInteger(p.colorIndex) ? p.colorIndex : i;
+    map.set(p.uid, VOTER_PALETTE[slot % VOTER_PALETTE.length]);
   });
   return map;
 }
