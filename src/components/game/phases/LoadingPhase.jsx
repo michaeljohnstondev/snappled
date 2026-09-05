@@ -7,7 +7,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { prefetchVideo } from '../../../services/videoCache';
+import {
+  prefetchVideo, isVideoCached, getPrefetchError,
+} from '../../../services/videoCache';
+import { useAuth } from '../../../store/AuthContext';
+import { useModal } from '../../../store/ModalContext';
 import { thumbnailService } from '../../../services/thumbnailService';
 import { pickRandomTip } from '../../../lib/loadingTips';
 import theme from '../../../theme/themes';
@@ -24,6 +28,14 @@ import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 // waiting instead of each phone deciding alone.
 const FALLBACK_WAIT_MS = 60000;
 
+// A flaky cellular download usually succeeds on a second attempt, so
+// retry before giving up - but bounded, or a dead url spins forever.
+const MAX_ATTEMPTS = 3;
+const RETRY_MS = 1200;
+
+// Same list as PromptInfoOverlay / PreviewPlayer.
+const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
+
 // Minimum time the screen stays up even when every prefetch was
 // already cached. Without this the loading screen flashes for a
 // frame and users think it never rendered.
@@ -35,17 +47,32 @@ const MIN_DISPLAY_MS = 1500;
 // "done" so a broken URL doesn't stall the whole flow). A parallel
 // timeout fires onLoaded regardless after MAX_WAIT_MS.
 export default function LoadingPhase({
-  hand, onLoaded, deadline, players, readyMap,
+  hand, onLoaded, deadline, players, readyMap, handPending,
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const { user } = useAuth();
+  const { showToast } = useModal();
+  // Admin only. A player can do nothing with "HTTP 403 on clip 4" - the
+  // red pip already tells them what matters. While testing, the reason
+  // is the whole point, and it was previously swallowed completely.
+  const isAdmin = ADMIN_UIDS.includes(user?.uid);
+
+  // Held in a ref so the prefetch effect can reach the current values
+  // without taking them as dependencies and restarting every download.
+  const alertRef = useRef({ isAdmin, showToast });
+  useEffect(() => { alertRef.current = { isAdmin, showToast }; },
+    [isAdmin, showToast]);
   const total = hand?.length || 0;
   // Which cards are done, not just how many. A bare percentage says
   // nothing about whether it is moving or wedged on one slow file -
   // per-snapple state makes a stall visible instead of leaving you
   // guessing whether anything downloaded at all.
   const [done, setDone] = useState([]);
+  // Settled either way - the phase must not hang on a clip that will
+  // never arrive. A failure is shown in red rather than counted as a win.
   const doneCount = done.filter(Boolean).length;
+  const failedCount = done.filter((d) => d === 'failed').length;
   const [firedOnce, setFiredOnce] = useState(false);
   // Guarantees the loading screen renders long enough to actually
   // be seen — flips true after MIN_DISPLAY_MS.
@@ -87,9 +114,9 @@ export default function LoadingPhase({
     // Mark by INDEX rather than incrementing a counter: these settle out
     // of order, so a counter can say "4 done" without being able to say
     // which four - and which one is stuck is the useful part.
-    const mark = (i) => setDone((prev) => {
+    const mark = (i, ok) => setDone((prev) => {
       const next = prev.slice();
-      next[i] = true;
+      next[i] = ok ? 'ok' : 'failed';
       return next;
     });
 
@@ -99,20 +126,43 @@ export default function LoadingPhase({
     // thumbnails, SnappleThumbnail would show its own loading
     // spinner on mount even though the video is cached — user
     // sees a "twirl" on every card on the picking screen.
-    hand.forEach((card, i) => {
+    // Attempt a card, then VERIFY. prefetchVideo resolves with the
+    // remote url when a download fails instead of rejecting, so
+    // allSettled reported success for files that never arrived - which
+    // is how six cards could all go green while the clips were not
+    // actually there. isVideoCached is the only honest signal.
+    //
+    // Retried because the common failure off wifi is a transient one,
+    // and a second attempt usually lands. Bounded so a genuinely dead
+    // url cannot spin: after the last try the card is marked failed,
+    // which shows red rather than quietly claiming success.
+    const attempt = async (card, i, tries = 0) => {
       const url = card?.videoUrl;
-      if (!url) {
-        if (!cancelled) mark(i);
-        return;
-      }
-      Promise.allSettled([
+      if (!url) { if (!cancelled) mark(i, true); return; }
+
+      await Promise.allSettled([
         prefetchVideo(url),
         thumbnailService.getThumbnail(url),
-      ]).then(() => {
-        if (cancelled) return;
-        mark(i);
-      });
-    });
+      ]);
+      if (cancelled) return;
+
+      if (isVideoCached(url)) { mark(i, true); return; }
+
+      const why = getPrefetchError(url) || 'no reason reported';
+      const { isAdmin: admin, showToast: toast } = alertRef.current;
+
+      if (tries >= MAX_ATTEMPTS - 1) {
+        mark(i, false);
+        if (admin) toast?.('info', `Snapple ${i + 1} failed`, why);
+        return;
+      }
+      if (admin) {
+        toast?.('info', `Snapple ${i + 1} retry ${tries + 1}`, why);
+      }
+      setTimeout(() => { if (!cancelled) attempt(card, i, tries + 1); }, RETRY_MS);
+    };
+
+    hand.forEach((card, i) => { attempt(card, i); });
 
     return () => { cancelled = true; };
   }, [hand]);
@@ -122,14 +172,17 @@ export default function LoadingPhase({
   // if both conditions land in the same tick.
   useEffect(() => {
     if (firedOnce) return;
-    // No `total > 0` guard: an empty hand is already complete, and
-    // requiring one meant it sat through the entire deadline waiting
-    // for downloads that were never going to happen.
+    // An empty hand is only "complete" if it is genuinely empty. While
+    // the pool is still loading there is nothing to prefetch YET, and
+    // treating that as done is what let the phase finish before the
+    // cards existed. The shared deadline still backstops this, so a
+    // pool that never arrives cannot hang the round.
+    if (handPending) return;
     if (minElapsed && doneCount >= total) {
       setFiredOnce(true);
       onLoadedRef.current?.();
     }
-  }, [doneCount, total, firedOnce, minElapsed]);
+  }, [doneCount, total, firedOnce, minElapsed, handPending]);
 
   // Give-up timer, measured against the SHARED deadline so every client
   // stops waiting at the same moment rather than each running its own
@@ -195,8 +248,21 @@ export default function LoadingPhase({
       {total > 0 && (
         <View style={styles.pipRow}>
           {Array.from({ length: total }, (_, i) => (
-            <View key={i} style={[styles.pip, done[i] && styles.pipDone]}>
-              <Text style={[styles.pipText, done[i] && styles.pipTextDone]}>
+            <View
+              key={i}
+              style={[
+                styles.pip,
+                done[i] === 'ok' && styles.pipDone,
+                done[i] === 'failed' && styles.pipFailed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.pipText,
+                  done[i] === 'ok' && styles.pipTextDone,
+                  done[i] === 'failed' && styles.pipTextFailed,
+                ]}
+              >
                 {i + 1}
               </Text>
             </View>
@@ -206,9 +272,13 @@ export default function LoadingPhase({
 
       {waitingOn > 0 && (
         <Text style={styles.waitingOn}>
-          {myTurnDone
-            ? `waiting on ${waitingOn} ${waitingOn === 1 ? 'player' : 'players'}`
-            : 'downloading this round'}
+          {failedCount > 0
+            ? `${failedCount} couldn't download`
+            : handPending
+            ? 'drawing your hand'
+            : myTurnDone
+              ? `waiting on ${waitingOn} ${waitingOn === 1 ? 'player' : 'players'}`
+              : 'downloading this round'}
         </Text>
       )}
 
@@ -303,6 +373,11 @@ const makeStyles = (t) => ({
     fontWeight: '800',
   },
   pipTextDone: { color: theme.colors.vibeGreen },
+  pipFailed: {
+    borderColor: theme.colors.vibeRed,
+    backgroundColor: 'rgba(255,68,68,0.15)',
+  },
+  pipTextFailed: { color: theme.colors.vibeRed },
   waitingOn: {
     color: t.colors.textSecondary,
     fontSize: 12,

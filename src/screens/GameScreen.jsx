@@ -1843,6 +1843,17 @@ export default function GameScreen({ navigation }) {
     return (
       <LoadingPhase
         hand={hand}
+        // The hand is drawn from Firestore data that loads async, so
+        // LOADING can begin before there is a hand to prefetch. Without
+        // this the screen reported "100%" of an EMPTY hand, advanced,
+        // and the cards were then drawn during warmup having never been
+        // downloaded - which is why your own snapples streamed even
+        // though loading claimed it had them.
+        handPending={
+          hand.length === 0
+          && mySnapples.length === 0
+          && allSnapples.length === 0
+        }
         onLoaded={advance}
         deadline={game.loadingDeadline}
         players={game.players || []}

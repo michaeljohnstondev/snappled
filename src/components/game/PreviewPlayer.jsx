@@ -3,9 +3,10 @@
 // driven by the snapple's own setting.
 
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useCachedVideoUri, invalidateCachedVideo } from '../../services/videoCache';
+import theme from '../../theme/themes';
 import { useAuth } from '../../store/AuthContext';
 import { useModal } from '../../store/ModalContext';
 
@@ -18,8 +19,17 @@ import { useModal } from '../../store/ModalContext';
 // Same list as PromptInfoOverlay / SnappleOverlay.
 const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 
+const WAIT_FOR_CACHE_MS = 3000;
+
 export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) {
-  const cachedUri = useCachedVideoUri(videoUrl);
+  // Hold out briefly for the downloaded file. Clips you watch in a game
+  // are OTHER players' submissions, which the loading screen never
+  // covered - it only prefetches your own hand - so they are often
+  // still arriving when the big player opens. Three seconds is enough
+  // for one clip on a normal connection and short enough not to feel
+  // like a hang; past that it streams, since a stuttering clip beats
+  // no clip.
+  const cachedUri = useCachedVideoUri(videoUrl, WAIT_FOR_CACHE_MS);
   const { user } = useAuth();
 
   // useCachedVideoUri hands back the REMOTE url until the download
@@ -29,6 +39,7 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
   // broken clip, because the only signal was a console.warn nobody sees
   // on a phone. Admin-only, since it means nothing to a player.
   const streaming = !!videoUrl && cachedUri === videoUrl;
+  const waiting = !!videoUrl && !cachedUri;
   const isAdmin = ADMIN_UIDS.includes(user?.uid);
   const { showToast } = useModal();
 
@@ -48,6 +59,19 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
     p.play();
   });
 
+  // The player is constructed while cachedUri is still null, so the real
+  // source has to be pushed in when the download lands. Relying on
+  // useVideoPlayer to notice the prop change is not safe - it takes the
+  // source at creation - and without this the wait would end in a
+  // permanently blank player instead of a playing clip.
+  useEffect(() => {
+    if (!player || !cachedUri) return;
+    try {
+      player.replace(cachedUri);
+      player.play();
+    } catch (e) { /* replace is best-effort; source may already match */ }
+  }, [player, cachedUri]);
+
   useEffect(() => {
     if (!player) return;
     const sub = player.addListener?.('statusChange', (event) => {
@@ -66,6 +90,14 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
     return () => { try { sub?.remove?.(); } catch (e) {} };
   }, [player, videoUrl, showToast]);
 
+  if (waiting) {
+    return (
+      <View style={[StyleSheet.absoluteFill, styles.waiting]}>
+        <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+      </View>
+    );
+  }
+
   return (
     <VideoView
       player={player}
@@ -77,3 +109,11 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
     />
   );
 }
+
+const styles = StyleSheet.create({
+  waiting: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+  },
+});

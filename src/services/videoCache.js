@@ -143,6 +143,21 @@ export async function prefetchVideo(url) {
 
     try {
       const res = await FileSystem.downloadAsync(url, localUri);
+
+      // downloadAsync RESOLVES on a 404 or 500 - it just writes the
+      // error body to the file. Without this check a Storage error page
+      // was cached as though it were the video, and every later play
+      // read that file happily and showed nothing.
+      if (res.status && (res.status < 200 || res.status >= 300)) {
+        try {
+          await FileSystem.deleteAsync(localUri, { idempotent: true });
+        } catch (e) { /* nothing to clean up */ }
+        recordError(url, `HTTP ${res.status}`);
+        notify(url, url);
+        return url;
+      }
+
+      lastErrors.delete(url);
       cached.set(url, res.uri);
       notify(url, res.uri);
       // Fire-and-forget: the caller is waiting on a video, not on
@@ -152,6 +167,8 @@ export async function prefetchVideo(url) {
     } catch (err) {
       // Silent fallback to remote URL — video still streams, just no
       // cache speedup. Don't set `cached` so a later attempt can retry.
+      recordError(url, err?.message || String(err) || 'unknown error');
+      notify(url, url);
       return url;
     }
   })().finally(() => inFlight.delete(url));
@@ -175,19 +192,78 @@ export async function invalidateCachedVideo(url) {
   notify(url, url); // hand subscribers the remote URL as a fallback
 }
 
+/**
+ * Is this url actually on disk?
+ *
+ * prefetchVideo RESOLVES with the remote url when a download fails
+ * rather than rejecting, so "the promise settled" says nothing about
+ * whether anything was downloaded. Callers that need the truth - the
+ * loading screen deciding whether a card is ready - have to ask this
+ * instead, or they report success for files that were never fetched.
+ */
+// Why the last prefetch of a url failed. Kept because the failure was
+// otherwise swallowed entirely - prefetchVideo resolves either way, so
+// "it didn't download" arrived with no cause attached and there was
+// nothing to debug from. Bounded to the most recent handful; this is a
+// diagnostic, not a log.
+const lastErrors = new Map();
+const MAX_ERRORS = 20;
+
+function recordError(url, reason) {
+  if (lastErrors.size >= MAX_ERRORS) {
+    lastErrors.delete(lastErrors.keys().next().value);
+  }
+  lastErrors.set(url, reason);
+}
+
+/** Reason the last prefetch of `url` failed, or null. */
+export function getPrefetchError(url) {
+  return (url && lastErrors.get(url)) || null;
+}
+
+export function isVideoCached(url) {
+  return !!url && cached.has(url);
+}
+
 export function getCachedUriSync(url) {
   if (!url) return url;
   return cached.get(url) || url;
 }
 
-// Hook: returns local URI when cached, remote URL while pending. Subscribes to
-// the cache so the player swaps to local once the download finishes.
-export function useCachedVideoUri(url) {
-  const [uri, setUri] = useState(() => getCachedUriSync(url));
+/**
+ * Hook: the local URI once cached, otherwise the remote URL.
+ *
+ * @param {string} url
+ * @param {number} [graceMs] wait this long for the download before
+ *   falling back to the remote URL, returning null meanwhile so the
+ *   caller can show a spinner.
+ *
+ *   Without a grace period an uncached clip does not fail - it streams,
+ *   and on a weak connection that is the stutter people report as "it
+ *   didn't play right". A clip is a few seconds long, so streaming one
+ *   that is halfway downloaded is strictly worse than waiting a moment
+ *   for the file. The fallback still exists: if the download has not
+ *   landed by graceMs, stream rather than spin forever, because a
+ *   stuttering clip beats no clip at all.
+ */
+export function useCachedVideoUri(url, graceMs = 0) {
+  const [uri, setUri] = useState(() => {
+    if (!url) return url;
+    const hit = cached.get(url);
+    return hit || (graceMs > 0 ? null : url);
+  });
 
   useEffect(() => {
     if (!url) return;
-    setUri(getCachedUriSync(url));
+    const hit = cached.get(url);
+    setUri(hit || (graceMs > 0 ? null : url));
+
+    // Stop holding out after the grace period, whatever the download is
+    // doing. Cleared on unmount so a closed player can't strand a timer.
+    let graceTimer = null;
+    if (graceMs > 0 && !hit) {
+      graceTimer = setTimeout(() => setUri((cur) => cur || url), graceMs);
+    }
     // Subscribe in case a download is in progress.
     const subs = listeners.get(url) || new Set();
     const fn = (localUri) => setUri(localUri);
@@ -196,10 +272,11 @@ export function useCachedVideoUri(url) {
     // Kick off prefetch (idempotent).
     prefetchVideo(url);
     return () => {
+      if (graceTimer) clearTimeout(graceTimer);
       subs.delete(fn);
       if (subs.size === 0) listeners.delete(url);
     };
-  }, [url]);
+  }, [url, graceMs]);
 
   return uri;
 }
