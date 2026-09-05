@@ -104,6 +104,24 @@ export default function LobbyPhase({
             ? `Join code: ${game.joinCode}`
             : `Game ID: ${gameId.slice(0, 6).toUpperCase()}`}
         </Text>
+
+        {/* Connecting a screen IS the switch into TV mode — there's no
+            host toggle, because a toggle can disagree with reality
+            ("TV mode on, no TV attached") whereas a claim written by the
+            actual display cannot. This line is the host's confirmation
+            that the link took. */}
+        {game?.display?.attached ? (
+          <View style={styles.tvRow}>
+            <Ionicons name="tv" size={14} color={theme.colors.vibeGreen} />
+            <Text style={styles.tvText}>TV connected</Text>
+          </View>
+        ) : (
+          <Text style={styles.tvHint}>
+            {game?.joinCode
+              ? 'Open snappled.com/tv and enter the code to play on a screen'
+              : ''}
+          </Text>
+        )}
       </ScrollView>
     </LinearGradient>
   );
@@ -182,6 +200,25 @@ const makeStyles = (t) => ({
   buttons: { width: '100%', gap: 12, marginTop: 16 },
   waiting: { color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   gameCode: { color: t.colors.textSecondary, fontSize: 12, marginTop: 16 },
+  tvRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  tvText: {
+    color: theme.colors.vibeGreen,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  tvHint: {
+    color: t.colors.textSecondary,
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
   roundsPicker: {
     alignItems: 'center',
     marginTop: 16,
