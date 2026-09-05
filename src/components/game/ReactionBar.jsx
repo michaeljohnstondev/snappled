@@ -75,30 +75,39 @@ export default function ReactionBar({
     ? REACTIONS.filter(({ key }) => (counts[key] || 0) > 0)
     : REACTIONS;
 
-  // Nothing given yet — render nothing rather than an empty strip holding
-  // vertical space under every card.
-  if (isSummary && shown.length === 0) return null;
+  // Summary can take new reactions too, when handed an onReact. The
+  // round is still on screen and people keep reacting to what they just
+  // watched - there was no reason the tally was read-only.
+  //
+  // It gets its own toggle rather than making the chips send: a tap on a
+  // summary chip already means "who reacted", and overloading that would
+  // make every attempt to read the tally fire an emoji.
+  const canAdd = isSummary && !!onReact;
+
+  // Nothing given yet - normally render nothing rather than an empty
+  // strip holding vertical space under every card. But when adding is
+  // allowed the toggle has to survive, or a card nobody has reacted to
+  // yet would be the one card you cannot react to.
+  if (isSummary && shown.length === 0 && !canAdd) return null;
+
+  const addToggle = (
+    <Pressable
+      onPress={() => setOpen(true)}
+      style={styles.chip}
+      hitSlop={6}
+    >
+      <Ionicons name="happy-outline" size={15} color="rgba(255,255,255,0.65)" />
+      <Text style={styles.plus}>+</Text>
+    </Pressable>
+  );
 
   if (collapsed) {
-    // A grey outlined face with a +, not one of the emoji. Showing a real
-    // emoji here made the toggle look like a fifth choice you were picking
-    // — greyscale reads as chrome, and the + says it opens something.
-    //
-    // It stays grey even once you've reacted. What you sent is shown on
-    // the card corner instead, so tinting this too would say the same
-    // thing twice, in the button you're about to press again.
-    return (
-      <View style={styles.row}>
-        <Pressable
-          onPress={() => setOpen(true)}
-          style={styles.chip}
-          hitSlop={6}
-        >
-          <Ionicons name="happy-outline" size={15} color="rgba(255,255,255,0.65)" />
-          <Text style={styles.plus}>+</Text>
-        </Pressable>
-      </View>
-    );
+    // A grey outlined face with a +, not one of the emoji. Showing a
+    // real emoji made the toggle look like a fifth choice you were
+    // picking - greyscale reads as chrome, and the + says it opens
+    // something. It stays grey once you've reacted: what you sent is
+    // shown on the card corner, so tinting this would say it twice.
+    return <View style={styles.row}>{addToggle}</View>;
   }
 
   return (
@@ -151,7 +160,34 @@ export default function ReactionBar({
           </Pressable>
         );
       })}
+      {/* Trailing, so the tally still reads left to right and the way
+          to add sits after what's already there. */}
+      {canAdd && !open && addToggle}
       </View>
+      {/* The picker opens as its own row BELOW the tally rather than
+          replacing it - the counts are the results screen's content and
+          shouldn't vanish because you reached for an emoji. */}
+      {canAdd && open && (
+        <View style={styles.row}>
+          {REACTIONS.map(({ key, glyph }) => (
+            <Pressable
+              key={key}
+              onPress={() => {
+                onReact?.(key);
+                if (!disabled) setOpen(false);
+              }}
+              style={({ pressed }) => [
+                styles.chip,
+                mine[key] && styles.chipMine,
+                (pressed || disabled) && styles.chipDim,
+              ]}
+              hitSlop={4}
+            >
+              <Text style={styles.glyph}>{glyph}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       {openList && openList.length > 0 && (
         <View style={styles.whoRow}>
           {openList.map((r, i) => (

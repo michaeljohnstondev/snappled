@@ -2013,6 +2013,8 @@ export default function GameScreen({ navigation }) {
                     reactions={game.reactions}
                     myUid={user?.uid}
                     reactionsMode="summary"
+                    onReact={handleReact}
+                    reactionsDisabled={reactionCooling}
                     reactorsFor={reactorsFor}
                     submissions={game.submissions || []}
                     voters={buildVoters}
@@ -2390,6 +2392,12 @@ export default function GameScreen({ navigation }) {
               reactions={game.reactions}
               myUid={user?.uid}
               reactionsMode="summary"
+              // Still reactable. The clips are on screen and people keep
+              // reacting to what they just watched; a tally that goes
+              // read-only when the round ends cuts that off exactly as
+              // the reaction lands.
+              onReact={handleReact}
+              reactionsDisabled={reactionCooling}
               reactorsFor={reactorsFor}
               submissions={rankedSubmissions}
               voters={buildVoters}
