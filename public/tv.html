@@ -114,7 +114,7 @@
     <div class="phase" id="phase">Lobby</div>
     <div class="prompt" id="prompt">Waiting for the round to start…</div>
     <div class="joinbox">
-      <div>
+      <div id="qr-wrap">
         <div class="qr" id="qr"></div>
         <div class="qr-cap">Get the app</div>
       </div>
@@ -172,6 +172,10 @@ function tileColumns() {
  * isn't worth the bytes.
  */
 function renderQr() {
+  // Only on a screen big enough to be shared. On a laptop or a phone the
+  // QR is pointless — whoever is looking at it is already holding the
+  // device they'd scan it with.
+  if (window.innerWidth < 1100) { el('qr-wrap').classList.add('hidden'); return; }
   const url = 'https://snappled.com/';
   el('qr').innerHTML =
     '<img alt="Download Snappled" src="https://api.qrserver.com/v1/create-qr-code/'
@@ -188,6 +192,14 @@ function renderGame(data, code) {
   el('room').classList.remove('hidden');
   el('shown-code').textContent = code;
   el('phase').textContent = PHASE_LABEL[data.phase] || data.phase || '';
+
+  // The QR earns its space in the lobby and again on the score screens:
+  // that's when people who aren't playing are watching, and when someone
+  // who just saw a good round is most likely to want in. It's in the way
+  // during picking and voting, so it goes.
+  const showQr = ['LOBBY', 'SCORING', 'ROUND_RESULTS', 'FINAL_RESULTS']
+    .includes(data.phase) && window.innerWidth >= 1100;
+  el('qr-wrap').classList.toggle('hidden', !showQr);
 
   // Round 0 is the lobby, and prompts are 1-indexed against currentRound.
   const prompt = (data.prompts || [])[(data.currentRound || 0) - 1];
