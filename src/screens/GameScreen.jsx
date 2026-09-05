@@ -990,10 +990,12 @@ export default function GameScreen({ navigation }) {
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            // Host transitions to PICKING when review timer ends
-            if (game.hostId === user?.uid) {
-              gameService.startPicking(gameId);
-            }
+            // Any client advances when its timer ends — not just the
+            // host. The host's phone backgrounding or losing signal used
+            // to stall the round for everyone. The service guards the
+            // transition, so whoever gets there first wins and the rest
+            // no-op.
+            gameService.startPicking(gameId);
             return 0;
           }
           return prev - 1;
@@ -1010,9 +1012,7 @@ export default function GameScreen({ navigation }) {
             // Host force-advances to voting when the timer expires so AFK
             // players don't stall the round. (Add isRanked branch back
             // here once ranked exists — there autopick is fair game.)
-            if (game.hostId === user?.uid) {
-              gameService.startVoting(gameId);
-            }
+            gameService.startVoting(gameId);
             return 0;
           }
           return prev - 1;
@@ -1028,8 +1028,10 @@ export default function GameScreen({ navigation }) {
             // No auto-vote either. Host force-advances to results so the
             // round doesn't stall on AFK voters. Same scheduling guard as
             // the all-voted path so we don't double-fire finishRound.
-            if (game.hostId === user?.uid &&
-                finishScheduledRoundRef.current !== game.currentRound) {
+            // finishRound awards points, so it must run exactly once —
+            // it claims the transition in a transaction. The local ref
+            // still stops this client double-scheduling.
+            if (finishScheduledRoundRef.current !== game.currentRound) {
               finishScheduledRoundRef.current = game.currentRound;
               setTimeout(() => gameService.finishRound(gameId), 1000);
             }
@@ -1048,9 +1050,7 @@ export default function GameScreen({ navigation }) {
         setTimer(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            if (game.hostId === user?.uid) {
-              gameService.enterRoundResults(gameId);
-            }
+            gameService.enterRoundResults(gameId);
             return 0;
           }
           return prev - 1;

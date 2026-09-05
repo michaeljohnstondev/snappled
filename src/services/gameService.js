@@ -3,6 +3,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  runTransaction,
   collection,
   query,
   where,
@@ -299,6 +300,13 @@ export const gameService = {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
 
+      // Any client may advance when its timer expires, so bail if
+      // someone already did. Cheap read; the write below is idempotent
+      // anyway, but this keeps the log honest about who moved it.
+      const curstartVoting = await getDoc(gameRef);
+      if (curstartVoting.exists() && curstartVoting.data().phase !== GAME_PHASES.PICKING) {
+        return { success: true, skipped: true };
+      }
       await updateDoc(gameRef, {
         phase: GAME_PHASES.VOTING,
         votes: {},
@@ -334,6 +342,23 @@ export const gameService = {
   async finishRound(gameId) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
+
+      // Claim the transition atomically. Advancing is no longer the
+      // host's job — any client whose timer expires may call this — so
+      // several can fire at once. Scoring appends to roundResults and
+      // awards points, both of which must happen exactly once, and a
+      // transaction is what guarantees only the first caller proceeds.
+      const claimed = await runTransaction(db, async (tx) => {
+        const cur = await tx.get(gameRef);
+        if (!cur.exists()) return false;
+        if (cur.data().phase !== GAME_PHASES.VOTING) return false;
+        // Flipping the phase here IS the claim; the write below no
+        // longer sets it.
+        tx.update(gameRef, { phase: GAME_PHASES.SCORING });
+        return true;
+      });
+      if (!claimed) return { success: true, skipped: true };
+
       const gameDoc = await getDoc(gameRef);
       const data = gameDoc.data();
 
@@ -381,7 +406,7 @@ export const gameService = {
       // are committed here so the SCORING screen can show per-card
       // points-earned without re-tallying.
       await updateDoc(gameRef, {
-        phase: GAME_PHASES.SCORING,
+        // phase already flipped by the claim above
         players: updatedPlayers,
         roundResults: arrayUnion({
           round: data.currentRound,
@@ -640,6 +665,13 @@ export const gameService = {
   async startPicking(gameId) {
     try {
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      // Any client may advance when its timer expires, so bail if
+      // someone already did. Cheap read; the write below is idempotent
+      // anyway, but this keeps the log honest about who moved it.
+      const curstartPicking = await getDoc(gameRef);
+      if (curstartPicking.exists() && curstartPicking.data().phase !== GAME_PHASES.REVIEW) {
+        return { success: true, skipped: true };
+      }
       await updateDoc(gameRef, {
         phase: GAME_PHASES.PICKING,
         pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
