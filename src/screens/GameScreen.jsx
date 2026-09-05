@@ -1827,12 +1827,27 @@ export default function GameScreen({ navigation }) {
   // Only the host advances the doc to REVIEW; other clients wait for
   // the phase transition to propagate.
   if (game.phase === GAME_PHASES.LOADING) {
-    const isHostClient = game.hostId === user?.uid;
+    // Every client reports its OWN download, then asks to advance. The
+    // transition is a transactional claim in finishLoading, so all of
+    // them racing is fine and only the first lands it.
+    //
+    // This used to advance on the host alone: the host finished, flipped
+    // the phase, and pulled everyone into the round - including a player
+    // on cellular who had downloaded nothing. That is the bug where
+    // snapples don't play; the clip really was not there yet.
     const advance = () => {
-      if (isHostClient) gameService.startWarmup(gameId);
+      gameService.markLoaded(gameId, user?.uid)
+        .then(() => gameService.finishLoading(gameId))
+        .catch(() => {});
     };
     return (
-      <LoadingPhase hand={hand} onLoaded={advance} />
+      <LoadingPhase
+        hand={hand}
+        onLoaded={advance}
+        deadline={game.loadingDeadline}
+        players={game.players || []}
+        readyMap={game.loadingReady || {}}
+      />
     );
   }
 

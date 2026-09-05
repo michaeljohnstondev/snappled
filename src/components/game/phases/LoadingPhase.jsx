@@ -13,10 +13,16 @@ import { pickRandomTip } from '../../../lib/loadingTips';
 import theme from '../../../theme/themes';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
-// Max time we'll sit on the loading screen before advancing anyway.
-// A stuck CDN request or a bad URL shouldn't be able to hold the
-// whole game hostage — 12s covers slow LTE and still feels snappy.
-const MAX_WAIT_MS = 12000;
+// Fallback only for when the game doc carries no deadline (an older
+// client, or a game started before loadingDeadline existed).
+//
+// This was 12s, on the theory that it "covers slow LTE". It does not: a
+// hand of eight clips off wifi is tens of megabytes, so the timer fired
+// long before the downloads finished and the round started on top of
+// them. The real budget now comes from the game doc, shared by everyone
+// (LOADING_MAX_MS in gameService), so the room agrees on when to stop
+// waiting instead of each phone deciding alone.
+const FALLBACK_WAIT_MS = 60000;
 
 // Minimum time the screen stays up even when every prefetch was
 // already cached. Without this the loading screen flashes for a
@@ -28,11 +34,18 @@ const MIN_DISPLAY_MS = 1500;
 // per-video attempt has settled — a failing prefetch still counts as
 // "done" so a broken URL doesn't stall the whole flow). A parallel
 // timeout fires onLoaded regardless after MAX_WAIT_MS.
-export default function LoadingPhase({ hand, onLoaded }) {
+export default function LoadingPhase({
+  hand, onLoaded, deadline, players, readyMap,
+}) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const total = hand?.length || 0;
-  const [doneCount, setDoneCount] = useState(0);
+  // Which cards are done, not just how many. A bare percentage says
+  // nothing about whether it is moving or wedged on one slow file -
+  // per-snapple state makes a stall visible instead of leaving you
+  // guessing whether anything downloaded at all.
+  const [done, setDone] = useState([]);
+  const doneCount = done.filter(Boolean).length;
   const [firedOnce, setFiredOnce] = useState(false);
   // Guarantees the loading screen renders long enough to actually
   // be seen — flips true after MIN_DISPLAY_MS.
@@ -69,7 +82,16 @@ export default function LoadingPhase({ hand, onLoaded }) {
   useEffect(() => {
     if (!hand || hand.length === 0) return;
     let cancelled = false;
-    let completed = 0;
+    setDone(new Array(hand.length).fill(false));
+
+    // Mark by INDEX rather than incrementing a counter: these settle out
+    // of order, so a counter can say "4 done" without being able to say
+    // which four - and which one is stuck is the useful part.
+    const mark = (i) => setDone((prev) => {
+      const next = prev.slice();
+      next[i] = true;
+      return next;
+    });
 
     // For each card we kick off BOTH the video prefetch and the
     // thumbnail extraction in parallel, then wait for both to
@@ -77,11 +99,10 @@ export default function LoadingPhase({ hand, onLoaded }) {
     // thumbnails, SnappleThumbnail would show its own loading
     // spinner on mount even though the video is cached — user
     // sees a "twirl" on every card on the picking screen.
-    hand.forEach((card) => {
+    hand.forEach((card, i) => {
       const url = card?.videoUrl;
       if (!url) {
-        completed += 1;
-        if (!cancelled) setDoneCount(completed);
+        if (!cancelled) mark(i);
         return;
       }
       Promise.allSettled([
@@ -89,8 +110,7 @@ export default function LoadingPhase({ hand, onLoaded }) {
         thumbnailService.getThumbnail(url),
       ]).then(() => {
         if (cancelled) return;
-        completed += 1;
-        setDoneCount(completed);
+        mark(i);
       });
     });
 
@@ -102,26 +122,49 @@ export default function LoadingPhase({ hand, onLoaded }) {
   // if both conditions land in the same tick.
   useEffect(() => {
     if (firedOnce) return;
-    if (minElapsed && total > 0 && doneCount >= total) {
+    // No `total > 0` guard: an empty hand is already complete, and
+    // requiring one meant it sat through the entire deadline waiting
+    // for downloads that were never going to happen.
+    if (minElapsed && doneCount >= total) {
       setFiredOnce(true);
       onLoadedRef.current?.();
     }
   }, [doneCount, total, firedOnce, minElapsed]);
 
+  // Give-up timer, measured against the SHARED deadline so every client
+  // stops waiting at the same moment rather than each running its own
+  // stopwatch from whenever it happened to mount.
   useEffect(() => {
+    const ms = deadline
+      ? Math.max(0, Date.parse(deadline) - Date.now())
+      : FALLBACK_WAIT_MS;
     const id = setTimeout(() => {
-      if (!firedOnce) {
-        setFiredOnce(true);
-        onLoadedRef.current?.();
-      }
-    }, MAX_WAIT_MS);
+      // Deliberately NOT guarded on firedOnce. A client that finished
+      // early has already reported and asked to advance, and was told
+      // no because someone else was still downloading. If it then went
+      // quiet, nobody would ever ask again and a single stuck player
+      // would hang the room until it gave up on its own. Asking again
+      // at the deadline is safe: markLoaded is idempotent and the
+      // transition is a claim, so only the first caller lands it.
+      setFiredOnce(true);
+      onLoadedRef.current?.();
+    }, ms);
     return () => clearTimeout(id);
-  }, [firedOnce]);
+  }, [deadline]);
 
   // Percentage — capped at 100 and blended with a soft floor so the
   // display never stays at 0 forever if a slow network is dragging
   // the first prefetch.
   const pct = total > 0 ? Math.min(100, Math.round((doneCount / total) * 100)) : 0;
+
+  // Bots are excluded for the same reason finishLoading excludes them:
+  // nothing downloads on their behalf, so they are never "ready" and
+  // counting them would show a number that never reaches zero.
+  const myTurnDone = total > 0 && doneCount >= total;
+  const waitingOn = (players || [])
+    .filter(p => !String(p?.uid || '').startsWith('bot_'))
+    .filter(p => !(readyMap || {})[p?.uid])
+    .length;
 
   return (
     <Pressable style={styles.container} onPress={nextTip}>
@@ -148,6 +191,26 @@ export default function LoadingPhase({ hand, onLoaded }) {
           <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
         </View>
       </View>
+
+      {total > 0 && (
+        <View style={styles.pipRow}>
+          {Array.from({ length: total }, (_, i) => (
+            <View key={i} style={[styles.pip, done[i] && styles.pipDone]}>
+              <Text style={[styles.pipText, done[i] && styles.pipTextDone]}>
+                {i + 1}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {waitingOn > 0 && (
+        <Text style={styles.waitingOn}>
+          {myTurnDone
+            ? `waiting on ${waitingOn} ${waitingOn === 1 ? 'player' : 'players'}`
+            : 'downloading this round'}
+        </Text>
+      )}
 
       <View style={styles.tipBlock}>
         <Text style={styles.tipTitle}>{tip.title}</Text>
@@ -213,6 +276,41 @@ const makeStyles = (t) => ({
   // thing here you can interact with, and a surface says so. Themed
   // surface + a vibeBlue edge, matching the scoreboard's treatment so
   // it reads as the same family of panel.
+  pipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 18,
+    maxWidth: 300,
+  },
+  pip: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pipDone: {
+    borderColor: theme.colors.vibeGreen,
+    backgroundColor: 'rgba(0,255,65,0.15)',
+  },
+  pipText: {
+    color: t.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  pipTextDone: { color: theme.colors.vibeGreen },
+  waitingOn: {
+    color: t.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 20,
+  },
   tipBlock: {
     alignItems: 'center',
     maxWidth: 340,

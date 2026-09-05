@@ -65,6 +65,15 @@ const PICK_TIME = 60000; // 60 seconds to pick — matches the "60s to pick" rou
 const VOTE_TIME = 60000; // 60 seconds to vote — matches the "60s to vote" round-start alert
 const MAX_PLAYERS = 8;
 
+// How long the whole room will wait on the slowest downloader before
+// starting anyway. Deliberately generous: a hand of eight clips over
+// cellular is tens of megabytes, and the old 12s client-side give-up
+// meant a phone off wifi essentially never finished before the game
+// moved on - which is what "snapples don't play right" actually was.
+// It's a backstop, not a delay: the round starts the moment everyone
+// is genuinely ready, usually in a couple of seconds on wifi.
+const LOADING_MAX_MS = 60000;
+
 /**
  * Colour slots, one per seat, matching VOTER_PALETTE in GameScreen and
  * PLAYER_COLORS in public/tv.html.
@@ -353,20 +362,70 @@ export const gameService = {
     }
   },
 
-  // Transition LOADING → REVIEW. Host-only. LoadingPhase calls this
-  // once its prefetches complete (or the fallback timer fires) so the
-  // warmup timer never starts on a client that's still downloading.
-  async startWarmup(gameId) {
+  /**
+   * Report that THIS client has finished downloading the hand.
+   *
+   * Readiness is per player because downloading is per player. The old
+   * flow advanced on the host alone: whoever hosted finished (or timed
+   * out), flipped the phase, and dragged everyone into the round -
+   * including a player on cellular who had fetched nothing. That is the
+   * bug where snapples don't play; the clip genuinely was not there yet.
+   */
+  async markLoaded(gameId, userId) {
     try {
-      const gameRef = doc(db, GAMES_COLLECTION, gameId);
-      await updateDoc(gameRef, {
-        phase: GAME_PHASES.REVIEW,
-        reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
+      if (!gameId || !userId) return { success: false };
+      await updateDoc(doc(db, GAMES_COLLECTION, gameId), {
+        [`loadingReady.${userId}`]: true,
         updatedAt: serverTimestamp(),
       });
       return { success: true };
     } catch (error) {
-      console.error('[GameService] Error starting warmup:', error);
+      console.error('[GameService] markLoaded error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Transition LOADING -> REVIEW once the room is ready.
+   *
+   * Any client may call this and several will at once, so the phase flip
+   * is a transactional claim - the same pattern finishRound uses.
+   *
+   * Advances when every HUMAN player is ready, or when the shared
+   * deadline passes. Bots are excluded because nothing downloads on
+   * their behalf, so waiting on them would hang the game forever.
+   */
+  async finishLoading(gameId) {
+    try {
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      const claimed = await runTransaction(db, async (tx) => {
+        const cur = await tx.get(gameRef);
+        if (!cur.exists()) return false;
+        const data = cur.data();
+        if (data.phase !== GAME_PHASES.LOADING) return false;
+
+        const ready = data.loadingReady || {};
+        const humans = (data.players || [])
+          .filter(p => !String(p.uid || '').startsWith('bot_'));
+        const allReady = humans.length > 0 && humans.every(p => ready[p.uid]);
+
+        const deadline = data.loadingDeadline
+          ? Date.parse(data.loadingDeadline)
+          : 0;
+        const expired = deadline > 0 && Date.now() > deadline;
+
+        if (!allReady && !expired) return false;
+
+        tx.update(gameRef, {
+          phase: GAME_PHASES.REVIEW,
+          reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
+          updatedAt: serverTimestamp(),
+        });
+        return true;
+      });
+      return { success: true, advanced: claimed };
+    } catch (error) {
+      console.error('[GameService] finishLoading error:', error);
       return { success: false, error: error.message };
     }
   },
@@ -391,6 +450,11 @@ export const gameService = {
       // REVIEW when ready (or the LoadingPhase fallback timer fires).
       await updateDoc(gameRef, {
         phase: GAME_PHASES.LOADING,
+        // Fresh readiness map + a deadline every client can read, so
+        // nobody is relying on their own clock to decide when the wait
+        // has gone on too long.
+        loadingReady: {},
+        loadingDeadline: new Date(Date.now() + LOADING_MAX_MS).toISOString(),
         currentRound: 1,
         prompts: prompts,
         submissions: [],
