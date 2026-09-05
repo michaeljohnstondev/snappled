@@ -30,9 +30,11 @@ const FALLBACK_IMAGE = null;
 const TEMPLATE = fs.readFileSync(
   path.join(__dirname, 'shareTemplate.html'), 'utf8');
 
+// Shorter than the site's version on purpose: this sits under a title,
+// beside a thumbnail, and after a "by @creator — " prefix, and WhatsApp
+// truncates the card description hard.
 const DESCRIPTION =
-  'Answer a prompt in ten seconds of video. The crowd votes, ' +
-  'the votes decide the round.';
+  'A meme caught or created. Play yours against random prompts — everyone votes.';
 
 /** Escape for use inside a double-quoted HTML attribute. */
 function attr(value) {
