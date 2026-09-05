@@ -226,7 +226,7 @@ function VotingWaitGrid({
             key={sub.snappleId || `sub-${i}`}
             layout={LinearTransition.springify().damping(12).stiffness(90)}
             collapsable={false}
-            style={[cellStyle, reactionsMode && styles.cellWithReactions]}
+            style={cellStyle}
           >
             <VoteAuraCard
               submission={sub}
@@ -240,26 +240,23 @@ function VotingWaitGrid({
               playToken={inlinePlayingId === sub.uid ? (playToken || 0) : 0}
               onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
               onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
-            />
-            {/* Straddles the card's bottom edge rather than sitting
-                under it. Below the card the tally read as a separate
-                caption belonging to the layout; half on the clip it
-                reads as a reaction TO that clip - and it stops the
-                emoji stealing a row of height from every card in the
-                grid. The cell carries bottom padding to make room for
-                the half that hangs off. */}
-            {reactionsMode && (
-              <View style={styles.reactionOverlay} pointerEvents="box-none">
+              // Handed to the card so it can straddle the VIDEO's edge.
+              // As a sibling here it anchored to the cell and landed on
+              // the picker's name, which the card draws below the video.
+              overlaySlot={reactionsMode ? (
                 <ReactionBar
                   mode={reactionsMode}
+                  // The wait grid's cards are 100pt wide; full-size
+                  // chips overflow them.
+                  compact={!isLarge}
                   counts={countsFor(reactions, sub.uid)}
                   mine={mineFor(reactions, sub.uid, myUid)}
                   reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
                   onReact={onReact ? (key) => onReact(sub.uid, key) : undefined}
                   disabled={reactionsDisabled}
                 />
-              </View>
-            )}
+              ) : null}
+            />
           </Reanimated.View>
         );
       })}

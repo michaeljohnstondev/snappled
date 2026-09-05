@@ -49,6 +49,8 @@ export const REACTIONS = [
  * @param {boolean} vertical stack the chips instead of laying them in a
  *   row — used in the big player, where the actions live on a rail down
  *   the right edge and a horizontal strip would cut across the video.
+ * @param {boolean} compact smaller chips, for the vote-wait grid whose
+ *   cards are only 100pt wide - full-size chips overflowed them.
  * @param {boolean} collapsible picker only — render a single toggle that
  *   opens the set, instead of a permanent row. Used in the two-column
  *   voting grid, where five chips under every card crowded the vote auras
@@ -58,7 +60,7 @@ export const REACTIONS = [
  */
 export default function ReactionBar({
   counts = {}, mine = {}, onReact, disabled, mode = 'picker', reactors,
-  collapsible = false, vertical = false,
+  collapsible = false, vertical = false, compact = false,
 }) {
   const isSummary = mode === 'summary';
   const [open, setOpen] = useState(false);
@@ -112,7 +114,7 @@ export default function ReactionBar({
 
   return (
     <View>
-      <View style={[styles.row, vertical && styles.rowVertical]}>
+      <View style={[styles.row, vertical && styles.rowVertical, compact && styles.rowCompact]}>
       {shown.map(({ key, glyph }) => {
         const count = counts[key] || 0;
         if (isSummary) {
@@ -128,12 +130,13 @@ export default function ReactionBar({
               style={[
                 styles.chip,
                 styles.chipBare,
+                compact && styles.chipCompact,
                 openKey === key && styles.chipOpen,
               ]}
               hitSlop={4}
             >
-              <Text style={styles.glyph}>{glyph}</Text>
-              <Text style={styles.count}>{count}</Text>
+              <Text style={[styles.glyph, compact && styles.glyphCompact]}>{glyph}</Text>
+              <Text style={[styles.count, compact && styles.countCompact]}>{count}</Text>
             </Pressable>
           );
         }
@@ -203,6 +206,18 @@ export default function ReactionBar({
 
 const styles = StyleSheet.create({
   rowVertical: { flexDirection: 'column' },
+  // Wraps rather than overflowing. All four emoji on one narrow card is
+  // rare but not impossible, and a chip sticking out past the video
+  // looks broken in a way a second row does not.
+  rowCompact: { flexWrap: 'wrap', gap: 2, marginTop: 0 },
+  chipCompact: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
+  },
+  glyphCompact: { fontSize: 11 },
+  countCompact: { fontSize: 9 },
   row: {
     flexDirection: 'row',
     justifyContent: 'center',

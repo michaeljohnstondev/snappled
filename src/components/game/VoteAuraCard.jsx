@@ -28,6 +28,11 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
   // When isPlaying is true the thumbnail swaps to a mini-player;
   // playToken bumps to force a remount so re-taps replay.
   isPlaying, playToken = 0, onTogglePlay, onFullscreen,
+  // Rendered straddling the BOTTOM EDGE OF THE VIDEO. It has to live
+  // in here rather than as a sibling in the grid cell, because the
+  // picker's name is drawn inside this component below the video -
+  // anything positioned against the cell lands on top of that name.
+  overlaySlot,
   // Max ring count across the whole grid — used to reserve a
   // consistent gap between the card and its picker name so every
   // card in the grid lines up regardless of individual vote count.
@@ -202,6 +207,12 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
             />
           );
         })}
+
+        {overlaySlot ? (
+          <View style={styles.overlaySlot} pointerEvents="box-none">
+            {overlaySlot}
+          </View>
+        ) : null}
       </View>
 
       {picker && (
@@ -213,7 +224,8 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
             // grid (passed by the parent), not this card's own count,
             // so 4-vote cards and 0-vote cards align to the same
             // horizontal line.
-            { marginTop: 6 + maxRingCount * ringThickness },
+            { marginTop: 6 + maxRingCount * ringThickness
+              + (overlaySlot ? 16 : 0) },
             { color: picker.color, opacity: picker.opacity ?? 1 },
             picker.isMe && styles.pickerNameMe,
           ]}
@@ -267,6 +279,16 @@ const makeStyles = (t) => ({
     bottom: -8,
     borderRadius: 16,
     borderWidth: 2,
+  },
+  // Straddles the video's bottom edge. box-none so the full-width
+  // wrapper doesn't swallow taps meant for the card behind it.
+  overlaySlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -14,
+    alignItems: 'center',
+    zIndex: 5,
   },
   pickerName: {
     fontSize: 11,
