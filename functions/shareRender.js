@@ -40,6 +40,18 @@ const path = require('path');
 // So: do not bump this without checking the linux binary first.
 const ffmpegPath = require('ffmpeg-static');
 
+// Unfurl card geometry. 1.91:1 is what every messenger lays out inline
+// at a sane size; POSTER_BG is the site's own page background, so the
+// letterboxing around a portrait clip looks intentional.
+const POSTER_W = 1200;
+const POSTER_H = 630;
+const POSTER_BG = '#05080F';
+
+// Bumped whenever the poster's SHAPE changes, so existing snapples
+// regenerate instead of keeping a stale one.
+const POSTER_VERSION = 2;
+
+
 // Anton — heavy condensed sans. Holds up at small sizes over busy video,
 // which a lighter face would not.
 const FONT_PATH = require.resolve(
@@ -218,7 +230,12 @@ function buildFilter(captionFile, markFile) {
  */
 async function ensureSharePoster(snappleId, snapple) {
   if (!snappleId || !snapple) return null;
-  if (snapple.shareThumbUrl) return snapple.shareThumbUrl;
+  // Version-gated so a shape change actually reaches snapples that
+  // already have a poster. Without this, every clip shared before this
+  // deploy would keep its portrait one forever.
+  if (snapple.shareThumbUrl && snapple.sharePosterV === POSTER_VERSION) {
+    return snapple.shareThumbUrl;
+  }
 
   const bucket = admin.storage().bucket();
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'snapposter-'));
@@ -236,9 +253,21 @@ async function ensureSharePoster(snappleId, snapple) {
       return null;
     }
 
-    // One frame a second in, so it isn't a black lead-in frame.
+    // One frame a second in, so it isn't a black lead-in frame, then
+    // fitted onto a 1200x630 card.
+    //
+    // The frame itself is 9:16. Handed a portrait og:image, messengers
+    // lay it out full-width and it dominates the conversation - which
+    // is exactly what it was doing. force_original_aspect_ratio=decrease
+    // scales the whole frame to fit without cropping (nothing in a
+    // snapple is safe to cut - the joke can be anywhere in it), and pad
+    // fills the sides with the site's own background so the letterbox
+    // reads as the card's design rather than as empty space.
     await run(ffmpegPath, [
-      '-y', '-ss', '1', '-i', input, '-frames:v', '1', '-q:v', '3', poster,
+      '-y', '-ss', '1', '-i', input, '-frames:v', '1',
+      '-vf', `scale=${POSTER_W}:${POSTER_H}:force_original_aspect_ratio=decrease,`
+        + `pad=${POSTER_W}:${POSTER_H}:(ow-iw)/2:(oh-ih)/2:color=${POSTER_BG}`,
+      '-q:v', '3', poster,
     ]);
     if (!fs.existsSync(poster)) return null;
 
@@ -255,7 +284,7 @@ async function ensureSharePoster(snappleId, snapple) {
       + `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
 
     await admin.firestore().collection('snapples').doc(snappleId)
-      .update({ shareThumbUrl: url });
+      .update({ shareThumbUrl: url, sharePosterV: POSTER_VERSION });
     return url;
   } catch (error) {
     console.warn('[ensureSharePoster]', snappleId, error.message);
@@ -266,6 +295,46 @@ async function ensureSharePoster(snappleId, snapple) {
 }
 
 exports.ensureSharePoster = ensureSharePoster;
+
+/**
+ * Regenerate posters whose shape predates the current POSTER_VERSION.
+ *
+ * ensureSharePoster only ever runs from onNewSnapple, so a change to
+ * the card's shape would otherwise reach new snapples only and every
+ * clip already shared would keep unfurling at the old proportions.
+ *
+ * Idempotent and resumable: it processes a bounded batch and reports
+ * how many remain, so it can simply be called again rather than
+ * needing to finish inside one timeout.
+ */
+exports.backfillSharePosters = functions
+  .runWith({ memory: '2GB', timeoutSeconds: 540 })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const limit = Math.min(Number(data && data.limit) || 25, 100);
+    const snap = await admin.firestore().collection('snapples').get();
+
+    const stale = snap.docs.filter(
+      (d) => (d.data().sharePosterV || 0) !== POSTER_VERSION);
+
+    let done = 0;
+    let failed = 0;
+    for (const doc of stale.slice(0, limit)) {
+      // Safe to call directly: ensureSharePoster's early return checks
+      // the VERSION, not merely the presence of a URL, so a stale
+      // poster is regenerated rather than kept.
+      const result = await ensureSharePoster(doc.id, doc.data());
+      if (result) done++; else failed++;
+    }
+    return {
+      success: true,
+      done,
+      failed,
+      remaining: Math.max(0, stale.length - limit),
+    };
+  });
 
 exports.renderShareVideo = functions
   // Transcoding is CPU-bound; 2GB buys proportionally more CPU on GCF and

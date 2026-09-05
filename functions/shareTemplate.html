@@ -48,7 +48,8 @@ __OG__
     margin-bottom: 6px;
   }
 
-  .creator { color: #00d4ff; font-size: 0.95em; margin-bottom: 18px; }
+  /* Creator line removed: a share is about the prompt and the clip.
+     Whoever wants the author taps through to the app. */
 
   /* 9:16 is the capture aspect; reserving it up front stops the layout
      jumping when the video loads. */
@@ -125,7 +126,6 @@ __OG__
 
   <div id="content" class="hidden">
     <div class="prompt" id="prompt"></div>
-    <div class="creator" id="creator"></div>
 
     <div class="video-wrap">
       <video id="video" playsinline loop controls preload="metadata"></video>
@@ -165,7 +165,6 @@ __DATA__
       'It may have expired, or the link is incomplete.');
 
     el('prompt').textContent = data.prompt ? '"' + data.prompt + '"' : 'A snapple';
-    el('creator').textContent = '@' + (data.creatorUsername || 'anonymous');
 
     var video = el('video');
     if (data.thumbUrl) video.poster = data.thumbUrl;

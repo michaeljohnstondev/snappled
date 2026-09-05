@@ -26,6 +26,12 @@ const admin = require('firebase-admin');
 // real image in and set this to use it.
 const FALLBACK_IMAGE = null;
 
+// Poster dimensions, matching ensureSharePoster in shareRender.js. The
+// standard 1.91:1 unfurl card: messengers lay it out inline at a modest
+// height, where a 9:16 frame was rendered as a full-width tower.
+const POSTER_W = 1200;
+const POSTER_H = 630;
+
 // Read once at cold start rather than per request.
 const TEMPLATE = fs.readFileSync(
   path.join(__dirname, 'shareTemplate.html'), 'utf8');
@@ -65,11 +71,22 @@ function buildOg(card, pageUrl, promptOverride) {
   const title = prompt
     ? '"' + prompt + '"'
     : 'A snapple on Snappled';
-  const creator = card && card.creatorUsername
-    ? 'by @' + card.creatorUsername + ' — ' + DESCRIPTION
-    : DESCRIPTION;
+  // No byline. A share is the prompt and the clip; the recipient is not
+  // in the game and the author is a tap away in the app.
+  const creator = DESCRIPTION;
   const image = (card && card.thumbUrl) || FALLBACK_IMAGE;
   // tag() already drops empties, so a null image emits nothing.
+
+  // Image dimensions belong OUTSIDE the video branch. They used to sit
+  // inside it and borrow the video's width/height, which meant two
+  // bugs at once: most snapples never recorded those, so no dimensions
+  // were published at all, and the ones that did published PORTRAIT
+  // dimensions for what is now a landscape card. A messenger told an
+  // image is 9:16 lays it out as a full-width tower - which is exactly
+  // how it was rendering.
+  const imageDims = image
+    ? [tag('og:image:width', POSTER_W), tag('og:image:height', POSTER_H)]
+    : [];
 
   const tags = [
     tag('og:site_name', 'Snappled'),
@@ -81,6 +98,7 @@ function buildOg(card, pageUrl, promptOverride) {
     tag('twitter:title', title),
     tag('twitter:description', creator),
     tag('twitter:image', image),
+    ...imageDims,
   ];
 
   if (card && card.videoUrl && card.width && card.height) {
@@ -91,8 +109,6 @@ function buildOg(card, pageUrl, promptOverride) {
       tag('og:video:type', 'video/mp4'),
       tag('og:video:width', card.width),
       tag('og:video:height', card.height),
-      tag('og:image:width', card.width),
-      tag('og:image:height', card.height),
       // A player card needs a hosted iframe and domain allowlisting, so
       // the large image card is the honest choice here.
       tag('twitter:card', 'summary_large_image'),

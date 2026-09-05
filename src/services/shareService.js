@@ -95,17 +95,25 @@ async function shareVideo({ caption, dialogTitle = 'Share Snapple' }) {
 export const shareService = {
   SHARE_URL,
 
-  /** Caption for a single snapple: the prompt is the hook, so it leads. */
+  /**
+   * Caption for a snapple share: the link, and nothing else.
+   *
+   * Everything worth reading is in the card the link unfurls into - the
+   * prompt is its title, the clip is its image. Writing it out again as
+   * message text said the same thing twice, and the two disagreed: the
+   * text carried the round's prompt while the URL was built without
+   * one, so the card fell back to the prompt the clip was recorded for.
+   * A snapple played against a new prompt is funny precisely BECAUSE
+   * it is out of context, and the card was quietly restoring it.
+   *
+   * No creator either. Whoever receives this is not in the game; if
+   * they want to know who made it, it is a tap away in the app.
+   *
+   * creatorUsername stays in the signature only so existing callers
+   * do not have to change shape.
+   */
   buildSnappleCaption(prompt, creatorUsername, snappleId) {
-    const lines = [];
-    if (prompt) lines.push(`"${prompt}"`);
-    if (creatorUsername) lines.push(`@${creatorUsername} on Snappled`);
-    else lines.push('on Snappled');
-    lines.push('');
-    // Deep-links to the snapple itself rather than the app front door,
-    // so a creator sharing their own work sends people to their work.
-    lines.push(`Watch it — ${snappleUrl(snappleId)}`);
-    return lines.join('\n');
+    return snappleUrl(snappleId, prompt);
   },
 
   /** Share one snapple from the feed / overlay. */
@@ -128,22 +136,15 @@ export const shareService = {
   /** Share the winning clip of a single round, with the round's prompt. */
   async shareRound({ prompt, winningSubmission }) {
     // Deliberately lean. A mid-game scoreboard is noise to whoever
-    // receives it — they aren't in the game — and the standings are
+    // receives it - they are not in the game - and the standings are
     // half-finished anyway. Those belong on the final share, where
-    // they're a result rather than a progress update.
+    // they are a result rather than a progress update.
     //
-    // No prompt line either: the link carries it as the card's title
-    // via ?p=.
-    const caption = [
-      winningSubmission?.creatorUsername
-        ? `Round won by @${winningSubmission.creatorUsername}`
-        : 'Round winner',
-      '',
-      `Watch it — ${snappleUrl(winningSubmission?.snappleId, prompt)}`,
-    ].filter(Boolean).join('\n');
-
+    // Not even a winner line. The card carries the round's prompt as
+    // its title and the clip as its image, which is the whole joke;
+    // text above it only competes with what it is introducing.
     return shareVideo({
-      caption,
+      caption: snappleUrl(winningSubmission?.snappleId, prompt),
       dialogTitle: 'Share Round',
     });
   },

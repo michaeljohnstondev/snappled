@@ -366,8 +366,12 @@ function RoundResultsReveal({
                   {p.username}
                 </Text>
               </View>
+              {/* The gain stays green for everyone. It's the round's
+                  event, not an identity — green reads as "went up"
+                  regardless of whose row it's on, and it only appears
+                  on the rows that scored. */}
               {earned > 0 && (
-                <Text style={[styles.resultRoundPts, styles.resultRoundPtsEarned, { color }]}>
+                <Text style={[styles.resultRoundPts, styles.resultRoundPtsEarned]}>
                   +{earned}
                 </Text>
               )}
