@@ -2080,11 +2080,16 @@ export default function GameScreen({ navigation }) {
                   // cards' inline players would fire together.
                   const cardId = item?.uid || item?.snappleId || `vote-${i}`;
                   const isInlinePlaying = votingInlinePlaying.id === cardId;
+                  const mineHere = mineFor(game.reactions, item.uid, user?.uid);
+                  const myGlyphs = REACTIONS
+                    .filter(({ key }) => mineHere[key])
+                    .map(({ glyph }) => glyph);
                   return (
                     <View
                       key={cardId}
                       style={styles.votingCell}
                     >
+                      <View style={styles.votingCardWrap}>
                       <HandCardThumbnail
                         card={{
                           id: cardId,
@@ -2113,6 +2118,20 @@ export default function GameScreen({ navigation }) {
                           setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true });
                         }}
                       />
+                      {/* What you sent, hung off the card's corner. No
+                          chip or border — a drop shadow is enough to
+                          hold it over any video frame, and this sits
+                          among the vote auras, which are the only
+                          outlines that should read as meaningful here.
+                          Not touchable, so the card still plays. */}
+                      {myGlyphs.length > 0 && (
+                        <View style={styles.myReactionBadge} pointerEvents="none">
+                          {myGlyphs.map((g) => (
+                            <Text key={g} style={styles.myReactionGlyph}>{g}</Text>
+                          ))}
+                        </View>
+                      )}
+                      </View>
                       {/* Picker lives here, not on the results screen:
                           you react to a snapple while you're actually
                           watching and judging it. No counts shown — the
@@ -2120,7 +2139,7 @@ export default function GameScreen({ navigation }) {
                       <ReactionBar
                         mode="picker"
                         collapsible
-                        mine={mineFor(game.reactions, item.uid, user?.uid)}
+                        mine={mineHere}
                         onReact={(key) => handleReact(item.uid, key)}
                         disabled={reactionCooling}
                       />
@@ -3458,6 +3477,23 @@ const makeStyles = (t) => ({
   votingCell: {
     width: '50%',
     padding: 4,
+  },
+  // Anchors the corner badge to the card, not to the cell — the cell's
+  // padding would otherwise push it away from the edge it's meant to
+  // hang off.
+  votingCardWrap: { position: 'relative' },
+  myReactionBadge: {
+    position: 'absolute',
+    right: -5,
+    bottom: -7,
+    flexDirection: 'row',
+    gap: 1,
+  },
+  myReactionGlyph: {
+    fontSize: 19,
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   swipeHints: {
     flexDirection: 'row', justifyContent: 'space-between', width: '100%',

@@ -80,25 +80,22 @@ export default function ReactionBar({
   if (isSummary && shown.length === 0) return null;
 
   if (collapsed) {
-    const anyMine = REACTIONS.some(({ key }) => mine[key]);
     // A grey outlined face with a +, not one of the emoji. Showing a real
     // emoji here made the toggle look like a fifth choice you were picking
     // — greyscale reads as chrome, and the + says it opens something.
-    // Colour is the only thing that changes once you've reacted, so the
-    // control never moves or relabels under your thumb.
+    //
+    // It stays grey even once you've reacted. What you sent is shown on
+    // the card corner instead, so tinting this too would say the same
+    // thing twice, in the button you're about to press again.
     return (
       <View style={styles.row}>
         <Pressable
           onPress={() => setOpen(true)}
-          style={[styles.chip, anyMine && styles.chipMine]}
+          style={styles.chip}
           hitSlop={6}
         >
-          <Ionicons
-            name="happy-outline"
-            size={15}
-            color={anyMine ? theme.colors.vibeGreen : 'rgba(255,255,255,0.65)'}
-          />
-          <Text style={[styles.plus, anyMine && styles.plusMine]}>+</Text>
+          <Ionicons name="happy-outline" size={15} color="rgba(255,255,255,0.65)" />
+          <Text style={styles.plus}>+</Text>
         </Pressable>
       </View>
     );
@@ -215,7 +212,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginLeft: -1,
   },
-  plusMine: { color: theme.colors.vibeGreen },
   count: {
     color: 'white',
     fontSize: 11,
