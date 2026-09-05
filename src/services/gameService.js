@@ -21,6 +21,7 @@ import { db } from './firebase';
 const SNAPPLES_COLLECTION = 'snapples';
 
 const GAMES_COLLECTION = 'games';
+const GAME_CODES_COLLECTION = 'gameCodes';
 
 const DEFAULT_PROMPTS = [
   "Most likely to go viral", "Best excuse for being late", "This one hits different at 3am",
@@ -83,6 +84,45 @@ export const GAME_PHASES = {
   FINAL_RESULTS: 'finalResults',
 };
 
+
+// Join codes. Four characters from an alphabet with no 0/O/1/I/L, because
+// these get read aloud across a room and off a TV — the ambiguous glyphs
+// cause more failed joins than a shorter code saves typing.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODE_LENGTH = 4;
+
+function randomCode() {
+  let out = '';
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    out += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return out;
+}
+
+/**
+ * Claim a short code pointing at a game.
+ *
+ * The code is the document id, so Firestore's create-if-absent is the
+ * collision check — no read-then-write race. A few attempts is plenty:
+ * the space is 31^4, and codes are released when their game ends.
+ */
+async function claimGameCode(gameId, hostId) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const code = randomCode();
+    try {
+      await setDoc(doc(db, GAME_CODES_COLLECTION, code), {
+        gameId,
+        hostId,
+        createdAt: serverTimestamp(),
+      });
+      return code;
+    } catch (e) {
+      // Taken, or the write lost a race. Try another.
+    }
+  }
+  return null;
+}
+
 export const gameService = {
   // Create a new game lobby
   async createGame(hostId, hostUsername, targetPoints = 25) {
@@ -114,6 +154,13 @@ export const gameService = {
       };
 
       await setDoc(gameRef, gameDoc);
+
+      // Short code for joining and for the TV display. Best-effort: a
+      // game without one still plays, it just can't be joined by code.
+      const joinCode = await claimGameCode(gameRef.id, hostId);
+      if (joinCode) {
+        await updateDoc(gameRef, { joinCode });
+      }
       // Record the active game on the host's user doc so app-relaunch
       // rejoin is a single read (see checkActiveGame in GameScreen)
       // instead of a collection scan. Skipped for bots (no user doc).
@@ -180,6 +227,23 @@ export const gameService = {
   },
 
   // Find an open game to join
+  /**
+   * Resolve a join code to a game id. Used by the TV page and, later, by
+   * join-by-code in the app. Returns null rather than throwing so a typo
+   * is an ordinary "not found" rather than an error state.
+   */
+  async gameIdFromCode(code) {
+    if (!code) return null;
+    try {
+      const snap = await getDoc(
+        doc(db, GAME_CODES_COLLECTION, String(code).trim().toUpperCase()));
+      return snap.exists() ? (snap.data().gameId || null) : null;
+    } catch (error) {
+      console.error('[GameService] gameIdFromCode error:', error);
+      return null;
+    }
+  },
+
   async findOpenGame(userId) {
     try {
       const q = query(

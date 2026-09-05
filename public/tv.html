@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snappled on TV</title>
+<meta name="robots" content="noindex">
+<!--
+  Snappled TV — a big-screen view of a game in progress.
+
+  It is a READ-ONLY subscriber. The whole game lives in one Firestore
+  document that the phones already write to and watch, so a television is
+  just another client rendering that document larger. Nothing here
+  advances a round, scores anything, or writes at all.
+
+  Auth is anonymous. The Firestore rules require a signed-in caller, and
+  a TV has no account — so the join code is what actually gates which
+  game you can find. Knowing the code is the access grant.
+-->
+<style>
+  :root {
+    --bg: #05080F;
+    --surface: #141A33;
+    --line: rgba(255,255,255,0.12);
+    --text: #FFFFFF;
+    --muted: rgba(255,255,255,0.55);
+    --blue: #00C6FF;
+    --green: #00FF41;
+    --pink: #FF10F0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; padding: 4vh 4vw; }
+  .wrap { width: 100%; max-width: 1400px; }
+
+  /* Everything scales off viewport width so it reads from a sofa. */
+  .brand { font-size: 1.6vw; letter-spacing: 0.5em; color: var(--muted); text-transform: uppercase; }
+  .code-in { display: flex; gap: 1.2vw; margin-top: 3vh; }
+  input {
+    flex: 1; background: var(--surface); border: 2px solid var(--line);
+    border-radius: 1vw; color: var(--text); font-size: 5vw; font-weight: 800;
+    letter-spacing: 0.4em; text-align: center; text-transform: uppercase;
+    padding: 2vh 1vw; outline: none; font-family: inherit;
+  }
+  input:focus { border-color: var(--blue); }
+  button {
+    background: var(--blue); color: #04121b; border: 0; border-radius: 1vw;
+    font-size: 2.2vw; font-weight: 900; letter-spacing: 0.1em;
+    padding: 0 3vw; cursor: pointer; font-family: inherit;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .hint { margin-top: 2vh; color: var(--muted); font-size: 1.4vw; }
+  .err { color: var(--pink); }
+
+  .phase { font-size: 1.5vw; letter-spacing: 0.4em; color: var(--blue); text-transform: uppercase; }
+  .prompt {
+    font-size: 5.5vw; font-weight: 900; line-height: 1.05; margin: 2vh 0 4vh;
+  }
+  .joincode { font-size: 2vw; color: var(--muted); letter-spacing: 0.3em; }
+  .players { display: flex; flex-wrap: wrap; gap: 1.2vw; margin-top: 2vh; }
+  .player {
+    background: var(--surface); border: 2px solid var(--line);
+    border-radius: 1vw; padding: 1.6vh 1.8vw;
+    font-size: 2vw; font-weight: 800; display: flex; gap: 1vw; align-items: baseline;
+  }
+  .player .pts { color: var(--green); font-size: 1.5vw; font-variant-numeric: tabular-nums; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="join">
+    <div class="brand">Snappled</div>
+    <div class="code-in">
+      <input id="code" maxlength="4" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" placeholder="CODE" aria-label="Game code">
+      <button id="go">Connect</button>
+    </div>
+    <p class="hint" id="hint">Start a game on your phone, then enter its code.</p>
+  </section>
+
+  <section id="room" class="hidden">
+    <div class="phase" id="phase">Lobby</div>
+    <div class="prompt" id="prompt">Waiting for the round to start…</div>
+    <div class="joincode">Join code · <strong id="shown-code"></strong></div>
+    <div class="players" id="players"></div>
+  </section>
+
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInAnonymously }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, getDoc, onSnapshot }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+// Same project the app writes to. These values are public by design —
+// Firestore rules are the access control, not the config.
+const app = initializeApp({
+  apiKey: 'AIzaSyDLBKPVH4XH-hJIcI3KNJwYqAI8fqboHF4',
+  authDomain: 'snapplepark.firebaseapp.com',
+  projectId: 'snapplepark',
+  storageBucket: 'snapplepark.firebasestorage.app',
+  messagingSenderId: '107855342657',
+  appId: '1:107855342657:web:3ef147a9906a238bf5aac0',
+});
+const db = getFirestore(app);
+
+const el = (id) => document.getElementById(id);
+const PHASE_LABEL = {
+  LOBBY: 'Lobby', LOADING: 'Loading', REVIEW: 'Warmup', PICKING: 'Picking',
+  VOTING: 'Voting', SCORING: 'Scoring', ROUND_RESULTS: 'Round results',
+  FINAL_RESULTS: 'Final results',
+};
+
+function renderGame(data, code) {
+  el('join').classList.add('hidden');
+  el('room').classList.remove('hidden');
+  el('shown-code').textContent = code;
+  el('phase').textContent = PHASE_LABEL[data.phase] || data.phase || '';
+
+  // Round 0 is the lobby, and prompts are 1-indexed against currentRound.
+  const prompt = (data.prompts || [])[(data.currentRound || 0) - 1];
+  el('prompt').textContent = prompt || 'Waiting for the round to start…';
+
+  el('players').innerHTML = '';
+  [...(data.players || [])]
+    .sort((a, b) => (b.points || 0) - (a.points || 0))
+    .forEach((p) => {
+      const d = document.createElement('div');
+      d.className = 'player';
+      const name = document.createElement('span');
+      name.textContent = p.username || 'Player';
+      const pts = document.createElement('span');
+      pts.className = 'pts';
+      pts.textContent = (p.points || 0) + ' pts';
+      d.append(name, pts);
+      el('players').append(d);
+    });
+}
+
+async function connect() {
+  const code = el('code').value.trim().toUpperCase();
+  if (code.length < 4) return;
+  el('go').disabled = true;
+  el('hint').className = 'hint';
+  el('hint').textContent = 'Connecting…';
+
+  try {
+    await signInAnonymously(getAuth(app));
+    const codeSnap = await getDoc(doc(db, 'gameCodes', code));
+    if (!codeSnap.exists()) throw new Error('No game with that code.');
+
+    const gameId = codeSnap.data().gameId;
+    // Live from here on: the phones write, this redraws.
+    onSnapshot(doc(db, 'games', gameId), (snap) => {
+      if (snap.exists()) renderGame(snap.data(), code);
+    });
+  } catch (e) {
+    el('hint').className = 'hint err';
+    el('hint').textContent = e.message || 'Could not connect.';
+    el('go').disabled = false;
+  }
+}
+
+el('go').addEventListener('click', connect);
+el('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+el('code').focus();
+</script>
+</body>
+</html>

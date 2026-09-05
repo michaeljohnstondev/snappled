@@ -50,6 +50,10 @@
         "function": "snappleShare"
       },
       {
+        "source": "/tv",
+        "destination": "/tv.html"
+      },
+      {
         "source": "/privacy",
         "destination": "/privacy.html"
       },

@@ -99,7 +99,11 @@ export default function LobbyPhase({
           </View>
         )}
 
-        <Text style={styles.gameCode}>Game ID: {gameId.slice(0, 6).toUpperCase()}</Text>
+        <Text style={styles.gameCode}>
+          {game?.joinCode
+            ? `Join code: ${game.joinCode}`
+            : `Game ID: ${gameId.slice(0, 6).toUpperCase()}`}
+        </Text>
       </ScrollView>
     </LinearGradient>
   );
