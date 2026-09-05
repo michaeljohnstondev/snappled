@@ -142,7 +142,20 @@ export async function prefetchVideo(url) {
     } catch (e) { /* fall through to download */ }
 
     try {
-      const res = await FileSystem.downloadAsync(url, localUri);
+      // createDownloadResumable instead of downloadAsync purely for the
+      // progress callback. Same request, same result - downloadAsync
+      // simply gives no way to see how far along it is.
+      setProgress(url, 0);
+      const task = FileSystem.createDownloadResumable(
+        url, localUri, {},
+        ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+          if (totalBytesExpectedToWrite > 0) {
+            setProgress(url, totalBytesWritten / totalBytesExpectedToWrite);
+          }
+        },
+      );
+      const res = await task.downloadAsync();
+      if (!res) throw new Error('download produced no result');
 
       // downloadAsync RESOLVES on a 404 or 500 - it just writes the
       // error body to the file. Without this check a Storage error page
@@ -158,6 +171,7 @@ export async function prefetchVideo(url) {
       }
 
       lastErrors.delete(url);
+      setProgress(url, 1);
       cached.set(url, res.uri);
       notify(url, res.uri);
       // Fire-and-forget: the caller is waiting on a video, not on
@@ -206,6 +220,34 @@ export async function invalidateCachedVideo(url) {
 // "it didn't download" arrived with no cause attached and there was
 // nothing to debug from. Bounded to the most recent handful; this is a
 // diagnostic, not a log.
+// Bytes-so-far per url, 0..1. downloadAsync reports nothing, so the
+// download was a black box - there was no way to tell "slow" from
+// "stalled", which is most of what you want to know off wifi.
+const progress = new Map();
+const progressListeners = new Map();
+
+function setProgress(url, value) {
+  progress.set(url, value);
+  const subs = progressListeners.get(url);
+  if (subs) subs.forEach((fn) => { try { fn(value); } catch (e) {} });
+}
+
+/** Download progress for `url`, 0..1, or 0 if nothing has started. */
+export function getDownloadProgress(url) {
+  return (url && progress.get(url)) || 0;
+}
+
+/** Subscribe to progress for `url`. Returns an unsubscribe function. */
+export function onDownloadProgress(url, fn) {
+  const subs = progressListeners.get(url) || new Set();
+  subs.add(fn);
+  progressListeners.set(url, subs);
+  return () => {
+    subs.delete(fn);
+    if (subs.size === 0) progressListeners.delete(url);
+  };
+}
+
 const lastErrors = new Map();
 const MAX_ERRORS = 20;
 
@@ -246,7 +288,23 @@ export function getCachedUriSync(url) {
  *   landed by graceMs, stream rather than spin forever, because a
  *   stuttering clip beats no clip at all.
  */
+/** Hook: live download progress for `url`, 0..1. */
+export function useDownloadProgress(url) {
+  const [pct, setPct] = useState(() => getDownloadProgress(url));
+  useEffect(() => {
+    if (!url) { setPct(0); return undefined; }
+    setPct(getDownloadProgress(url));
+    return onDownloadProgress(url, setPct);
+  }, [url]);
+  return pct;
+}
+
 export function useCachedVideoUri(url, graceMs = 0) {
+  // graceMs === Infinity means never fall back: wait for the file,
+  // however long it takes. Streaming a clip whose download is already
+  // in flight competes with that download for the same connection, so
+  // on a weak link it makes the thing it is trying to paper over worse.
+
   const [uri, setUri] = useState(() => {
     if (!url) return url;
     const hit = cached.get(url);
@@ -261,12 +319,18 @@ export function useCachedVideoUri(url, graceMs = 0) {
     // Stop holding out after the grace period, whatever the download is
     // doing. Cleared on unmount so a closed player can't strand a timer.
     let graceTimer = null;
-    if (graceMs > 0 && !hit) {
+    if (graceMs > 0 && graceMs !== Infinity && !hit) {
       graceTimer = setTimeout(() => setUri((cur) => cur || url), graceMs);
     }
     // Subscribe in case a download is in progress.
     const subs = listeners.get(url) || new Set();
-    const fn = (localUri) => setUri(localUri);
+    // A failed prefetch notifies with the REMOTE url as its fallback.
+    // When streaming is disabled that must be ignored, or the very
+    // failure we're waiting through would hand us the stream anyway.
+    const fn = (localUri) => {
+      if (graceMs === Infinity && localUri === url) return;
+      setUri(localUri);
+    };
     subs.add(fn);
     listeners.set(url, subs);
     // Kick off prefetch (idempotent).

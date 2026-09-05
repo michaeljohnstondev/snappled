@@ -10,6 +10,13 @@ const TOAST_TYPES = {
   reward: { icon: 'gift', color: '#00FF41', label: 'REWARD!' },
   streak: { icon: 'flame', color: '#FF6B00', label: 'WIN STREAK!' },
   rank_up: { icon: 'shield-checkmark', color: '#8B00FF', label: 'RANK UP!' },
+  // Every type here was a celebration, and an unknown type falls back to
+  // `reward` - so a diagnostic sent as 'info' arrived as a gift icon
+  // reading "REWARD!". Anything that is not good news needs somewhere
+  // to land that does not congratulate the user for it.
+  info: { icon: 'information-circle', color: '#00C6FF', label: 'HEADS UP' },
+  warning: { icon: 'warning', color: '#FFD700', label: 'WARNING' },
+  problem: { icon: 'alert-circle', color: '#FF4444', label: 'PROBLEM' },
 };
 
 export default function RewardToast({ visible, type = 'reward', title, subtitle, onDismiss, autoDismiss = 4000 }) {

@@ -3,9 +3,11 @@
 // driven by the snapple's own setting.
 
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCachedVideoUri, invalidateCachedVideo } from '../../services/videoCache';
+import {
+  useCachedVideoUri, invalidateCachedVideo, useDownloadProgress,
+} from '../../services/videoCache';
 import theme from '../../theme/themes';
 import { useAuth } from '../../store/AuthContext';
 import { useModal } from '../../store/ModalContext';
@@ -19,7 +21,12 @@ import { useModal } from '../../store/ModalContext';
 // Same list as PromptInfoOverlay / SnappleOverlay.
 const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 
-const WAIT_FOR_CACHE_MS = 3000;
+// Streaming disabled for now. A half-downloaded clip played off the
+// network competes with its own download for the same connection, so on
+// a weak link it makes things worse, not better - and it hid whether
+// downloads were working at all. Set this back to a number of ms to
+// re-enable the fallback.
+const WAIT_FOR_CACHE_MS = Infinity;
 
 export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) {
   // Hold out briefly for the downloaded file. Clips you watch in a game
@@ -40,6 +47,7 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
   // on a phone. Admin-only, since it means nothing to a player.
   const streaming = !!videoUrl && cachedUri === videoUrl;
   const waiting = !!videoUrl && !cachedUri;
+  const pct = useDownloadProgress(waiting ? videoUrl : null);
   const isAdmin = ADMIN_UIDS.includes(user?.uid);
   const { showToast } = useModal();
 
@@ -51,7 +59,7 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
     if (!videoUrl || !streaming || !isAdmin) return;
     if (toldRef.current === videoUrl) return;
     toldRef.current = videoUrl;
-    showToast?.('info', 'Streaming', 'Not downloaded yet - may stutter');
+    showToast?.('warning', 'Streaming', 'Not downloaded yet - may stutter');
   }, [videoUrl, streaming, isAdmin, showToast]);
   const player = useVideoPlayer(cachedUri, (p) => {
     p.loop = loop;
@@ -64,12 +72,21 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
   // useVideoPlayer to notice the prop change is not safe - it takes the
   // source at creation - and without this the wait would end in a
   // permanently blank player instead of a playing clip.
+  // Only swap when the source ACTUALLY changed. useVideoPlayer already
+  // loads whatever cachedUri held at creation, so replacing it again on
+  // mount reloaded the same file and restarted playback - a hitch on
+  // every open, including the second view of a clip already on disk.
+  // The ref starts at the creation-time value so that first render is a
+  // no-op, and only the null -> file swap after a wait does any work.
+  const appliedRef = useRef(cachedUri);
   useEffect(() => {
     if (!player || !cachedUri) return;
+    if (appliedRef.current === cachedUri) return;
+    appliedRef.current = cachedUri;
     try {
       player.replace(cachedUri);
       player.play();
-    } catch (e) { /* replace is best-effort; source may already match */ }
+    } catch (e) { /* best-effort; the source may already match */ }
   }, [player, cachedUri]);
 
   useEffect(() => {
@@ -84,7 +101,7 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
         // Everyone gets this one, not just admins: a clip that won't
         // play is the player's problem too, and a console.warn on a
         // phone is the same as saying nothing at all.
-        showToast?.('info', 'Video trouble', 'Reloading that snapple');
+        showToast?.('problem', 'Video trouble', 'Reloading that snapple');
       }
     });
     return () => { try { sub?.remove?.(); } catch (e) {} };
@@ -94,6 +111,7 @@ export default function PreviewPlayer({ videoUrl, muted = false, loop = true }) 
     return (
       <View style={[StyleSheet.absoluteFill, styles.waiting]}>
         <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
+        <Text style={styles.waitingPct}>{Math.round(pct * 100)}%</Text>
       </View>
     );
   }
@@ -115,5 +133,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#000',
+    gap: 10,
+  },
+  waitingPct: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -8,8 +8,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  prefetchVideo, isVideoCached, getPrefetchError,
+  prefetchVideo, isVideoCached, getPrefetchError, getDownloadProgress,
+  onDownloadProgress,
 } from '../../../services/videoCache';
+import ProgressRing from '../../ui/ProgressRing';
 import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
 import { thumbnailService } from '../../../services/thumbnailService';
@@ -72,6 +74,22 @@ export default function LoadingPhase({
   // Settled either way - the phase must not hang on a clip that will
   // never arrive. A failure is shown in red rather than counted as a win.
   const doneCount = done.filter(Boolean).length;
+
+  // Per-card download progress, so a card that is moving slowly looks
+  // different from one that is stuck. Subscribed rather than polled -
+  // the cache pushes each chunk.
+  const [pcts, setPcts] = useState({});
+  useEffect(() => {
+    const offs = (hand || []).map((card, i) => {
+      const url = card?.videoUrl;
+      if (!url) return null;
+      setPcts((prev) => ({ ...prev, [i]: getDownloadProgress(url) }));
+      return onDownloadProgress(url, (v) => {
+        setPcts((prev) => (prev[i] === v ? prev : { ...prev, [i]: v }));
+      });
+    });
+    return () => offs.forEach((off) => off && off());
+  }, [hand]);
   const failedCount = done.filter((d) => d === 'failed').length;
   const [firedOnce, setFiredOnce] = useState(false);
   // Guarantees the loading screen renders long enough to actually
@@ -153,11 +171,11 @@ export default function LoadingPhase({
 
       if (tries >= MAX_ATTEMPTS - 1) {
         mark(i, false);
-        if (admin) toast?.('info', `Snapple ${i + 1} failed`, why);
+        if (admin) toast?.('problem', `Snapple ${i + 1} failed`, why);
         return;
       }
       if (admin) {
-        toast?.('info', `Snapple ${i + 1} retry ${tries + 1}`, why);
+        toast?.('warning', `Snapple ${i + 1} retry ${tries + 1}`, why);
       }
       setTimeout(() => { if (!cancelled) attempt(card, i, tries + 1); }, RETRY_MS);
     };
@@ -248,8 +266,15 @@ export default function LoadingPhase({
       {total > 0 && (
         <View style={styles.pipRow}>
           {Array.from({ length: total }, (_, i) => (
-            <View
+            <ProgressRing
               key={i}
+              size={30}
+              progress={done[i] === 'ok' ? 1 : (pcts[i] || 0)}
+              color={done[i] === 'failed'
+                ? 'rgba(255,68,68,0.30)'
+                : 'rgba(0,255,65,0.30)'}
+            >
+            <View
               style={[
                 styles.pip,
                 done[i] === 'ok' && styles.pipDone,
@@ -266,6 +291,7 @@ export default function LoadingPhase({
                 {i + 1}
               </Text>
             </View>
+            </ProgressRing>
           ))}
         </View>
       )}
@@ -355,9 +381,9 @@ const makeStyles = (t) => ({
     maxWidth: 300,
   },
   pip: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: t.colors.textSecondary,
     alignItems: 'center',
