@@ -186,8 +186,16 @@ exports.snappleShare = functions.https.onRequest(async (req, res) => {
   if (card) {
     // Hand the client the payload the server already fetched. </script>
     // inside JSON would close this block early, so neutralise it.
+    // The override replaces the prompt in the PAYLOAD too, not just in
+    // og:title — the visible header on the page reads from here. Without
+    // it a game share unfurled with the round's prompt and then showed
+    // the snapple's original one on the page, which is worse than
+    // either alone.
+    const payload = promptOverride
+      ? Object.assign({}, card, { prompt: promptOverride })
+      : card;
     data = '<script>window.__SNAPPLE__ = ' +
-      JSON.stringify(card).split('<').join('\\u003c') + ';</script>';
+      JSON.stringify(payload).split('<').join('\\u003c') + ';</script>';
   } else if (failure) {
     data = '<script>window.__SNAPPLE_ERROR__ = ' +
       JSON.stringify(failure).split('<').join('\\u003c') + ';</script>';

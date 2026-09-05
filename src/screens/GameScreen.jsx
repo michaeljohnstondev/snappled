@@ -2445,10 +2445,11 @@ export default function GameScreen({ navigation }) {
     const sortedPlayers = [...game.players].sort((a, b) => b.points - a.points);
     const handleShareRound = async () => {
       const winnerUid = lastRoundResult?.rankings?.[0]?.uid;
+      // No players passed any more — a mid-game share doesn't carry
+      // standings; those are on the final result share.
       await shareService.shareRound({
         prompt: game.prompts[game.currentRound - 1] || '',
         winningSubmission: game.submissions.find(s => s.uid === winnerUid),
-        players: sortedPlayers,
       });
     };
     return (

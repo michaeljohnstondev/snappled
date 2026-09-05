@@ -120,20 +120,18 @@ export const shareService = {
   },
 
   /** Share the winning clip of a single round, with the round's prompt. */
-  async shareRound({ prompt, winningSubmission, players = [] }) {
-    const standings = [...players]
-      .sort((a, b) => (b.points || 0) - (a.points || 0))
-      .map((p, i) => `${i + 1}. ${p.username}`)
-      .join('\n');
-
-    // No prompt line: the link carries it as the card's title via ?p=.
-    // The standings below are the part a card can't show, so they stay.
+  async shareRound({ prompt, winningSubmission }) {
+    // Deliberately lean. A mid-game scoreboard is noise to whoever
+    // receives it — they aren't in the game — and the standings are
+    // half-finished anyway. Those belong on the final share, where
+    // they're a result rather than a progress update.
+    //
+    // No prompt line either: the link carries it as the card's title
+    // via ?p=.
     const caption = [
       winningSubmission?.creatorUsername
         ? `Round won by @${winningSubmission.creatorUsername}`
         : 'Round winner',
-      '',
-      standings,
       '',
       `Watch it — ${snappleUrl(winningSubmission?.snappleId, prompt)}`,
     ].filter(Boolean).join('\n');
