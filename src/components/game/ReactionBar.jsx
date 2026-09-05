@@ -7,15 +7,16 @@
 // decision about who may react, how often, and what gets written lives
 // in GameScreen and gameService.
 //
-// The set is deliberately tiny and fixed. A closed set has essentially no
-// moderation surface — which is the whole reason this exists instead of
-// free text or voice — and four choices fit under a card without
-// crowding the vote auras already drawn around it.
+// The set is CLOSED, which is the whole reason this exists instead of
+// free text or voice: a fixed list has essentially no moderation
+// surface. It is no longer tiny, though - four was a constraint of the
+// counted chip strip that had to fit under a card. Reactions now
+// scatter across the clip itself, which has room, so the thumbs are
+// back along with a few more.
 //
-// Dropped the thumbs-up and the screaming face; added a bin. Reactions
-// live only for the round and are cleared alongside submissions and
-// votes, so retiring a key needs no migration — nothing outlives the
-// game that used it.
+// Reactions live only for the round and are cleared alongside
+// submissions and votes, so adding or retiring a key needs no
+// migration - nothing outlives the game that used it.
 
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
@@ -29,6 +30,12 @@ export const REACTIONS = [
   { key: 'fire', glyph: '🔥' },
   { key: 'skull', glyph: '💀' },
   { key: 'trash', glyph: '🗑️' },
+  { key: 'up', glyph: '👍' },
+  { key: 'down', glyph: '👎' },
+  { key: 'love', glyph: '😍' },
+  { key: 'mind', glyph: '🤯' },
+  { key: 'eyes', glyph: '👀' },
+  { key: 'clown', glyph: '🤡' },
 ];
 
 /**
@@ -220,6 +227,8 @@ const styles = StyleSheet.create({
   countCompact: { fontSize: 9 },
   row: {
     flexDirection: 'row',
+    // The set grew from four to ten, which is wider than a grid cell.
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,

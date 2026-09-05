@@ -224,8 +224,7 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
             // grid (passed by the parent), not this card's own count,
             // so 4-vote cards and 0-vote cards align to the same
             // horizontal line.
-            { marginTop: 6 + maxRingCount * ringThickness
-              + (overlaySlot ? 16 : 0) },
+            { marginTop: 6 + maxRingCount * ringThickness },
             { color: picker.color, opacity: picker.opacity ?? 1 },
             picker.isMe && styles.pickerNameMe,
           ]}
@@ -280,14 +279,13 @@ const makeStyles = (t) => ({
     borderRadius: 16,
     borderWidth: 2,
   },
-  // Straddles the video's bottom edge. box-none so the full-width
-  // wrapper doesn't swallow taps meant for the card behind it.
+  // Covers the whole video. Reactions scatter across the clip now
+  // rather than sitting in a strip at one edge, so the slot has to be
+  // the full frame and position within it. box-none, so the wrapper
+  // doesn't swallow taps meant for the card behind it while the
+  // individual emoji stay tappable.
   overlaySlot: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -14,
-    alignItems: 'center',
+    ...StyleSheet.absoluteFillObject,
     zIndex: 5,
   },
   pickerName: {

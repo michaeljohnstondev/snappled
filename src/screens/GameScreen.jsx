@@ -20,6 +20,7 @@ import VibeButton from '../components/ui/VibeButton';
 import ShimmerBar from '../components/ui/ShimmerBar';
 import BackChunk from '../components/ui/BackChunk';
 import ReactionBar, { REACTIONS } from '../components/game/ReactionBar';
+import ReactionScatter from '../components/game/ReactionScatter';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
 import PreviewModal from '../components/game/PreviewModal';
@@ -240,20 +241,15 @@ function VotingWaitGrid({
               playToken={inlinePlayingId === sub.uid ? (playToken || 0) : 0}
               onTogglePlay={onTogglePlay ? () => onTogglePlay(sub) : undefined}
               onFullscreen={onFullscreen ? () => onFullscreen(sub) : undefined}
-              // Handed to the card so it can straddle the VIDEO's edge.
-              // As a sibling here it anchored to the cell and landed on
-              // the picker's name, which the card draws below the video.
+              // Scattered ACROSS the clip rather than tallied beneath
+              // it. Handed to the card because it has to sit over the
+              // video - the picker's name is drawn below that, and
+              // anything anchored to the grid cell landed on the name.
               overlaySlot={reactionsMode ? (
-                <ReactionBar
-                  mode={reactionsMode}
-                  // The wait grid's cards are 100pt wide; full-size
-                  // chips overflow them.
-                  compact={!isLarge}
+                <ReactionScatter
                   counts={countsFor(reactions, sub.uid)}
-                  mine={mineFor(reactions, sub.uid, myUid)}
                   reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
-                  onReact={onReact ? (key) => onReact(sub.uid, key) : undefined}
-                  disabled={reactionsDisabled}
+                  subUid={sub.uid}
                 />
               ) : null}
             />
