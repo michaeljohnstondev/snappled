@@ -107,18 +107,18 @@ export default function ReactionBar({
       {shown.map(({ key, glyph }) => {
         const count = counts[key] || 0;
         if (isSummary) {
-          // One reactor = the colour is unambiguous, so show it for free.
-          // Several = fall back to neutral rather than picking a winner.
-          const who = reactors ? reactors(key) : [];
-          const solo = who.length === 1 ? who[0] : null;
           return (
             <Pressable
               key={key}
               onPress={() => setOpenKey(openKey === key ? null : key)}
+              // No outline here, not even for a single reactor. These
+              // sit among the vote auras, which are drawn in the same
+              // player colours — a bordered chip competed with them and
+              // read as another piece of scoring. Who reacted is still
+              // a tap away, and the names come up in their colours.
               style={[
                 styles.chip,
-                mine[key] && styles.chipMine,
-                solo && { borderColor: solo.color },
+                styles.chipBare,
                 openKey === key && styles.chipOpen,
               ]}
               hitSlop={4}
@@ -191,6 +191,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.vibeGreen,
     backgroundColor: 'rgba(0,255,65,0.12)',
   },
+  // Summary chips keep the dark pill — the count is white and would
+  // vanish on the light theme without it — but lose the outline.
+  chipBare: { borderWidth: 0 },
   chipDim: { opacity: 0.45 },
   chipOpen: { backgroundColor: 'rgba(0,0,0,0.8)' },
   whoRow: {

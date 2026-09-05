@@ -3494,7 +3494,21 @@ const makeStyles = (t) => ({
   // Bottom padding leaves room for the flush action row that sits
   // OUTSIDE the ScrollView so scoreboard rows / Share button never
   // hide behind it. ~140pt covers a two-line CTA + safe-area.
-  resultsScrollContent: { paddingBottom: 140 },
+  // Centred between the header chips and the action row rather than
+  // hugging the top: with three or four players the standings are
+  // short, and pinned high they left a dead gap above NEXT ROUND.
+  // flexGrow lets the content container fill the space it's given, so
+  // justifyContent has something to centre within; once the standings
+  // are taller than that space it grows past it and simply scrolls.
+  //
+  // The old 140 bottom padding was left over from when the action row
+  // overlapped the scroll view. It's a flex sibling now and can't
+  // cover anything, so that padding only pushed the standings up.
+  resultsScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingBottom: 16,
+  },
   // Non-host waiting bar — same flush-bottom shape as the host's
   // NEXT ROUND ShimmerBar so the layout is stable regardless of
   // which role you have.
