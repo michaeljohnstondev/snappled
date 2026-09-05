@@ -78,6 +78,10 @@ export default function LoadingPhase({
   // Per-card download progress, so a card that is moving slowly looks
   // different from one that is stuck. Subscribed rather than polled -
   // the cache pushes each chunk.
+  // What each card is busy with. A stuck pip said nothing about
+  // WHICH half was stuck - the download or the frame extraction that
+  // follows it - and those have completely different causes.
+  const [stage, setStage] = useState({});
   const [pcts, setPcts] = useState({});
   useEffect(() => {
     const offs = (hand || []).map((card, i) => {
@@ -162,17 +166,23 @@ export default function LoadingPhase({
       // cached file when one exists, so running it alongside the
       // download meant it found nothing and fetched the same video a
       // second time, competing with the very download it was racing.
+      setStage((prev) => ({ ...prev, [i]: 'video' }));
       await prefetchVideo(url);
       if (cancelled) return;
       // Only extract when the server made no tile for this clip. With
       // one, extraction is pure waste - it decodes a frame nothing will
       // ever draw, while the round waits on it.
       if (!card?.gridThumbUrl) {
+        setStage((prev) => ({ ...prev, [i]: 'thumb' }));
         await thumbnailService.getThumbnail(url).catch(() => {});
         if (cancelled) return;
       }
 
-      if (isVideoCached(url)) { mark(i, true); return; }
+      if (isVideoCached(url)) {
+        setStage((prev) => ({ ...prev, [i]: null }));
+        mark(i, true);
+        return;
+      }
 
       const why = getPrefetchError(url) || 'no reason reported';
       const { isAdmin: admin, showToast: toast } = alertRef.current;
@@ -239,6 +249,17 @@ export default function LoadingPhase({
   // Bots are excluded for the same reason finishLoading excludes them:
   // nothing downloads on their behalf, so they are never "ready" and
   // counting them would show a number that never reaches zero.
+  // The one card currently working. With downloads serialised there is
+  // only ever one, which is the point of serialising them.
+  const busyIdx = Object.keys(stage).find((k) => stage[k]);
+  const busy = busyIdx == null ? null : {
+    n: Number(busyIdx) + 1,
+    what: stage[busyIdx] === 'thumb' ? 'making thumbnail' : 'downloading video',
+    pct: stage[busyIdx] === 'video'
+      ? ` ${Math.round((pcts[busyIdx] || 0) * 100)}%`
+      : '',
+  };
+
   const myTurnDone = total > 0 && doneCount >= total;
   const waitingOn = (players || [])
     .filter(p => !String(p?.uid || '').startsWith('bot_'))
@@ -302,6 +323,12 @@ export default function LoadingPhase({
             </ProgressRing>
           ))}
         </View>
+      )}
+
+      {busy && (
+        <Text style={styles.stageLine}>
+          {`Snapple ${busy.n} — ${busy.what}${busy.pct}`}
+        </Text>
       )}
 
       {waitingOn > 0 && (
@@ -412,6 +439,14 @@ const makeStyles = (t) => ({
     backgroundColor: 'rgba(255,68,68,0.15)',
   },
   pipTextFailed: { color: theme.colors.vibeRed },
+  stageLine: {
+    color: theme.colors.vibeBlue,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    fontVariant: ['tabular-nums'],
+  },
   waitingOn: {
     color: t.colors.textSecondary,
     fontSize: 12,

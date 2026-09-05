@@ -146,9 +146,15 @@ export async function prefetchVideo(url) {
       // progress callback. Same request, same result - downloadAsync
       // simply gives no way to see how far along it is.
       setProgress(url, 0);
+      let lastMovedAt = Date.now();
+      let lastBytes = 0;
       const task = FileSystem.createDownloadResumable(
         url, localUri, {},
         ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+          if (totalBytesWritten > lastBytes) {
+            lastBytes = totalBytesWritten;
+            lastMovedAt = Date.now();
+          }
           if (totalBytesExpectedToWrite > 0) {
             setProgress(url, totalBytesWritten / totalBytesExpectedToWrite);
           }
@@ -162,16 +168,23 @@ export async function prefetchVideo(url) {
         res = await Promise.race([
           task.downloadAsync(),
           new Promise((_, reject) => {
-            timer = setTimeout(() => {
+            // Polls rather than a single deadline, so the clock resets
+            // every time bytes arrive.
+            timer = setInterval(() => {
+              const idle = Date.now() - lastMovedAt;
+              if (idle < STALL_TIMEOUT_MS) return;
               // Best-effort: stop the transfer so it isn't still using
               // the connection after we've given up on it.
               task.cancelAsync?.().catch(() => {});
-              reject(new Error(`timed out after ${DOWNLOAD_TIMEOUT_MS / 1000}s`));
-            }, DOWNLOAD_TIMEOUT_MS);
+              reject(new Error(
+                `stalled ${Math.round(idle / 1000)}s at `
+                + `${Math.round(getDownloadProgress(url) * 100)}%`,
+              ));
+            }, 2000);
           }),
         ]);
       } finally {
-        if (timer) clearTimeout(timer);
+        if (timer) clearInterval(timer);
         // Release before any throw below, or a failing download would
         // hold its slot forever and wedge the queue after three of them.
         releaseSlot();
@@ -249,13 +262,23 @@ export async function invalidateCachedVideo(url) {
 // the connection and the whole hand timed out together. Three at a time
 // finish in sequence instead, which is both faster overall and gives
 // visible progress rather than six stalled bars.
-const MAX_PARALLEL_DOWNLOADS = 3;
+// One at a time, deliberately, to measure the pace of a single clip.
+// Three concurrent made every download slow without making the set
+// finish sooner, and hid which clip was the problem. Raise this once
+// per-clip speed is understood.
+const MAX_PARALLEL_DOWNLOADS = 1;
 
 // A download that stalls has no timeout of its own, so it would hold
 // one of the three slots indefinitely and starve everything queued
-// behind it - one stuck clip quietly becoming a stuck hand. Cancelling
-// frees the slot and lets the caller's retry have a clean go.
-const DOWNLOAD_TIMEOUT_MS = 45000;
+// behind it - one stuck clip quietly becoming a stuck hand.
+//
+// Measured as time WITHOUT PROGRESS, not total duration. A flat 45s
+// deadline killed big clips that were downloading perfectly well: some
+// snapples are 40MB+, which is minutes on cellular, so they were
+// cancelled mid-transfer, retried, and cancelled again - turning slow
+// into permanently broken. A transfer that is still moving is not
+// stuck, however long it takes.
+const STALL_TIMEOUT_MS = 20000;
 let activeDownloads = 0;
 const downloadQueue = [];
 
