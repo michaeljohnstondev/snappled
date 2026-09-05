@@ -1147,4 +1147,8 @@ exports.onActivePromptCreated = functions.firestore
     }
   });
 exports.renderShareVideo = require('./shareRender').renderShareVideo;
+// snappled.com share pages. Moved here from the studio project so
+// Snappled owns its own website end to end — and so the page can read
+// Firestore directly instead of calling across projects over HTTPS.
+exports.snappleShare = require('./sharePage').snappleShare;
 exports.getShareCard = require('./shareRender').getShareCard;

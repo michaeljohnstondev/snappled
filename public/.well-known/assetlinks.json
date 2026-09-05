@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bigvibestudios.snappled",
+      "sha256_cert_fingerprints": [
+        "BB:25:55:4B:E0:E4:6A:3C:9B:06:51:EC:3E:60:37:F0:FB:0D:59:A7:88:18:36:AE:2C:84:67:80:E6:7E:D5:76"
+      ]
+    }
+  }
+]

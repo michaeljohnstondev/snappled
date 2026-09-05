@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>__TITLE__</title>
+__OG__
+<meta name="theme-color" content="#00d4ff">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #e0e0e0;
+    background: linear-gradient(135deg, #000814 0%, #001d3d 100%);
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 460px;
+    background: rgba(0, 13, 26, 0.85);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 14px;
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.12);
+    padding: 26px;
+  }
+
+  .brand {
+    font-size: 0.75em;
+    letter-spacing: 3px;
+    color: #00d4ff;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+
+  .prompt {
+    font-size: 1.5em;
+    line-height: 1.25;
+    color: #fff;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .creator { color: #00d4ff; font-size: 0.95em; margin-bottom: 18px; }
+
+  /* 9:16 is the capture aspect; reserving it up front stops the layout
+     jumping when the video loads. */
+  .video-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    max-height: 62vh;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  .meta {
+    display: flex;
+    gap: 18px;
+    font-size: 0.85em;
+    color: #8fa9bd;
+    margin-bottom: 20px;
+  }
+  .meta strong { color: #e0e0e0; }
+
+  .cta { display: flex; flex-direction: column; gap: 10px; }
+
+  .btn {
+    display: block;
+    text-align: center;
+    padding: 13px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: transform 0.12s ease;
+  }
+  .btn:active { transform: scale(0.985); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #00d4ff 0%, #0077b6 100%);
+    color: #001220;
+    box-shadow: 0 4px 18px rgba(0, 212, 255, 0.25);
+  }
+  .btn-secondary {
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    color: #00d4ff;
+  }
+
+  .footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 0.8em;
+    color: #5f7a8f;
+  }
+  .footer a { color: #8fa9bd; text-decoration: none; }
+
+  .state { text-align: center; padding: 40px 10px; color: #8fa9bd; }
+  .state h1 { color: #fff; font-size: 1.3em; margin-bottom: 8px; }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">Snappled</div>
+
+  <div id="loading" class="state">Loading&hellip;</div>
+
+  <div id="error" class="state hidden">
+    <h1 id="error-title">Snapple not found</h1>
+    <p id="error-body">It may have expired, or the link is incomplete.</p>
+  </div>
+
+  <div id="content" class="hidden">
+    <div class="prompt" id="prompt"></div>
+    <div class="creator" id="creator"></div>
+
+    <div class="video-wrap">
+      <video id="video" playsinline loop controls preload="metadata"></video>
+    </div>
+
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <div class="cta" id="cta">
+    <a class="btn btn-primary hidden" id="open-app" href="#">Open in Snappled</a>
+    <a class="btn btn-secondary" href="https://testflight.apple.com/join/aBmbZSCY"
+       target="_blank" rel="noopener">Get Snappled &mdash; iOS</a>
+    <a class="btn btn-secondary" href="https://play.google.com/apps/internaltest/4701744108664769427"
+       target="_blank" rel="noopener">Get Snappled &mdash; Android</a>
+  </div>
+
+  <div class="footer">
+    <a href="/snappled">What is Snappled?</a>
+  </div>
+</div>
+
+__DATA__
+<script>
+(function () {
+  var ENDPOINT = 'https://us-central1-snapplepark.cloudfunctions.net/getShareCard';
+  var el = function (id) { return document.getElementById(id); };
+
+  function fail(title, body) {
+    el('loading').classList.add('hidden');
+    el('error-title').textContent = title;
+    el('error-body').textContent = body;
+    el('error').classList.remove('hidden');
+  }
+
+  function render(data) {
+    if (!data || !data.videoUrl) return fail('Snapple not found',
+      'It may have expired, or the link is incomplete.');
+
+    el('prompt').textContent = data.prompt ? '"' + data.prompt + '"' : 'A snapple';
+    el('creator').textContent = '@' + (data.creatorUsername || 'anonymous');
+
+    var video = el('video');
+    if (data.thumbUrl) video.poster = data.thumbUrl;
+    video.src = data.videoUrl;
+    // Muted autoplay is the only kind browsers allow; controls are on so
+    // sound is one tap away.
+    video.muted = true;
+    video.play().catch(function () { /* autoplay blocked — fine */ });
+
+    var bits = [];
+    if (data.price) bits.push('<span><strong>' + data.price + '</strong> coins</span>');
+    if (data.owners) {
+      bits.push('<span><strong>' + data.owners + '</strong> owner' +
+        (data.owners === 1 ? '' : 's') + '</span>');
+    }
+    el('meta').innerHTML = bits.join('');
+
+    // Universal links normally open the app before this page ever loads.
+    // This button covers when they don't — in-app browsers (Instagram,
+    // TikTok) routinely refuse to hand an https link to a native app.
+    var open = el('open-app');
+    open.href = 'snappled://s/' + encodeURIComponent(data.id);
+    open.classList.remove('hidden');
+
+    el('loading').classList.add('hidden');
+    el('content').classList.remove('hidden');
+  }
+
+  // The server already fetched the card to build the OG tags, so it hands
+  // the same payload down inline. Saves the client a round trip; the fetch
+  // below is only the fallback for a static/unrendered hit.
+  if (window.__SNAPPLE__) return render(window.__SNAPPLE__);
+  if (window.__SNAPPLE_ERROR__) {
+    return fail(window.__SNAPPLE_ERROR__.title, window.__SNAPPLE_ERROR__.body);
+  }
+
+  var parts = window.location.pathname.split('/').filter(Boolean);
+  var id = parts[parts.length - 1];
+  if (!id || id === 's' || id === 'index.html') {
+    id = new URLSearchParams(window.location.search).get('id');
+  }
+  if (!id) return fail('Nothing to show', 'This link is missing a snapple id.');
+
+  fetch(ENDPOINT + '?id=' + encodeURIComponent(id))
+    .then(function (res) {
+      if (res.status === 403) throw new Error('private');
+      if (!res.ok) throw new Error('missing');
+      return res.json();
+    })
+    .then(render)
+    .catch(function (err) {
+      if (err && err.message === 'private') {
+        fail('This snapple is private', 'Its creator has not shared it publicly.');
+      } else {
+        fail('Snapple not found', 'It may have expired, or the link is incomplete.');
+      }
+    });
+})();
+</script>
+</body>
+</html>
