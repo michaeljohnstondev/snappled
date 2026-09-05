@@ -154,7 +154,16 @@ export async function prefetchVideo(url) {
           }
         },
       );
-      const res = await task.downloadAsync();
+      // Take a slot only around the transfer itself.
+      await acquireSlot();
+      let res;
+      try {
+        res = await task.downloadAsync();
+      } finally {
+        // Release before any throw below, or a failing download would
+        // hold its slot forever and wedge the queue after three of them.
+        releaseSlot();
+      }
       if (!res) throw new Error('download produced no result');
 
       // downloadAsync RESOLVES on a 404 or 500 - it just writes the
@@ -223,6 +232,29 @@ export async function invalidateCachedVideo(url) {
 // Bytes-so-far per url, 0..1. downloadAsync reports nothing, so the
 // download was a black box - there was no way to tell "slow" from
 // "stalled", which is most of what you want to know off wifi.
+// Cap parallel downloads. Six clips at once on cellular starved each
+// other badly enough that none of them finished - each got a sliver of
+// the connection and the whole hand timed out together. Three at a time
+// finish in sequence instead, which is both faster overall and gives
+// visible progress rather than six stalled bars.
+const MAX_PARALLEL_DOWNLOADS = 3;
+let activeDownloads = 0;
+const downloadQueue = [];
+
+function acquireSlot() {
+  if (activeDownloads < MAX_PARALLEL_DOWNLOADS) {
+    activeDownloads++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => downloadQueue.push(resolve));
+}
+
+function releaseSlot() {
+  const next = downloadQueue.shift();
+  if (next) next();
+  else activeDownloads--;
+}
+
 const progress = new Map();
 const progressListeners = new Map();
 

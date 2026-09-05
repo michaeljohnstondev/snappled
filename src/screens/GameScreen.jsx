@@ -768,10 +768,14 @@ export default function GameScreen({ navigation }) {
   // internally (in-flight promise + result cache), so repeated
   // effect runs on submissions.length changes are cheap.
   useEffect(() => {
+    // Thumbnail AFTER the download, for the same reason as the loading
+    // screen: extracting from a remote url pulls the whole video down
+    // again, alongside the prefetch of the identical file.
     (game?.submissions || []).forEach(s => {
       if (s?.videoUrl) {
-        prefetchVideo(s.videoUrl);
-        thumbnailService.getThumbnail(s.videoUrl);
+        prefetchVideo(s.videoUrl)
+          .then(() => thumbnailService.getThumbnail(s.videoUrl))
+          .catch(() => {});
       }
     });
   }, [game?.submissions?.length]);
@@ -782,8 +786,9 @@ export default function GameScreen({ navigation }) {
   useEffect(() => {
     hand.forEach(card => {
       if (card?.videoUrl) {
-        prefetchVideo(card.videoUrl);
-        thumbnailService.getThumbnail(card.videoUrl);
+        prefetchVideo(card.videoUrl)
+          .then(() => thumbnailService.getThumbnail(card.videoUrl))
+          .catch(() => {});
       }
     });
   }, [hand]);

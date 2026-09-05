@@ -6,6 +6,8 @@
 // what was tanking the profile screen). Concurrent extractions are
 // capped at MAX_PARALLEL; the rest queue up and run as slots free.
 
+import { getCachedUriSync } from './videoCache';
+
 let VideoThumbnails = null;
 try {
   VideoThumbnails = require('expo-video-thumbnails');
@@ -38,7 +40,16 @@ const drain = () => {
 
 // Run a single extraction, then release the slot and drain the queue.
 const runExtraction = (videoUrl, resolve) => {
-  VideoThumbnails.getThumbnailAsync(videoUrl, {
+  // Extract from the DOWNLOADED file when there is one. This was
+  // pointing at the remote url, so every thumbnail pulled the video
+  // down a second time - concurrently with the prefetch of the exact
+  // same file, competing with it for the same connection. On wifi that
+  // was invisible; off wifi it roughly doubled the traffic needed to
+  // start a round. Falls back to the remote url when nothing is cached
+  // yet, which is still correct, just slower.
+  const source = getCachedUriSync(videoUrl);
+
+  VideoThumbnails.getThumbnailAsync(source, {
     time: 500,
     quality: 0.5,
   })

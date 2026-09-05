@@ -158,10 +158,13 @@ export default function LoadingPhase({
       const url = card?.videoUrl;
       if (!url) { if (!cancelled) mark(i, true); return; }
 
-      await Promise.allSettled([
-        prefetchVideo(url),
-        thumbnailService.getThumbnail(url),
-      ]);
+      // Sequential, not parallel. getThumbnail extracts from the
+      // cached file when one exists, so running it alongside the
+      // download meant it found nothing and fetched the same video a
+      // second time, competing with the very download it was racing.
+      await prefetchVideo(url);
+      if (cancelled) return;
+      await thumbnailService.getThumbnail(url).catch(() => {});
       if (cancelled) return;
 
       if (isVideoCached(url)) { mark(i, true); return; }
