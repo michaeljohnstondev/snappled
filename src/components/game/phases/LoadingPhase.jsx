@@ -5,7 +5,7 @@
 // tap the screen to cycle to another tip.
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { prefetchVideo } from '../../../services/videoCache';
 import { thumbnailService } from '../../../services/thumbnailService';
@@ -129,6 +129,19 @@ export default function LoadingPhase({ hand, onLoaded }) {
         colors={t.colors.gameBackgroundGradient}
         style={StyleSheet.absoluteFill}
       />
+      {/* Same lockup as the play menu — the adaptive-icon asset is the
+          S on transparency, so it sits on the gradient without a plate,
+          and the name is typed rather than the splash's baked-in
+          wordmark, which is white and would vanish in light theme. */}
+      <View style={styles.brandBlock}>
+        <Image
+          source={require('../../../../assets/images/icon-android.png')}
+          style={styles.brandMark}
+          resizeMode="contain"
+        />
+        <Text style={styles.brandName}>Snappled</Text>
+      </View>
+
       <View style={styles.pctBlock}>
         <Text style={styles.pctText}>{pct}%</Text>
         <View style={styles.progressBarWrap}>
@@ -151,6 +164,25 @@ const makeStyles = (t) => ({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+  },
+  // Deliberately smaller than the play menu's 132/32: the percentage
+  // is the thing you're watching here, so the logo sets the scene
+  // without competing with it.
+  brandBlock: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  brandMark: {
+    width: 96,
+    height: 96,
+  },
+  brandName: {
+    color: theme.colors.vibeBlue,
+    fontSize: 24,
+    fontWeight: theme.fontWeights.bold,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: 2,
   },
   pctBlock: {
     alignItems: 'center',

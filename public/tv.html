@@ -181,6 +181,24 @@ function renderQr() {
     '<img alt="Download Snappled" src="https://api.qrserver.com/v1/create-qr-code/'
     + '?size=400x400&margin=0&data=' + encodeURIComponent(url) + '">';
 }
+/**
+ * Player colours, in the same order and by the same rule the app uses
+ * (VOTER_PALETTE + buildPlayerColors in GameScreen): position in
+ * game.players, which every client reads from the same document.
+ *
+ * That rule exists BECAUSE of this screen. The app used to paint the
+ * local user green and cycle the rest, so each phone painted a
+ * different player green — fine while the game only looked at itself,
+ * a contradiction the moment a shared display shows the same room.
+ *
+ * Kept as literals rather than imported: this page loads no bundle.
+ * If the palette changes in themes.js, change it here too.
+ */
+const PLAYER_COLORS = [
+  '#00C6FF', '#6B00CC', '#FF10F0', '#FFD700',
+  '#007FFF', '#FF4444', '#40E0D0', '#4169E1',
+];
+
 const PHASE_LABEL = {
   LOBBY: 'Lobby', LOADING: 'Loading', REVIEW: 'Warmup', PICKING: 'Picking',
   VOTING: 'Voting', SCORING: 'Scoring', ROUND_RESULTS: 'Round results',
@@ -212,12 +230,19 @@ function renderGame(data, code) {
   el('prompt').textContent = prompt || waiting;
 
   el('players').innerHTML = '';
+  // Colour comes from the player's index in the UNSORTED array, so it
+  // survives the reorder as scores change — the same reason the app
+  // builds its map before sorting.
+  const seat = new Map((data.players || []).map((p, i) => [p.uid, i]));
   [...(data.players || [])]
     .sort((a, b) => (b.points || 0) - (a.points || 0))
     .forEach((p) => {
       const d = document.createElement('div');
       d.className = 'player';
+      const color = PLAYER_COLORS[(seat.get(p.uid) || 0) % PLAYER_COLORS.length];
+      d.style.borderColor = color;
       const name = document.createElement('span');
+      name.style.color = color;
       name.textContent = p.username || 'Player';
       const pts = document.createElement('span');
       pts.className = 'pts';

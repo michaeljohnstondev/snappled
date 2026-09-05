@@ -49,9 +49,8 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // each player's row Y in screen coords. The reveal grid + winner spotlight
 // are an overlay on top. During shrink each winner card scales down and
 // translates toward its actual row in the scoreboard.
-// Palette assigned to non-self players in voter-order. Self always shows
-// in vibeGreen so the user can spot their own vote at a glance.
-// Distinct colors only — vibeCyan/Aqua/Teal were near-duplicates of
+// One colour per player, assigned by position in game.players (see
+// buildPlayerColors). Distinct colors only — vibeCyan/Aqua/Teal were near-duplicates of
 // vibeBlue and made adjacent players hard to tell apart. Replaced with
 // vibeTurquoise (clearly different green-blue), vibeRed, and
 // vibeRoyalBlue for spread.
@@ -68,6 +67,31 @@ const VOTER_PALETTE = [
   theme.colors.vibeTurquoise,
   theme.colors.vibeRoyalBlue,
 ];
+
+/**
+ * Who is what colour. Derived purely from position in game.players —
+ * the same document every client reads — so a player wears one colour
+ * on every phone in the room AND on the television.
+ *
+ * This used to paint self vibeGreen and cycle the palette for everyone
+ * else, which meant each phone painted a DIFFERENT player green and no
+ * two screens agreed. That was survivable while the game only ever
+ * looked at itself; a shared display makes it a contradiction.
+ *
+ * Self is still findable without a reserved colour: VoteAuraCard bolds
+ * your name and the reactor lists say "you".
+ *
+ * The palette holds MAX_PLAYERS entries, so the modulo only wraps if
+ * that cap is ever raised — at which point two players share a colour
+ * rather than anything breaking.
+ */
+function buildPlayerColors(players) {
+  const map = new Map();
+  (players || []).forEach((p, i) => {
+    map.set(p.uid, VOTER_PALETTE[i % VOTER_PALETTE.length]);
+  });
+  return map;
+}
 
 // Scoring-phase winner callout. Slides down from above on mount with a
 // soft fade so the moment feels announced rather than printed. Idempotent
@@ -262,19 +286,8 @@ function RoundResultsReveal({
 
   // Per-player color — same as voting wait + scoreboard so colors are
   // consistent across all surfaces.
-  const playerColors = React.useMemo(() => {
-    const map = new Map();
-    let i = 0;
-    (players || []).forEach(p => {
-      if (p.uid === selfUid) {
-        map.set(p.uid, theme.colors.vibeGreen);
-      } else {
-        map.set(p.uid, VOTER_PALETTE[i % VOTER_PALETTE.length]);
-        i++;
-      }
-    });
-    return map;
-  }, [players, selfUid]);
+  const playerColors = React.useMemo(
+    () => buildPlayerColors(players), [players]);
 
   // earnedByUid lookup for the scoreboard +N display.
   const earnedByUid = {};
@@ -340,8 +353,8 @@ function RoundResultsReveal({
               {/* Whole row in the player's colour. Rows reorder as the
                   points tick up, so colour is what lets you follow your
                   own row through the swap rather than re-reading names.
-                  The isMe green override is gone — the colour map
-                  already assigns self vibeGreen. */}
+                  The isMe green override is gone: every player now
+                  has their own colour. */}
               <Text style={[styles.resultPlacement, { color }]}>#{i + 1}</Text>
               <View style={styles.resultInfo}>
                 <Text style={[styles.resultName, { color }]}>
@@ -1939,27 +1952,16 @@ export default function GameScreen({ navigation }) {
           // Vote-submitted wait screen — unified grid of all snapples,
           // each card same size with a multi-color vote aura around its
           // video and colored-border name chips below. Auras populate as
-          // bots/players cast votes (see scheduleBotVote effect). Self
-          // always renders in vibeGreen so the user can spot their own
-          // pick by the green stripe in its aura.
+          // bots/players cast votes (see scheduleBotVote effect). You
+          // find your own pick by the bold name under the card, not by
+          // a reserved colour — see buildPlayerColors.
           (() => {
             const votedUids = new Set(Object.values(game.votes || {}).flat());
             const sortedPlayers = [...(game.players || [])].sort(
               (a, b) => (b.points || 0) - (a.points || 0)
             );
 
-            // Per-player color map: self → vibeGreen, others cycle through
-            // VOTER_PALETTE in players-array order.
-            const playerColors = new Map();
-            let paletteIdx = 0;
-            (game.players || []).forEach(p => {
-              if (p.uid === user?.uid) {
-                playerColors.set(p.uid, theme.colors.vibeGreen);
-              } else {
-                playerColors.set(p.uid, VOTER_PALETTE[paletteIdx % VOTER_PALETTE.length]);
-                paletteIdx++;
-              }
-            });
+            const playerColors = buildPlayerColors(game.players);
 
             const buildVoters = (subUid) => {
               const ids = (game.votes?.[subUid] || []);
@@ -2245,16 +2247,7 @@ export default function GameScreen({ navigation }) {
           const scoreboardPlayers = [...(game.players || [])].sort(
             (a, b) => (b.points || 0) - (a.points || 0)
           );
-          const colorsSb = new Map();
-          let pi = 0;
-          (game.players || []).forEach(p => {
-            if (p.uid === user?.uid) {
-              colorsSb.set(p.uid, theme.colors.vibeGreen);
-            } else {
-              colorsSb.set(p.uid, VOTER_PALETTE[pi % VOTER_PALETTE.length]);
-              pi++;
-            }
-          });
+          const colorsSb = buildPlayerColors(game.players);
           return (
             <Modal visible transparent animationType="fade" onRequestClose={() => setShowScoreboard(false)}>
               <Pressable style={styles.scoreboardOverlay} onPress={() => setShowScoreboard(false)}>
@@ -2268,9 +2261,8 @@ export default function GameScreen({ navigation }) {
                         {/* Whole row in the player's colour, not just
                             the left bar — same colour they wear in the
                             vote auras and reaction names, so a row is
-                            identifiable at a glance. The old isMe green
-                            override was redundant: the colour map
-                            already assigns self vibeGreen. */}
+                            identifiable at a glance, and the same
+                            colour they wear on the television. */}
                         <Text style={[styles.scoreboardPlace, { color }]}>#{i + 1}</Text>
                         <Text style={[styles.scoreboardName, { color }]} numberOfLines={1}>
                           {p.username}
@@ -2318,16 +2310,7 @@ export default function GameScreen({ navigation }) {
 
     // Per-player color map mirrors the voting wait so chip / aura
     // colors stay consistent across the round.
-    const playerColors = new Map();
-    let paletteIdx = 0;
-    (game.players || []).forEach(p => {
-      if (p.uid === user?.uid) {
-        playerColors.set(p.uid, theme.colors.vibeGreen);
-      } else {
-        playerColors.set(p.uid, VOTER_PALETTE[paletteIdx % VOTER_PALETTE.length]);
-        paletteIdx++;
-      }
-    });
+    const playerColors = buildPlayerColors(game.players);
 
     const buildVoters = (subUid) => {
       const ids = (game.votes?.[subUid] || []);
@@ -2457,9 +2440,8 @@ export default function GameScreen({ navigation }) {
                         {/* Whole row in the player's colour, not just
                             the left bar — same colour they wear in the
                             vote auras and reaction names, so a row is
-                            identifiable at a glance. The old isMe green
-                            override was redundant: the colour map
-                            already assigns self vibeGreen. */}
+                            identifiable at a glance, and the same
+                            colour they wear on the television. */}
                         <Text style={[styles.scoreboardPlace, { color }]}>#{i + 1}</Text>
                         <Text style={[styles.scoreboardName, { color }]} numberOfLines={1}>
                           {p.username}
