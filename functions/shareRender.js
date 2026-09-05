@@ -1,17 +1,14 @@
 /**
- * shareRender.js — burns the prompt onto a snapple so a shared clip
- * carries its own context.
+ * shareRender.js - the picture a shared link unfurls with.
  *
- * A shared video with no prompt is just a stranger doing something odd.
- * With the prompt on it, it reads as a bit, and the watermark tells you
- * where it came from. That's the whole advertising case, so the text has
- * to live in the pixels — it survives re-upload to any platform, which a
- * caption does not.
+ * This used to transcode the whole clip, burning the prompt and a
+ * watermark into every frame, because Android strips the caption off an
+ * attached file and the text had to survive re-upload. Shares are links
+ * now: the prompt travels as og:title and the page only needs an image,
+ * so that render is gone along with the 5-30s of CPU it cost per share.
  *
- * Renders are cached: the output URL is written back to the snapple doc
- * as `sharedVideoUrl`, and a second share of the same snapple is a plain
- * Firestore read. Transcoding is by far the most expensive thing this
- * backend does, so it must happen at most once per snapple.
+ * What's left is a single frame grab fitted to an unfurl card, plus the
+ * JSON endpoint the share page falls back to.
  */
 
 // firebase-functions v5+ made the ROOT import the v2 API. Every
@@ -25,19 +22,12 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-// ffmpeg-static is PINNED to 5.2.0 (binary release b6.0) on purpose.
-//
-// 5.3.0 ships release b6.1.1, whose linux-x64 build has no `drawtext`
-// filter — it isn't compiled with libfreetype. Every render in
-// production failed in ~1.7s with "No such filter: 'drawtext'" and a
-// 500, and the client silently fell back to the un-overlaid clip, so
-// the overlay never worked once while sharing appeared fine.
-//
-// It passed local testing because the WINDOWS binary of the same
-// package does have drawtext. Verified by string-scanning both linux
-// builds: b6.0 contains 'drawtext', b6.1.1 does not.
-//
-// So: do not bump this without checking the linux binary first.
+// ffmpeg-static was PINNED to 5.2.0 (binary release b6.0) because
+// 5.3.0's linux-x64 build ships without the `drawtext` filter, and the
+// burned-in overlay depended on it. Nothing here calls drawtext any
+// more - a poster is scale + pad, which every build has - so that
+// constraint is lifted and the pin can move whenever there's a reason.
+// It is left where it is only because there is currently no reason.
 const ffmpegPath = require('ffmpeg-static');
 
 // Unfurl card geometry. 1.91:1 is what every messenger lays out inline
@@ -52,61 +42,7 @@ const POSTER_BG = '#05080F';
 const POSTER_VERSION = 2;
 
 
-// Anton — heavy condensed sans. Holds up at small sizes over busy video,
-// which a lighter face would not.
-const FONT_PATH = require.resolve(
-  '@expo-google-fonts/anton/400Regular/Anton_400Regular.ttf'
-);
-
 const OUTPUT_DIR = 'shared';
-
-// Bump when the burned-in LAYOUT changes (position, size, colour).
-// Renders are cached per snapple, so without this a tweak would only
-// ever show on clips nobody had shared yet — every existing one would
-// keep serving the old framing forever.
-const LAYOUT_VERSION = 5;
-
-// Short stable id for a caption, so a render of the same text reuses the
-// same Storage object instead of transcoding again. djb2 — collisions are
-// irrelevant here; the worst case is two captions sharing a cache slot,
-// and the caption is re-burned from the request either way.
-function hashText(text) {
-  let h = 5381;
-  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
-  return h.toString(36);
-}
-// Roughly what fits across a 720px-wide frame at the caption size below.
-const WRAP_CHARS = 26;
-const MAX_LINES = 3;
-
-/**
- * Hard-wrap on word boundaries. drawtext has no wrapping of its own, and
- * a long prompt would otherwise run off both edges of the frame.
- */
-function wrapText(text, width = WRAP_CHARS) {
-  const words = String(text || '').trim().split(/\s+/);
-  const lines = [];
-  let line = '';
-
-  for (const word of words) {
-    if (!line) {
-      line = word;
-    } else if ((line + ' ' + word).length <= width) {
-      line += ' ' + word;
-    } else {
-      lines.push(line);
-      line = word;
-    }
-  }
-  if (line) lines.push(line);
-
-  if (lines.length > MAX_LINES) {
-    const kept = lines.slice(0, MAX_LINES);
-    kept[MAX_LINES - 1] = kept[MAX_LINES - 1].replace(/.{1}$/, '') + '…';
-    return kept;
-  }
-  return lines;
-}
 
 function run(bin, args) {
   return new Promise((resolve, reject) => {
@@ -163,71 +99,6 @@ function probeDimensions(bin, file) {
  * of apostrophes. textfile= sidesteps that, and expansion=none below
  * handles `%`, which textfile= alone does NOT protect against.
  */
-function buildFilter(captionFile, markFile) {
-  const esc = p => p.replace(/\\/g, '/').replace(/:/g, '\\:');
-  return [
-    // Cap at 720 wide, never UPSCALE. This was 'scale=720:-2', which
-    // blew a 406x720 phone clip up to 720x1276 — triple the pixels, a
-    // file nearly twice the size of the original (0.96MB -> 1.76MB), and
-    // no added detail, since upscaling invents nothing. The bloat pushed
-    // shares past what SMS/MMS will carry, so Google Messages refused to
-    // send them outright.
-    "scale='min(720,iw)':-2",
-    [
-      `drawtext=textfile='${esc(captionFile)}'`,
-      `fontfile='${esc(FONT_PATH)}'`,
-      // expansion=none or drawtext parses %-sequences in the prompt as
-      // format specifiers and silently renders NOTHING. A prompt like
-      // "100% unhinged energy" is enough to blank the whole caption.
-      'expansion=none',
-      'fontcolor=white',
-      // Proportional: 34/720 of the width, so it reads the same at any
-      // source size now that we no longer normalise everything to 720.
-      'fontsize=w*0.047',
-      'line_spacing=8',
-      'box=1',
-      'boxcolor=black@0.55',
-      'boxborderw=18',
-      'x=(w-text_w)/2',
-      // Not near the top: WhatsApp (and most messengers) overlay their
-      // own chrome there — toolbar, frame scrubber, download/edit
-      // buttons — and it sat right on the caption. Just above centre
-      // clears both that and the caption bar at the bottom, while
-      // staying off the subject's face more than dead centre would.
-      'y=h*0.38',
-    ].join(':'),
-    [
-      `drawtext=textfile='${esc(markFile)}'`,
-      `fontfile='${esc(FONT_PATH)}'`,
-      'expansion=none',
-      'fontcolor=white@0.85',
-      'fontsize=w*0.031',
-      'box=1',
-      'boxcolor=black@0.4',
-      'boxborderw=10',
-      'x=w-text_w-28',
-      // Lifted off the very bottom edge for the same reason — the
-      // receiving app's caption field sits there.
-      'y=h-text_h-96',
-    ].join(':'),
-  ].join(',');
-}
-
-
-/**
- * ensureSharePoster — extract ONE frame so a shared link unfurls with a
- * thumbnail instead of a bare text card.
- *
- * This replaces the full video render for share purposes. Burning the
- * prompt into every frame cost 5-30s of transcode and existed only
- * because Android strips the caption off an attached file. Now that
- * shares are links, the prompt travels as og:title and all the page
- * needs is a picture — which is a single -frames:v 1 grab, about a
- * second, no re-encode.
- *
- * Best-effort throughout: a snapple with no poster still shares fine,
- * it just unfurls without an image.
- */
 async function ensureSharePoster(snappleId, snapple) {
   if (!snappleId || !snapple) return null;
   // Version-gated so a shape change actually reaches snapples that
@@ -271,6 +142,19 @@ async function ensureSharePoster(snappleId, snapple) {
     ]);
     if (!fs.existsSync(poster)) return null;
 
+    // Probe the SOURCE clip while it's already on disk. sharePage needs
+    // these for og:video, and the deleted render was the only thing that
+    // ever wrote them - without this, og:video would quietly stop being
+    // emitted and Facebook and Discord would lose inline playback.
+    // Best-effort: a failed probe just means no og:video, same as today
+    // for every snapple that was never rendered.
+    let dims = null;
+    try {
+      dims = await probeDimensions(ffmpegPath, input);
+    } catch (e) {
+      dims = null;
+    }
+
     const token = `${snappleId}-${Date.now()}`;
     const dest = `${OUTPUT_DIR}/${snappleId}-poster.jpg`;
     await bucket.upload(poster, {
@@ -284,7 +168,12 @@ async function ensureSharePoster(snappleId, snapple) {
       + `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
 
     await admin.firestore().collection('snapples').doc(snappleId)
-      .update({ shareThumbUrl: url, sharePosterV: POSTER_VERSION });
+      .update(Object.assign(
+        { shareThumbUrl: url, sharePosterV: POSTER_VERSION },
+        dims && dims.width && dims.height
+          ? { shareWidth: dims.width, shareHeight: dims.height }
+          : {},
+      ));
     return url;
   } catch (error) {
     console.warn('[ensureSharePoster]', snappleId, error.message);
@@ -336,208 +225,6 @@ exports.backfillSharePosters = functions
     };
   });
 
-exports.renderShareVideo = functions
-  // Transcoding is CPU-bound; 2GB buys proportionally more CPU on GCF and
-  // a 10s clip lands in a few seconds rather than timing out.
-  .runWith({ memory: '2GB', timeoutSeconds: 300 })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
-        'unauthenticated', 'Sign in to share.'
-      );
-    }
-
-    const snappleId = data && data.snappleId;
-    if (!snappleId) {
-      throw new functions.https.HttpsError(
-        'invalid-argument', 'snappleId is required.'
-      );
-    }
-
-    // Optional caption override. A snapple carries the prompt it was
-    // recorded for, but it gets REPLAYED against other prompts — a game
-    // round is a different prompt entirely. Sharing a round used to burn
-    // in the snapple's original prompt, which is the wrong caption for
-    // the thing being shared.
-    const promptOverride =
-      data && typeof data.promptText === 'string' ? data.promptText.trim() : '';
-
-    const db = admin.firestore();
-    const snapRef = db.collection('snapples').doc(snappleId);
-    const snap = await snapRef.get();
-    if (!snap.exists) {
-      throw new functions.https.HttpsError('not-found', 'Snapple not found.');
-    }
-
-    const snapple = snap.data();
-    const basePrompt = snapple.prompt || '';
-    // Only treat it as an override when it actually differs, so a caller
-    // that helpfully passes the same text still gets the shared cache.
-    const usingOverride = !!promptOverride && promptOverride !== basePrompt;
-    const effectivePrompt = usingOverride ? promptOverride : basePrompt;
-
-    // Cache hit — the expensive path only ever runs once per snapple.
-    // Skipped for overrides: sharedVideoUrl is the render of the snapple's
-    // OWN prompt, and handing that back for a round share is exactly the
-    // bug this override exists to fix.
-    if (!usingOverride
-        && snapple.sharedVideoUrl
-        && snapple.shareLayoutVersion === LAYOUT_VERSION) {
-      return {
-        url: snapple.sharedVideoUrl,
-        thumbUrl: snapple.shareThumbUrl || null,
-        width: snapple.shareWidth || null,
-        height: snapple.shareHeight || null,
-        cached: true,
-      };
-    }
-
-    // Older snapples predate `filename` being stored on the doc. They
-    // still have a public videoUrl, so fall back to fetching that rather
-    // than refusing outright — a missing field was returning 400 and
-    // leaving those clips permanently un-overlaid.
-    if (!snapple.filename && !snapple.videoUrl) {
-      throw new functions.https.HttpsError(
-        'failed-precondition',
-        'Snapple has no video to render.'
-      );
-    }
-
-    const bucket = admin.storage().bucket();
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshare-'));
-    const input = path.join(work, 'in.mp4');
-    const output = path.join(work, 'out.mp4');
-    const poster = path.join(work, 'poster.jpg');
-    const captionFile = path.join(work, 'caption.txt');
-    const markFile = path.join(work, 'mark.txt');
-
-    try {
-      if (snapple.filename) {
-        await bucket.file(snapple.filename).download({ destination: input });
-      } else {
-        const res = await fetch(snapple.videoUrl);
-        if (!res.ok) {
-          throw new Error(`source fetch failed: ${res.status}`);
-        }
-        fs.writeFileSync(input, Buffer.from(await res.arrayBuffer()));
-      }
-
-      fs.writeFileSync(captionFile, wrapText(snapple.prompt).join('\n'), 'utf8');
-      fs.writeFileSync(markFile, 'SNAPPLED', 'utf8');
-
-      await run(ffmpegPath, [
-        '-y',
-        '-i', input,
-        '-vf', buildFilter(captionFile, markFile),
-        '-c:v', 'libx264',
-        // 'veryfast' + crf 24 was a visibly lossy second generation on
-        // top of an already-compressed 406x720 upload. 'fast' + crf 22
-        // buys real quality for a modest size increase and only a couple
-        // of seconds of render time — which matters, because the client
-        // gives up at 22s and a slower preset would blow through it.
-        //
-        // Size is the hard constraint, not time: at 1.68MB a share was
-        // refused outright by SMS/MMS. Don't drop crf below ~21 without
-        // checking what the output actually weighs.
-        '-preset', 'fast',
-        '-crf', '22',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        // faststart puts the index up front so the clip previews without
-        // a full download when someone opens the share.
-        '-movflags', '+faststart',
-        output,
-      ]);
-
-      // Poster frame, taken from the OVERLAID render so the prompt is
-      // visible in the unfurl thumbnail. Seek a little past the start —
-      // frame zero of a phone recording is very often a black or
-      // half-exposed frame.
-      //
-      // 720px wide at q:v 4 lands around 60-120kb. That ceiling matters:
-      // WhatsApp quietly gives up on preview images that are too large.
-      await run(ffmpegPath, [
-        '-y', '-ss', '0.5', '-i', output,
-        '-frames:v', '1', '-q:v', '4', poster,
-      ]).catch(async () => {
-        // Clip shorter than the seek point — retake from the first frame.
-        await run(ffmpegPath, ['-y', '-i', output, '-frames:v', '1', '-q:v', '4', poster]);
-      });
-
-      const dims = await probeDimensions(ffmpegPath, output);
-
-      const token = `${snappleId}-${Date.now()}`;
-
-      // One token covers both objects; they are created together and are
-      // equally public once shared.
-      const publicUrl = (dest) =>
-        `https://firebasestorage.googleapis.com/v0/b/${bucket.name}` +
-        `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
-
-      // Overrides get their own object so a round render never clobbers
-      // the snapple's canonical one (or vice versa).
-      const variant = usingOverride ? `-${hashText(promptOverride)}` : '';
-      // Layout version rides in the filename too, so a re-render writes a
-      // new object instead of racing the CDN's copy of the old one.
-      const v = `-v${LAYOUT_VERSION}`;
-      const videoDest = `${OUTPUT_DIR}/${snappleId}${variant}${v}.mp4`;
-      const posterDest = `${OUTPUT_DIR}/${snappleId}${variant}${v}.jpg`;
-
-      await bucket.upload(output, {
-        destination: videoDest,
-        metadata: {
-          contentType: 'video/mp4',
-          metadata: { firebaseStorageDownloadTokens: token },
-        },
-      });
-
-      let thumbUrl = null;
-      if (fs.existsSync(poster)) {
-        await bucket.upload(poster, {
-          destination: posterDest,
-          metadata: {
-            contentType: 'image/jpeg',
-            metadata: { firebaseStorageDownloadTokens: token },
-          },
-        });
-        thumbUrl = publicUrl(posterDest);
-      }
-
-      const url = publicUrl(videoDest);
-
-      // Only the canonical render is recorded on the doc. An override is
-      // one caption among many, so writing it here would make the next
-      // plain share serve a round's caption.
-      if (!usingOverride) {
-        await snapRef.update({
-          sharedVideoUrl: url,
-          shareLayoutVersion: LAYOUT_VERSION,
-          shareThumbUrl: thumbUrl,
-          shareWidth: dims ? dims.width : null,
-          shareHeight: dims ? dims.height : null,
-          sharedVideoRenderedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-
-      return {
-        url,
-        thumbUrl,
-        width: dims ? dims.width : null,
-        height: dims ? dims.height : null,
-        cached: false,
-      };
-    } catch (error) {
-      console.error('[renderShareVideo]', snappleId, error);
-      throw new functions.https.HttpsError(
-        'internal', 'Could not render the share video.'
-      );
-    } finally {
-      // /tmp is an in-memory tmpfs on GCF — leaving files there counts
-      // against the function's own memory on every warm invocation.
-      fs.rmSync(work, { recursive: true, force: true });
-    }
-  });
-
 /**
  * getShareCard — public JSON for the web share page.
  *
@@ -573,7 +260,12 @@ exports.getShareCard = functions.https.onRequest(async (req, res) => {
       creatorUsername: s.creatorUsername || 'anonymous',
       // Prefer the overlaid render so the web page shows the same thing
       // that got shared to socials.
-      videoUrl: s.sharedVideoUrl || s.videoUrl || null,
+      // videoUrl, never sharedVideoUrl. The latter is a leftover
+      // render with the snapple's ORIGINAL prompt burned into every
+      // frame - so a game share of an older clip would unfurl with
+      // the right prompt in its title and the wrong one painted on
+      // the video itself. The raw clip is the honest source.
+      videoUrl: s.videoUrl || null,
       // Unfurl metadata. Only present once a render has run — the OG
       // renderer degrades to a text-only card without it.
       thumbUrl: s.shareThumbUrl || null,

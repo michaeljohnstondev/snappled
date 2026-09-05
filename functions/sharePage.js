@@ -36,12 +36,6 @@ const POSTER_H = 630;
 const TEMPLATE = fs.readFileSync(
   path.join(__dirname, 'shareTemplate.html'), 'utf8');
 
-// Shorter than the site's version on purpose: this sits under a title,
-// beside a thumbnail, and after a "by @creator — " prefix, and WhatsApp
-// truncates the card description hard.
-const DESCRIPTION =
-  'A meme caught or created on camera. Play yours for random prompts — vote to see who wins.';
-
 /** Escape for use inside a double-quoted HTML attribute. */
 function attr(value) {
   return String(value == null ? '' : value)
@@ -71,9 +65,12 @@ function buildOg(card, pageUrl, promptOverride) {
   const title = prompt
     ? '"' + prompt + '"'
     : 'A snapple on Snappled';
-  // No byline. A share is the prompt and the clip; the recipient is not
-  // in the game and the author is a tap away in the app.
-  const creator = DESCRIPTION;
+  // No description at all. It was a boilerplate explainer of what
+  // Snappled is, repeated under every clip anyone ever shared - which
+  // told the recipient nothing about THIS one and made every card look
+  // like an advert. The prompt is the title and the clip is the image;
+  // between them the joke either lands or it doesn't, and someone
+  // curious has snappled.com right there.
   const image = (card && card.thumbUrl) || FALLBACK_IMAGE;
   // tag() already drops empties, so a null image emits nothing.
 
@@ -92,11 +89,9 @@ function buildOg(card, pageUrl, promptOverride) {
     tag('og:site_name', 'Snappled'),
     tag('og:url', pageUrl),
     tag('og:title', title),
-    tag('og:description', creator),
     tag('og:image', image),
     tag('og:image:secure_url', image),
     tag('twitter:title', title),
-    tag('twitter:description', creator),
     tag('twitter:image', image),
     ...imageDims,
   ];
@@ -184,7 +179,12 @@ exports.snappleShare = functions.https.onRequest(async (req, res) => {
           id: snap.id,
           prompt: s.prompt || '',
           creatorUsername: s.creatorUsername || 'anonymous',
-          videoUrl: s.sharedVideoUrl || s.videoUrl || null,
+          // videoUrl, never sharedVideoUrl. The latter is a leftover
+          // render with the snapple's ORIGINAL prompt burned into every
+          // frame - so a game share of an older clip would unfurl with
+          // the right prompt in its title and the wrong one painted on
+          // the video itself. The raw clip is the honest source.
+          videoUrl: s.videoUrl || null,
           thumbUrl: s.shareThumbUrl || null,
           width: s.shareWidth || null,
           height: s.shareHeight || null,
