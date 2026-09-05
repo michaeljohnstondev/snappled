@@ -44,3 +44,6 @@ app-example
 !.env.example
 credentials.json
 credentials/
+
+# Firebase deploy cache
+.firebase/
