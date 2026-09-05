@@ -216,7 +216,7 @@ export default function UserProfileScreen({ route, navigation }) {
     <Pressable style={styles.snappleItem} onPress={() => handleSnapplePress(item)}>
       <View style={styles.videoContainer}>
         {item.videoUrl ? (
-          <SnappleThumbnail videoUrl={item.videoUrl} />
+          <SnappleThumbnail videoUrl={item.videoUrl} thumbUrl={item.gridThumbUrl} />
         ) : (
           <View style={styles.thumbnailPlaceholder}>
             <Ionicons name="play-circle" size={28} color="white" />

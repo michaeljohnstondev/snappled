@@ -801,15 +801,23 @@ export default function GameScreen({ navigation }) {
   // getting drawn are already cached. Runs on any phase change so
   // it fires when SCORE opens and again when VOTING opens.
   useEffect(() => {
-    const isIdleWait = game?.phase === GAME_PHASES.ROUND_RESULTS
-      || game?.phase === GAME_PHASES.VOTING;
-    if (!isIdleWait) return;
+    // ROUND_RESULTS only. This used to run during VOTING as well, which
+    // is the worst possible moment: it queued ten SPECULATIVE downloads
+    // ahead of the submissions you are actually watching and voting on,
+    // and they competed for the same connection. Results is genuine
+    // idle time - the clips for that screen are already local.
+    if (game?.phase !== GAME_PHASES.ROUND_RESULTS) return;
     const inHandIds = new Set(hand.map(h => h?.id).filter(Boolean));
-    const pool = getHandSnapples().filter(s => !inHandIds.has(s.id)).slice(0, 10);
+    // Four, not ten. Only one of these will actually be drawn, so the
+    // rest is bandwidth spent on a guess.
+    const pool = getHandSnapples().filter(s => !inHandIds.has(s.id)).slice(0, 4);
     pool.forEach(s => {
       if (s?.videoUrl) {
-        prefetchVideo(s.videoUrl);
-        thumbnailService.getThumbnail(s.videoUrl);
+        // Sequenced for the same reason as everywhere else: extracting
+        // from a remote url fetches the whole video a second time.
+        prefetchVideo(s.videoUrl)
+          .then(() => thumbnailService.getThumbnail(s.videoUrl))
+          .catch(() => {});
       }
     });
   }, [game?.phase, game?.currentRound]);

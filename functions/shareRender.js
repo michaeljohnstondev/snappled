@@ -37,9 +37,17 @@ const POSTER_W = 1200;
 const POSTER_H = 630;
 const POSTER_BG = '#05080F';
 
+// Portrait tile for profile / deck grids. A grid used to make its own
+// thumbnails by running native extraction against the REMOTE video url,
+// which pulls video data over the network for every tile just to get
+// one frame - a profile of thirty snapples fetched thirty videos to
+// draw thirty images. A stored JPEG is a few KB instead.
+const GRID_W = 360;
+const GRID_H = 640;
+
 // Bumped whenever the poster's SHAPE changes, so existing snapples
 // regenerate instead of keeping a stale one.
-const POSTER_VERSION = 2;
+const POSTER_VERSION = 3;
 
 
 const OUTPUT_DIR = 'shared';
@@ -155,6 +163,23 @@ async function ensureSharePoster(snappleId, snapple) {
       dims = null;
     }
 
+    // Portrait grid tile, from the same downloaded file. Cropped rather
+    // than letterboxed: a grid cell is portrait already, so it fills
+    // properly, and unlike the unfurl card there are no bars to explain.
+    const gridFile = path.join(work, 'grid.jpg');
+    let gridUrl = null;
+    try {
+      await run(ffmpegPath, [
+        '-y', '-ss', '1', '-i', input, '-frames:v', '1',
+        '-vf', `scale=${GRID_W}:${GRID_H}:force_original_aspect_ratio=increase,`
+          + `crop=${GRID_W}:${GRID_H}`,
+        '-q:v', '5', gridFile,
+      ]);
+    } catch (e) {
+      // Non-fatal: the grid falls back to extracting its own frame.
+      console.warn('[ensureSharePoster] grid thumb failed', snappleId, e.message);
+    }
+
     const token = `${snappleId}-${Date.now()}`;
     const dest = `${OUTPUT_DIR}/${snappleId}-poster.jpg`;
     await bucket.upload(poster, {
@@ -164,12 +189,27 @@ async function ensureSharePoster(snappleId, snapple) {
         metadata: { firebaseStorageDownloadTokens: token },
       },
     });
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}`
-      + `/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+    const publicUrl = (d) =>
+      `https://firebasestorage.googleapis.com/v0/b/${bucket.name}`
+      + `/o/${encodeURIComponent(d)}?alt=media&token=${token}`;
+    const url = publicUrl(dest);
+
+    if (fs.existsSync(gridFile)) {
+      const gridDest = `${OUTPUT_DIR}/${snappleId}-grid.jpg`;
+      await bucket.upload(gridFile, {
+        destination: gridDest,
+        metadata: {
+          contentType: 'image/jpeg',
+          metadata: { firebaseStorageDownloadTokens: token },
+        },
+      });
+      gridUrl = publicUrl(gridDest);
+    }
 
     await admin.firestore().collection('snapples').doc(snappleId)
       .update(Object.assign(
         { shareThumbUrl: url, sharePosterV: POSTER_VERSION },
+        gridUrl ? { gridThumbUrl: gridUrl } : {},
         dims && dims.width && dims.height
           ? { shareWidth: dims.width, shareHeight: dims.height }
           : {},

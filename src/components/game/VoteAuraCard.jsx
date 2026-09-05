@@ -133,7 +133,10 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
                 player overlays on top when playing so the video's
                 first-frame gap doesn't flash black. */}
             {submission?.videoUrl ? (
-              <SnappleThumbnailImg videoUrl={submission.videoUrl} />
+              <SnappleThumbnailImg
+                videoUrl={submission.videoUrl}
+                thumbUrl={submission.gridThumbUrl}
+              />
             ) : null}
             {submission?.videoUrl && isPlaying ? (
               <View style={StyleSheet.absoluteFill}>

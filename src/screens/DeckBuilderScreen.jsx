@@ -172,7 +172,7 @@ export default function DeckBuilderScreen({ navigation }) {
           setSelectedSnapple(item);
         }}>
           {item.videoUrl ? (
-            <SnappleThumbnail videoUrl={item.videoUrl} />
+            <SnappleThumbnail videoUrl={item.videoUrl} thumbUrl={item.gridThumbUrl} />
           ) : (
             <View style={styles.thumbnailPlaceholder}>
               <Ionicons name="play-circle" size={24} color="white" />

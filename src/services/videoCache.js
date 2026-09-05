@@ -157,9 +157,21 @@ export async function prefetchVideo(url) {
       // Take a slot only around the transfer itself.
       await acquireSlot();
       let res;
+      let timer = null;
       try {
-        res = await task.downloadAsync();
+        res = await Promise.race([
+          task.downloadAsync(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              // Best-effort: stop the transfer so it isn't still using
+              // the connection after we've given up on it.
+              task.cancelAsync?.().catch(() => {});
+              reject(new Error(`timed out after ${DOWNLOAD_TIMEOUT_MS / 1000}s`));
+            }, DOWNLOAD_TIMEOUT_MS);
+          }),
+        ]);
       } finally {
+        if (timer) clearTimeout(timer);
         // Release before any throw below, or a failing download would
         // hold its slot forever and wedge the queue after three of them.
         releaseSlot();
@@ -238,6 +250,12 @@ export async function invalidateCachedVideo(url) {
 // finish in sequence instead, which is both faster overall and gives
 // visible progress rather than six stalled bars.
 const MAX_PARALLEL_DOWNLOADS = 3;
+
+// A download that stalls has no timeout of its own, so it would hold
+// one of the three slots indefinitely and starve everything queued
+// behind it - one stuck clip quietly becoming a stuck hand. Cancelling
+// frees the slot and lets the caller's retry have a clean go.
+const DOWNLOAD_TIMEOUT_MS = 45000;
 let activeDownloads = 0;
 const downloadQueue = [];
 

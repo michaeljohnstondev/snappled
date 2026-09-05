@@ -67,7 +67,10 @@ export default function HandCardThumbnail({
               the thumbnail underneath it holds the still until the
               video paints. */}
           {card?.videoUrl ? (
-            <SnappleThumbnailImg videoUrl={card.videoUrl} />
+            <SnappleThumbnailImg
+              videoUrl={card.videoUrl}
+              thumbUrl={card.gridThumbUrl}
+            />
           ) : (
             <View style={styles.placeholder} />
           )}

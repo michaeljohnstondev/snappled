@@ -109,7 +109,7 @@ export default function SnappleGrid({
       >
         <View style={styles.videoContainer}>
           {item.videoUrl ? (
-            <SnappleThumbnail videoUrl={item.videoUrl} />
+            <SnappleThumbnail videoUrl={item.videoUrl} thumbUrl={item.gridThumbUrl} />
           ) : (
             <View style={styles.thumbnailPlaceholder}>
               <Ionicons name="play-circle" size={32} color="white" />

@@ -164,8 +164,13 @@ export default function LoadingPhase({
       // second time, competing with the very download it was racing.
       await prefetchVideo(url);
       if (cancelled) return;
-      await thumbnailService.getThumbnail(url).catch(() => {});
-      if (cancelled) return;
+      // Only extract when the server made no tile for this clip. With
+      // one, extraction is pure waste - it decodes a frame nothing will
+      // ever draw, while the round waits on it.
+      if (!card?.gridThumbUrl) {
+        await thumbnailService.getThumbnail(url).catch(() => {});
+        if (cancelled) return;
+      }
 
       if (isVideoCached(url)) { mark(i, true); return; }
 

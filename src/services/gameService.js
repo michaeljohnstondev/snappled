@@ -486,6 +486,11 @@ export const gameService = {
           creatorId: snapple.creatorId || null,
           creatorUsername: snapple.creatorUsername || 'anonymous',
           muted: !!snapple.muted,
+          // The server-made grid tile. Snapshotted here so every other
+          // client's grid can draw this card from a ~30KB image rather
+          // than running native extraction against the video url, which
+          // pulls the whole clip over the network just to get a frame.
+          gridThumbUrl: snapple.gridThumbUrl || null,
           // Snapshot so CreatorActionRow can hide Buy/Wishlist on
           // private snapples without an extra fetch per submission.
           isPrivate: !!snapple.isPrivate,

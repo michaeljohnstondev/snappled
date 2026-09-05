@@ -16,7 +16,7 @@ import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
 // Resolves and renders a thumbnail for a single videoUrl. Loading
 // state shows a spinner; error/unavailable shows a placeholder icon.
-export default function SnappleThumbnail({ videoUrl, style }) {
+export default function SnappleThumbnail({ videoUrl, thumbUrl, style }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [thumbnailUri, setThumbnailUri] = useState(null);
@@ -24,6 +24,19 @@ export default function SnappleThumbnail({ videoUrl, style }) {
 
   useEffect(() => {
     let cancelled = false;
+
+    // A stored image beats extracting one. Native extraction runs
+    // against the REMOTE video url, so a grid of thirty snapples pulled
+    // thirty videos over the network just to draw thirty stills. When
+    // the server made a tile for this clip, use it - it is a few KB and
+    // needs no decoding. Extraction stays as the fallback for snapples
+    // that predate it or whose render failed.
+    if (thumbUrl) {
+      setThumbnailUri(thumbUrl);
+      setLoading(false);
+      return undefined;
+    }
+
     if (!videoUrl) {
       setLoading(false);
       return;
@@ -41,7 +54,7 @@ export default function SnappleThumbnail({ videoUrl, style }) {
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [videoUrl]);
+  }, [videoUrl, thumbUrl]);
 
   if (loading) {
     return (
