@@ -9,8 +9,13 @@
 //
 // The set is deliberately tiny and fixed. A closed set has essentially no
 // moderation surface — which is the whole reason this exists instead of
-// free text or voice — and five choices fit under a card without
+// free text or voice — and four choices fit under a card without
 // crowding the vote auras already drawn around it.
+//
+// Dropped the thumbs-up and the screaming face; added a bin. Reactions
+// live only for the round and are cleared alongside submissions and
+// votes, so retiring a key needs no migration — nothing outlives the
+// game that used it.
 
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
@@ -21,9 +26,8 @@ import theme from '../../theme/themes';
 export const REACTIONS = [
   { key: 'laugh', glyph: '😂' },
   { key: 'fire', glyph: '🔥' },
-  { key: 'thumbsup', glyph: '👍' },
-  { key: 'shock', glyph: '😱' },
   { key: 'skull', glyph: '💀' },
+  { key: 'trash', glyph: '🗑️' },
 ];
 
 /**
