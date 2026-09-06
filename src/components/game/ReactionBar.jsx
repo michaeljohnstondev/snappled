@@ -19,7 +19,7 @@
 // migration - nothing outlives the game that used it.
 
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
@@ -110,13 +110,54 @@ export default function ReactionBar({
     </Pressable>
   );
 
-  if (collapsed) {
+  if (collapsed || (collapsible && !isSummary)) {
     // A grey outlined face with a +, not one of the emoji. Showing a
     // real emoji made the toggle look like a fifth choice you were
     // picking - greyscale reads as chrome, and the + says it opens
     // something. It stays grey once you've reacted: what you sent is
-    // shown on the card corner, so tinting this would say it twice.
-    return <View style={styles.row}>{addToggle}</View>;
+    // shown on the clip itself, so tinting this would say it twice.
+    //
+    // The set opens in a MODAL rather than expanding in place. Inline,
+    // ten chips added a row to one cell and shoved every card below it
+    // down the screen - the grid rearranging itself under your thumb
+    // while you reach for an emoji. Floating over the top leaves the
+    // layout alone.
+    return (
+      <View style={styles.row}>
+        {addToggle}
+        <Modal
+          visible={!!open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpen(false)}
+        >
+          <Pressable style={styles.pickerBackdrop} onPress={() => setOpen(false)}>
+            <Pressable style={styles.pickerSheet} onPress={() => {}}>
+              {REACTIONS.map(({ key, glyph }) => (
+                <Pressable
+                  key={key}
+                  onPress={() => {
+                    onReact?.(key);
+                    // Not while dimmed: GameScreen drops that tap, and
+                    // closing on a reaction that never landed reads as
+                    // a success.
+                    if (!disabled) setOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.pickerCell,
+                    mine[key] && styles.pickerCellMine,
+                    (pressed || disabled) && styles.chipDim,
+                  ]}
+                  hitSlop={4}
+                >
+                  <Text style={styles.pickerGlyph}>{glyph}</Text>
+                </Pressable>
+              ))}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      </View>
+    );
   }
 
   return (
@@ -255,6 +296,39 @@ const styles = StyleSheet.create({
   // vanish on the light theme without it — but lose the outline.
   chipBare: { borderWidth: 0 },
   chipDim: { opacity: 0.45 },
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  pickerSheet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: theme.colors.vibeBlue,
+    backgroundColor: '#0A1A2A',
+    maxWidth: 320,
+  },
+  pickerCell: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  pickerCellMine: {
+    borderColor: theme.colors.vibeGreen,
+    backgroundColor: 'rgba(0,255,65,0.12)',
+  },
+  pickerGlyph: { fontSize: 28 },
   chipOpen: { backgroundColor: 'rgba(0,0,0,0.8)' },
   whoRow: {
     flexDirection: 'row',

@@ -30,6 +30,48 @@ function hash(str) {
 
 const GLYPH = 19;
 
+// Fixed landing spots around the border, three to a side. Every glyph
+// takes a DIFFERENT one, which is what stops them stacking on top of
+// each other - a hash picked freely will happily hand two reactions the
+// same coordinates. Corners are skipped: they are where two sides meet
+// and glyphs bunch up there.
+//
+// Three a side keeps neighbours 25% apart. Even on the vote-wait grid's
+// 100pt cards that is ~25px between centres against a 19px glyph, so
+// they sit close but clear.
+const SLOTS = (() => {
+  const out = [];
+  [25, 50, 75].forEach((t) => {
+    out.push({ left: t, top: 0 });    // top
+    out.push({ left: 100, top: t });  // right
+    out.push({ left: t, top: 100 });  // bottom
+    out.push({ left: 0, top: t });    // left
+  });
+  return out;
+})();
+
+/**
+ * Deterministic shuffle of the slot list, seeded per snapple.
+ *
+ * Fixed slots alone would put the first reaction in the same corner on
+ * every card in the grid. Seeding by the snapple scatters them
+ * differently card to card while staying identical on every phone -
+ * which is what matters once a television shows the same grid.
+ */
+function slotOrder(seed) {
+  const order = SLOTS.map((_, i) => i);
+  let r = seed || 1;
+  for (let i = order.length - 1; i > 0; i--) {
+    // Park-Miller LCG: enough for shuffling, and it needs no imports.
+    r = (r * 48271) % 2147483647;
+    const j = r % (i + 1);
+    const tmp = order[i];
+    order[i] = order[j];
+    order[j] = tmp;
+  }
+  return order;
+}
+
 /**
  * @param {Object} counts   { [key]: number } — used only to know which
  *   emoji were given; the number itself is never drawn.
@@ -55,18 +97,19 @@ export default function ReactionScatter({ counts = {}, reactors, subUid = '' }) 
 
   if (items.length === 0) return null;
 
+  // More reactors than slots would force two into one spot. Beyond a
+  // dozen the card is a wall of emoji anyway, so the extras are simply
+  // not drawn rather than piled on top of what is already there.
+  const order = slotOrder(hash(subUid));
+  const shown = items.slice(0, SLOTS.length);
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {items.map((item, i) => {
-        const h = hash(`${subUid}:${item.id}`);
-        // An angle around the card, and a radius that varies a little so
-        // they don't sit on a perfect circle. Kept near the edge: the
-        // middle is the video, and covering someone's face with an
-        // emoji is the one place this stops being fun.
-        const angle = (h % 360) * (Math.PI / 180);
-        const radius = 38 + ((h >> 9) % 12); // 38-50% of the card
-        const left = 50 + radius * Math.cos(angle);
-        const top = 50 + radius * Math.sin(angle) * 0.92;
+      {shown.map((item, i) => {
+        // One slot each, in a per-snapple order. Centred ON the border
+        // line so the glyph half hangs off the clip; frameOuter doesn't
+        // clip, since the vote rings already draw outside it.
+        const { left, top } = SLOTS[order[i]];
 
         return (
           <Pressable
@@ -76,8 +119,8 @@ export default function ReactionScatter({ counts = {}, reactors, subUid = '' }) 
             style={[
               styles.slot,
               {
-                left: `${Math.max(2, Math.min(98, left))}%`,
-                top: `${Math.max(2, Math.min(98, top))}%`,
+                left: `${left}%`,
+                top: `${top}%`,
                 // Nudged by half a glyph so the POINT is centred, since
                 // percentage offsets can't be combined with a percentage
                 // translate here.
