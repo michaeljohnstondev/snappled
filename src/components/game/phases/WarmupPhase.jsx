@@ -6,7 +6,7 @@
 // timer hits 0.
 
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import PreviewModal from '../PreviewModal';
@@ -69,6 +69,15 @@ export default function WarmupPhase({
           READY UP bar, which read as fallen off the screen, then 2:1
           which was still low. Centre it is. */}
       <View style={styles.spacerTop} />
+
+      {/* The mark fills the gap above the hand, which was empty. Uses
+          the adaptive-icon asset because it is the S on transparency,
+          so it sits on the gradient without a plate behind it. */}
+      <Image
+        source={require('../../../../assets/images/icon-android.png')}
+        style={styles.warmupMark}
+        resizeMode="contain"
+      />
 
       <View style={styles.handGroup}>
         <View style={styles.sectionHead}>
@@ -174,6 +183,14 @@ const makeStyles = (t) => ({
   // normal flow, so the bottom spacer is real gap, not clearance.
   spacerTop: { flex: 1 },
   spacerBottom: { flex: 1 },
+  // Deliberately modest: the hand is what you are here to look at, and
+  // a large mark above it would pull the eye off the cards.
+  warmupMark: {
+    width: 64,
+    height: 64,
+    alignSelf: 'center',
+    marginBottom: 4,
+  },
   handGroup: {},
 
   // Just the label now — the card count and the swipe hint were

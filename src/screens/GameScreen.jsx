@@ -246,11 +246,29 @@ function VotingWaitGrid({
               // video - the picker's name is drawn below that, and
               // anything anchored to the grid cell landed on the name.
               overlaySlot={reactionsMode ? (
-                <ReactionScatter
-                  counts={countsFor(reactions, sub.uid)}
-                  reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
-                  subUid={sub.uid}
-                />
+                <>
+                  <ReactionScatter
+                    counts={countsFor(reactions, sub.uid)}
+                    reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
+                    subUid={sub.uid}
+                  />
+                  {/* The scatter only DISPLAYS. Swapping it in for the
+                      old summary bar took the bar's add button with it,
+                      which quietly removed any way to react on these
+                      screens - so the toggle comes back on its own, in
+                      the corner where it can't sit on the clip. */}
+                  {onReact && (
+                    <View style={styles.scatterAdd}>
+                      <ReactionBar
+                        mode="picker"
+                        collapsible
+                        mine={mineFor(reactions, sub.uid, myUid)}
+                        onReact={(key) => onReact(sub.uid, key)}
+                        disabled={reactionsDisabled}
+                      />
+                    </View>
+                  )}
+                </>
               ) : null}
             />
           </Reanimated.View>
@@ -3533,6 +3551,14 @@ const makeStyles = (t) => ({
   votingCell: {
     width: '50%',
     padding: 4,
+  },
+  // Bottom-right of the card, clear of the scattered emoji which ride
+  // the border at fixed points along each side.
+  scatterAdd: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    zIndex: 20,
   },
   // Anchors the corner badge to the card, not to the cell — the cell's
   // padding would otherwise push it away from the edge it's meant to
