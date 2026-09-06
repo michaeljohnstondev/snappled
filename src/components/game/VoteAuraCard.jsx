@@ -22,6 +22,13 @@ import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 // pointsEarned (optional): when set, shows a small "+N" chip on the
 //   card. Used during SCORING to make each card's contribution legible
 //   at a glance.
+// Where the crown settles once it has been seen. Not as small as a
+// reaction emoji - it is still the loudest thing on the card - but out
+// of the middle, and low enough into the top edge to read as sitting ON
+// the snapple rather than floating above it.
+const CROWN_PERCH_SCALE = 0.42;
+const CROWN_PERCH_INSET = 16;
+
 const VoteAuraCard = React.memo(function VoteAuraCard({
   submission, voters, picker, onPress, isWinner, pointsEarned,
   // Inline playback — matches the picking/voting/warmup hand cards.
@@ -69,16 +76,38 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
   // full scale after a short delay so the reveal feels staged rather
   // than instant. One-shot per mount.
   const crownScale = useRef(new Animated.Value(0)).current;
+
+  // ...then gets out of the way. Big and centred is the right ANNOUNCEMENT
+  // but the wrong resting state: it sits over the middle of the clip,
+  // which is exactly what someone wants to watch again. So it holds the
+  // pose for a beat and then perches on the top edge, small, where a
+  // crown belongs anyway.
+  const perch = useRef(new Animated.Value(0)).current;
+  // The travel distance is half the card, which is only known once the
+  // frame has laid out - hence measuring rather than guessing a number
+  // that would be wrong on every screen size.
+  const [frameH, setFrameH] = useState(0);
+
   useEffect(() => {
     if (!isWinner) return;
     crownScale.setValue(0);
-    Animated.spring(crownScale, {
-      toValue: 1,
-      delay: 250,
-      useNativeDriver: true,
-      friction: 4,
-      tension: 120,
-    }).start();
+    perch.setValue(0);
+    Animated.sequence([
+      Animated.spring(crownScale, {
+        toValue: 1,
+        delay: 250,
+        useNativeDriver: true,
+        friction: 4,
+        tension: 120,
+      }),
+      Animated.delay(900),
+      Animated.spring(perch, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 7,
+        tension: 60,
+      }),
+    ]).start();
   }, [isWinner]);
 
   // Points "+N" tick-up. Counts from 0 → pointsEarned over ~700ms so
@@ -131,7 +160,10 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
           ring (hugging the video), most-recent voter is the
           outermost. Rings sit as absolute siblings so the video's
           overflow: hidden doesn't clip them. */}
-      <View style={styles.frameOuter}>
+      <View
+        style={styles.frameOuter}
+        onLayout={(e) => setFrameH(e.nativeEvent.layout.height)}
+      >
         <View style={styles.videoFrame}>
           <View style={styles.video}>
             {/* Thumbnail always renders underneath; the inline
@@ -176,7 +208,29 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
               pointerEvents="none"
               style={[
                 styles.winnerBadge,
-                { transform: [{ scale: crownScale }] },
+                {
+                  transform: [
+                    // Travel first, then scale: with scale applied
+                    // first the translation would be scaled down too
+                    // and the crown would stop short of the edge.
+                    {
+                      translateY: perch.interpolate({
+                        inputRange: [0, 1],
+                        // Half the frame, less enough to leave the
+                        // crown straddling the top edge rather than
+                        // clearing it entirely.
+                        outputRange: [0, -(frameH / 2) + CROWN_PERCH_INSET],
+                      }),
+                    },
+                    { scale: crownScale },
+                    {
+                      scale: perch.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, CROWN_PERCH_SCALE],
+                      }),
+                    },
+                  ],
+                },
               ]}
             >
               <Text style={styles.winnerBadgeText}>👑</Text>

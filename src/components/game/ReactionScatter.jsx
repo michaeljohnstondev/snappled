@@ -172,12 +172,23 @@ export default function ReactionScatter({
                 // to break the edge without leaving the snapple.
                 // Percentage offsets can't be combined with a
                 // percentage translate here, so this is done in points.
+                // The glyph is laid out DOWN-RIGHT from its point, so
+                // the two edges of an axis need opposite corrections
+                // and it is easy to get them the wrong way round:
+                //
+                //   left edge   point is at the border, box grows
+                //               inward -> pull back by OUT
+                //   right edge  point is at the border, box grows
+                //               OUTWARD -> pull back by (1 - OUT)
+                //
+                // Reversed, the right side ended up almost entirely off
+                // the card, which is exactly how it looked.
                 marginLeft: left === 100
-                  ? -GLYPH * OUT_SIDE
-                  : left === 0 ? -GLYPH * (1 - OUT_SIDE) : -GLYPH / 2,
+                  ? -GLYPH * (1 - OUT_SIDE)
+                  : left === 0 ? -GLYPH * OUT_SIDE : -GLYPH / 2,
                 marginTop: top === 100
-                  ? -GLYPH * OUT_VERT
-                  : top === 0 ? -GLYPH * (1 - OUT_VERT) : -GLYPH / 2,
+                  ? -GLYPH * (1 - OUT_VERT)
+                  : top === 0 ? -GLYPH * OUT_VERT : -GLYPH / 2,
                 // Later reactions sit above earlier ones where they
                 // happen to overlap.
                 zIndex: 5 + i,
