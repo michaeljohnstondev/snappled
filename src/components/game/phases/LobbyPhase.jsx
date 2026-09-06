@@ -9,6 +9,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import { gameService } from '../../../services/gameService';
+import {
+  PLAYER_PALETTE, buildPlayerColors, takenColorSlots,
+} from '../../../lib/playerColors';
 import theme from '../../../theme/themes';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
@@ -16,6 +19,9 @@ import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 export default function LobbyPhase({
   game,
   gameId,
+  // Whose colour the picker changes. Without it the lobby cannot tell
+  // which row is yours.
+  userId,
   isHost,
   onLeave,
   onAddBot,
@@ -23,6 +29,8 @@ export default function LobbyPhase({
   onSetRounds,
 }) {
   const { theme: t } = useTheme();
+  const colors = buildPlayerColors(game.players);
+  const me = (game.players || []).find(p => p.uid === userId);
   const styles = useThemedStyles(makeStyles);
   const totalRounds = game?.totalRounds ?? 5;
   return (
@@ -47,16 +55,51 @@ export default function LobbyPhase({
         </Text>
 
         <View style={styles.playerList}>
-          {game.players.map(p => (
-            <View key={p.uid} style={styles.playerRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{p.username.charAt(0).toUpperCase()}</Text>
+          {game.players.map(p => {
+            const color = colors.get(p.uid) || t.colors.textPrimary;
+            return (
+              <View key={p.uid} style={[styles.playerRow, { borderColor: color }]}>
+                <View style={[styles.avatar, { borderColor: color }]}>
+                  <Text style={[styles.avatarText, { color }]}>
+                    {p.username.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={[styles.playerName, { color }]}>{p.username}</Text>
+                {p.uid === game.hostId && <Text style={styles.hostBadge}>HOST</Text>}
               </View>
-              <Text style={styles.playerName}>{p.username}</Text>
-              {p.uid === game.hostId && <Text style={styles.hostBadge}>HOST</Text>}
-            </View>
-          ))}
+            );
+          })}
         </View>
+
+        {/* Colour picker. The colour follows you through vote auras,
+            the scoreboard, reaction names and the television, so the
+            lobby is the one place it can be chosen - by the round it is
+            load-bearing, and changing it then would contradict what
+            everyone had already seen. Taken swatches are shown, not
+            hidden: seeing that someone already has the pink is part of
+            picking. */}
+        {!!userId && (
+          <View style={styles.colorRow}>
+            {PLAYER_PALETTE.map((c, i) => {
+              const mine = me?.colorIndex === i;
+              const taken = takenColorSlots(game.players).has(i) && !mine;
+              return (
+                <Pressable
+                  key={c}
+                  disabled={taken}
+                  onPress={() => gameService.setPlayerColor(gameId, userId, i)}
+                  style={[
+                    styles.swatch,
+                    { backgroundColor: c },
+                    mine && styles.swatchMine,
+                    taken && styles.swatchTaken,
+                  ]}
+                  hitSlop={4}
+                />
+              );
+            })}
+          </View>
+        )}
 
         {/* Play-to target picker — host-only. ∞ stores totalRounds=0
             (host ends manually from the scoreboard). Field is named
@@ -180,6 +223,27 @@ const makeStyles = (t) => ({
     maxWidth: 280,
   },
   playerList: { width: '100%', gap: 12, marginTop: 16 },
+  colorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 18,
+  },
+  swatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
+  swatchMine: {
+    borderColor: '#FFFFFF',
+  },
+  // Dimmed rather than removed - which colours are gone is information.
+  swatchTaken: {
+    opacity: 0.22,
+  },
   playerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 12,

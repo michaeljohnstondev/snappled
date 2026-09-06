@@ -444,6 +444,53 @@ export const gameService = {
     }
   },
 
+  /**
+   * Claim a different colour slot in the lobby.
+   *
+   * Transactional for the same reason join is: the slot is only valid
+   * if nobody else holds it, and two players tapping the same swatch at
+   * once would otherwise both read it as free. Whoever commits first
+   * gets it; the other is told no and their swatch simply stays put.
+   *
+   * Lobby only. Colours are woven through vote auras, scoreboards,
+   * reaction names and the television - changing one mid-round would
+   * make every screen disagree with what people had already seen.
+   */
+  async setPlayerColor(gameId, userId, colorIndex) {
+    try {
+      if (!gameId || !userId) return { success: false };
+      if (!Number.isInteger(colorIndex)
+        || colorIndex < 0 || colorIndex >= PLAYER_COLOR_SLOTS) {
+        return { success: false, error: 'Bad colour' };
+      }
+      const gameRef = doc(db, GAMES_COLLECTION, gameId);
+      const claimed = await runTransaction(db, async (tx) => {
+        const cur = await tx.get(gameRef);
+        if (!cur.exists()) return false;
+        const data = cur.data();
+        if (data.phase !== GAME_PHASES.LOBBY) return false;
+
+        const players = data.players || [];
+        if (players.some(p => p.uid !== userId && p.colorIndex === colorIndex)) {
+          return false;
+        }
+        if (!players.some(p => p.uid === userId)) return false;
+
+        tx.update(gameRef, {
+          players: players.map(p => (
+            p.uid === userId ? { ...p, colorIndex } : p
+          )),
+          updatedAt: serverTimestamp(),
+        });
+        return true;
+      });
+      return { success: claimed };
+    } catch (error) {
+      console.error('[GameService] setPlayerColor error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // Start the game (host only)
   async startGame(gameId, hostId, prompts) {
     try {

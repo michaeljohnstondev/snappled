@@ -1,17 +1,24 @@
-// HandCardRail — the hand as a horizontal rail instead of a grid.
+// HandCardRail — the hand, as a horizontal rail or a two-column grid.
 //
-// The 2-col grid fit 4-6 cards on screen, which made every card small
-// enough that you had to open a preview to tell them apart. The rail
-// shows two at a time at roughly 40% more height, and the rest are one
-// swipe away. Cards use the 9:16 shape snapples are recorded in, so a
-// big card is mostly video rather than letterbox.
+// The rail came first: a 2-col grid made every card small enough that
+// you had to open a preview to tell them apart, so the rail traded
+// seeing them all for seeing two of them properly.
+//
+// With cards now the same size everywhere else in the round, that trade
+// stopped paying - the hand was the only screen where the snapples were
+// a different size, and swiping to find one you already knew you had is
+// worse than a slightly smaller card you can see immediately. `grid`
+// puts it back, matched to the voting grid's cell so a snapple is the
+// same size from picking through to results.
 //
 // Dumb layout only. It owns sizing and snapping; the caller renders
 // the card itself through `renderCard`, so picking and warmup keep
 // their own tap handlers and selection logic.
 
 import React from 'react';
-import { View, FlatList, Dimensions, StyleSheet } from 'react-native';
+import {
+  View, FlatList, ScrollView, Dimensions, StyleSheet,
+} from 'react-native';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -54,9 +61,35 @@ export const CARD_HEIGHT = Math.round(CARD_WIDTH / CARD_ASPECT);
  * @param {Function} renderCard (card, index) => node, rendered at CARD_WIDTH
  * @param {Function} keyExtractor optional; defaults to card.id
  */
-export default function HandCardRail({ cards = [], renderCard, keyExtractor }) {
+export default function HandCardRail({
+  cards = [], renderCard, keyExtractor, grid = false,
+}) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
+
+  // Two-column wrap, scrolling vertically. Cell metrics are copied from
+  // the voting grid deliberately - the whole point is that a card does
+  // not change size between the hand and the screen after it.
+  if (grid) {
+    return (
+      <ScrollView
+        style={styles.gridScroll}
+        contentContainerStyle={styles.grid}
+        showsVerticalScrollIndicator={false}
+      >
+        {cards.map((item, index) => (
+          <View
+            key={(keyExtractor && keyExtractor(item, index))
+              || item?.id || `hand-${index}`}
+            style={styles.gridCell}
+          >
+            {renderCard(item, index)}
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
   return (
     <FlatList
       data={cards}
@@ -88,4 +121,16 @@ const makeStyles = (t) => ({
   },
   cell: { width: CARD_WIDTH },
   cellGap: { marginLeft: GAP },
+  gridScroll: { flex: 1 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingBottom: 12,
+  },
+  // Same numbers as votingCell / auraCellLarge.
+  gridCell: {
+    width: '50%',
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+  },
 });

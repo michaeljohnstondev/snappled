@@ -85,6 +85,7 @@ export default function WarmupPhase({
         </View>
 
         <HandCardRail
+          grid
           cards={hand}
           renderCard={(item) => {
             const isInlinePlaying = inlinePlaying.id === item.id;

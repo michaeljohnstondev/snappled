@@ -41,6 +41,7 @@ import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import TutorialOverlay from '../components/game/TutorialOverlay';
 import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
+import { PLAYER_PALETTE, buildPlayerColors } from '../lib/playerColors';
 import { soundService } from '../services/soundService';
 import { shareService } from '../services/shareService';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
@@ -52,60 +53,11 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // each player's row Y in screen coords. The reveal grid + winner spotlight
 // are an overlay on top. During shrink each winner card scales down and
 // translates toward its actual row in the scoreboard.
-// One colour per player, assigned by position in game.players (see
-// buildPlayerColors). Distinct colors only — vibeCyan/Aqua/Teal were near-duplicates of
-// vibeBlue and made adjacent players hard to tell apart. Replaced with
-// vibeTurquoise (clearly different green-blue), vibeRed, and
-// vibeRoyalBlue for spread.
-// vibeOrange dropped — sat too close to vibeYellow in the palette
-// and two adjacent voters would end up looking identical. Swapped
-// for vibeElectricBlue which reads distinctly against the yellow.
 // How long the vote-wait screen stays up once everybody has voted.
 // It is a viewing window, not a delay: every submission is on screen
 // and reactable, so this is the room's chance to enjoy the round before
 // the scoreboard takes over.
 const ALL_VOTED_WINDOW = 15;
-
-const VOTER_PALETTE = [
-  theme.colors.vibeBlue,
-  theme.colors.vibePurple,
-  theme.colors.vibePink,
-  theme.colors.vibeYellow,
-  theme.colors.vibeElectricBlue,
-  theme.colors.vibeRed,
-  theme.colors.vibeTurquoise,
-  theme.colors.vibeRoyalBlue,
-];
-
-/**
- * Who is what colour. Read from the colorIndex stored on each player at
- * join, so it is identical on every phone in the room AND on the
- * television, and it does not move when someone leaves.
- *
- * Two rules this replaced, both wrong:
- *  - self in vibeGreen, palette for the rest: each phone painted a
- *    DIFFERENT player green, so no two screens agreed. Survivable
- *    while the game only looked at itself; a shared display makes it
- *    a contradiction.
- *  - straight array position: leaveGame splices the array, so every
- *    player after the leaver changed colour mid-game and the leaver's
- *    colour was handed to someone else.
- *
- * Position is kept only as a fallback for games that were already in
- * flight when colorIndex shipped — those players have no slot stored
- * and would otherwise all collapse onto one colour.
- *
- * Self is findable without a reserved colour: VoteAuraCard bolds your
- * name and the reactor lists say "you".
- */
-function buildPlayerColors(players) {
-  const map = new Map();
-  (players || []).forEach((p, i) => {
-    const slot = Number.isInteger(p.colorIndex) ? p.colorIndex : i;
-    map.set(p.uid, VOTER_PALETTE[slot % VOTER_PALETTE.length]);
-  });
-  return map;
-}
 
 // Scoring-phase winner callout. Slides down from above on mount with a
 // soft fade so the moment feels announced rather than printed. Idempotent
@@ -1843,6 +1795,7 @@ export default function GameScreen({ navigation }) {
     return (
       <LobbyPhase
         game={game}
+        userId={user?.uid}
         gameId={gameId}
         isHost={game.hostId === user.uid}
         onLeave={handleLeaveGame}
@@ -2178,6 +2131,11 @@ export default function GameScreen({ navigation }) {
                     >
                       <View style={styles.votingCardWrap}>
                       <HandCardThumbnail
+                        // 9:16, the shape snapples are recorded in and
+                        // the shape VoteAuraCard uses. The 4:5 default
+                        // letterboxed them and made these cards a
+                        // different height from the next screen's.
+                        aspect={9 / 16}
                         card={{
                           id: cardId,
                           videoUrl: item.videoUrl,
@@ -2440,19 +2398,11 @@ export default function GameScreen({ navigation }) {
             contentContainerStyle={styles.pickedWaitContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Scrolls with the cards rather than sitting pinned, the
-                same as the voting phase. By results you have read the
-                prompt several times over, and the banner is tall - held
-                at the top it costs a chunk of every screen for something
-                nobody is still reading. The clips need that height more.
-                Winner banner stays gone: the crown and the points chip
-                already say who won. */}
-            <RoundPromptBanner
-              prompt={game.prompts[game.currentRound - 1]}
-              round={game.currentRound}
-              totalRounds={game.totalRounds || null}
-            />
-
+            {/* No prompt banner here at all. By results you have read
+                it through picking, voting and the wait after it, and
+                this screen is about WHO WON - the ranked order, the
+                crowns, the points. The banner was the tallest thing on
+                it and the only thing nobody was looking at. */}
             {/* No reactions on the results screen, by choice. This is
                 the payoff: ranked order, crowns, points ticking up. The
                 emoji competed with all of it for the same card, and
@@ -3552,9 +3502,14 @@ const makeStyles = (t) => ({
     flexWrap: 'wrap',
     paddingHorizontal: 10,
   },
+  // Matches auraCellLarge, which is what the vote-wait and results
+  // grids use. This was padding: 4, so the first vote screen's cards
+  // were noticeably wider than the same snapples on the very next
+  // screen - the grid appeared to resize itself the moment you voted.
   votingCell: {
     width: '50%',
-    padding: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
   },
   // Bottom-right of the card, clear of the scattered emoji which ride
   // the border at fixed points along each side.

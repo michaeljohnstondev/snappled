@@ -225,6 +225,7 @@ export default function PickingPhase({
 
       <View style={styles.railWrap}>
         <HandCardRail
+          grid
           cards={hand}
           renderCard={(item) => {
             const isSelected = selectedCard?.id === item.id;
