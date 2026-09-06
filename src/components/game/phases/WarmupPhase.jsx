@@ -6,7 +6,7 @@
 // timer hits 0.
 
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import PreviewModal from '../PreviewModal';
@@ -65,20 +65,6 @@ export default function WarmupPhase({
         caption={`${readyCount} of ${totalCount} ready`}
       />
 
-      {/* Equal spacers — the hand sits centred. Started pinned to the
-          READY UP bar, which read as fallen off the screen, then 2:1
-          which was still low. Centre it is. */}
-      <View style={styles.spacerTop} />
-
-      {/* The mark fills the gap above the hand, which was empty. Uses
-          the adaptive-icon asset because it is the S on transparency,
-          so it sits on the gradient without a plate behind it. */}
-      <Image
-        source={require('../../../../assets/images/icon-android.png')}
-        style={styles.warmupMark}
-        resizeMode="contain"
-      />
-
       <View style={styles.handGroup}>
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>YOUR HAND</Text>
@@ -107,7 +93,6 @@ export default function WarmupPhase({
         />
       </View>
 
-      <View style={styles.spacerBottom} />
 
       {/* Ready Up bar — blue → neon-purple ShimmerBar while
           waiting; once tapped, locks into a non-interactive
@@ -182,18 +167,15 @@ const makeStyles = (t) => ({
 
   // Leftover height splits evenly, centring the hand. ShimmerBar is in
   // normal flow, so the bottom spacer is real gap, not clearance.
-  spacerTop: { flex: 1 },
-  spacerBottom: { flex: 1 },
+  // No spacers and no mark above the hand any more. Both existed to
+  // frame a fixed-height rail; a grid has to FILL the space instead,
+  // and two flex:1 spacers plus an unflexed handGroup left the grid's
+  // scroll view in a zero-height parent - the hand simply did not
+  // render.
   // Fills the gap above the hand properly. 64 was too timid for the
   // space - the mark is on transparency with generous adaptive-icon
   // padding baked in, so it reads considerably smaller than its box.
-  warmupMark: {
-    width: 132,
-    height: 132,
-    alignSelf: 'center',
-    marginBottom: 0,
-  },
-  handGroup: {},
+  handGroup: { flex: 1 },
 
   // Just the label now — the card count and the swipe hint were
   // noise above a rail that obviously scrolls.
