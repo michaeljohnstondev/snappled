@@ -112,7 +112,7 @@ export default function HandCardThumbnail({
           </Pressable>
         ) : null}
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, cornerSlot && styles.footerWithCorner]}>
           <View style={styles.playBtn}>
             <Ionicons
               name={isPlaying ? 'pause' : 'play'}
@@ -137,6 +137,8 @@ export default function HandCardThumbnail({
             <Text style={styles.username} numberOfLines={1}>{username}</Text>
           )}
         </View>
+        {/* The footer spans the whole bottom edge, so it has to give
+            up its right end or the toggle lands on the username. */}
         {cornerSlot ? (
           <View style={styles.cornerSlot} pointerEvents="box-none">
             {cornerSlot}
@@ -234,6 +236,7 @@ const makeStyles = (t) => ({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
+  footerWithCorner: { right: 36 },
   footer: {
     position: 'absolute',
     left: 8,

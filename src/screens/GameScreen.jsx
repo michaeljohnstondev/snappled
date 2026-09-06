@@ -2070,6 +2070,12 @@ export default function GameScreen({ navigation }) {
                       nothing until someone actually reacts, so cards
                       with none look exactly as they do now. */}
                   <VotingWaitGrid
+                    // Same two-column layout as the scoring grid and
+                    // the voting hand. This screen was the odd one out
+                    // at 100pt cells - small enough that the clips were
+                    // hard to read, and inconsistent with every other
+                    // grid in the app.
+                    variant="large"
                     reactions={game.reactions}
                     myUid={user?.uid}
                     reactionsMode="summary"

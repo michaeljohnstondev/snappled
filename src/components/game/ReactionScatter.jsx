@@ -78,10 +78,10 @@ function slotOrder(seed, count) {
  * @param {Function} reactors (key) => [{uid, name, color, isMe}]
  * @param {string} subUid   seeds the scatter so two cards holding the
  *   same emoji don't land identically.
- * @param {boolean} reserveCorner keep the bottom-right clear. The add
- *   toggle sits there, and the two slots nearest that corner put a
- *   glyph close enough to it to read as a second, slightly different
- *   button stacked on the first.
+ * @param {boolean} reserveCorner keep the bottom corners clear. The add
+ *   toggle sits bottom-right and the points chip bottom-left, and a
+ *   glyph in the slots nearest either one reads as a second, slightly
+ *   different button stacked on it.
  */
 export default function ReactionScatter({
   counts = {}, reactors, subUid = '', reserveCorner = false,
@@ -109,8 +109,12 @@ export default function ReactionScatter({
   // Drop the two slots flanking the bottom-right corner when the add
   // toggle is down there, so nothing lands on top of it.
   const usable = reserveCorner
-    ? SLOTS.filter((p) => !((p.top === 100 && p.left === 75)
-      || (p.left === 100 && p.top === 75)))
+    ? SLOTS.filter((p) => !(
+      // bottom-right: the add toggle
+      (p.top === 100 && p.left === 75) || (p.left === 100 && p.top === 75)
+      // bottom-left: the points chip
+      || (p.top === 100 && p.left === 25) || (p.left === 0 && p.top === 75)
+    ))
     : SLOTS;
   const order = slotOrder(hash(subUid), usable.length);
   const shown = items.slice(0, usable.length);

@@ -328,10 +328,14 @@ const makeStyles = (t) => ({
   winnerBadgeText: {
     fontSize: 14,
   },
+  // Bottom-LEFT. It used to sit bottom-right, which is where the
+  // add-reaction toggle now lives - the two stacked, and the gold
+  // chip showing through behind the toggle read as a second button.
+  // Nothing else is down here: the crown is top-left, expand top-right.
   pointsChip: {
     position: 'absolute',
     bottom: 6,
-    right: 6,
+    left: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
