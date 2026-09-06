@@ -173,6 +173,7 @@ const VoteAuraCard = React.memo(function VoteAuraCard({
               corners. Rings live outside (below). */}
           {isWinner && (
             <Animated.View
+              pointerEvents="none"
               style={[
                 styles.winnerBadge,
                 { transform: [{ scale: crownScale }] },
@@ -314,19 +315,23 @@ const makeStyles = (t) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Centred over the clip and unplated. Tucked in a corner at 24pt it
+  // read as a status pip; winning a round is the loudest moment in the
+  // game and deserves the middle of the card. pointerEvents none so it
+  // never intercepts a tap meant for the video.
   winnerBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 8,
   },
   winnerBadgeText: {
-    fontSize: 14,
+    fontSize: 84,
+    // A drop shadow rather than a background plate - it holds up over
+    // any frame without boxing the crown in.
+    textShadowColor: 'rgba(0,0,0,0.65)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   // Bottom-LEFT. It used to sit bottom-right, which is where the
   // add-reaction toggle now lives - the two stacked, and the gold

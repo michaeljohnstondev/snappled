@@ -65,6 +65,19 @@ const PICK_TIME = 60000; // 60 seconds to pick — matches the "60s to pick" rou
 const VOTE_TIME = 60000; // 60 seconds to vote — matches the "60s to vote" round-start alert
 const MAX_PLAYERS = 8;
 
+// How many emoji one player may put on ONE snapple in a round.
+//
+// Repeats are allowed - piling five laughs on something is a stronger
+// reaction than one, and that is the point. The cap is not there to
+// keep the card tidy: emoji lap the border and land on each other past
+// a dozen, which is funny rather than broken. It is there so one player
+// cannot drown a snapple on their own.
+//
+// Enforced in a transaction rather than on the client, because the
+// client can be lied to and the whole appeal of a closed emoji set is
+// that it cannot be abused.
+const MAX_REACTIONS_PER_SNAPPLE = 5;
+
 // How long the whole room will wait on the slowest downloader before
 // starting anyway. Deliberately generous: a hand of eight clips over
 // cellular is tens of megabytes, and the old 12s client-side give-up
@@ -187,6 +200,7 @@ export const gameService = {
         submissions: [],
         votes: {},
         reactions: {},
+        reactionOrder: {},
         roundResults: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -460,6 +474,7 @@ export const gameService = {
         submissions: [],
         votes: {},
         reactions: {},
+        reactionOrder: {},
         ready: {}, // fresh ready map for the warmup screen
         reviewDeadline: new Date(Date.now() + REVIEW_TIME).toISOString(),
         updatedAt: serverTimestamp(),
@@ -731,6 +746,7 @@ export const gameService = {
         submissions: [],
         votes: {},
         reactions: {},
+        reactionOrder: {},
         pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
@@ -833,6 +849,7 @@ export const gameService = {
         submissions: [],
         votes: {},
         reactions: {},
+        reactionOrder: {},
         pickDeadline: new Date(Date.now() + PICK_TIME).toISOString(),
         updatedAt: serverTimestamp(),
       });
@@ -927,11 +944,43 @@ export const gameService = {
         return { success: false, error: 'Missing reaction fields' };
       }
       const gameRef = doc(db, GAMES_COLLECTION, gameId);
-      await updateDoc(gameRef, {
-        [`reactions.${submissionUid}.${emojiKey}`]: arrayUnion(userId),
-        updatedAt: serverTimestamp(),
+
+      // Transactional because the cap is decided by READING what this
+      // player already sent. Entries are `uid#n` rather than a bare uid:
+      // arrayUnion dedupes, so a bare uid made a second identical emoji
+      // a silent no-op. The n is the count at the time, which keeps the
+      // token deterministic and avoids a timestamp that would differ
+      // between two clients writing the same thing.
+      const written = await runTransaction(db, async (tx) => {
+        const cur = await tx.get(gameRef);
+        if (!cur.exists()) return false;
+        const data = cur.data();
+        const forSub = (data.reactions || {})[submissionUid] || {};
+        const mine = Object.values(forSub)
+          .flat()
+          .filter(v => String(v).split('#')[0] === userId)
+          .length;
+        if (mine >= MAX_REACTIONS_PER_SNAPPLE) return false;
+
+        const token = `${userId}#${mine}`;
+        tx.update(gameRef, {
+          [`reactions.${submissionUid}.${emojiKey}`]: arrayUnion(token),
+        // Arrival order across ALL emoji on this submission, which the
+        // reactions map cannot express: it orders uids WITHIN one emoji
+        // only, so a new laugh on a card that already had a fire sorted
+        // ahead of it and shifted everything after. The scatter places
+        // by position in this list, so an append can only ever take the
+        // next free spot and never moves an emoji already on screen.
+        //
+        // arrayUnion, so reacting twice with the same emoji is a no-op
+        // here exactly as it is above. Cleared with reactions each
+        // round, so nothing outlives the game that wrote it.
+          [`reactionOrder.${submissionUid}`]: arrayUnion(`${emojiKey}:${token}`),
+          updatedAt: serverTimestamp(),
+        });
+        return true;
       });
-      return { success: true };
+      return { success: true, written };
     } catch (error) {
       console.error('[GameService] addReaction error:', error);
       return { success: false, error: error.message };
@@ -1148,6 +1197,7 @@ export const gameService = {
   ROUNDS_PER_GAME,
   HAND_SIZE,
   MAX_PLAYERS,
+  MAX_REACTIONS_PER_SNAPPLE,
   REVIEW_TIME,
   PICK_TIME,
   VOTE_TIME,

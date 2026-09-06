@@ -168,7 +168,8 @@ function VotingWaitGrid({
   inlinePlayingId, playToken, onTogglePlay, onFullscreen,
   // Reactions are only wired on the scoring grid. Left undefined
   // elsewhere, the bar simply isn't rendered.
-  reactions, myUid, onReact, reactionsDisabled, reactionsMode, reactorsFor,
+  reactions, reactionOrder, myUid, onReact, reactionsDisabled,
+  reactionsMode, reactorsFor,
   // "large" = 2-col grid with big cards (SCORING screen), matches
   // the picking/voting hand grid. Anything else = the older
   // 8-column-ish centered flex-wrap for the voting wait screen.
@@ -238,7 +239,7 @@ function VotingWaitGrid({
                   <ReactionScatter
                     counts={countsFor(reactions, sub.uid)}
                     reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
-                    subUid={sub.uid}
+                    order={(reactionOrder || {})[sub.uid]}
                     reserveCorner={!!onReact}
                   />
                   {/* The scatter only DISPLAYS. Swapping it in for the
@@ -2045,13 +2046,21 @@ export default function GameScreen({ navigation }) {
             // laughed at it. Local because playerColors is — the scoring
             // screen builds its own map from its own player order.
             const reactorsFor = (subUid, emojiKey) => {
+              // Entries are `uid#n` so repeats survive arrayUnion. The
+              // raw entry is carried through as `token`: the scatter
+              // matches it against reactionOrder, where the same string
+              // is what fixes each emoji's position.
               const ids = (game.reactions?.[subUid]?.[emojiKey]) || [];
-              return ids.map(uid => ({
-                uid,
-                name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
-                color: playerColors.get(uid) || t.colors.textSecondary,
-                isMe: uid === user?.uid,
-              }));
+              return ids.map((token) => {
+                const uid = String(token).split('#')[0];
+                return {
+                  uid,
+                  token,
+                  name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
+                  color: playerColors.get(uid) || t.colors.textSecondary,
+                  isMe: uid === user?.uid,
+                };
+              });
             };
 
             const pending = (game.players || []).filter(p => !votedUids.has(p.uid));
@@ -2075,6 +2084,7 @@ export default function GameScreen({ navigation }) {
                     // grid in the app.
                     variant="large"
                     reactions={game.reactions}
+                    reactionOrder={game.reactionOrder}
                     myUid={user?.uid}
                     reactionsMode="summary"
                     onReact={handleReact}
@@ -2403,13 +2413,19 @@ export default function GameScreen({ navigation }) {
     // buildVoters, so a player reads as the same colour whether they
     // voted for a snapple or laughed at it.
     const reactorsFor = (subUid, emojiKey) => {
+      // See the vote-wait copy: entries are `uid#n`, and the raw token
+      // is what the scatter looks up in reactionOrder.
       const ids = (game.reactions?.[subUid]?.[emojiKey]) || [];
-      return ids.map(uid => ({
-        uid,
-        name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
-        color: playerColors.get(uid) || t.colors.textSecondary,
-        isMe: uid === user?.uid,
-      }));
+      return ids.map((token) => {
+        const uid = String(token).split('#')[0];
+        return {
+          uid,
+          token,
+          name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
+          color: playerColors.get(uid) || t.colors.textSecondary,
+          isMe: uid === user?.uid,
+        };
+      });
     };
 
     // Snapples land in submission order, then reshuffle into rank order a
@@ -2437,25 +2453,29 @@ export default function GameScreen({ navigation }) {
       <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
         <RoundHeaderBar phase="scoring" timerSec={timer} onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp} />
 
-        {/* Prompt banner during scoring — winner banner removed per
-            user ask. The crown badge on the winning card + points
-            chip already surface the winner without a duplicate
-            headline. */}
-        <RoundPromptBanner
-          prompt={game.prompts[game.currentRound - 1]}
-          round={game.currentRound}
-          totalRounds={game.totalRounds || null}
-        />
-
         <View style={styles.pickedWaitWrap}>
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={styles.pickedWaitContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Scrolls with the cards rather than sitting pinned, the
+                same as the voting phase. By results you have read the
+                prompt several times over, and the banner is tall - held
+                at the top it costs a chunk of every screen for something
+                nobody is still reading. The clips need that height more.
+                Winner banner stays gone: the crown and the points chip
+                already say who won. */}
+            <RoundPromptBanner
+              prompt={game.prompts[game.currentRound - 1]}
+              round={game.currentRound}
+              totalRounds={game.totalRounds || null}
+            />
+
             <VotingWaitGrid
               variant="large"
               reactions={game.reactions}
+              reactionOrder={game.reactionOrder}
               myUid={user?.uid}
               reactionsMode="summary"
               // Still reactable. The clips are on screen and people keep

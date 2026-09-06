@@ -68,12 +68,19 @@ export function countsFor(reactions, subUid) {
   return out;
 }
 
-/** Which emoji THIS user sent on one submission. */
+/**
+ * Which emoji THIS user sent on one submission.
+ *
+ * Entries are `uid#n`, not bare uids - repeats are allowed, and
+ * arrayUnion would have collapsed a second identical emoji into
+ * nothing. So this matches on the part before the separator.
+ */
 export function mineFor(reactions, subUid, myUid) {
   const forSub = (reactions || {})[subUid] || {};
   const out = {};
   REACTIONS.forEach(({ key }) => {
-    out[key] = !!(forSub[key] || []).includes(myUid);
+    out[key] = (forSub[key] || [])
+      .some(v => String(v).split('#')[0] === myUid);
   });
   return out;
 }
