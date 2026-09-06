@@ -18,13 +18,25 @@
 // submissions and votes, so adding or retiring a key needs no
 // migration - nothing outlives the game that used it.
 
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View, Text, Pressable, StyleSheet, Modal, Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/themes';
 
 // key = what's stored in Firestore, glyph = what's drawn. Keeping them
 // separate means the art can change without migrating any game docs.
+// Picker sheet geometry. Fixed rather than measured because the sheet
+// has to be POSITIONED before it is laid out - it opens anchored to the
+// toggle, and you cannot anchor to something whose size you don't know
+// yet. Five to a row across ten emoji is two rows.
+const SHEET_COLS = 5;
+const SHEET_CELL = 40;
+const SHEET_GAP = 6;
+const SHEET_PAD = 10;
+const SHEET_W = SHEET_COLS * SHEET_CELL + (SHEET_COLS - 1) * SHEET_GAP + SHEET_PAD * 2;
+
 export const REACTIONS = [
   { key: 'laugh', glyph: '😂' },
   { key: 'fire', glyph: '🔥' },
@@ -37,6 +49,39 @@ export const REACTIONS = [
   { key: 'eyes', glyph: '👀' },
   { key: 'clown', glyph: '🤡' },
 ];
+
+/**
+ * Absolute position for the picker sheet, beside the toggle that
+ * opened it.
+ *
+ * Centred on screen it sat a long way from the thumb that summoned it
+ * and read as a page-level dialog rather than as something belonging
+ * to one card. This puts it against the toggle, preferring above -
+ * the toggles sit low on a card, so there is usually room up there -
+ * and dropping below only when there is not.
+ *
+ * Clamped to the screen either way, or a toggle near an edge would
+ * push half the sheet off it. Returns null when the measurement is
+ * unavailable, leaving the sheet wherever the backdrop puts it.
+ */
+function sheetPosition(anchor) {
+  if (!anchor) return null;
+  const win = Dimensions.get('window');
+  const height = 2 * SHEET_CELL + SHEET_GAP + SHEET_PAD * 2;
+
+  const left = Math.max(8, Math.min(
+    win.width - SHEET_W - 8,
+    anchor.x + anchor.w / 2 - SHEET_W / 2,
+  ));
+  const above = anchor.y - height - 8;
+  const top = above >= 8 ? above : anchor.y + anchor.h + 8;
+
+  return {
+    position: 'absolute',
+    left,
+    top: Math.min(top, win.height - height - 8),
+  };
+}
 
 /**
  * Two modes, and the split is deliberate.
@@ -79,6 +124,21 @@ export default function ReactionBar({
   // already drawn around this card in the same player colours, and a
   // chip holding three reactors can only carry one colour anyway.
   const [openKey, setOpenKey] = useState(null);
+
+  // Where the toggle is on screen, captured on press. measureInWindow
+  // is async, so the sheet opens in the callback rather than
+  // immediately - otherwise the first frame renders in the wrong
+  // place and visibly jumps.
+  const toggleRef = useRef(null);
+  const [anchor, setAnchor] = useState(null);
+  const openAtToggle = () => {
+    if (!toggleRef.current?.measureInWindow) { setOpen(true); return; }
+    toggleRef.current.measureInWindow((x, y, w, h) => {
+      setAnchor({ x, y, w, h });
+      setOpen(true);
+    });
+  };
+
   const openList = openKey && reactors ? reactors(openKey) : null;
   const shown = isSummary
     ? REACTIONS.filter(({ key }) => (counts[key] || 0) > 0)
@@ -101,7 +161,8 @@ export default function ReactionBar({
 
   const addToggle = (
     <Pressable
-      onPress={() => setOpen(true)}
+      ref={toggleRef}
+      onPress={openAtToggle}
       style={styles.chip}
       hitSlop={6}
     >
@@ -132,7 +193,7 @@ export default function ReactionBar({
           onRequestClose={() => setOpen(false)}
         >
           <Pressable style={styles.pickerBackdrop} onPress={() => setOpen(false)}>
-            <Pressable style={styles.pickerSheet} onPress={() => {}}>
+            <Pressable style={[styles.pickerSheet, sheetPosition(anchor)]} onPress={() => {}}>
               {REACTIONS.map(({ key, glyph }) => (
                 <Pressable
                   key={key}
@@ -298,27 +359,28 @@ const styles = StyleSheet.create({
   chipDim: { opacity: 0.45 },
   pickerBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
+    // Barely there. The sheet is a small thing attached to one
+    // card, not a page-level dialog, so blacking out the screen
+    // behind it overstated it - but it still has to catch a tap
+    // to dismiss.
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   pickerSheet: {
+    width: SHEET_W,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 18,
+    gap: SHEET_GAP,
+    padding: SHEET_PAD,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: theme.colors.vibeBlue,
     backgroundColor: '#0A1A2A',
-    maxWidth: 320,
   },
   pickerCell: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: SHEET_CELL,
+    height: SHEET_CELL,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -328,7 +390,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.vibeGreen,
     backgroundColor: 'rgba(0,255,65,0.12)',
   },
-  pickerGlyph: { fontSize: 28 },
+  pickerGlyph: { fontSize: 22 },
   chipOpen: { backgroundColor: 'rgba(0,0,0,0.8)' },
   whoRow: {
     flexDirection: 'row',
