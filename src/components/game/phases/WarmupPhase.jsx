@@ -183,13 +183,14 @@ const makeStyles = (t) => ({
   // normal flow, so the bottom spacer is real gap, not clearance.
   spacerTop: { flex: 1 },
   spacerBottom: { flex: 1 },
-  // Deliberately modest: the hand is what you are here to look at, and
-  // a large mark above it would pull the eye off the cards.
+  // Fills the gap above the hand properly. 64 was too timid for the
+  // space - the mark is on transparency with generous adaptive-icon
+  // padding baked in, so it reads considerably smaller than its box.
   warmupMark: {
-    width: 64,
-    height: 64,
+    width: 132,
+    height: 132,
     alignSelf: 'center',
-    marginBottom: 4,
+    marginBottom: 0,
   },
   handGroup: {},
 

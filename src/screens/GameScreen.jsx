@@ -251,6 +251,7 @@ function VotingWaitGrid({
                     counts={countsFor(reactions, sub.uid)}
                     reactors={reactorsFor ? (key) => reactorsFor(sub.uid, key) : undefined}
                     subUid={sub.uid}
+                    reserveCorner={!!onReact}
                   />
                   {/* The scatter only DISPLAYS. Swapping it in for the
                       old summary bar took the bar's add button with it,
@@ -2189,6 +2190,19 @@ export default function GameScreen({ navigation }) {
                           setFavoriteCard(item);
                           setPreviewCard({ ...item, videoUrl: item.videoUrl, _isVoting: true });
                         }}
+                        // In the card's corner, matching every other
+                        // screen. Below the card it read as part of the
+                        // layout rather than as something belonging to
+                        // this clip.
+                        cornerSlot={(
+                          <ReactionBar
+                            mode="picker"
+                            collapsible
+                            mine={mineHere}
+                            onReact={(key) => handleReact(item.uid, key)}
+                            disabled={reactionCooling}
+                          />
+                        )}
                       />
                       {/* What you sent, hung off the card's corner. No
                           chip or border — a drop shadow is enough to
@@ -2204,17 +2218,6 @@ export default function GameScreen({ navigation }) {
                         </View>
                       )}
                       </View>
-                      {/* Picker lives here, not on the results screen:
-                          you react to a snapple while you're actually
-                          watching and judging it. No counts shown — the
-                          room's opinion would lead the vote. */}
-                      <ReactionBar
-                        mode="picker"
-                        collapsible
-                        mine={mineHere}
-                        onReact={(key) => handleReact(item.uid, key)}
-                        disabled={reactionCooling}
-                      />
                     </View>
                   );
                 })}

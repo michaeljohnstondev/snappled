@@ -47,6 +47,12 @@ export default function HandCardThumbnail({
   // used. The hand rail passes 9:16 because that's the shape snapples
   // are actually recorded in, so a big card letterboxes less.
   aspect = 4 / 5,
+  // Rendered in the card's bottom-right corner. Sibling content below
+  // the card reads as belonging to the LAYOUT rather than to the clip,
+  // which is why the reaction toggle used to look like it was floating
+  // outside the card on the voting grid while sitting on the card
+  // everywhere else.
+  cornerSlot,
 }) {
   const styles = useThemedStyles(makeStyles);
   const username = label || `@${card?.creatorUsername || 'anon'}`;
@@ -131,6 +137,11 @@ export default function HandCardThumbnail({
             <Text style={styles.username} numberOfLines={1}>{username}</Text>
           )}
         </View>
+        {cornerSlot ? (
+          <View style={styles.cornerSlot} pointerEvents="box-none">
+            {cornerSlot}
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -142,6 +153,12 @@ export default function HandCardThumbnail({
 // them is the video, not the app background. Only the card fill follows
 // the theme.
 const makeStyles = (t) => ({
+  cornerSlot: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    zIndex: 20,
+  },
   // Outer wrapper carries the drop-shadow on iOS / elevation on
   // Android. Needs an opaque background for iOS to render the
   // shadow at all.

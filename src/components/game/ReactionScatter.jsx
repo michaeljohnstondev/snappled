@@ -58,8 +58,8 @@ const SLOTS = (() => {
  * differently card to card while staying identical on every phone -
  * which is what matters once a television shows the same grid.
  */
-function slotOrder(seed) {
-  const order = SLOTS.map((_, i) => i);
+function slotOrder(seed, count) {
+  const order = Array.from({ length: count }, (_, i) => i);
   let r = seed || 1;
   for (let i = order.length - 1; i > 0; i--) {
     // Park-Miller LCG: enough for shuffling, and it needs no imports.
@@ -78,8 +78,14 @@ function slotOrder(seed) {
  * @param {Function} reactors (key) => [{uid, name, color, isMe}]
  * @param {string} subUid   seeds the scatter so two cards holding the
  *   same emoji don't land identically.
+ * @param {boolean} reserveCorner keep the bottom-right clear. The add
+ *   toggle sits there, and the two slots nearest that corner put a
+ *   glyph close enough to it to read as a second, slightly different
+ *   button stacked on the first.
  */
-export default function ReactionScatter({ counts = {}, reactors, subUid = '' }) {
+export default function ReactionScatter({
+  counts = {}, reactors, subUid = '', reserveCorner = false,
+}) {
   const [named, setNamed] = useState(null);
 
   // One entry per reactor, not per emoji.
@@ -100,8 +106,14 @@ export default function ReactionScatter({ counts = {}, reactors, subUid = '' }) 
   // More reactors than slots would force two into one spot. Beyond a
   // dozen the card is a wall of emoji anyway, so the extras are simply
   // not drawn rather than piled on top of what is already there.
-  const order = slotOrder(hash(subUid));
-  const shown = items.slice(0, SLOTS.length);
+  // Drop the two slots flanking the bottom-right corner when the add
+  // toggle is down there, so nothing lands on top of it.
+  const usable = reserveCorner
+    ? SLOTS.filter((p) => !((p.top === 100 && p.left === 75)
+      || (p.left === 100 && p.top === 75)))
+    : SLOTS;
+  const order = slotOrder(hash(subUid), usable.length);
+  const shown = items.slice(0, usable.length);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -109,7 +121,7 @@ export default function ReactionScatter({ counts = {}, reactors, subUid = '' }) 
         // One slot each, in a per-snapple order. Centred ON the border
         // line so the glyph half hangs off the clip; frameOuter doesn't
         // clip, since the vote rings already draw outside it.
-        const { left, top } = SLOTS[order[i]];
+        const { left, top } = usable[order[i]];
 
         return (
           <Pressable
