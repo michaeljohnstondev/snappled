@@ -2409,25 +2409,6 @@ export default function GameScreen({ navigation }) {
       }));
     };
 
-    // Who sent a given reaction. Same shape and the same colour source as
-    // buildVoters, so a player reads as the same colour whether they
-    // voted for a snapple or laughed at it.
-    const reactorsFor = (subUid, emojiKey) => {
-      // See the vote-wait copy: entries are `uid#n`, and the raw token
-      // is what the scatter looks up in reactionOrder.
-      const ids = (game.reactions?.[subUid]?.[emojiKey]) || [];
-      return ids.map((token) => {
-        const uid = String(token).split('#')[0];
-        return {
-          uid,
-          token,
-          name: (game.players || []).find(p => p.uid === uid)?.username || uid?.slice(0, 4),
-          color: playerColors.get(uid) || t.colors.textSecondary,
-          isMe: uid === user?.uid,
-        };
-      });
-    };
-
     // Snapples land in submission order, then reshuffle into rank order a
     // beat later — the same trick the scoreboard uses, where rows reorder
     // as the points tick up. Sorting immediately would just render the
@@ -2472,19 +2453,15 @@ export default function GameScreen({ navigation }) {
               totalRounds={game.totalRounds || null}
             />
 
+            {/* No reactions on the results screen, by choice. This is
+                the payoff: ranked order, crowns, points ticking up. The
+                emoji competed with all of it for the same card, and
+                reacting is already available for the whole of voting
+                and the wait after it - by results the moment has been
+                had. Omitting reactionsMode is what switches the overlay
+                off; the grid draws no reaction chrome without it. */}
             <VotingWaitGrid
               variant="large"
-              reactions={game.reactions}
-              reactionOrder={game.reactionOrder}
-              myUid={user?.uid}
-              reactionsMode="summary"
-              // Still reactable. The clips are on screen and people keep
-              // reacting to what they just watched; a tally that goes
-              // read-only when the round ends cuts that off exactly as
-              // the reaction lands.
-              onReact={handleReact}
-              reactionsDisabled={reactionCooling}
-              reactorsFor={reactorsFor}
               submissions={rankedSubmissions}
               voters={buildVoters}
               players={game.players || []}
