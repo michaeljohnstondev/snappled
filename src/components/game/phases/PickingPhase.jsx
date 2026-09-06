@@ -19,6 +19,7 @@ import CreatorActionRow from '../CreatorActionRow';
 import HandCardThumbnail from '../round/HandCardThumbnail';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import RoundPromptBanner from '../round/RoundPromptBanner';
+import ReactionBar, { mineFor } from '../ReactionBar';
 import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
 import theme from '../../../theme/themes';
@@ -63,6 +64,11 @@ export default function PickingPhase({
   onDeletePrompt,
   onTrueDeletePrompt,
   onExcludeFromPool,
+  // Reacting to your own pick while the round waits on everyone else.
+  // The clip is on screen and there is nothing else to do; the old
+  // screen just counted heads.
+  onReact,
+  reactionCooling,
 }) {
   const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
   const alreadyPicked = game.submissions.some(s => s.uid === user.uid);
@@ -120,9 +126,23 @@ export default function PickingPhase({
             {myPick?.videoUrl ? (
               <View style={styles.yourPickCardWrap}>
                 <HandCardThumbnail
-                  card={{ videoUrl: myPick.videoUrl, creatorUsername: 'you' }}
+                  card={{
+                    videoUrl: myPick.videoUrl,
+                    creatorUsername: 'you',
+                    gridThumbUrl: myPick.gridThumbUrl,
+                  }}
                   label="@you"
                   onFullscreen={() => onPreviewCard({ ...myPick, _isWaiting: true })}
+                  // Same corner as every other card in the app.
+                  cornerSlot={onReact ? (
+                    <ReactionBar
+                      mode="picker"
+                      collapsible
+                      mine={mineFor(game.reactions, user?.uid, user?.uid)}
+                      onReact={(key) => onReact(user?.uid, key)}
+                      disabled={reactionCooling}
+                    />
+                  ) : null}
                 />
               </View>
             ) : null}

@@ -51,6 +51,34 @@ export const REACTIONS = [
 ];
 
 /**
+ * Tally of each emoji on one submission.
+ *
+ * reactions[submissionUid][key] is an array of uids; a card only needs
+ * the count and whether this user is in it. Lives here rather than in a
+ * screen because every surface that draws reactions needs the same two
+ * shapes out of that structure.
+ */
+export function countsFor(reactions, subUid) {
+  const forSub = (reactions || {})[subUid] || {};
+  const out = {};
+  REACTIONS.forEach(({ key }) => {
+    const list = forSub[key];
+    if (list && list.length) out[key] = list.length;
+  });
+  return out;
+}
+
+/** Which emoji THIS user sent on one submission. */
+export function mineFor(reactions, subUid, myUid) {
+  const forSub = (reactions || {})[subUid] || {};
+  const out = {};
+  REACTIONS.forEach(({ key }) => {
+    out[key] = !!(forSub[key] || []).includes(myUid);
+  });
+  return out;
+}
+
+/**
  * Absolute position for the picker sheet, beside the toggle that
  * opened it.
  *

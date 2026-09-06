@@ -19,7 +19,9 @@ import { userService } from '../services/userService';
 import VibeButton from '../components/ui/VibeButton';
 import ShimmerBar from '../components/ui/ShimmerBar';
 import BackChunk from '../components/ui/BackChunk';
-import ReactionBar, { REACTIONS } from '../components/game/ReactionBar';
+import ReactionBar, {
+  REACTIONS, countsFor, mineFor,
+} from '../components/game/ReactionBar';
 import ReactionScatter from '../components/game/ReactionScatter';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { CardThumbnailDelayed } from '../components/game/CardThumbnail';
@@ -58,6 +60,12 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 // vibeOrange dropped — sat too close to vibeYellow in the palette
 // and two adjacent voters would end up looking identical. Swapped
 // for vibeElectricBlue which reads distinctly against the yellow.
+// How long the vote-wait screen stays up once everybody has voted.
+// It is a viewing window, not a delay: every submission is on screen
+// and reactable, so this is the room's chance to enjoy the round before
+// the scoreboard takes over.
+const ALL_VOTED_WINDOW = 15;
+
 const VOTER_PALETTE = [
   theme.colors.vibeBlue,
   theme.colors.vibePurple,
@@ -150,26 +158,6 @@ function ScoringWinnerBanner({ isTie, names, votes }) {
 // Optional props:
 //   winnerUids (Set):    submission.uid values to crown (SCORING phase)
 //   pointsByUid (Map):   submission.uid → pointsEarned chip (SCORING phase)
-// reactions[submissionUid][key] is an array of uids; the card only needs
-// a tally and whether this user is in it.
-function countsFor(reactions, subUid) {
-  const forSub = (reactions || {})[subUid] || {};
-  const out = {};
-  REACTIONS.forEach(({ key }) => {
-    const list = forSub[key];
-    if (list && list.length) out[key] = list.length;
-  });
-  return out;
-}
-
-function mineFor(reactions, subUid, myUid) {
-  const forSub = (reactions || {})[subUid] || {};
-  const out = {};
-  REACTIONS.forEach(({ key }) => {
-    out[key] = !!(forSub[key] || []).includes(myUid);
-  });
-  return out;
-}
 
 function VotingWaitGrid({
   submissions, voters, players, playerColors, selfUid, allVotedIn,
@@ -1142,17 +1130,25 @@ export default function GameScreen({ navigation }) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [game?.phase, game?.currentRound]);
 
-  // When all votes are in during VOTING, snap the visible timer down to
-  // 5s so the on-screen countdown matches the actual time-to-finish
-  // (instead of running a separate hidden setTimeout that desynced the
-  // visible 30s timer and made results land while the timer still
+  // When all votes are in during VOTING, bring the visible timer to a
+  // fixed window so the on-screen countdown matches the actual
+  // time-to-finish (instead of a separate hidden setTimeout that
+  // desynced the visible timer and made results land while it still
   // showed seconds left).
+  //
+  // This window was 5s, on the theory that once everyone has voted the
+  // only thing left is to get to the results. That stopped being true
+  // when this screen gained reactions: the clips are all on display,
+  // people are watching them, and five seconds is not enough to react
+  // to one - the screen was hurrying you past the part you were
+  // enjoying. Math.min still applies, so a room that votes late never
+  // gets EXTRA time beyond what the round had left.
   useEffect(() => {
     if (game?.phase !== GAME_PHASES.VOTING) return;
     const votedUids = new Set(Object.values(game.votes || {}).flat());
     const allVoted = (game.players || []).every(p => votedUids.has(p.uid));
     if (allVoted) {
-      setTimer(prev => Math.min(prev, 5));
+      setTimer(prev => Math.min(prev, ALL_VOTED_WINDOW));
     }
   }, [game?.phase, game?.votes]);
 
@@ -1976,6 +1972,8 @@ export default function GameScreen({ navigation }) {
         onDeletePrompt={handleDeletePrompt}
         onTrueDeletePrompt={handleTrueDeletePrompt}
         onExcludeFromPool={handleExcludeFromPool}
+        onReact={handleReact}
+        reactionCooling={reactionCooling}
         onHelp={showPhaseHelp} onHelpEnd={hidePhaseHelp}
         />
         <RoundStartOverlay
