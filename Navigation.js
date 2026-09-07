@@ -133,12 +133,12 @@ export default function Navigation() {
 
   return (
     <ErrorBoundary>
+      {/* Two screens, not three. Landing IS the login screen - the old
+          'Login' route was a near-duplicate of it with different copy
+          and its own Google button, reachable only from Signup's
+          back-link, so that link led somewhere that looked nothing
+          like where the user had started. */}
       {!isAuthenticated ? (
-        {/* Two screens, not three. Landing IS the login screen - the
-            old 'Login' route was a near-duplicate of it with different
-            copy and its own Google button, reachable only from
-            Signup's back-link, so that link led somewhere that looked
-            nothing like where the user had started. */}
         <Stack.Navigator initialRouteName="Landing" screenOptions={screenOptions}>
           <Stack.Screen name="Landing" component={LandingScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
