@@ -6,16 +6,23 @@ import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
+import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
 import { snappleService } from '../services/snappleService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { promptRotationService } from '../services/promptRotationService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+// Bumping this string re-shows the intro to everyone, which is the
+// only way to reintroduce the screen if its copy ever changes
+// meaningfully.
+const PROMPTS_INTRO_KEY = 'promptsIntroSeen:v1';
 
 export default function PromptsScreen({ navigation }) {
   const { theme: t } = useTheme();
@@ -89,6 +96,26 @@ export default function PromptsScreen({ navigation }) {
   const [pool, setPool] = useState([]);
   const [poolIndex, setPoolIndex] = useState(0);
   const [poolOpen, setPoolOpen] = useState(false);
+
+  // One-line intro, the same idea as the in-game phase intros. Shown
+  // ONCE EVER rather than once per session: unlike a round, this screen
+  // is somewhere you return to constantly, and a tap-to-dismiss card on
+  // every visit is a toll rather than an explanation.
+  const [showIntro, setShowIntro] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(PROMPTS_INTRO_KEY)
+      .then((seen) => { if (!seen && !cancelled) setShowIntro(true); })
+      // Storage unavailable just means it is not shown. Better than
+      // showing it forever on a device that cannot remember.
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const dismissIntro = () => {
+    setShowIntro(false);
+    AsyncStorage.setItem(PROMPTS_INTRO_KEY, '1').catch(() => {});
+  };
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -438,6 +465,14 @@ export default function PromptsScreen({ navigation }) {
           )}
         </ScrollView>
         )}
+
+        <RoundStartOverlay
+          visible={showIntro}
+          title="Prompts"
+          sub={'Prompts are ideas for making snapples. Tap one to browse '
+            + 'snapples, or create your own.'}
+          onDismiss={dismissIntro}
+        />
 
         <SnappleOverlay
           visible={poolOpen}
