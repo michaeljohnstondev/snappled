@@ -95,9 +95,30 @@ export default function BasicCameraView({
     }
   }, [device?.minZoom]);
 
+  // Sequential, not concurrent. These both fired at once and neither
+  // was awaited: Android shows one permission dialog at a time, so the
+  // microphone request arrived while the camera dialog was still up and
+  // was dropped - returning denied without ever prompting. The symptom
+  // is being asked for the camera and never for the mic, then finding
+  // recording broken with no dialog to explain it.
+  //
+  // handleGrant below already awaited them in order, which is why the
+  // recovery button worked while the first-run path did not.
   useEffect(() => {
-    if (!cameraPermission) requestCameraPermission().catch(() => {});
-    if (!microphonePermission && mode === 'video') requestMicrophonePermission().catch(() => {});
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!cameraPermission) await requestCameraPermission();
+        if (cancelled) return;
+        if (!microphonePermission && mode === 'video') {
+          await requestMicrophonePermission();
+        }
+      } catch (e) {
+        // Denials are handled by the permission screen below; nothing
+        // to do here but stop asking.
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Build a wrapper that matches expo-camera's API used by RecordingControls

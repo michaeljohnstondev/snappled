@@ -11,7 +11,10 @@
 // All writes go straight to the user doc via userService.updateUserData.
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Switch, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, Switch, Pressable, ScrollView, ActivityIndicator,
+  Linking,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
@@ -107,13 +110,26 @@ export default function NotificationSettingsScreen({ navigation }) {
       const p = await fcmService.getPermissionStatus();
       setPerms(p);
       if (!ok || !p.granted) {
-        showAlert(
-          'Permission needed',
-          'Notifications are off for Snappled in your device settings. Open Settings → Snappled → Notifications to enable.',
-        );
+        // Once permission has been denied at OS level the dialog never
+        // appears again - the request just resolves denied. This used
+        // to print directions to Settings and leave the user to follow
+        // them, which is the only route back and the app was making
+        // them walk it. openSettings lands on this app's own page.
+        // Same treatment BasicCameraView gives the camera.
+        await Linking.openSettings();
       }
     } catch (e) {
-      showError('Error', e.message);
+      // openSettings can reject on some OEM builds; fall back to
+      // telling them where to go rather than failing silently.
+      try {
+        showAlert(
+          'Permission needed',
+          'Notifications are off for Snappled in your device settings. '
+          + 'Open Settings → Snappled → Notifications to enable.',
+        );
+      } catch (e2) {
+        showError('Error', e.message);
+      }
     }
   };
 
@@ -160,7 +176,8 @@ export default function NotificationSettingsScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.permTitle}>Notifications are off</Text>
               <Text style={styles.permBody}>
-                Tap to grant permission. Without it, none of the toggles below matter.
+                Tap to turn them on. Without permission, none of the
+                toggles below matter.
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.colors.vibeBlue} />
