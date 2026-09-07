@@ -178,8 +178,10 @@ export default function LandingScreen({ navigation }) {
               never saw the one-tap option below it. The easiest way in
               should be the one you see without scrolling. */}
           <View style={styles.buttonContainer}>
-            {/* Apple Sign-In first on iOS per App Store guideline 4.8. */}
-            {Platform.OS === 'ios' && (
+            {/* Hidden while the email form is open. Two ways in on one
+                screen is a choice to make; once the choice is made,
+                the other one is just noise above the keyboard. */}
+            {!showEmail && Platform.OS === 'ios' && (
               <Pressable
                 onPress={() => handleSocialSignIn('apple')}
                 disabled={isLoading || googleLoading || appleLoading}
@@ -194,6 +196,7 @@ export default function LandingScreen({ navigation }) {
                 </Text>
               </Pressable>
             )}
+            {!showEmail && (
             <Pressable
               onPress={() => handleSocialSignIn('google')}
               disabled={isLoading || googleLoading || appleLoading}
@@ -209,19 +212,26 @@ export default function LandingScreen({ navigation }) {
                 {googleLoading ? 'Signing in...' : 'Sign in with Google'}
               </Text>
             </Pressable>
+            )}
 
 
-            {/* Email is the fallback now, folded away. It is still one
-                tap to reach, but it no longer costs everyone else a
+            {/* Email is the fallback, folded away. It is still one tap
+                to reach, but it no longer costs everyone else a
                 screenful. */}
-            <Pressable onPress={() => setShowEmail(v => !v)}>
-              <Text style={styles.emailToggle}>
-                {showEmail ? 'Hide email sign in' : 'Sign in with email'}
-              </Text>
-            </Pressable>
+            {!showEmail && (
+              <VibeButton
+                label="Sign in with email"
+                onPress={() => setShowEmail(true)}
+                color="purple"
+                style={styles.emailButton}
+              />
+            )}
 
             {showEmail && (
-              <>
+              // Full width: buttonContainer centres its children, which
+              // sized the inputs to their content and made them
+              // noticeably narrower than everything else on the screen.
+              <View style={styles.emailPane}>
           <View style={styles.formContainer}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
@@ -289,7 +299,17 @@ export default function LandingScreen({ navigation }) {
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </Pressable>
 
-              </>
+                {/* Under the login button, not above the form. Once you
+                    are in the form, leaving it is the LAST thing you
+                    might want, so it belongs after the thing you came
+                    to do. */}
+                {/* A plain link, not a button. It is a way OUT of the
+                    choice you already made, and bordering it would give
+                    it the same weight as the login button above it. */}
+                <Pressable onPress={() => setShowEmail(false)}>
+                  <Text style={styles.goBackText}>Go back</Text>
+                </Pressable>
+              </View>
             )}
 
             <View style={styles.signupContainer}>
@@ -309,17 +329,25 @@ const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
-  emailToggle: {
-    color: theme.colors.vibeBlue,
+  emailPane: {
+    width: '100%',
+  },
+  // Matches the width of the social buttons above it so the three read
+  // as one stack of choices rather than two buttons and a text link.
+  emailButton: {
+    width: '100%',
+  },
+  goBackText: {
+    color: t.colors.textSecondary,
     fontSize: 14,
-    fontWeight: '700',
     textAlign: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
   },
   scrollContent: {
     flexGrow: 1,
     padding: theme.sizes.spacing?.lg || 24,
-    paddingTop: 80,
+    // Was 80. The mark does not need a third of the screen above it.
+    paddingTop: 40,
     justifyContent: 'center',
   },
   header: {
@@ -339,7 +367,9 @@ const makeStyles = (t) => ({
     textAlign: 'center',
   },
   formContainer: {
-    marginBottom: 40,
+    // Was 40, which left a canyon between the password field and the
+    // button that submits it.
+    marginBottom: 8,
   },
   inputGroup: {
     marginBottom: theme.sizes.spacing?.lg || 24,
