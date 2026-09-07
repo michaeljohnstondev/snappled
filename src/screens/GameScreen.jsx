@@ -1802,6 +1802,7 @@ export default function GameScreen({ navigation }) {
         onAddBot={handleAddBot}
         onStartGame={handleStartGame}
         onSetRounds={(n) => gameService.setTotalRounds(gameId, n)}
+        onSetRoundLimit={(n) => gameService.setRoundLimit(gameId, n)}
       />
     );
   }
@@ -1955,7 +1956,7 @@ export default function GameScreen({ navigation }) {
       <RoundPromptBanner
         prompt={game.prompts[game.currentRound - 1]}
         round={game.currentRound}
-        totalRounds={game.totalRounds || null}
+        roundLimit={game.roundLimit}
       />
     );
 

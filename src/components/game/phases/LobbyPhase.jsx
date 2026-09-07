@@ -27,12 +27,14 @@ export default function LobbyPhase({
   onAddBot,
   onStartGame,
   onSetRounds,
+  onSetRoundLimit,
 }) {
   const { theme: t } = useTheme();
   const colors = buildPlayerColors(game.players);
   const me = (game.players || []).find(p => p.uid === userId);
   const styles = useThemedStyles(makeStyles);
   const totalRounds = game?.totalRounds ?? 5;
+  const roundLimit = game?.roundLimit ?? 0;
   return (
     <LinearGradient colors={t.colors.backgroundGradient} style={styles.container}>
       <View style={styles.header}>
@@ -117,6 +119,30 @@ export default function LobbyPhase({
                 >
                   <Text style={[styles.roundsOptionText, totalRounds === n && styles.roundsOptionTextActive]}>
                     {n === 0 ? '∞' : n}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Round cap, separate from the points target because they
+                answer different questions: how LONG this takes versus
+                how much it is worth winning. A room with twenty minutes
+                needs the first, and a score target cannot promise it.
+                Whichever lands first ends the game; OFF leaves the
+                points target in charge. */}
+            <Text style={[styles.roundsLabel, styles.roundsLabelSecond]}>ROUNDS</Text>
+            <View style={styles.roundsOptions}>
+              {[0, 5, 10, 15].map(n => (
+                <Pressable
+                  key={`limit-${n}`}
+                  style={[styles.roundsOption, roundLimit === n && styles.roundsOptionActive]}
+                  onPress={() => onSetRoundLimit?.(n)}
+                >
+                  <Text style={[
+                    styles.roundsOptionText,
+                    roundLimit === n && styles.roundsOptionTextActive,
+                  ]}>
+                    {n === 0 ? 'OFF' : n}
                   </Text>
                 </Pressable>
               ))}
@@ -283,6 +309,7 @@ const makeStyles = (t) => ({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  roundsLabelSecond: { marginTop: 14 },
   roundsPicker: {
     alignItems: 'center',
     marginTop: 16,

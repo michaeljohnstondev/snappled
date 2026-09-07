@@ -1,6 +1,6 @@
 // RoundPromptBanner — richer prompt card used across the round
 // screens. Left cyan stripe, pink PROMPT label + "ROUND N" (adds
-// "OF M" only when a max round is set), big prompt title, and an
+// "OF M" only when a round cap is set), big prompt title, and an
 // optional subtitle underneath. Rounded, not edge-to-edge — sits
 // as a card inside the phase's padded content area.
 
@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../../../theme/themes';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
-// Render the banner. `round` is 1-based; `totalRounds` is optional
+// Render the banner. `round` is 1-based; `roundLimit` is optional
 // (0 or null = infinite mode, hides the "OF M" suffix). `subtitle`
 // is optional — omit to render just the prompt. `onEdit`/`onDelete`
 // are admin-only handlers; when passed, small pencil/X icons appear
@@ -19,15 +19,20 @@ import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 export default function RoundPromptBanner({
   prompt,
   round,
-  totalRounds,
+  roundLimit,
   subtitle,
   onEdit,
   onDelete,
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const roundText = totalRounds
-    ? `ROUND ${round} OF ${totalRounds}`
+  // "OF M" only when there genuinely is an Mth round. This used to be
+  // handed game.totalRounds, which is the POINTS target - so a game to
+  // 25 points announced "ROUND 1 OF 25" and promised twenty-five rounds
+  // that were never going to happen. The round cap is the only number
+  // that can honestly finish that sentence.
+  const roundText = roundLimit > 0
+    ? `ROUND ${round} OF ${roundLimit}`
     : `ROUND ${round}`;
   return (
     <View style={styles.card}>

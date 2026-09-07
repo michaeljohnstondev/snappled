@@ -187,6 +187,8 @@ export const gameService = {
         phase: GAME_PHASES.LOBBY,
         currentRound: 0,
         totalRounds: safeRounds,
+        // 0 = no cap; the points target decides the ending.
+        roundLimit: 0,
         players: [{
           uid: hostId,
           username: hostUsername,
@@ -707,14 +709,39 @@ export const gameService = {
         }
       });
 
-      const target = data.totalRounds;
-      const topScore = updatedPlayers.reduce((m, p) => Math.max(m, p.points || 0), 0);
-      const isLastRound = target > 0 && topScore >= target;
+      const isLastRound = this.isGameOver(data, updatedPlayers);
       return { success: true, roundResult, isLastRound };
     } catch (error) {
       console.error('[GameService] Error finishing round:', error);
       return { success: false, error: error.message };
     }
+  },
+
+  /**
+   * Has the game reached its end?
+   *
+   * Two independent conditions, whichever lands first:
+   *  - a POINTS target (stored as totalRounds for backward compat)
+   *  - a ROUND limit, for a game that should last a known length
+   *
+   * The round limit is the newer one. Points-only meant a game ran until
+   * somebody got there, which is fine for a long session and useless
+   * when the room has twenty minutes - "ten rounds" is a promise about
+   * duration that a score target cannot make.
+   *
+   * Either may be 0, meaning that condition is off; both 0 is an
+   * endless game the host ends from the scoreboard.
+   */
+  isGameOver(data, players) {
+    const target = data.totalRounds;
+    const topScore = (players || data.players || [])
+      .reduce((m, p) => Math.max(m, p.points || 0), 0);
+    const hitTarget = target > 0 && topScore >= target;
+
+    const limit = data.roundLimit;
+    const hitLimit = limit > 0 && (data.currentRound || 0) >= limit;
+
+    return hitTarget || hitLimit;
   },
 
   // Broadcast that an admin just excluded a snapple from the pool so
@@ -747,9 +774,7 @@ export const gameService = {
       const data = gameDoc.data();
       if (data.phase !== GAME_PHASES.SCORING) return { success: true, skipped: true };
 
-      const target = data.totalRounds;
-      const topScore = (data.players || []).reduce((m, p) => Math.max(m, p.points || 0), 0);
-      const isLastRound = target > 0 && topScore >= target;
+      const isLastRound = this.isGameOver(data);
 
       await updateDoc(gameRef, {
         phase: isLastRound ? GAME_PHASES.FINAL_RESULTS : GAME_PHASES.ROUND_RESULTS,
@@ -903,6 +928,29 @@ export const gameService = {
       return { success: true, newPrompt };
     } catch (error) {
       console.error('[GameService] replaceAndRestartRound error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Host-only: cap the game at a number of rounds.
+   *
+   * Separate from the points target rather than replacing it, because
+   * they answer different questions - "how long will this take" versus
+   * "how much is it worth winning" - and a room often wants both. 0
+   * turns the cap off.
+   */
+  async setRoundLimit(gameId, rounds) {
+    try {
+      const raw = Number(rounds);
+      const safe = raw === 0 ? 0 : Math.max(1, Math.min(50, raw || 10));
+      await updateDoc(doc(db, GAMES_COLLECTION, gameId), {
+        roundLimit: safe,
+        updatedAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[GameService] Error setting roundLimit:', error);
       return { success: false, error: error.message };
     }
   },

@@ -72,7 +72,8 @@ export default function PickingPhase({
 }) {
   const currentPrompt = game.prompts[game.currentRound - 1] || 'Show us something!';
   const alreadyPicked = game.submissions.some(s => s.uid === user.uid);
-  const totalRoundsShown = game.totalRounds || null;
+  // The round CAP, not the points target - see RoundPromptBanner.
+  const roundLimitShown = game.roundLimit || null;
 
   // Which card in the hand is playing inline right now (only one
   // at a time). Tap a different card = swap + play. Tap the same
@@ -113,7 +114,7 @@ export default function PickingPhase({
         <RoundPromptBanner
           prompt={currentPrompt}
           round={game.currentRound}
-          totalRounds={totalRoundsShown}
+          roundLimit={roundLimitShown}
         />
         <ScrollView
           contentContainerStyle={styles.pickedWaitContent}
@@ -211,7 +212,7 @@ export default function PickingPhase({
       <RoundPromptBanner
         prompt={currentPrompt}
         round={game.currentRound}
-        totalRounds={totalRoundsShown}
+        roundLimit={roundLimitShown}
         onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
       />
 
