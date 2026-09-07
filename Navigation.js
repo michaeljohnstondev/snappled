@@ -8,7 +8,6 @@ import CustomTabBar from './src/components/ui/navigation/CustomTabBar';
 
 // Screen imports
 import LandingScreen from './src/screens/LandingScreen';
-import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import PromptsScreen from './src/screens/PromptsScreen';
@@ -135,9 +134,13 @@ export default function Navigation() {
   return (
     <ErrorBoundary>
       {!isAuthenticated ? (
+        {/* Two screens, not three. Landing IS the login screen - the
+            old 'Login' route was a near-duplicate of it with different
+            copy and its own Google button, reachable only from
+            Signup's back-link, so that link led somewhere that looked
+            nothing like where the user had started. */}
         <Stack.Navigator initialRouteName="Landing" screenOptions={screenOptions}>
           <Stack.Screen name="Landing" component={LandingScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
         </Stack.Navigator>
       ) : (

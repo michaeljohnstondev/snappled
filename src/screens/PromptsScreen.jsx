@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,6 +96,18 @@ export default function PromptsScreen({ navigation }) {
   const [pool, setPool] = useState([]);
   const [poolIndex, setPoolIndex] = useState(0);
   const [poolOpen, setPoolOpen] = useState(false);
+
+  // promptId -> how many snapples answer it, derived from the pool
+  // rather than queried. The pool is every public snapple and each one
+  // carries its promptId, so the counts are already in hand.
+  const snappleCounts = useMemo(() => {
+    const m = new Map();
+    pool.forEach((snap) => {
+      if (!snap.promptId) return;
+      m.set(snap.promptId, (m.get(snap.promptId) || 0) + 1);
+    });
+    return m;
+  }, [pool]);
 
   // One-line intro, the same idea as the in-game phase intros. Shown
   // ONCE EVER rather than once per session: unlike a round, this screen
@@ -416,6 +428,21 @@ export default function PromptsScreen({ navigation }) {
                   colors={getPromptGradient(index)}
                   style={styles.cardGradient}
                 >
+                  {/* How many snapples answer this prompt. Hidden at
+                      zero rather than showing "0": most prompts have
+                      none, and a wall of zeroes advertises how empty
+                      the library is. A number that only appears when
+                      there is something to see turns the card into a
+                      reason to tap it.
+                      Counted from the pool already loaded for the grid
+                      below, so it costs no extra read. */}
+                  {snappleCounts.get(prompt.id) > 0 && (
+                    <View style={styles.countChip}>
+                      <Text style={styles.countChipText}>
+                        {snappleCounts.get(prompt.id)}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.cardContent}>
                     {prompt.lockoutAt && new Date().toISOString() >= prompt.lockoutAt && (
                       <Text style={styles.lockoutBadge}>CLOSING SOON</Text>
@@ -554,6 +581,24 @@ const makeStyles = (t) => ({
   scrollView: {
     flex: 1,
   },
+  countChip: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  countChipText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
   poolSection: {
     marginTop: 28,
     paddingHorizontal: 12,
@@ -615,7 +660,10 @@ const makeStyles = (t) => ({
     fontWeight: theme.fontWeights.medium,
     lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 16,
+    // No marginBottom. cardContent centres its children, so a bottom
+    // margin got centred WITH the text and pushed the visible line up
+    // by half of it - the card read as very slightly high. Nothing sits
+    // under the text any more for the margin to hold off.
   },
   lockoutBadge: {
     color: theme.colors.vibeRed,

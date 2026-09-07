@@ -1,4 +1,6 @@
-import { View, Text, StyleSheet, Alert, ScrollView, Pressable, Platform } from 'react-native';
+import {
+  View, Text, StyleSheet, Alert, ScrollView, Pressable, Platform, Image,
+} from 'react-native';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import VibeButton from '../components/ui/VibeButton';
@@ -21,7 +23,7 @@ export default function SignupScreen({ navigation }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
 
-  // Mirrors LoginScreen.handleSocialSignIn — Google / Apple → Firebase
+  // Mirrors LandingScreen.handleSocialSignIn — Google / Apple → Firebase
   // → ensureUserDocument. ensureUserDocument is idempotent so a user
   // who already signed up with social can re-sign-in here without
   // creating a second doc.
@@ -125,7 +127,11 @@ export default function SignupScreen({ navigation }) {
   }
 
   function handleGoToLogin() {
-    navigation.navigate('Login');
+    // Landing IS the login screen. There used to be a separate
+    // 'Login' route that was a near-duplicate of it, so this link
+    // took you somewhere that looked nothing like where you came
+    // from.
+    navigation.navigate('Landing');
   }
 
   function handleGoBack() {
@@ -139,10 +145,15 @@ export default function SignupScreen({ navigation }) {
     >
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.title}>Join Snappled! 🎬</Text>
-          <Text style={styles.subtitle}>
-            Create your account and start having fun with creative prompts!
-          </Text>
+          <Image
+            source={require('../../assets/images/icon-android.png')}
+            style={styles.mark}
+            resizeMode="contain"
+          />
+          {/* Same mark and the same plain voice as the landing screen.
+              "Join Snappled! 🎬" and "Welcome Back! 👋" were two
+              different apps talking to you two screens apart. */}
+          <Text style={styles.title}>Create account</Text>
         </View>
 
         <View style={styles.formContainer}>
@@ -195,9 +206,11 @@ export default function SignupScreen({ navigation }) {
           </View>
 
           <View style={styles.termsContainer}>
+            {/* Just the legal line. The cheerleading after it was the
+                app talking to itself, and it sat between the form and
+                the button people were trying to reach. */}
             <Text style={styles.termsText}>
               By signing up, you agree to our Terms of Service and Privacy Policy.
-              Let's keep Snappled fun and safe for everyone! 🌟
             </Text>
           </View>
         </View>
@@ -272,11 +285,16 @@ const makeStyles = (t) => ({
   },
   header: {
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: theme.sizes.spacing?.xl || 32,
+    marginTop: 32,
+    marginBottom: theme.sizes.spacing?.lg || 24,
+  },
+  mark: {
+    width: 96,
+    height: 96,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: t.colors.textPrimary,
     marginBottom: theme.sizes.spacing?.md || 16,
