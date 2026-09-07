@@ -344,12 +344,18 @@ export default function PromptsScreen({ navigation }) {
   };
 
   const getPromptGradient = (index) => {
+    // Every pair has to travel a real distance in hue, or the card
+    // reads as one flat colour. vibeOrange (#FFCC66) to vibeYellow
+    // (#FFD700) was the odd one out - two pale golds a few percent
+    // apart, so that card looked like a solid yellow-orange while the
+    // rest visibly graded. Paired with red instead, which is what
+    // PromptCarousel already does with the same orange.
     const gradients = [
       [theme.colors.vibeBlue, theme.colors.vibeGreen],
       [theme.colors.vibePurple, theme.colors.vibePink],
-      [theme.colors.vibeOrange, theme.colors.vibeYellow],
+      [theme.colors.vibeOrange, theme.colors.vibeRed],
       [theme.colors.vibePink, theme.colors.vibeBlue],
-      [theme.colors.vibeGreen, theme.colors.vibeOrange]
+      [theme.colors.vibeGreen, theme.colors.vibeOrange],
     ];
     return gradients[index % gradients.length];
   };
