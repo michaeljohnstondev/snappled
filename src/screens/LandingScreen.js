@@ -5,7 +5,8 @@ import {
   StyleSheet, 
   KeyboardAvoidingView, 
   Platform, 
-  ScrollView, 
+  ScrollView,
+  Image,
   Pressable, 
   Alert 
 } from 'react-native';
@@ -26,6 +27,9 @@ export default function LandingScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Email sign in starts collapsed. Social is the path most people
+  // want and the one they were missing.
+  const [showEmail, setShowEmail] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -160,9 +164,64 @@ export default function LandingScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
+            <Image
+              source={require('../../assets/images/icon-android.png')}
+              style={styles.mark}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Snappled</Text>
           </View>
 
+          {/* Social first, and above the fold. The email form used to
+              sit here and pushed Google and Apple off the bottom of the
+              screen - people were typing out an account because they
+              never saw the one-tap option below it. The easiest way in
+              should be the one you see without scrolling. */}
+          <View style={styles.buttonContainer}>
+            {/* Apple Sign-In first on iOS per App Store guideline 4.8. */}
+            {Platform.OS === 'ios' && (
+              <Pressable
+                onPress={() => handleSocialSignIn('apple')}
+                disabled={isLoading || googleLoading || appleLoading}
+                style={({ pressed }) => [
+                  styles.appleButton,
+                  { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
+                ]}
+              >
+                <Text style={styles.appleLogo}></Text>
+                <Text style={styles.appleButtonText}>
+                  {appleLoading ? 'Signing in...' : 'Sign in with Apple'}
+                </Text>
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => handleSocialSignIn('google')}
+              disabled={isLoading || googleLoading || appleLoading}
+              style={({ pressed }) => [
+                styles.googleButton,
+                { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
+              ]}
+            >
+              <View style={styles.googleIconContainer}>
+                <Text style={styles.googleG}>G</Text>
+              </View>
+              <Text style={styles.googleButtonText}>
+                {googleLoading ? 'Signing in...' : 'Sign in with Google'}
+              </Text>
+            </Pressable>
+
+
+            {/* Email is the fallback now, folded away. It is still one
+                tap to reach, but it no longer costs everyone else a
+                screenful. */}
+            <Pressable onPress={() => setShowEmail(v => !v)}>
+              <Text style={styles.emailToggle}>
+                {showEmail ? 'Hide email sign in' : 'Sign in with email'}
+              </Text>
+            </Pressable>
+
+            {showEmail && (
+              <>
           <View style={styles.formContainer}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
@@ -219,7 +278,6 @@ export default function LandingScreen({ navigation }) {
             </View>
           </View>
 
-          <View style={styles.buttonContainer}>
             <VibeButton
               label={isLoading ? 'Signing In...' : 'Login'}
               onPress={handleLogin}
@@ -231,46 +289,11 @@ export default function LandingScreen({ navigation }) {
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </Pressable>
 
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Apple Sign-In first on iOS per App Store guideline 4.8. */}
-            {Platform.OS === 'ios' && (
-              <Pressable
-                onPress={() => handleSocialSignIn('apple')}
-                disabled={isLoading || googleLoading || appleLoading}
-                style={({ pressed }) => [
-                  styles.appleButton,
-                  { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
-                ]}
-              >
-                <Text style={styles.appleLogo}></Text>
-                <Text style={styles.appleButtonText}>
-                  {appleLoading ? 'Signing in...' : 'Sign in with Apple'}
-                </Text>
-              </Pressable>
+              </>
             )}
-            <Pressable
-              onPress={() => handleSocialSignIn('google')}
-              disabled={isLoading || googleLoading || appleLoading}
-              style={({ pressed }) => [
-                styles.googleButton,
-                { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
-              ]}
-            >
-              <View style={styles.googleIconContainer}>
-                <Text style={styles.googleG}>G</Text>
-              </View>
-              <Text style={styles.googleButtonText}>
-                {googleLoading ? 'Signing in...' : 'Sign in with Google'}
-              </Text>
-            </Pressable>
 
             <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Don't have an account? </Text>
+              <Text style={styles.signupText}>{"Don't have an account? "}</Text>
               <Pressable onPress={handleSignup}>
                 <Text style={styles.signupLink}>Sign Up</Text>
               </Pressable>
@@ -286,6 +309,13 @@ const makeStyles = (t) => ({
   container: {
     flex: 1,
   },
+  emailToggle: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
   scrollContent: {
     flexGrow: 1,
     padding: theme.sizes.spacing?.lg || 24,
@@ -294,7 +324,13 @@ const makeStyles = (t) => ({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 60,
+    // Was 60. The mark carries the space now, and the buttons need to
+    // clear the fold on a small phone.
+    marginBottom: 24,
+  },
+  mark: {
+    width: 120,
+    height: 120,
   },
   title: {
     fontSize: 48,
