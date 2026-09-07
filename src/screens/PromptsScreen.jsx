@@ -4,9 +4,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
+import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
+import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
+import { snappleService } from '../services/snappleService';
 import { promptRotationService } from '../services/promptRotationService';
 import { userService } from '../services/userService';
 import theme from '../theme/themes';
@@ -81,6 +84,11 @@ export default function PromptsScreen({ navigation }) {
 
   // State
   const [prompts, setPrompts] = useState([]);
+  // The browse pool under the prompts. Loaded once per visit; the
+  // shuffle lives in the service so it is different each time.
+  const [pool, setPool] = useState([]);
+  const [poolIndex, setPoolIndex] = useState(0);
+  const [poolOpen, setPoolOpen] = useState(false);
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -127,6 +135,15 @@ export default function PromptsScreen({ navigation }) {
   const loadData = async () => {
     const { prompts: allPrompts } = await promptRotationService.getActivePrompts();
     setPrompts(allPrompts);
+
+    // Best-effort and after the prompts, which are what the screen is
+    // for. A pool that fails to load should cost nothing but itself.
+    try {
+      const { success, snapples } = await snappleService.getPoolSnapples();
+      if (success) setPool(snapples || []);
+    } catch (e) {
+      // Non-fatal; the section just doesn't render.
+    }
   };
 
   const handlePromptPress = (prompt, index) => {
@@ -384,8 +401,52 @@ export default function PromptsScreen({ navigation }) {
               </Pressable>
             ))}
           </View>
+
+          {/* Browse pool.
+              Global rather than per prompt, which was the obvious
+              alternative and the wrong one: of 347 prompts only 48 have
+              a snapple at all and 43 of those have exactly one, so a
+              per-prompt pool would be an empty box nearly every time
+              you opened it. Drawing from every snapple sidesteps the
+              distribution entirely.
+              Cheap to show: these are the stored ~30KB tiles, so the
+              grid costs almost nothing until someone taps play. */}
+          {pool.length > 0 && (
+            <View style={styles.poolSection}>
+              <Text style={styles.poolLabel}>SNAPPLE POOL</Text>
+              <View style={styles.poolGrid}>
+                {pool.map((snap, i) => (
+                  <Pressable
+                    key={snap.id}
+                    style={styles.poolCell}
+                    onPress={() => { setPoolIndex(i); setPoolOpen(true); }}
+                  >
+                    <View style={styles.poolTile}>
+                      <SnappleThumbnail
+                        videoUrl={snap.videoUrl}
+                        thumbUrl={snap.gridThumbUrl}
+                      />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+              {/* Says so rather than looping. An endless scroll over a
+                  small library just shows the same clips again, which
+                  reads as broken; an end that admits it does not. */}
+              <Text style={styles.poolEnd}>{"that's all of them — for now"}</Text>
+            </View>
+          )}
         </ScrollView>
         )}
+
+        <SnappleOverlay
+          visible={poolOpen}
+          snapple={pool[poolIndex]}
+          snapples={pool}
+          initialIndex={poolIndex}
+          onClose={() => setPoolOpen(false)}
+          navigation={navigation}
+        />
 
         {/* Prompt Info Overlay */}
         <PromptInfoOverlay
@@ -457,6 +518,41 @@ const makeStyles = (t) => ({
   },
   scrollView: {
     flex: 1,
+  },
+  poolSection: {
+    marginTop: 28,
+    paddingHorizontal: 12,
+  },
+  poolLabel: {
+    color: theme.colors.vibeBlue,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 10,
+  },
+  poolGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  // Three across. Two would make each tile as big as a prompt card and
+  // turn the pool into the point of the screen; three reads as a
+  // gallery you dip into.
+  poolCell: {
+    width: '33.333%',
+    padding: 3,
+  },
+  poolTile: {
+    aspectRatio: 9 / 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  poolEnd: {
+    color: t.colors.textSecondary,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 14,
+    marginBottom: 8,
   },
   promptsList: {
     paddingHorizontal: 20,

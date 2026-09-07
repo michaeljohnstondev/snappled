@@ -38,8 +38,6 @@ import RoundPromptBanner from '../components/game/round/RoundPromptBanner';
 import { COUNTDOWN_SECONDS } from '../components/game/CountdownOverlay';
 import HandCardThumbnail from '../components/game/round/HandCardThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
-import TutorialOverlay from '../components/game/TutorialOverlay';
-import { useTutorial } from '../hooks/useTutorial';
 import theme from '../theme/themes';
 import { PLAYER_PALETTE, buildPlayerColors } from '../lib/playerColors';
 import { soundService } from '../services/soundService';
@@ -430,11 +428,11 @@ export default function GameScreen({ navigation }) {
   const [isPractice, setIsPractice] = useState(false);
   // Tutorial mode: a practice game with tap-to-dismiss phase tips.
   // Cleared on leaveGame the same as isPractice.
-  const [isTutorial, setIsTutorial] = useState(false);
-  const { activeTip: tutorialTip, dismiss: dismissTutorialTip } = useTutorial(
-    isTutorial,
-    game?.phase,
-  );
+  // Tutorial mode removed. It was a separate practice run with tips
+  // layered over it - a mode you had to know to choose, explaining a
+  // game you were not yet playing. Each phase now introduces itself in
+  // one line the first time you reach it, which reaches everyone
+  // instead of only the people who went looking.
   // Freeze flag consumed by the phase timer and auto-advance triggers.
   // While a tutorial tip is open the round pauses so first-timers can
   // read without racing the countdown. Kept as a ref so the interval
@@ -446,8 +444,8 @@ export default function GameScreen({ navigation }) {
   // and freeze the countdown + auto-advance so reading isn't racing
   // the clock.
   useEffect(() => {
-    pausedRef.current = !!tutorialTip || !!roundAlert;
-  }, [tutorialTip, roundAlert]);
+    pausedRef.current = !!roundAlert;
+  }, [roundAlert]);
   const [isSpectating, setIsSpectating] = useState(false);
   const [timer, setTimer] = useState(0);
 
@@ -514,6 +512,44 @@ export default function GameScreen({ navigation }) {
   // press-out hides it. Copy per phase lives here so it stays with
   // the game screen instead of leaking into each phase component.
   const [roundAlert, setRoundAlert] = useState(null);
+
+  // One line per phase, shown the first time you reach it in a round.
+  // Deliberately a single sentence: this replaces a tutorial mode, and
+  // anything longer becomes something to dismiss rather than read.
+  const PHASE_INTRO = {
+    [GAME_PHASES.REVIEW]: {
+      title: 'Warmup',
+      sub: "These are your snapples. Tap them to see what you're working with.",
+    },
+    [GAME_PHASES.PICKING]: {
+      title: 'Pick',
+      sub: 'Select a snapple from your hand that best fits the prompt.',
+    },
+    [GAME_PHASES.VOTING]: {
+      title: 'Vote',
+      sub: "These are other players' snapples. Vote for your favorite — "
+        + 'each vote gives that player a point.',
+    },
+  };
+
+  // Once per phase per ROUND, not once per game: five rounds in, the
+  // rules are known and it would just be a tap between every screen.
+  // Keyed rather than a boolean so re-entering a phase in the same
+  // round - a re-render, a reconnect - does not show it again.
+  const seenIntrosRef = useRef(new Set());
+  useEffect(() => {
+    const phase = game?.phase;
+    const intro = PHASE_INTRO[phase];
+    if (!intro) return;
+    // Round 1 only. The phases repeat every round and the copy would
+    // not change; after the first pass it is noise.
+    if ((game?.currentRound || 0) !== 1) return;
+    const key = `${game.currentRound}:${phase}`;
+    if (seenIntrosRef.current.has(key)) return;
+    seenIntrosRef.current.add(key);
+    setRoundAlert(intro);
+  }, [game?.phase, game?.currentRound]);
+
   const hidePhaseHelp = () => setRoundAlert(null);
   const showPhaseHelp = () => {
     const phase = game?.phase;
@@ -1343,11 +1379,6 @@ export default function GameScreen({ navigation }) {
 
   // Tutorial mode = practice game + tap-to-dismiss tip on each phase.
   // Same setup path as practice so bots + hand + prompts are identical.
-  const handleTutorial = async () => {
-    setIsTutorial(true);
-    await handlePractice();
-  };
-
   const handlePickCard = async (snapple) => {
     setSelectedCard(snapple);
     try {
@@ -1639,7 +1670,6 @@ export default function GameScreen({ navigation }) {
           setCurrentVoteIndex(0);
           setIsSpectating(false);
           setIsPractice(false);
-          setIsTutorial(false);
           setPlayedCardIds([]);
           setMulliganMode(false);
 
@@ -1765,13 +1795,6 @@ export default function GameScreen({ navigation }) {
               color="cyan"
               disabled={isLoading || allSnapples.length < 4}
             />
-            <VibeButton
-              label="How to Play (Tutorial)"
-              onPress={handleTutorial}
-              variant="toggle"
-              color="pink"
-              disabled={isLoading || allSnapples.length < 4}
-            />
           </View>
 
           {allSnapples.length < 4 && (
@@ -1877,7 +1900,6 @@ export default function GameScreen({ navigation }) {
           bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
-        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </>
     );
   }
@@ -1938,7 +1960,6 @@ export default function GameScreen({ navigation }) {
           bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
-        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </>
     );
   }
@@ -2337,7 +2358,6 @@ export default function GameScreen({ navigation }) {
           bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
-        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </LinearGradient>
     );
   }
@@ -2534,7 +2554,6 @@ export default function GameScreen({ navigation }) {
           bullets={roundAlert?.bullets}
           onDismiss={() => setRoundAlert(null)}
         />
-        <TutorialOverlay tip={tutorialTip} onDismiss={dismissTutorialTip} />
       </LinearGradient>
     );
   }

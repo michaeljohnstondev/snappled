@@ -331,6 +331,36 @@ export const snappleService = {
     }
   },
 
+  /**
+   * Snapples for the browse pool on the prompts screen.
+   *
+   * Shuffled, not ranked. getActiveSnapples sorts by votes, which is
+   * right for drawing a hand and wrong here: a fixed order means the
+   * same clips sit at the top every visit, and the pool stops being
+   * worth opening after the first look.
+   *
+   * Deliberately NOT paged yet. The whole library is small enough to
+   * arrive in one read, and the tiles are stored images of about 30KB,
+   * so a page boundary would cost more in complexity than it saves in
+   * bytes. When the library outgrows a single read, this is where the
+   * cursor goes - the callers only ever see a list.
+   */
+  async getPoolSnapples(limitCount = 200) {
+    const result = await this.getActiveSnapples(limitCount);
+    if (!result.success) return result;
+
+    // Fisher-Yates. Re-shuffled per call rather than seeded, because
+    // the point is that it looks different each time you come back.
+    const out = [...(result.snapples || [])];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return { success: true, snapples: out };
+  },
+
   async getTrendingSnapples(limitCount = 10) {
     try {
       // Simplified query to avoid composite index requirement
