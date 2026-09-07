@@ -399,7 +399,7 @@ function RoundResultsReveal({
 }
 
 // ── Main Game Screen ──
-export default function GameScreen({ navigation }) {
+export default function GameScreen({ navigation, route }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
@@ -484,6 +484,39 @@ export default function GameScreen({ navigation }) {
     const id = setTimeout(() => setShowRanked(true), 700);
     return () => clearTimeout(id);
   }, [game?.phase, game?.currentRound]);
+  // Joining from a game invite. fcmService routes a tapped invite to
+  // this screen with a gameId, which was previously dropped on the
+  // floor - the screen took no route prop at all, so the notification
+  // landed you in whatever game you already had, or none.
+  //
+  // Joins rather than just displaying: an invite is for a lobby you are
+  // not in yet. joinGame is idempotent for someone already in the
+  // players array, so a second tap is harmless.
+  const invitedGameId = route?.params?.gameId;
+  useEffect(() => {
+    if (!invitedGameId || !user?.uid) return;
+    if (gameId === invitedGameId) return;
+    let cancelled = false;
+    (async () => {
+      const res = await gameService.joinGame(
+        // Same fallback chain the other join paths use, so an invited
+        // player is not named differently from one who joined by code.
+        invitedGameId, user.uid,
+        user?.username || user?.email?.split('@')[0] || 'Player',
+      );
+      if (cancelled) return;
+      if (res?.success) {
+        setGameId(invitedGameId);
+      } else {
+        // Full, already started, or gone. Say so instead of silently
+        // leaving the tap looking broken.
+        showError?.("Can't join", res?.error || 'That game is no longer open.');
+      }
+      navigation.setParams?.({ gameId: undefined });
+    })();
+    return () => { cancelled = true; };
+  }, [invitedGameId, user?.uid]);
+
   const [previewCard, setPreviewCard] = useState(null);
   // Which voting card is playing inline (mini-player inside the
   // thumbnail). Token increments per tap so tapping the same card

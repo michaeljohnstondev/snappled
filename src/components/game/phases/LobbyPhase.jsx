@@ -3,12 +3,13 @@
 // join with. Wrapped in ScrollView so 8-player lobbies don't push the
 // Start button offscreen.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import VibeButton from '../../ui/VibeButton';
 import { gameService } from '../../../services/gameService';
+import { userService } from '../../../services/userService';
 import {
   PLAYER_PALETTE, buildPlayerColors, takenColorSlots,
 } from '../../../lib/playerColors';
@@ -32,6 +33,34 @@ export default function LobbyPhase({
   const { theme: t } = useTheme();
   const colors = buildPlayerColors(game.players);
   const me = (game.players || []).find(p => p.uid === userId);
+
+  // People you follow, for inviting. Loaded lazily on first open: most
+  // lobbies never invite anyone, and this is two reads.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [candidates, setCandidates] = useState([]);
+  const [invited, setInvited] = useState({});
+
+  const openInvites = async () => {
+    setInviteOpen(true);
+    if (candidates.length > 0 || !userId) return;
+    const data = await userService.getFollowData(userId);
+    const ids = (data?.following || [])
+      // Anyone already here does not need inviting.
+      .filter(id => !(game.players || []).some(p => p.uid === id));
+    const people = await Promise.all(
+      ids.slice(0, 25).map(id => userService.getUserData(id).catch(() => null)),
+    );
+    setCandidates(people.filter(Boolean));
+  };
+
+  const invite = async (target) => {
+    setInvited(prev => ({ ...prev, [target.id || target.uid]: 'sending' }));
+    const res = await gameService.inviteToGame(gameId, target.id || target.uid);
+    setInvited(prev => ({
+      ...prev,
+      [target.id || target.uid]: res?.sent ? 'sent' : (res?.reason || 'failed'),
+    }));
+  };
   const styles = useThemedStyles(makeStyles);
   const totalRounds = game?.totalRounds ?? 5;
   const roundLimit = game?.roundLimit ?? 0;
@@ -98,6 +127,42 @@ export default function LobbyPhase({
                   ]}
                   hitSlop={4}
                 />
+              );
+            })}
+          </View>
+        )}
+
+        {/* Invites. Anyone in the lobby can send one, not just the
+            host: the person who knows the missing player is not
+            necessarily the one who made the game. */}
+        <Pressable style={styles.inviteToggle} onPress={openInvites}>
+          <Ionicons name="person-add" size={16} color={theme.colors.vibeBlue} />
+          <Text style={styles.inviteToggleText}>Invite people you follow</Text>
+        </Pressable>
+
+        {inviteOpen && (
+          <View style={styles.inviteList}>
+            {candidates.length === 0 ? (
+              <Text style={styles.inviteEmpty}>
+                {'Nobody to invite yet — follow some players first.'}
+              </Text>
+            ) : candidates.map((c) => {
+              const id = c.id || c.uid;
+              const state = invited[id];
+              return (
+                <Pressable
+                  key={id}
+                  style={styles.inviteRow}
+                  disabled={!!state}
+                  onPress={() => invite(c)}
+                >
+                  <Text style={styles.inviteName}>{c.username || 'player'}</Text>
+                  <Text style={styles.inviteState}>
+                    {state === 'sent' ? 'Invited'
+                      : state === 'sending' ? '...'
+                        : state ? state : 'Invite'}
+                  </Text>
+                </Pressable>
               );
             })}
           </View>
@@ -249,6 +314,39 @@ const makeStyles = (t) => ({
     maxWidth: 280,
   },
   playerList: { width: '100%', gap: 12, marginTop: 16 },
+  inviteToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 18,
+  },
+  inviteToggleText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  inviteList: {
+    marginTop: 10,
+    gap: 6,
+  },
+  inviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  inviteName: { color: t.colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  inviteState: { color: theme.colors.vibeBlue, fontSize: 13, fontWeight: '800' },
+  inviteEmpty: {
+    color: t.colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 10,
+  },
   colorRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

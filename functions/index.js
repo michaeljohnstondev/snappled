@@ -945,6 +945,71 @@ async function resolveUsername(uid) {
 // doc. Handles both regular new-follower and mutual-follow flavors —
 // mutual is when the newly-added follower is ALREADY in this user's
 // following list (i.e. they follow each other now).
+/**
+ * Invite someone to a game lobby.
+ *
+ * Callable rather than a Firestore trigger: the sender wants to know
+ * whether it landed - the lobby is full, they already joined, the game
+ * started - and a trigger can only fail silently.
+ *
+ * deliverNotification does the blocked / muted / per-type-toggle checks
+ * and writes the in-app copy, so this only has to decide whether the
+ * invite makes sense at all.
+ */
+exports.sendGameInvite = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+  const inviterId = context.auth.uid;
+  const { gameId, targetUserId } = data || {};
+  if (!gameId || !targetUserId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing gameId or targetUserId');
+  }
+
+  const gameSnap = await db.collection('games').doc(gameId).get();
+  if (!gameSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'That game is gone');
+  }
+  const game = gameSnap.data();
+
+  // Only from the lobby. An invite to a round already in progress
+  // arrives as a link to somewhere the recipient cannot join, which is
+  // worse than no invite.
+  if (game.phase !== 'lobby') {
+    return { sent: false, reason: 'in-progress' };
+  }
+  const players = game.players || [];
+  if (!players.some(p => p.uid === inviterId)) {
+    throw new functions.https.HttpsError('permission-denied', 'Not in that game');
+  }
+  if (players.some(p => p.uid === targetUserId)) {
+    return { sent: false, reason: 'already-in' };
+  }
+  if (players.length >= 8) {
+    return { sent: false, reason: 'full' };
+  }
+
+  const inviterName = await resolveUsername(inviterId);
+  const result = await deliverNotification({
+    targetUserId,
+    actorUserId: inviterId,
+    settingsKey: 'gameInvite',
+    type: 'game_invite',
+    title: `@${inviterName} wants to play`,
+    // joinCode, not code - the game doc stores it under joinCode and
+    // reading the wrong field would have shipped "code undefined".
+    body: game.joinCode
+      ? `Join their game — code ${game.joinCode}`
+      : 'Tap to join their game',
+    // gameId is what fcmService routes on; the code is the fallback for
+    // anyone who opens the app the long way round.
+    data: { gameId, code: game.joinCode || '' },
+    priority: 'high',
+  });
+
+  return { sent: result.sent !== false, reason: result.reason || null };
+});
+
 exports.onFollowerAdded = functions.firestore
   .document('users/{userId}')
   .onUpdate(async (change, context) => {

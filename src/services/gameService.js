@@ -493,6 +493,30 @@ export const gameService = {
     }
   },
 
+  /**
+   * Invite a player to this lobby.
+   *
+   * Goes through a callable rather than writing a notification
+   * directly: the checks that matter - is the lobby still open, is it
+   * full, are you even in it - have to be made against server state,
+   * and the notification write itself is owned by Cloud Functions.
+   */
+  async inviteToGame(gameId, targetUserId) {
+    try {
+      // Dynamic import, matching snappleService.purchaseSnapple - the
+      // functions SDK is only pulled in when something actually calls
+      // one, rather than on every game screen mount.
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('./firebase');
+      const fn = httpsCallable(functions, 'sendGameInvite');
+      const res = await fn({ gameId, targetUserId });
+      return { success: true, ...(res?.data || {}) };
+    } catch (error) {
+      console.error('[GameService] inviteToGame error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // Start the game (host only)
   async startGame(gameId, hostId, prompts) {
     try {
