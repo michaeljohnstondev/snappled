@@ -550,16 +550,21 @@ export default function GameScreen({ navigation, route }) {
   // Deliberately a single sentence: this replaces a tutorial mode, and
   // anything longer becomes something to dismiss rather than read.
   const PHASE_INTRO = {
+    // Picking and voting are named as phases because they repeat every
+    // round. Warmup is not one of them: nextRound goes straight to
+    // PICKING, so warmup happens once at the start of a game and never
+    // again. Calling it a phase alongside the other two would imply a
+    // cycle it is not part of.
     [GAME_PHASES.REVIEW]: {
       title: 'Warmup',
       sub: "These are your snapples. Tap them to see what you're working with.",
     },
     [GAME_PHASES.PICKING]: {
-      title: 'Pick',
+      title: 'Picking phase',
       sub: 'Select a snapple from your hand that best fits the prompt.',
     },
     [GAME_PHASES.VOTING]: {
-      title: 'Vote',
+      title: 'Voting phase',
       sub: "These are other players' snapples. Vote for your favorite — "
         + 'each vote gives that player a point.',
     },
