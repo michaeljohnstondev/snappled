@@ -149,8 +149,21 @@ export function AuthProvider({ children }) {
                     if (s.promptId) uniquePrompts.add(s.promptId);
                   });
                 } catch (e) {}
+                // Follow counts for the social achievements. Read
+                // straight off the user doc rather than counted - the
+                // arrays ARE the source of truth, and mutuals is the
+                // intersection, which is the only one needing work.
+                const social = userData.social || {};
+                const followers = social.followers || [];
+                const following = social.following || [];
+                const followerSet = new Set(followers);
+                const mutualCount = following.filter(id => followerSet.has(id)).length;
+
                 const stats = {
                   ...savedStats,
+                  followerCount: followers.length,
+                  followingCount: following.length,
+                  mutualCount,
                   totalLikesReceived: totalLikes,
                   maxLikesOnOne,
                   uniquePromptsUsed: uniquePrompts.size,

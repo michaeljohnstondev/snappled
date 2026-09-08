@@ -12,7 +12,19 @@
 let toastFn = null;
 let navigationFn = null;
 
-export const notificationDisplayService = {
+export // Push type -> toast style. Deliberately explicit: these are two
+// different vocabularies and the overlap is coincidental, so a new
+// notification type should have to choose a style rather than inherit
+// whatever the fallback happens to be.
+const TOAST_TYPE_FOR = {
+  new_follower: 'info',
+  mutual_follow: 'info',
+  followed_user_snapple: 'info',
+  game_invite: 'info',
+  new_prompt_digest: 'info',
+};
+
+const notificationDisplayService = {
   // setToast — called ONCE from a bridge component that lives inside
   // ModalContext. Wires the toast callback so foreground FCM messages
   // can render as banners.
@@ -43,8 +55,13 @@ export const notificationDisplayService = {
     // handler. Foreground toast is informational only; users can
     // still tap the OS-tray notification when the app is
     // backgrounded/quit and hit the same navigation path.
-    const type = remoteMessage?.data?.type || 'info';
-    toastFn(type, title, body);
+    // The push's `type` is a NAVIGATION key - game_invite,
+    // new_follower - not a toast style. Passing it straight through
+    // meant RewardToast never recognised it and fell back to reward, so
+    // every push arrived labelled "REWARD!". Mapped explicitly, and
+    // anything unmapped lands on info rather than inventing a mood.
+    const toastType = TOAST_TYPE_FOR[remoteMessage?.data?.type] || 'info';
+    toastFn(toastType, title, body);
     return true;
   },
 };

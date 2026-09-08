@@ -2,8 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Constants from 'expo-constants';
-import * as Updates from 'expo-updates';
 import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
 import UpdateBanner from '../UpdateBanner';
@@ -12,10 +10,12 @@ import { useAppUpdate } from '../../../hooks/useAppUpdate';
 import theme from '../../../theme/themes';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
-const APP_VERSION = Constants.expoConfig?.version || '?';
-const UPDATE_TAG = Updates.updateId
-  ? Updates.updateId.slice(0, 8)
-  : 'embed';
+// The version tag is gone from the chrome. It existed to answer "is
+// this device actually on the update I just shipped", which mattered
+// while OTAs were being pushed constantly and a stale bundle was the
+// first suspect for any bug report. It stopped earning its corner of
+// every screen. useAppUpdate still drives UpdateBanner; only the
+// readout and its two imports went.
 
 /**
  * Wraps a screen with:
@@ -61,10 +61,6 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
         <View style={styles.content}>{children}</View>
       </SafeAreaView>
 
-      <Text style={styles.versionTag} pointerEvents="none">
-        v{APP_VERSION} · {UPDATE_TAG}
-      </Text>
-
       <UpdateBanner visible={isUpdateReady} onRestart={applyUpdate} />
 
       <UploadProgressToast />
@@ -76,17 +72,4 @@ const makeStyles = (t) => ({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   content: { flex: 1 },
-  versionTag: {
-    position: 'absolute',
-    top: 6,
-    left: 10,
-    color: '#00C6FF',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    fontWeight: 'bold',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
 });

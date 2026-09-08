@@ -24,6 +24,11 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 // meaningfully.
 const PROMPTS_INTRO_KEY = 'promptsIntroSeen:v1';
 
+// How many snapples the pool draws. Twelve is four rows of three -
+// enough to show the place is alive without turning a screen about
+// prompts into a gallery.
+const POOL_SHOWN = 12;
+
 export default function PromptsScreen({ navigation }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -96,6 +101,12 @@ export default function PromptsScreen({ navigation }) {
   const [pool, setPool] = useState([]);
   const [poolIndex, setPoolIndex] = useState(0);
   const [poolOpen, setPoolOpen] = useState(false);
+
+  // Only the newest handful are drawn. The full list still feeds the
+  // per-prompt counts below - a grid of everything turned the prompts
+  // screen into a gallery, and the point of the pool is to show that
+  // snapples exist, not to be the destination.
+  const poolShown = useMemo(() => pool.slice(0, POOL_SHOWN), [pool]);
 
   // promptId -> how many snapples answer it, derived from the pool
   // rather than queried. The pool is every public snapple and each one
@@ -471,11 +482,11 @@ export default function PromptsScreen({ navigation }) {
               distribution entirely.
               Cheap to show: these are the stored ~30KB tiles, so the
               grid costs almost nothing until someone taps play. */}
-          {pool.length > 0 && (
+          {poolShown.length > 0 && (
             <View style={styles.poolSection}>
               <Text style={styles.poolLabel}>SNAPPLE POOL</Text>
               <View style={styles.poolGrid}>
-                {pool.map((snap, i) => (
+                {poolShown.map((snap, i) => (
                   <Pressable
                     key={snap.id}
                     style={styles.poolCell}
@@ -490,10 +501,11 @@ export default function PromptsScreen({ navigation }) {
                   </Pressable>
                 ))}
               </View>
-              {/* Says so rather than looping. An endless scroll over a
-                  small library just shows the same clips again, which
-                  reads as broken; an end that admits it does not. */}
-              <Text style={styles.poolEnd}>{"that's all of them — for now"}</Text>
+              <Text style={styles.poolEnd}>
+                {pool.length > POOL_SHOWN
+                  ? `newest ${POOL_SHOWN} of ${pool.length}`
+                  : 'newest snapples'}
+              </Text>
             </View>
           )}
         </ScrollView>

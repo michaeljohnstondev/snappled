@@ -44,8 +44,19 @@ export default function AchievementsScreen({ navigation }) {
       });
     } catch (e) {}
 
+    // Same social counts AuthContext builds. Both call sites have to
+    // supply them or an achievement would unlock on one screen and stay
+    // locked on the other.
+    const social = userData.social || {};
+    const followers = social.followers || [];
+    const following = social.following || [];
+    const followerSet = new Set(followers);
+
     const stats = {
       ...savedStats,
+      followerCount: followers.length,
+      followingCount: following.length,
+      mutualCount: following.filter(id => followerSet.has(id)).length,
       totalLikesReceived: totalLikes,
       maxLikesOnOne,
       uniquePromptsUsed: uniquePrompts.size,

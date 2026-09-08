@@ -9,6 +9,7 @@ const GROUPS = [
   { key: 'sales', label: 'Sales' },
   { key: 'levels', label: 'Levels' },
   { key: 'trophies', label: 'Trophies' },
+  { key: 'social', label: 'Social' },
 ];
 
 const ACHIEVEMENTS = [
@@ -67,6 +68,20 @@ const ACHIEVEMENTS = [
   { id: 'trophies_100', group: 'trophies', name: 'Gold', desc: 'Earn 100 trophies', icon: '🥇', coins: 750, xp: 400 },
   { id: 'trophies_250', group: 'trophies', name: 'Platinum', desc: 'Earn 250 trophies', icon: '💠', coins: 1500, xp: 750 },
   { id: 'trophies_500', group: 'trophies', name: 'Diamond', desc: 'Earn 500 trophies', icon: '💎', coins: 3000, xp: 1500 },
+
+  // Social. Both sides of a follow are worth marking, and they are not
+  // the same thing: being followed is other people rating you, while
+  // following is you building the feed that makes the app worth
+  // opening. The following tiers stay small on purpose - it should not
+  // pay to follow everyone.
+  { id: 'followers_1', group: 'social', name: 'Noticed', desc: 'Get your first follower', icon: '👀', coins: 50, xp: 25 },
+  { id: 'followers_10', group: 'social', name: 'Circle', desc: 'Reach 10 followers', icon: '🫂', coins: 150, xp: 75 },
+  { id: 'followers_50', group: 'social', name: 'Crowd', desc: 'Reach 50 followers', icon: '📣', coins: 400, xp: 200 },
+  { id: 'followers_100', group: 'social', name: 'Draw', desc: 'Reach 100 followers', icon: '🎪', coins: 800, xp: 400 },
+  { id: 'followers_500', group: 'social', name: 'Household Name', desc: 'Reach 500 followers', icon: '🌍', coins: 2500, xp: 1200, trophies: 25 },
+  { id: 'following_5', group: 'social', name: 'Curious', desc: 'Follow 5 people', icon: '🔭', coins: 50, xp: 25 },
+  { id: 'following_25', group: 'social', name: 'Regular', desc: 'Follow 25 people', icon: '🧭', coins: 150, xp: 75 },
+  { id: 'mutual_10', group: 'social', name: 'Mutuals', desc: 'Have 10 people you follow follow you back', icon: '🤝', coins: 300, xp: 150 },
 ];
 
 export const achievementService = {
@@ -153,6 +168,16 @@ export const achievementService = {
           case 'level_50': earned = (stats.level || 1) >= 50; break;
           case 'level_75': earned = (stats.level || 1) >= 75; break;
           case 'level_100': earned = (stats.level || 1) >= 100; break;
+
+          // Social
+          case 'followers_1': earned = (stats.followerCount || 0) >= 1; break;
+          case 'followers_10': earned = (stats.followerCount || 0) >= 10; break;
+          case 'followers_50': earned = (stats.followerCount || 0) >= 50; break;
+          case 'followers_100': earned = (stats.followerCount || 0) >= 100; break;
+          case 'followers_500': earned = (stats.followerCount || 0) >= 500; break;
+          case 'following_5': earned = (stats.followingCount || 0) >= 5; break;
+          case 'following_25': earned = (stats.followingCount || 0) >= 25; break;
+          case 'mutual_10': earned = (stats.mutualCount || 0) >= 10; break;
 
           // Trophy ranks
           case 'trophies_25': earned = (stats.trophies || 0) >= 25; break;

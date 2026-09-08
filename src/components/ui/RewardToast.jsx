@@ -26,7 +26,11 @@ export default function RewardToast({ visible, type = 'reward', title, subtitle,
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
-  const config = TOAST_TYPES[type] || TOAST_TYPES.reward;
+  // Unknown types fall back to a NEUTRAL type, not to reward. Falling
+  // back to reward meant anything unrecognised arrived as a gift icon
+  // reading "REWARD!" - a game invite, a new follower, a warning. The
+  // fallback should say nothing rather than say something wrong.
+  const config = TOAST_TYPES[type] || TOAST_TYPES.info;
 
   useEffect(() => {
     if (visible) {

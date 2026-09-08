@@ -334,30 +334,24 @@ export const snappleService = {
   /**
    * Snapples for the browse pool on the prompts screen.
    *
-   * Shuffled, not ranked. getActiveSnapples sorts by votes, which is
-   * right for drawing a hand and wrong here: a fixed order means the
-   * same clips sit at the top every visit, and the pool stops being
-   * worth opening after the first look.
+   * Returns EVERY public snapple, newest first. The caller shows only a
+   * handful, but it also counts answers per prompt off this list, and
+   * limiting here would silently undercount every prompt on the screen.
    *
-   * Deliberately NOT paged yet. The whole library is small enough to
-   * arrive in one read, and the tiles are stored images of about 30KB,
-   * so a page boundary would cost more in complexity than it saves in
-   * bytes. When the library outgrows a single read, this is where the
-   * cursor goes - the callers only ever see a list.
+   * Newest first rather than by votes: getActiveSnapples ranks by
+   * totalVotes, which is right for drawing a hand and wrong for a
+   * browse pool, where the same clips would sit at the top forever.
+   * Recency at least changes.
    */
-  async getPoolSnapples(limitCount = 200) {
+  async getPoolSnapples(limitCount = 500) {
     const result = await this.getActiveSnapples(limitCount);
     if (!result.success) return result;
 
-    // Fisher-Yates. Re-shuffled per call rather than seeded, because
-    // the point is that it looks different each time you come back.
-    const out = [...(result.snapples || [])];
-    for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = out[i];
-      out[i] = out[j];
-      out[j] = tmp;
-    }
+    const out = [...(result.snapples || [])].sort((a, b) => {
+      const at = a.createdAt?.seconds || a.createdAt?._seconds || 0;
+      const bt = b.createdAt?.seconds || b.createdAt?._seconds || 0;
+      return bt - at;
+    });
     return { success: true, snapples: out };
   },
 
