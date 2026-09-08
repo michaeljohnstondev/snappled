@@ -202,6 +202,20 @@ export default function PickingPhase({
   }
 
   // Pre-pick screen — chips, prompt, hand grid, YOUR CARD, submit bar.
+  // Swipe between hand cards inside the fullscreen player, the same as
+  // the voting and results players. Opening a card used to be a dead
+  // end: one clip, then close and tap the next, which is a poor way to
+  // look through a hand you are choosing from.
+  const previewAt = previewCard
+    ? hand.findIndex(c => (c.id || c.snappleId) === (previewCard.id || previewCard.snappleId))
+    : -1;
+  const stepPreview = (d) => {
+    const next = hand[previewAt + d];
+    // Carries the flags the caller set, so a preview opened from the
+    // waiting screen stays a waiting preview as you move through it.
+    if (next) onPreviewCard({ ...next, _isWaiting: previewCard?._isWaiting });
+  };
+
   return (
     <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
@@ -307,6 +321,9 @@ export default function PickingPhase({
           videoUrl={previewCard.videoUrl}
           muted={!!previewCard.muted}
           onClose={onClosePreview}
+          onNext={previewAt >= 0 && previewAt < hand.length - 1
+            ? () => stepPreview(1) : undefined}
+          onPrev={previewAt > 0 ? () => stepPreview(-1) : undefined}
           primaryLabel={previewCard._isWaiting ? null : 'PLAY THIS SNAPPLE'}
           onPrimary={() => onPickCard(previewCard)}
           topRightSlot={

@@ -2325,9 +2325,16 @@ export default function GameScreen({ navigation, route }) {
                     grid. No counts here for the same reason as the grid
                     picker: seeing the room's opinion before you vote
                     would lead the vote. */}
+                {/* Collapsible, so the rail is one column of six
+                    controls rather than four buttons followed by a
+                    ten-high stack of emoji. The set grew from four to
+                    ten and a vertical row of them ran most of the
+                    height of the screen - it stopped reading as one
+                    overlay and started reading as a wall. The toggle
+                    opens the same floating picker the grids use. */}
                 <ReactionBar
                   mode="picker"
-                  vertical
+                  collapsible
                   mine={mineFor(game.reactions, previewCard.uid, user?.uid)}
                   onReact={(key) => handleReact(previewCard.uid, key)}
                   disabled={reactionCooling}
@@ -2546,12 +2553,25 @@ export default function GameScreen({ navigation, route }) {
             the scoring expand chip actually opens a full player with
             the follow/save/buy/report rail. `_isVoting: true` reuses
             the voting flow but with the CTA hidden (voting closed). */}
-        {previewCard && previewCard._isVoting && (
+        {previewCard && previewCard._isVoting && (() => {
+          // Same swipe-through as the voting player. Opening a card
+          // here used to be a dead end - one clip, then close and tap
+          // the next - when the whole point of results is watching all
+          // of them back.
+          const list = rankedSubmissions || game.submissions || [];
+          const at = list.findIndex(x => x.uid === previewCard.uid);
+          const step = (d) => {
+            const next = list[at + d];
+            if (next) setPreviewCard({ ...next, videoUrl: next.videoUrl, _isVoting: true });
+          };
+          return (
           <PreviewModal
             visible
             videoUrl={previewCard.videoUrl}
             muted={!!previewCard.muted}
             onClose={() => setPreviewCard(null)}
+            onNext={at >= 0 && at < list.length - 1 ? () => step(1) : undefined}
+            onPrev={at > 0 ? () => step(-1) : undefined}
             primaryLabel={null}
             topRightSlot={
               isAdmin && previewCard.snappleId ? (
@@ -2579,7 +2599,8 @@ export default function GameScreen({ navigation, route }) {
               />
             }
           />
-        )}
+          );
+        })()}
         <RoundStartOverlay
           visible={!!roundAlert}
           title={roundAlert?.title}
