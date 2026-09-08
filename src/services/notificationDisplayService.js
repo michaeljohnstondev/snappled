@@ -12,7 +12,7 @@
 let toastFn = null;
 let navigationFn = null;
 
-export // Push type -> toast style. Deliberately explicit: these are two
+// Push type -> toast style. Deliberately explicit: these are two
 // different vocabularies and the overlap is coincidental, so a new
 // notification type should have to choose a style rather than inherit
 // whatever the fallback happens to be.
@@ -24,7 +24,7 @@ const TOAST_TYPE_FOR = {
   new_prompt_digest: 'info',
 };
 
-const notificationDisplayService = {
+export const notificationDisplayService = {
   // setToast — called ONCE from a bridge component that lives inside
   // ModalContext. Wires the toast callback so foreground FCM messages
   // can render as banners.
