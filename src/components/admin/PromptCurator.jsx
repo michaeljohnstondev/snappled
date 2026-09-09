@@ -11,15 +11,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Modal, TextInput,
-  ActivityIndicator, Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, runOnJS,
-} from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import VibeButton from '../ui/VibeButton';
+import SwipeCard from '../ui/SwipeCard';
 import {
   listAllPrompts,
   updatePromptText,
@@ -28,9 +25,6 @@ import {
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
-const { width: screenWidth } = Dimensions.get('window');
-const SWIPE_THRESHOLD = screenWidth * 0.3;
-const SWIPE_OFF_SCREEN = screenWidth * 1.2;
 
 // Toggle between the two collections the curator supports. Mirror the
 // UI tab strip styling so it doesn't feel out of place.
@@ -96,77 +90,6 @@ function EditPromptModal({ visible, initialText, onCancel, onSave }) {
         </View>
       </View>
     </Modal>
-  );
-}
-
-// The swipeable card. translateX driven by pan; release decides
-// whether to fire delete / keep based on threshold. Tap delegated to
-// parent via onTap so the edit modal lives one level up.
-function SwipeCard({ prompt, onSwipeLeft, onSwipeRight, onTap }) {
-  const { theme: t } = useTheme();
-  const styles = useThemedStyles(makeStyles);
-  const tx = useSharedValue(0);
-
-  // Reanimated 4 dropped useAnimatedGestureHandler — use the new
-  // gesture-handler API. Gesture.Pan() runs on the UI thread; the
-  // shared value updates each frame, and the end callback animates the
-  // card off-screen + fires the JS-side handler via runOnJS.
-  const gesture = Gesture.Pan()
-    .onChange((e) => {
-      tx.value = e.translationX;
-    })
-    .onEnd(() => {
-      if (tx.value < -SWIPE_THRESHOLD) {
-        tx.value = withTiming(-SWIPE_OFF_SCREEN, { duration: 200 }, (done) => {
-          if (done) runOnJS(onSwipeLeft)();
-        });
-      } else if (tx.value > SWIPE_THRESHOLD) {
-        tx.value = withTiming(SWIPE_OFF_SCREEN, { duration: 200 }, (done) => {
-          if (done) runOnJS(onSwipeRight)();
-        });
-      } else {
-        tx.value = withSpring(0);
-      }
-    });
-
-  // Card tilts as it swipes — purely visual feedback. ~15deg at the
-  // threshold, capped at 25deg if user keeps dragging.
-  const cardStyle = useAnimatedStyle(() => {
-    const rotate = (tx.value / screenWidth) * 25;
-    return {
-      transform: [
-        { translateX: tx.value },
-        { rotate: `${Math.max(-25, Math.min(25, rotate))}deg` },
-      ],
-    };
-  });
-
-  // Action badges fade in based on swipe direction so the admin sees
-  // what's about to happen before they release.
-  const deleteBadgeStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.max(0, -tx.value / SWIPE_THRESHOLD)),
-  }));
-  const keepBadgeStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.max(0, tx.value / SWIPE_THRESHOLD)),
-  }));
-
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={[styles.card, cardStyle]}>
-        <Animated.View style={[styles.badgeDelete, deleteBadgeStyle]}>
-          <Text style={styles.badgeDeleteText}>DELETE</Text>
-        </Animated.View>
-        <Animated.View style={[styles.badgeKeep, keepBadgeStyle]}>
-          <Text style={styles.badgeKeepText}>KEEP</Text>
-        </Animated.View>
-
-        <Pressable style={styles.cardInner} onPress={onTap}>
-          <Text style={styles.cardCategory}>{prompt.category || 'general'}</Text>
-          <Text style={styles.cardText}>{prompt.text}</Text>
-          <Text style={styles.cardHint}>tap to edit · swipe left to delete · swipe right to keep</Text>
-        </Pressable>
-      </Animated.View>
-    </GestureDetector>
   );
 }
 
@@ -279,11 +202,18 @@ export default function PromptCurator() {
           // card's translateX/rotation).
           <SwipeCard
             key={current.id}
-            prompt={current}
             onSwipeLeft={handleSwipeLeft}
             onSwipeRight={handleSwipeRight}
             onTap={() => setEditing(current)}
-          />
+            leftLabel="DELETE"
+            rightLabel="KEEP"
+          >
+            <Text style={styles.cardCategory}>{current.category || 'general'}</Text>
+            <Text style={styles.cardText}>{current.text}</Text>
+            <Text style={styles.cardHint}>
+              {'tap to edit · swipe left to delete · swipe right to keep'}
+            </Text>
+          </SwipeCard>
         )}
       </View>
 
@@ -328,24 +258,6 @@ const makeStyles = (t) => ({
   },
   errorText: { color: theme.colors.vibeRed, textAlign: 'center' },
 
-  card: {
-    width: screenWidth - 32,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 18,
-    borderWidth: 3,
-    borderColor: theme.colors.vibeBlue,
-    padding: 24,
-    minHeight: 320,
-  },
-  cardInner: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  cardCategory: {
-    color: theme.colors.vibeBlue,
-    fontSize: 11,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 16,
-  },
   cardText: {
     color: t.colors.textPrimary,
     fontSize: 22,
@@ -362,37 +274,6 @@ const makeStyles = (t) => ({
     bottom: 0,
   },
 
-  // Action badges sit at the top corners and fade in as the card is
-  // pulled toward their side. Borrows the rotated-stamp look from
-  // typical Tinder clones.
-  badgeDelete: {
-    position: 'absolute',
-    top: 18, right: 18,
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderColor: theme.colors.vibeRed,
-    transform: [{ rotate: '12deg' }],
-    zIndex: 2,
-  },
-  badgeDeleteText: {
-    color: theme.colors.vibeRed,
-    fontSize: 16, fontWeight: 'bold', letterSpacing: 1,
-  },
-  badgeKeep: {
-    position: 'absolute',
-    top: 18, left: 18,
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderColor: theme.colors.vibeGreen,
-    transform: [{ rotate: '-12deg' }],
-    zIndex: 2,
-  },
-  badgeKeepText: {
-    color: theme.colors.vibeGreen,
-    fontSize: 16, fontWeight: 'bold', letterSpacing: 1,
-  },
 
   donePane: { alignItems: 'center', gap: 12 },
   doneTitle: { color: t.colors.textPrimary, fontSize: 22, fontWeight: 'bold' },

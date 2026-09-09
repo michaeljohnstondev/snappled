@@ -106,13 +106,7 @@
         }
       ],
       "@react-native-firebase/app",
-      [
-        "@react-native-firebase/messaging",
-        {
-          "android_notification_icon": "./assets/images/notification-icon.png",
-          "android_notification_color": "#00C6FF"
-        }
-      ],
+      "@react-native-firebase/messaging",
       "expo-secure-store",
       "expo-audio",
       "expo-sharing",
@@ -142,6 +136,10 @@
     },
     "updates": {
       "url": "https://u.expo.dev/a9e37a08-f738-46fc-b005-13392ce18692"
+    },
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#00C6FF"
     }
   }
 }

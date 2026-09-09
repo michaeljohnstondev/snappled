@@ -10,6 +10,7 @@ import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { useAuth } from '../store/AuthContext';
 import { promptService } from '../services/promptService';
+import { promptVoteService } from '../services/promptVoteService';
 import { promptRotationService } from '../services/promptRotationService';
 import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
@@ -179,7 +180,13 @@ export default function HomeScreen({ navigation, route }) {
 
   const handlePromptLike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.likePrompt(promptId, user.uid, 'activePrompts');
+    // Was promptService.likePrompt, which read the doc and then pushed
+    // the uid into a `likes[]` array on it. That array is capped by
+    // Firestore's 1 MiB document limit at roughly 31,000 voters, the
+    // read-then-write could lose a concurrent vote, and every voter on a
+    // prompt wrote to the SAME document - about 1 write/second before
+    // contention. A vote is now its own doc and a trigger owns the count.
+    const result = await promptVoteService.vote(promptId, user.uid, 1, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -205,7 +212,7 @@ export default function HomeScreen({ navigation, route }) {
 
   const handlePromptDislike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.dislikePrompt(promptId, user.uid, 'activePrompts');
+    const result = await promptVoteService.vote(promptId, user.uid, -1, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {

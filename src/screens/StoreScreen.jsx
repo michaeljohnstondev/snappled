@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import CurrencyIcon from '../components/ui/CurrencyIcon';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
@@ -12,23 +13,36 @@ import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 const BOOST_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
+// ids are the store product ids from src/lib/products.js. They were
+// local strings matching nothing; Apple will not let a product id be
+// renamed once created, so they are settled before anything is made.
 const COIN_PACKS = [
-  { id: 'coins_100', coins: 100, price: '$0.99', tag: null },
-  { id: 'coins_500', coins: 500, price: '$3.99', tag: null },
-  { id: 'coins_1000', coins: 1000, price: '$6.99', tag: 'Popular' },
-  { id: 'coins_5000', coins: 5000, price: '$29.99', tag: 'Best Value' },
+  { id: 'snappled_coins_100', coins: 100, price: '$0.99', tag: null },
+  { id: 'snappled_coins_500', coins: 500, price: '$3.99', tag: null },
+  { id: 'snappled_coins_1000', coins: 1000, price: '$6.99', tag: 'Popular' },
+  { id: 'snappled_coins_5000', coins: 5000, price: '$29.99', tag: 'Best Value' },
 ];
 
 const TICKET_PACKS = [
-  { id: 'tickets_5', tickets: 5, price: '$1.99', tag: null },
-  { id: 'tickets_10', tickets: 10, price: '$2.99', tag: null },
-  { id: 'tickets_25', tickets: 25, price: '$5.99', tag: 'Best Value' },
+  { id: 'snappled_tickets_5', tickets: 5, price: '$1.99', tag: null },
+  { id: 'snappled_tickets_10', tickets: 10, price: '$2.99', tag: null },
+  { id: 'snappled_tickets_25', tickets: 25, price: '$5.99', tag: 'Best Value' },
 ];
 
 const BUNDLES = [
-  { id: 'starter', name: 'Starter Pack', coins: 500, tickets: 10, price: '$4.99', tag: 'Save 25%', gradient: ['#00C6FF', '#0072FF'] },
-  { id: 'creator', name: 'Creator Pack', coins: 2000, tickets: 25, price: '$14.99', tag: 'Save 30%', gradient: ['#FFD700', '#FF8C00'] },
-  { id: 'whale', name: 'Mega Pack', coins: 10000, tickets: 50, price: '$49.99', tag: 'Save 40%', gradient: ['#6B00CC', '#FF00FF'] },
+  // Impulse tier. Priced under the psychological two-dollar line and
+  // sized so it is a taste rather than a substitute for the Starter -
+  // 100 coins buys two snapples, not a habit.
+  //
+  // Its per-dollar value is deliberately the best on the board: bought
+  // separately this is $2.98 ($0.99 + $1.99), so $1.99 is a third off,
+  // against 25-30% higher up. That inverts the usual "bigger is better
+  // value" ladder on purpose, because the hard step is the FIRST
+  // purchase, not the third.
+  { id: 'snappled_bundle_taster', name: 'Taster Pack', coins: 100, tickets: 5, price: '$1.99', tag: 'Save 33%', gradient: ['#00FF41', '#00C6FF'] },
+  { id: 'snappled_bundle_starter', name: 'Starter Pack', coins: 500, tickets: 10, price: '$4.99', tag: 'Save 25%', gradient: ['#00C6FF', '#0072FF'] },
+  { id: 'snappled_bundle_creator', name: 'Creator Pack', coins: 2000, tickets: 25, price: '$14.99', tag: 'Save 30%', gradient: ['#FFD700', '#FF8C00'] },
+  { id: 'snappled_bundle_mega', name: 'Mega Pack', coins: 10000, tickets: 50, price: '$49.99', tag: 'Save 40%', gradient: ['#6B00CC', '#FF00FF'] },
 ];
 
 const BOOSTS = [
@@ -64,7 +78,19 @@ export default function StoreScreen({ navigation }) {
   const handleCoinPurchase = (item) => {
     const balance = userCurrency.coins || 0;
     if (balance < item.coinPrice) {
-      showAlert('Not Enough Coins', `You need ${item.coinPrice.toLocaleString()} coins but only have ${balance.toLocaleString()}.`);
+      // Offers the way out rather than just naming the problem. This
+      // told you that you were short and then dropped you back on the
+      // same screen with nothing to press - in a store, of all places,
+      // where the fix is two taps away.
+      showAlert(
+        'Not Enough Coins',
+        `You need ${item.coinPrice.toLocaleString()} coins and have `
+        + `${balance.toLocaleString()}.`,
+        [
+          { text: 'Get Coins', onPress: () => setActiveSection('coins') },
+          { text: 'Not now' },
+        ],
+      );
       return;
     }
     showConfirm('Confirm Purchase', `Buy ${item.name} for ${item.coinPrice.toLocaleString()} coins?`, async () => {
@@ -117,7 +143,10 @@ export default function StoreScreen({ navigation }) {
     { key: 'bundles', label: 'Bundles' },
     { key: 'coins', label: 'Coins' },
     { key: 'tickets', label: 'Tickets' },
-    { key: 'game', label: 'Game' },
+    // 'Game' named where the items are used rather than what they
+    // are, which put it in a different category from every other
+    // tab on the row. The key stays so nothing else has to move.
+    { key: 'game', label: 'Items' },
     { key: 'boosts', label: 'Boosts' },
     { key: 'upgrades', label: 'Upgrades' },
   ];
@@ -152,8 +181,16 @@ export default function StoreScreen({ navigation }) {
                     {bundle.tag && <View style={styles.tagBadge}><Text style={styles.tagText}>{bundle.tag}</Text></View>}
                     <Text style={styles.bundleName}>{bundle.name}</Text>
                     <View style={styles.bundleDetails}>
-                      <Text style={styles.bundleItem}>{bundle.coins.toLocaleString()} coins</Text>
-                      <Text style={styles.bundleItem}>{bundle.tickets} tickets</Text>
+                      <View style={styles.bundleLine}>
+                        <CurrencyIcon name="coins" size={20} />
+                        <Text style={styles.bundleItem}>
+                          {bundle.coins.toLocaleString()}
+                        </Text>
+                      </View>
+                      <View style={styles.bundleLine}>
+                        <CurrencyIcon name="tickets" size={20} />
+                        <Text style={styles.bundleItem}>{bundle.tickets}</Text>
+                      </View>
                     </View>
                     <View style={styles.priceBtn}>
                       <Text style={styles.priceBtnText}>{bundle.price}</Text>
@@ -170,7 +207,10 @@ export default function StoreScreen({ navigation }) {
               {COIN_PACKS.map(pack => (
                 <Pressable key={pack.id} style={styles.packCard} onPress={() => handleRealMoneyPurchase(pack)}>
                   <View style={styles.packLeft}>
-                    <Text style={styles.packEmoji}>coins</Text>
+                    {/* Was the literal word "coins" rendered in the slot
+                        an emoji used to fill - visible on the card as
+                        text. */}
+                    <CurrencyIcon name="coins" size={38} />
                     <Text style={styles.packAmount}>{pack.coins.toLocaleString()} Coins</Text>
                   </View>
                   <View style={styles.packRight}>
@@ -190,7 +230,7 @@ export default function StoreScreen({ navigation }) {
               {TICKET_PACKS.map(pack => (
                 <Pressable key={pack.id} style={styles.packCard} onPress={() => handleRealMoneyPurchase(pack)}>
                   <View style={styles.packLeft}>
-                    <Text style={styles.packEmoji}>tickets</Text>
+                    <CurrencyIcon name="tickets" size={38} />
                     <Text style={styles.packAmount}>{pack.tickets} Tickets</Text>
                   </View>
                   <View style={styles.packRight}>
@@ -217,7 +257,12 @@ export default function StoreScreen({ navigation }) {
                     <Text style={styles.cosmeticDesc}>{item.description}</Text>
                   </View>
                   <View style={styles.cosmeticPrice}>
-                    <Text style={styles.cosmeticPriceText}>{item.coinPrice.toLocaleString()} coins</Text>
+                    <View style={styles.priceLine}>
+                      <CurrencyIcon name="coins" size={16} />
+                      <Text style={styles.cosmeticPriceText}>
+                        {item.coinPrice.toLocaleString()}
+                      </Text>
+                    </View>
                   </View>
                 </Pressable>
               ))}
@@ -237,7 +282,12 @@ export default function StoreScreen({ navigation }) {
                     <Text style={styles.cosmeticDesc}>{item.description}</Text>
                   </View>
                   <View style={styles.cosmeticPrice}>
-                    <Text style={styles.cosmeticPriceText}>{item.coinPrice.toLocaleString()} coins</Text>
+                    <View style={styles.priceLine}>
+                      <CurrencyIcon name="coins" size={16} />
+                      <Text style={styles.cosmeticPriceText}>
+                        {item.coinPrice.toLocaleString()}
+                      </Text>
+                    </View>
                   </View>
                 </Pressable>
               ))}
@@ -280,7 +330,14 @@ export default function StoreScreen({ navigation }) {
                     </Text>
                   </View>
                   <View style={styles.cosmeticPrice}>
-                    <Text style={styles.cosmeticPriceText}>{atMax ? 'MAXED' : `${nextPrice.toLocaleString()} coins`}</Text>
+                    <View style={styles.priceLine}>
+                      {/* No coin beside MAXED - there is no
+                          price left to pay. */}
+                      {!atMax && <CurrencyIcon name="coins" size={16} />}
+                      <Text style={styles.cosmeticPriceText}>
+                        {atMax ? 'MAXED' : nextPrice.toLocaleString()}
+                      </Text>
+                    </View>
                   </View>
                 </Pressable>
 
@@ -393,8 +450,15 @@ const makeStyles = (t) => ({
   packLeft: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
-  packEmoji: {
-    fontSize: 12, color: theme.colors.vibeYellow, fontWeight: theme.fontWeights.bold,
+  priceLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  bundleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   packAmount: {
     fontSize: 16, fontWeight: theme.fontWeights.bold, color: t.colors.textPrimary,

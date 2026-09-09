@@ -4,6 +4,7 @@
 // imports the v1 surface explicitly. Dropping the /v1 here silently
 // swaps the whole API shape.
 const functions = require('firebase-functions/v1');
+const { shouldRecycle, scoreFor, poolBaseline, bumpBaseline } = require('./promptScore');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -12,7 +13,9 @@ const db = admin.firestore();
 const MAX_ACTIVE_PROMPTS = 24;
 const PROMPT_DURATION_HOURS = 24;
 const LOCKOUT_MINUTES = 10;
-const APPROVAL_THRESHOLD = 0.5; // 50% likes to recycle a prompt
+// Share of prompt slots given to prompts that have never run. Without
+// it, proven prompts hold every slot and nothing new is ever tested.
+const EXPLORE_RATE = 0.3;
 const TICKET_REWARD = 1; // Tickets earned for promoted snapples
 
 // Mirrors src/utils/promptKey.js — keep in sync.
@@ -76,6 +79,14 @@ async function accrueLifetimeStats(prompt) {
     lastExpiredAt: new Date().toISOString(),
     used: false, // free to be picked again by rotation
   });
+
+  // Hand the merged pool doc back so the recycle decision can judge the
+  // prompt's WHOLE history rather than the single instance that just
+  // expired. The active doc carries one run's votes and no responseCount
+  // at all - that lives on the pool - so scoring the active doc would
+  // read zero answers for every prompt on earth.
+  const merged = await poolRef.get();
+  return merged.exists ? merged.data() : null;
 }
 
 // ── Scheduled: runs every hour ──
@@ -155,24 +166,37 @@ async function expirePrompts() {
 
   if (expiredQuery.empty) return 0;
 
+  // Read once for the whole run: it is a single doc, and every prompt in
+  // this batch should be judged against the same yardstick anyway.
+  const baseline = await poolBaseline(db);
+
   let count = 0;
   for (const doc of expiredQuery.docs) {
     const prompt = doc.data();
     await promoteAndCleanupSnapples(doc.id, prompt);
 
     // Accrue this instance's stats to the pool's lifetime totals before
-    // deleting the active doc.
-    try { await accrueLifetimeStats(prompt); } catch (e) { console.error('[Expire] accrue err:', e); }
+    // deleting the active doc. The merged result is what gets judged.
+    let pooled = null;
+    try { pooled = await accrueLifetimeStats(prompt); } catch (e) { console.error('[Expire] accrue err:', e); }
+    // Falling back to the active doc keeps expiry working if the accrue
+    // failed; it just judges on thinner evidence, which shouldRecycle
+    // already treats as a reason to keep rather than to discard.
+    const judged = pooled || prompt;
 
     if (prompt.isSystem) {
       // System prompt — recycle if popular
-      await recycleOrDiscardPrompt(doc.id, prompt);
+      await recycleOrDiscardPrompt(doc.id, judged, baseline);
     } else {
       // User prompt — recycle into system pool if popular
-      const totalVotes = (prompt.likeCount || 0) + (prompt.dislikeCount || 0);
-      const likeRatio = totalVotes > 0 ? (prompt.likeCount || 0) / totalVotes : 0;
-
-      if (totalVotes === 0 || likeRatio >= APPROVAL_THRESHOLD) {
+      // Was a raw like ratio with `totalVotes === 0` counting as
+      // approval - so five votes outranked eight thousand, and an
+      // unrated prompt came back forever, which is why a pool of
+      // mostly-weak prompts never shrank. shouldRecycle weighs thin
+      // evidence as thin on BOTH signals, and keeps UNTESTED apart from
+      // REJECTED so a prompt is never discarded for being new.
+      const score = scoreFor(judged, baseline);
+      if (shouldRecycle(judged, baseline)) {
         await db.collection('recycledPrompts').doc(doc.id).set({
           text: prompt.text,
           category: prompt.category || 'user',
@@ -180,10 +204,11 @@ async function expirePrompts() {
           creatorUsername: prompt.creatorUsername || null,
           lastUsed: new Date().toISOString(),
           timesUsed: 1,
-          lastLikeRatio: likeRatio,
+          lastScore: score,
           source: 'user_created',
         });
-        console.log(`[Recycle] User prompt "${prompt.text}" recycled (${totalVotes === 0 ? 'no votes' : 'popular'})`);
+        console.log(`[Recycle] User prompt "${prompt.text}" recycled`,
+          score === null ? '(untested)' : `(score ${score.toFixed(2)})`);
       }
 
       await db.collection('activePrompts').doc(doc.id).delete();
@@ -196,22 +221,22 @@ async function expirePrompts() {
 }
 
 // Quality-based prompt recycling (ported from legacy topicHandler)
-async function recycleOrDiscardPrompt(promptId, prompt) {
-  const totalVotes = (prompt.likeCount || 0) + (prompt.dislikeCount || 0);
-  const likeRatio = totalVotes > 0 ? (prompt.likeCount || 0) / totalVotes : 0;
+async function recycleOrDiscardPrompt(promptId, prompt, baseline) {
+  const score = scoreFor(prompt, baseline);
+  const why = score === null ? 'untested' : `score ${score.toFixed(2)}`;
 
-  if (totalVotes === 0 || likeRatio >= APPROVAL_THRESHOLD) {
-    // Recycle — no votes yet or liked enough
+  if (shouldRecycle(prompt, baseline)) {
+    // Recycle — untested (has not had its chance) or good enough.
     await db.collection('recycledPrompts').doc(promptId).set({
       text: prompt.text,
       category: prompt.category || 'general',
       lastUsed: new Date().toISOString(),
       timesUsed: (prompt.timesUsed || 0) + 1,
-      lastLikeRatio: likeRatio,
+      lastScore: score,
     });
-    console.log(`[Recycle] Prompt "${prompt.text}" recycled (${totalVotes === 0 ? 'no votes' : (likeRatio * 100).toFixed(0) + '% liked'})`);
+    console.log(`[Recycle] Prompt "${prompt.text}" recycled (${why})`);
   } else {
-    console.log(`[Discard] Prompt "${prompt.text}" discarded (${(likeRatio * 100).toFixed(0)}% liked)`);
+    console.log(`[Discard] Prompt "${prompt.text}" discarded (${why})`);
   }
 
   // Delete from active
@@ -453,6 +478,7 @@ async function replenishOnDeck() {
   });
 
   await batch.commit();
+  await bumpBaseline(db, { rotations: newPrompts.length });
   await saveOnDeck([...queue, ...newPrompts]);
   console.log(`[OnDeck] Replenished ${newPrompts.length} prompts`);
 }
@@ -466,12 +492,32 @@ async function fillFromPool(needed) {
 
   let filled = 0;
   for (let i = 0; i < needed; i++) {
-    // Weighted random: grab 10 least-used, pick one randomly
-    const poolQuery = await db.collection('promptPool')
-      .where('used', '==', false)
-      .orderBy('timesUsed', 'asc')
-      .limit(10)
-      .get();
+    // Explore / exploit, because ordering purely by score would be a
+    // trap: a prompt nobody has run has no score, so the proven ones
+    // would hold every slot forever and the pool would never drain.
+    // EXPLORE_RATE of the slots go to untested prompts (score -1,
+    // least-used first) and the rest to the best proven ones.
+    const explore = Math.random() < EXPLORE_RATE;
+    const pool = db.collection('promptPool').where('used', '==', false);
+    let poolQuery = await (explore
+      // Untested: -1 is the stored stand-in for "no evidence yet".
+      ? pool.where('score', '==', -1).orderBy('timesUsed', 'asc')
+      // Proven: best first. The inequality field has to lead the sort.
+      : pool.where('score', '>', -1).orderBy('score', 'desc')
+    ).limit(10).get();
+
+    // Nothing in the chosen lane: no untested prompts left, none proven
+    // yet, or - before the backfill runs - prompts that predate scoring
+    // and have no `score` field at all, which a where() clause excludes
+    // rather than treating as absent. Fall back to plain least-used
+    // rather than stopping, or the fill quietly comes up short.
+    if (poolQuery.empty) {
+      poolQuery = await db.collection('promptPool')
+        .where('used', '==', false)
+        .orderBy('timesUsed', 'asc')
+        .limit(10)
+        .get();
+    }
 
     if (poolQuery.empty) break;
 
@@ -504,6 +550,10 @@ async function fillFromPool(needed) {
 
   if (filled > 0) {
     await batch.commit();
+    // Half of the pool-wide answers-per-rotation average that scoring
+    // calibrates against. Two counters rather than an aggregate query,
+    // so it costs the same at 348 prompts and at a million.
+    await bumpBaseline(db, { rotations: filled });
     console.log(`[Fill] Activated ${filled} from pool (weighted random)`);
   }
   return needed - filled;
@@ -1172,6 +1222,7 @@ exports.trackPromptResponse = functions.firestore
       responseCount: admin.firestore.FieldValue.increment(1),
       lastResponseAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    await bumpBaseline(db, { answers: 1 });
   });
 
 // ── Prompt digest notification ──
@@ -1244,4 +1295,10 @@ exports.backfillSharePosters = require('./shareRender').backfillSharePosters;
 // Snappled owns its own website end to end — and so the page can read
 // Firestore directly instead of calling across projects over HTTPS.
 exports.snappleShare = require('./sharePage').snappleShare;
+// Not live until the store accounts exist and the app ships an IAP
+// SDK; exported now so the server half is deployable and reviewable
+// before any money moves.
+exports.revenueCatWebhook = require('./iap').revenueCatWebhook;
+exports.onPromptScoreInputChanged = require('./promptScore').onPromptScoreInputChanged;
+exports.onPromptVoteWritten = require('./promptVotes').onPromptVoteWritten;
 exports.getShareCard = require('./shareRender').getShareCard;

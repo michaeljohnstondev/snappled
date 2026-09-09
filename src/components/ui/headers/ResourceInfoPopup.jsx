@@ -37,7 +37,6 @@ export default function ResourceInfoPopup({ visible, title, bullets }) {
               </View>
             ))}
           </View>
-          <Text style={styles.hint}>RELEASE TO CLOSE</Text>
         </View>
       </View>
     </Modal>
@@ -93,14 +92,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     flex: 1,
-  },
-  hint: {
-    color: theme.colors.vibeBlue,
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    opacity: 0.55,
   },
 });

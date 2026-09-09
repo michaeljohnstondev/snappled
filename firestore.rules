@@ -138,6 +138,26 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
+    // Prompt votes — one document per person per prompt.
+    //
+    // The id is `<target>_<promptId>_<uid>`, and the rule pins the uid
+    // half to the caller. That is what makes the counts trustworthy:
+    // a client can only ever create or change its OWN vote, so it
+    // cannot stuff a prompt by writing rows on other people's behalf.
+    // The count itself is written by the onPromptVoteWritten trigger,
+    // never by a client.
+    match /promptVotes/{voteId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && voteId == request.resource.data.target + '_'
+          + request.resource.data.promptId + '_' + request.auth.uid
+        && request.resource.data.value in [1, -1]
+        && request.resource.data.target in ['activePrompts', 'promptPool'];
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
     // Recycled prompts
     match /recycledPrompts/{promptId} {
       allow read: if request.auth != null;

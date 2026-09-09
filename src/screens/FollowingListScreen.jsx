@@ -4,6 +4,7 @@
 // so the caller can drill from friend to friend.
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { rankFor } from '../lib/rank';
 import {
   View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, TextInput,
 } from 'react-native';
@@ -57,7 +58,7 @@ export default function FollowingListScreen({ route, navigation }) {
             hydrated.push({
               uid,
               username: profile.username || profile.email?.split('@')[0] || 'Unknown',
-              rank: profile.profile?.rank || 'Rookie',
+              rank: rankFor(profile).name,
             });
           }
         } catch (e) {}

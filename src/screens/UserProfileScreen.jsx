@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { rankFor } from '../lib/rank';
 import { useModal } from '../store/ModalContext';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
@@ -202,7 +203,10 @@ export default function UserProfileScreen({ route, navigation }) {
   const username = profileData?.username || profileData?.email?.split('@')[0] || 'Unknown';
   const totalXP = profileData?.profile?.xp || profileData?.profile?.experience || 0;
   const level = levelService.getLevelFromXP(totalXP);
-  const rank = profileData?.profile?.rank || profileData?.rank || 'Rookie';
+  // Derived, not stored. profile.rank was never written by anything,
+  // so this read only ever produced its own fallback.
+  const rankInfo = rankFor(profileData);
+  const rank = rankInfo.name;
   const followers = profileData?.social?.followers?.length || 0;
   const followingCount = profileData?.social?.following?.length || 0;
 
@@ -265,7 +269,7 @@ export default function UserProfileScreen({ route, navigation }) {
             onPress={() => setMenuOpen(true)}
             hitSlop={10}
           >
-            <Ionicons name="menu" size={24} color={theme.colors.vibeBlue} />
+            <Ionicons name="menu" size={26} color="#FFFFFF" />
           </Pressable>
         )}
         <View style={styles.avatar}>
@@ -537,9 +541,15 @@ const makeStyles = (t) => ({
   actionSection: {
     paddingTop: 20,
   },
+  // Sits level with the middle of the avatar rather than pinned to the
+  // top of the block, where it read as floating above the profile
+  // instead of belonging to it.
+  // profileSection has 24 of top padding and the avatar is 80 tall, so
+  // its centre sits at 64. The button is ~38 tall including its own
+  // padding, so 45 puts the two centres level.
   menuBtn: {
     position: 'absolute',
-    top: 0,
+    top: 45,
     right: 8,
     padding: 6,
     zIndex: 5,

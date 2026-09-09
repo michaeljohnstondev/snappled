@@ -1807,9 +1807,14 @@ export default function GameScreen({ navigation, route }) {
           )}
 
           <View style={styles.lobbyButtons}>
+            {/* All three share the toggle variant. Ranked was the
+                default neon-border style and the other two were
+                toggles, which read as two different kinds of thing
+                when they are simply the three ways to start a game. */}
             <VibeButton
               label="Ranked"
               onPress={() => showAlert('Coming Soon', 'Ranked matches will be available soon!')}
+              variant="toggle"
               color="yellow"
             />
             <VibeButton
@@ -1824,14 +1829,18 @@ export default function GameScreen({ navigation, route }) {
               )}
               variant="toggle"
               color="blue"
-              disabled={isLoading}
             />
+            {/* Not gated on the snapple pool loading. The buttons used
+                to sit disabled - and this one read "Loading..." - until
+                the community list arrived, which made the menu feel
+                broken on every open for the sake of a check that has
+                not failed since the library grew. If a game genuinely
+                cannot start, the start path already reports it. */}
             <VibeButton
-              label={isLoading ? "Loading..." : "Practice (Solo)"}
+              label="Practice (Solo)"
               onPress={handlePractice}
               variant="toggle"
               color="cyan"
-              disabled={isLoading || allSnapples.length < 4}
             />
           </View>
 
@@ -2787,7 +2796,11 @@ const makeStyles = (t) => ({
   lobbyMark: {
     width: 132,
     height: 132,
-    marginBottom: 4,
+    // Negative, deliberately. This is the adaptive-icon asset, which
+    // has roughly a quarter of its height as transparent safe-area
+    // padding baked in - so the visible S stops well short of the box
+    // and left a gap that looked like a layout mistake.
+    marginBottom: -26,
   },
   lobbyTitle: {
     color: theme.colors.vibeBlue, fontSize: 32, fontWeight: theme.fontWeights.bold,

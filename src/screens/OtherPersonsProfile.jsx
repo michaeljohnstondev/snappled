@@ -8,6 +8,7 @@
 // Following count is tappable so you can drill from friend to friend.
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { rankFor } from '../lib/rank';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList, Dimensions,
 } from 'react-native';
@@ -145,7 +146,10 @@ export default function OtherPersonsProfile({ route, navigation }) {
   const username = profileData?.username || profileData?.email?.split('@')[0] || 'Unknown';
   const totalXP = profileData?.profile?.xp || profileData?.profile?.experience || 0;
   const level = levelService.getLevelFromXP(totalXP);
-  const rank = profileData?.profile?.rank || profileData?.rank || 'Rookie';
+  // Derived, not stored. profile.rank was never written by anything,
+  // so this read only ever produced its own fallback.
+  const rankInfo = rankFor(profileData);
+  const rank = rankInfo.name;
   const followers = profileData?.social?.followers?.length || 0;
   const followingCount = profileData?.social?.following?.length || 0;
 

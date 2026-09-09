@@ -5,11 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
+import PromptSortDeck from '../components/ui/PromptSortDeck';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { promptService } from '../services/promptService';
+import { promptVoteService } from '../services/promptVoteService';
 import { snappleService } from '../services/snappleService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { promptRotationService } from '../services/promptRotationService';
@@ -210,7 +212,13 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptLike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.likePrompt(promptId, user.uid, 'activePrompts');
+    // Was promptService.likePrompt, which read the doc and then pushed
+    // the uid into a `likes[]` array on it. That array is capped by
+    // Firestore's 1 MiB document limit at roughly 31,000 voters, the
+    // read-then-write could lose a concurrent vote, and every voter on a
+    // prompt wrote to the SAME document - about 1 write/second before
+    // contention. A vote is now its own doc and a trigger owns the count.
+    const result = await promptVoteService.vote(promptId, user.uid, 1, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -236,7 +244,7 @@ export default function PromptsScreen({ navigation }) {
 
   const handlePromptDislike = async (promptId) => {
     if (!user?.uid) return;
-    const result = await promptService.dislikePrompt(promptId, user.uid, 'activePrompts');
+    const result = await promptVoteService.vote(promptId, user.uid, -1, 'activePrompts');
     
     // Update the prompt in local state if successful
     if (result?.success) {
@@ -472,6 +480,16 @@ export default function PromptsScreen({ navigation }) {
               </Pressable>
             ))}
           </View>
+
+          {/* Community prompt sorting.
+              Sits between the live prompts and the snapple pool because
+              that is the honest order: what is running now, then what
+              might run next. Renders nothing when there is nothing left
+              to sort, so it never shows an empty box. */}
+          <PromptSortDeck
+            userId={user?.uid}
+            liveTexts={prompts.map(p => p.text)}
+          />
 
           {/* Browse pool.
               Global rather than per prompt, which was the obvious
