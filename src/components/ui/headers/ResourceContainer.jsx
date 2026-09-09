@@ -11,6 +11,7 @@
 // purple/pink energy of the CTA gradients.
 
 import React, { useEffect, useRef, useState } from "react";
+import CurrencyIcon from '../CurrencyIcon';
 import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { levelService } from "../../../services/levelService";
@@ -81,7 +82,7 @@ export default function ResourceContainer({ userStats }) {
         onPressIn={() => openPopup('tickets')}
         onPressOut={closePopup}
       >
-        <Text style={styles.iconText}>🎫</Text>
+        <CurrencyIcon name="tickets" size={18} />
         <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
 
@@ -90,7 +91,7 @@ export default function ResourceContainer({ userStats }) {
         onPressIn={() => openPopup('coins')}
         onPressOut={closePopup}
       >
-        <Text style={styles.iconText}>💰</Text>
+        <CurrencyIcon name="coins" size={18} />
         <TickingNumber
           value={userStats.coins || 0}
           format={(n) => n.toLocaleString()}
@@ -104,7 +105,7 @@ export default function ResourceContainer({ userStats }) {
         onPressOut={closePopup}
       >
         <FlashOverlay value={userStats.trophies || 0} />
-        <Text style={styles.iconText}>🏆</Text>
+        <CurrencyIcon name="trophies" size={18} />
         <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
       </Pressable>
 

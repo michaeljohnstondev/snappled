@@ -8,6 +8,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { userService } from '../../services/userService';
 import { snappleService } from '../../services/snappleService';
+import CurrencyIcon from '../ui/CurrencyIcon';
 import { shareService } from '../../services/shareService';
 import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
@@ -179,7 +180,11 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
           disabled={busy || owned}
         >
           <View style={[styles.railIcon, owned && styles.railIconActive]}>
-            <Ionicons name="diamond" size={22} color={theme.colors.vibeBlue} />
+            {/* A COIN, not a gem. This was a blue diamond, and in games a
+                gem is conventionally a separate premium currency - so
+                the button was naming something the player does not
+                have and cannot spend. */}
+            <CurrencyIcon name="coins" size={24} />
           </View>
           <Text style={styles.railLabel}>{owned ? 'Owned' : 'Buy'}</Text>
         </Pressable>

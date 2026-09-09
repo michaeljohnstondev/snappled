@@ -1,4 +1,5 @@
 import React from 'react';
+import CurrencyIcon from '../ui/CurrencyIcon';
 import { View, Text, StyleSheet } from 'react-native';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
@@ -19,7 +20,7 @@ export default function CurrencyDisplay({
   return (
     <View style={[containerStyle, style]}>
       <View style={styles.currencyItem}>
-        <Text style={styles.currencyEmoji}>🪙</Text>
+        <CurrencyIcon name="coins" size={26} />
         <View style={styles.currencyInfo}>
           <Text style={styles.currencyAmount}>{coins.toLocaleString()}</Text>
           <Text style={styles.currencyLabel}>Coins</Text>
@@ -27,7 +28,7 @@ export default function CurrencyDisplay({
       </View>
 
       <View style={styles.currencyItem}>
-        <Text style={styles.currencyEmoji}>🏆</Text>
+        <CurrencyIcon name="trophies" size={26} />
         <View style={styles.currencyInfo}>
           <Text style={styles.currencyAmount}>{tickets.toLocaleString()}</Text>
           <Text style={styles.currencyLabel}>Trophies</Text>

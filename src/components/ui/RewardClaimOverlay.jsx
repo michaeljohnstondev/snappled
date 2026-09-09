@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import CurrencyIcon from './CurrencyIcon';
+import { currencyFor } from '../../lib/currency';
 import {
   View, Text, StyleSheet, Pressable, Animated, Dimensions, Modal,
 } from 'react-native';
@@ -18,11 +20,10 @@ const SLOT_X = {
   xp: 0.88,
 };
 
+// Only what CurrencyIcon does not cover. The three currencies moved to
+// the shared art; xp is a stat rather than something you hold, so it
+// stays a glyph.
 const ICON = {
-  coins: '💰',
-  tokens: '🎫',
-  tickets: '🎫',
-  trophies: '🏆',
   xp: '✨',
 };
 
@@ -182,7 +183,12 @@ function FlyingIcon({ type, amount, indexInRow, total }) {
         },
       ]}
     >
-      <Text style={styles.flyEmoji}>{ICON[type]}</Text>
+      {/* xp has no asset - it is a stat, not a currency - so it keeps
+          its glyph while the three real currencies use the shared
+          icon. */}
+      {currencyFor(type)
+        ? <CurrencyIcon name={type} size={34} />
+        : <Text style={styles.flyEmoji}>{ICON[type]}</Text>}
       <Text style={styles.flyAmount}>+{amount}</Text>
     </Animated.View>
   );
