@@ -165,24 +165,10 @@ export default function SettingsScreen({ navigation }) {
           onPress={() => navigation.navigate('NotificationSettings')}
         />
 
-        <Text style={styles.h2}>About</Text>
-        <SettingsRow
-          icon="information-circle-outline"
-          iconColor={theme.colors.vibeYellow}
-          label="Version"
-          desc="Quote this in a bug report."
-          valueText={`${APP_VERSION} · ${UPDATE_TAG}`}
-        />
-
-        <View style={styles.dangerZone}>
-          <SettingsRow
-            icon="log-out-outline"
-            iconColor={theme.colors.vibePink}
-            label="Sign Out"
-            destructive
-            onPress={handleSignOut}
-          />
-        </View>
+        {/* Version and Sign Out moved to the profile menu. Settings is
+            for things you CHANGE; a version string is a fact to read
+            and signing out is a way to leave, and neither was a setting
+            you could adjust. */}
       </ScrollView>
     </AppLayout>
   );

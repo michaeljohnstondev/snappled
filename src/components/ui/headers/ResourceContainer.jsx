@@ -82,7 +82,7 @@ export default function ResourceContainer({ userStats }) {
         onPressIn={() => openPopup('tickets')}
         onPressOut={closePopup}
       >
-        <CurrencyIcon name="tickets" size={18} />
+        <CurrencyIcon name="tickets" size={24} />
         <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
 
@@ -91,7 +91,7 @@ export default function ResourceContainer({ userStats }) {
         onPressIn={() => openPopup('coins')}
         onPressOut={closePopup}
       >
-        <CurrencyIcon name="coins" size={18} />
+        <CurrencyIcon name="coins" size={24} />
         <TickingNumber
           value={userStats.coins || 0}
           format={(n) => n.toLocaleString()}
@@ -105,7 +105,7 @@ export default function ResourceContainer({ userStats }) {
         onPressOut={closePopup}
       >
         <FlashOverlay value={userStats.trophies || 0} />
-        <CurrencyIcon name="trophies" size={18} />
+        <CurrencyIcon name="trophies" size={24} />
         <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
       </Pressable>
 

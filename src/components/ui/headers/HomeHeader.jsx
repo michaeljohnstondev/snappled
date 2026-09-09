@@ -22,12 +22,10 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
 
   return (
     <View style={styles.header}>
-      <View style={styles.profileContainer}>
-        <Pressable style={styles.profileImage} onPress={handleProfilePress}>
-          <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
-        </Pressable>
-      </View>
-      
+      {/* The person badge is gone. It opened a menu duplicating what
+          the profile tab already reaches, and it cost the resource row
+          the width its numbers need. Everything it led to now lives
+          under the hamburger on the profile screen itself. */}
       <ResourceContainer userStats={userStats} />
 
       <UserMenu

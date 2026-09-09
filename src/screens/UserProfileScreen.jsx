@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useModal } from '../store/ModalContext';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
+import { signOut } from 'firebase/auth';
+import { auth } from '../services/firebase';
+import ProfileMenu from '../components/ui/modals/ProfileMenu';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,10 +30,15 @@ const { width: screenWidth } = Dimensions.get('window');
 // 3-col grid: 40px horizontal padding (20+20) + 20px split across 2 gaps = 10px each.
 const ITEM_SIZE = (screenWidth - 60) / 3;
 
+// Read once at module load; neither changes while the app is running.
+const APP_VERSION = Constants.expoConfig?.version || '?';
+const UPDATE_TAG = Updates.updateId ? Updates.updateId.slice(0, 8) : 'embed';
+
 export default function UserProfileScreen({ route, navigation }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
+  const { showConfirm, showError } = useModal();
   // Default to current user if no userId param (e.g. when navigating via Profile tab)
   const userId = route?.params?.userId || user?.uid;
   const [profileData, setProfileData] = useState(null);
@@ -45,6 +56,17 @@ export default function UserProfileScreen({ route, navigation }) {
   useEffect(() => { setCurrentPage(1); }, [activeTab, sortKey]);
 
   const isOwnProfile = user?.uid === userId;
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleSignOut = () => {
+    showConfirm?.('Sign Out', 'Are you sure you want to sign out?', async () => {
+      try {
+        await signOut(auth);
+      } catch (e) {
+        showError?.('Sign out failed', e.message);
+      }
+    });
+  };
 
   useEffect(() => {
     loadProfile();
@@ -237,6 +259,15 @@ export default function UserProfileScreen({ route, navigation }) {
     <>
       {/* Avatar + Name */}
       <View style={styles.profileSection}>
+        {isOwnProfile && (
+          <Pressable
+            style={styles.menuBtn}
+            onPress={() => setMenuOpen(true)}
+            hitSlop={10}
+          >
+            <Ionicons name="menu" size={24} color={theme.colors.vibeBlue} />
+          </Pressable>
+        )}
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
             {username.charAt(0).toUpperCase()}
@@ -286,21 +317,11 @@ export default function UserProfileScreen({ route, navigation }) {
           />
         </View>
       ) : (
-        <View style={{ gap: 8 }}>
-          <Pressable style={styles.achievementsBtn} onPress={() => navigation.navigate('Achievements')}>
-            <Ionicons name="trophy" size={20} color={theme.colors.vibeYellow} />
-            <Text style={styles.achievementsBtnText}>Achievements</Text>
-            <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
-          </Pressable>
-          <Pressable
-            style={styles.achievementsBtn}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Ionicons name="settings-sharp" size={20} color={theme.colors.vibeBlue} />
-            <Text style={styles.achievementsBtnText}>Settings</Text>
-            <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
-          </Pressable>
-        </View>
+        // Achievements and Settings moved into the hamburger. Two
+        // full-width rows sat between the profile and the snapples,
+        // pushing the grid - the thing the screen is for - below the
+        // fold on a small phone.
+        null
       )}
 
       {/* Section picker + Edit Deck. Dropdown filters the grid
@@ -392,6 +413,15 @@ export default function UserProfileScreen({ route, navigation }) {
         initialIndex={selectedIndex}
         onClose={handleOverlayClose}
         navigation={navigation}
+      />
+
+      <ProfileMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onAchievements={() => navigation.navigate('Achievements')}
+        onSettings={() => navigation.navigate('Settings')}
+        onSignOut={handleSignOut}
+        version={`v${APP_VERSION} · ${UPDATE_TAG}`}
       />
     </AppLayout>
   );
@@ -506,6 +536,13 @@ const makeStyles = (t) => ({
   },
   actionSection: {
     paddingTop: 20,
+  },
+  menuBtn: {
+    position: 'absolute',
+    top: 0,
+    right: 8,
+    padding: 6,
+    zIndex: 5,
   },
   achievementsBtn: {
     flexDirection: 'row',
