@@ -212,8 +212,12 @@ class PromptService {
         status: 'pending',
       };
 
-      const reportsRef = collection(db, 'promptReports');
-      await addDoc(reportsRef, reportData);
+      // Keyed <promptId>_<uid> rather than addDoc'd with a random id.
+      // Reports now auto-ban a prompt once enough DISTINCT people file
+      // one, and with random ids a single person could tap report three
+      // times and delete any prompt in the game. Reporting twice now
+      // overwrites one row instead of filing two.
+      await setDoc(doc(db, 'promptReports', `${promptId}_${userId}`), reportData);
 
       return { success: true };
     } catch (error) {

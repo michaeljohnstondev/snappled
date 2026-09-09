@@ -491,7 +491,11 @@ async function fillFromPool(needed) {
   const lockoutAt = new Date(Date.now() + (PROMPT_DURATION_HOURS * 60 - LOCKOUT_MINUTES) * 60 * 1000).toISOString();
 
   let filled = 0;
-  for (let i = 0; i < needed; i++) {
+  // Bounded because a banned pick retries its slot; without a ceiling a
+  // pool that was entirely banned would spin here forever.
+  let attempts = 0;
+  for (let i = 0; i < needed && attempts < needed * 5; i++) {
+    attempts++;
     // Explore / exploit, because ordering purely by score would be a
     // trap: a prompt nobody has run has no score, so the proven ones
     // would hold every slot forever and the pool would never drain.
@@ -523,6 +527,23 @@ async function fillFromPool(needed) {
 
     const pick = poolQuery.docs[Math.floor(Math.random() * poolQuery.size)];
     const prompt = pick.data();
+
+    // The server never consulted bannedPromptTexts anywhere - only the
+    // client did, on the summon flow - so a banned prompt could be drawn
+    // straight back out of the pool and put in front of everyone. The
+    // auto-ban path deletes the pool entry itself; this covers a ban
+    // recorded by hand from the admin screen, which writes the banned
+    // text and nothing else. Retries the slot rather than consuming it.
+    const key = prompt.textKey || normalizePromptText(prompt.text || '');
+    if (key) {
+      const banned = await db.collection('bannedPromptTexts').doc(key).get();
+      if (banned.exists) {
+        console.log(`[Fill] skipping banned prompt "${prompt.text}"`);
+        await pick.ref.delete();
+        i--;
+        continue;
+      }
+    }
 
     const activeRef = db.collection('activePrompts').doc();
     batch.set(activeRef, {
@@ -1301,4 +1322,5 @@ exports.snappleShare = require('./sharePage').snappleShare;
 exports.revenueCatWebhook = require('./iap').revenueCatWebhook;
 exports.onPromptScoreInputChanged = require('./promptScore').onPromptScoreInputChanged;
 exports.onPromptVoteWritten = require('./promptVotes').onPromptVoteWritten;
+exports.onPromptReported = require('./promptModeration').onPromptReported;
 exports.getShareCard = require('./shareRender').getShareCard;

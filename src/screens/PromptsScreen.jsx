@@ -6,6 +6,7 @@ import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import PromptSortDeck from '../components/ui/PromptSortDeck';
+import SwipeToRate from '../components/ui/SwipeToRate';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
 import { useAuth } from '../store/AuthContext';
@@ -101,6 +102,8 @@ export default function PromptsScreen({ navigation }) {
   // The browse pool under the prompts. Loaded once per visit; the
   // shuffle lives in the service so it is different each time.
   const [pool, setPool] = useState([]);
+  // promptId -> 1 | -1, this user's own ratings of the LIVE prompts.
+  const [myVotes, setMyVotes] = useState({});
   const [poolIndex, setPoolIndex] = useState(0);
   const [poolOpen, setPoolOpen] = useState(false);
 
@@ -188,6 +191,16 @@ export default function PromptsScreen({ navigation }) {
     const { prompts: allPrompts } = await promptRotationService.getActivePrompts();
     setPrompts(allPrompts);
 
+    // Fetched by document id for exactly the prompts on screen, so the
+    // cost is one small read per visible card rather than one per vote
+    // this person has ever cast.
+    if (user?.uid && allPrompts?.length) {
+      promptVoteService
+        .getMyVotes(user.uid, 'activePrompts', allPrompts.map(p => p.id))
+        .then(setMyVotes)
+        .catch(() => {});
+    }
+
     // Best-effort and after the prompts, which are what the screen is
     // for. A pool that fails to load should cost nothing but itself.
     try {
@@ -266,6 +279,18 @@ export default function PromptsScreen({ navigation }) {
     }
     
     return result;
+  };
+
+  // Optimistic: the stamp lands under the thumb and the write follows.
+  // The vote document is idempotent and keyed to this user, so a failed
+  // write costs one rating rather than corrupting a count - and swiping
+  // the other way later just overwrites it.
+  const handlePromptRate = (promptId, value) => {
+    if (!user?.uid) return;
+    setMyVotes(prev => (prev[promptId] === value
+      ? prev
+      : { ...prev, [promptId]: value }));
+    promptVoteService.vote(promptId, user.uid, value, 'activePrompts');
   };
 
   const handlePromptReport = async (promptId, reason) => {
@@ -443,8 +468,16 @@ export default function PromptsScreen({ navigation }) {
             </Pressable>
 
             {prompts.map((prompt, index) => (
-              <Pressable
+              // Rating lived inside PromptInfoOverlay, which you had to
+              // open first - most of why live prompts were never rated.
+              // A verdict you can give with your thumb, without leaving
+              // the list, is one people will actually give.
+              <SwipeToRate
                 key={prompt.id || index}
+                value={myVotes[prompt.id] ?? null}
+                onRate={(v) => handlePromptRate(prompt.id, v)}
+              >
+              <Pressable
                 style={styles.promptCard}
                 onPress={() => handlePromptPress(prompt, index)}
                 onLongPress={() => handlePromptLongPress(prompt)}
@@ -478,6 +511,7 @@ export default function PromptsScreen({ navigation }) {
                   </View>
                 </LinearGradient>
               </Pressable>
+              </SwipeToRate>
             ))}
           </View>
 
