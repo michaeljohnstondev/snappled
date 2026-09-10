@@ -17,13 +17,19 @@ const trophy = require('../../assets/images/trophy.png');
 /**
  * Per-currency art and naming.
  *
- * `scale` is an OPTICAL correction, not a measurement. The three assets
- * fill their canvases very differently — measured content boxes are
- * 342x344 for the coin, 427x251 for the ticket and 461x384 for the
- * trophy — so rendering them all into the same square box makes the
- * ticket look tiny and the trophy look oversized. These multipliers
- * even out the apparent weight; they were derived from those boxes and
- * then nudged, which is why they aren't round numbers.
+ * `scale` is OPTICAL TASTE ONLY. It used to be doing a second job -
+ * compensating for transparent padding baked into the assets - and that
+ * is why the coin looked undersized everywhere it appeared. The three
+ * canvases were 512x512 while the art inside measured 342x344, 427x251
+ * and 461x384, so resizeMode "contain" fitted the CANVAS to the
+ * requested box and drew the artwork smaller than asked. The coin was
+ * the worst offender at 67% and, being the `scale: 1` baseline, it
+ * pulled the whole set down with it: a coin requested at 24pt drew
+ * about 16pt of coin beside a 22pt Ionicons glyph.
+ *
+ * The assets are now cropped to their own artwork (tools/trimicon.js),
+ * so 1.0 means "fills the box", the same as a glyph. Padding is not
+ * something these numbers have to think about any more.
  */
 export const CURRENCY = {
   coins: {
@@ -31,6 +37,8 @@ export const CURRENCY = {
     label: 'Coins',
     one: 'coin',
     source: coin,
+    // Square and fills its box, so it now matches an icon of the same
+    // nominal size instead of landing a third smaller.
     scale: 1,
   },
   tickets: {
@@ -38,18 +46,19 @@ export const CURRENCY = {
     label: 'Tickets',
     one: 'ticket',
     source: ticket,
-    // Short and wide, so it needs a lift to sit level with the others.
-    // Not lifted all the way to matching height - that would make it
-    // wider than the row can take.
-    scale: 1.18,
+    // Wide and short, so `contain` fits it by WIDTH and it sits shorter
+    // than the others by nature. Left at full width rather than lifted
+    // to match their height, which would make it wider than the row can
+    // take - the same compromise as before, minus the padding math.
+    scale: 1,
   },
   trophies: {
     key: 'trophies',
     label: 'Trophies',
     one: 'trophy',
     source: trophy,
-    // The largest of the three on canvas; pulled back so it doesn't
-    // dominate the row.
+    // The chunkiest silhouette of the three; pulled back a little so it
+    // doesn't dominate the resource bar next to a round coin.
     scale: 0.92,
   },
 };

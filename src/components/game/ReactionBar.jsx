@@ -194,15 +194,26 @@ export default function ReactionBar({
   // yet would be the one card you cannot react to.
   if (isSummary && shown.length === 0 && !canAdd) return null;
 
+  // In the big player the toggle stands in a column of 46pt round action
+  // buttons (Save / Buy / Share / Report), where a small pill read as a
+  // different class of control than the things it sits with. On the
+  // scoring grid it stays a pill, because there it sits on a 100pt card
+  // and a 46pt circle would cover the clip.
+  const railSized = vertical;
+
   const addToggle = (
     <Pressable
       ref={toggleRef}
       onPress={openAtToggle}
-      style={styles.chip}
+      style={railSized ? styles.railToggle : styles.chip}
       hitSlop={6}
     >
-      <Ionicons name="happy-outline" size={15} color="rgba(255,255,255,0.65)" />
-      <Text style={styles.plus}>+</Text>
+      <Ionicons
+        name="happy-outline"
+        size={railSized ? 22 : 15}
+        color={railSized ? 'white' : 'rgba(255,255,255,0.65)'}
+      />
+      <Text style={[styles.plus, railSized && styles.plusRail]}>+</Text>
     </Pressable>
   );
 
@@ -440,11 +451,33 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   glyph: { fontSize: 14 },
+  // Mirrors railIcon in CreatorActionRow: 46pt circle, same fill and
+  // border. They stack in one column, so any drift between the two
+  // shows up as a wobble down the edge of the video.
+  railToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
   plus: {
     color: 'rgba(255,255,255,0.65)',
     fontSize: 12,
     fontWeight: '900',
     marginLeft: -1,
+  },
+  // Grows with the face so the pairing keeps its proportions, and
+  // brightens to match: on the rail it is a peer of Save and Share,
+  // not the greyed-out chrome it reads as on a crowded grid card.
+  plusRail: {
+    color: 'white',
+    fontSize: 15,
+    marginLeft: 1,
   },
   count: {
     color: 'white',

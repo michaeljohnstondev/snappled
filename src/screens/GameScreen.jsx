@@ -2349,6 +2349,13 @@ export default function GameScreen({ navigation, route }) {
                 <ReactionBar
                   mode="picker"
                   collapsible
+                  // The prop existed and was documented for exactly this
+                  // spot - "used in the big player, where the actions
+                  // live on a rail" - but nothing ever passed it, so the
+                  // toggle stayed pill-sized under a column of 46pt
+                  // round buttons and read as a lesser control than the
+                  // things beside it.
+                  vertical
                   mine={mineFor(game.reactions, previewCard.uid, user?.uid)}
                   onReact={(key) => handleReact(previewCard.uid, key)}
                   disabled={reactionCooling}
