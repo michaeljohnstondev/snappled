@@ -27,28 +27,58 @@ import theme from '../../theme/themes';
 
 // key = what's stored in Firestore, glyph = what's drawn. Keeping them
 // separate means the art can change without migrating any game docs.
+// Three bands - praise, chaos, burns - so the pick is a region first
+// and a glyph second. First slot in each row is the most reached for.
+export const REACTION_GROUPS = [
+  {
+    band: 'good',
+    items: [
+      { key: 'up', glyph: '👍' },
+      { key: 'laugh', glyph: '😂' },
+      { key: 'love', glyph: '😍' },
+      { key: 'hundred', glyph: '💯' },
+    ],
+  },
+  {
+    band: 'chaos',
+    items: [
+      { key: 'fire', glyph: '🔥' },
+      { key: 'monocle', glyph: '🧐' },
+      { key: 'mind', glyph: '🤯' },
+      { key: 'skull', glyph: '💀' },
+    ],
+  },
+  {
+    band: 'bad',
+    items: [
+      { key: 'down', glyph: '👎' },
+      { key: 'scream', glyph: '😱' },
+      { key: 'cringe', glyph: '😬' },
+      { key: 'trash', glyph: '🗑️' },
+    ],
+  },
+];
+
+// Flat, in band order. Everything outside the picker - the scatter, the
+// summary strip, GameScreen's bot picks - wants one list and does not
+// care about the grouping, so the bands stay a picker concern only.
+export const REACTIONS = REACTION_GROUPS.flatMap(g => g.items);
+
 // Picker sheet geometry. Fixed rather than measured because the sheet
 // has to be POSITIONED before it is laid out - it opens anchored to the
 // toggle, and you cannot anchor to something whose size you don't know
-// yet. Five to a row across ten emoji is two rows.
-const SHEET_COLS = 5;
+// yet. Derived from the bands rather than hardcoded, so adding an emoji
+// cannot leave the sheet the wrong size for what it holds.
+const SHEET_COLS = Math.max(...REACTION_GROUPS.map(g => g.items.length));
+const SHEET_ROWS = REACTION_GROUPS.length;
 const SHEET_CELL = 40;
 const SHEET_GAP = 6;
+// Bands get more air between them than the glyphs inside one, which is
+// what makes them read as three groups rather than a block of twelve.
+const SHEET_ROW_GAP = 12;
 const SHEET_PAD = 10;
 const SHEET_W = SHEET_COLS * SHEET_CELL + (SHEET_COLS - 1) * SHEET_GAP + SHEET_PAD * 2;
-
-export const REACTIONS = [
-  { key: 'laugh', glyph: '😂' },
-  { key: 'fire', glyph: '🔥' },
-  { key: 'skull', glyph: '💀' },
-  { key: 'trash', glyph: '🗑️' },
-  { key: 'up', glyph: '👍' },
-  { key: 'down', glyph: '👎' },
-  { key: 'love', glyph: '😍' },
-  { key: 'mind', glyph: '🤯' },
-  { key: 'eyes', glyph: '👀' },
-  { key: 'clown', glyph: '🤡' },
-];
+const SHEET_H = SHEET_ROWS * SHEET_CELL + (SHEET_ROWS - 1) * SHEET_ROW_GAP + SHEET_PAD * 2;
 
 /**
  * Tally of each emoji on one submission.
@@ -102,7 +132,7 @@ export function mineFor(reactions, subUid, myUid) {
 function sheetPosition(anchor) {
   if (!anchor) return null;
   const win = Dimensions.get('window');
-  const height = 2 * SHEET_CELL + SHEET_GAP + SHEET_PAD * 2;
+  const height = SHEET_H;
 
   const left = Math.max(8, Math.min(
     win.width - SHEET_W - 8,
@@ -240,25 +270,31 @@ export default function ReactionBar({
         >
           <Pressable style={styles.pickerBackdrop} onPress={() => setOpen(false)}>
             <Pressable style={[styles.pickerSheet, sheetPosition(anchor)]} onPress={() => {}}>
-              {REACTIONS.map(({ key, glyph }) => (
-                <Pressable
-                  key={key}
-                  onPress={() => {
-                    onReact?.(key);
-                    // Not while dimmed: GameScreen drops that tap, and
-                    // closing on a reaction that never landed reads as
-                    // a success.
-                    if (!disabled) setOpen(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.pickerCell,
-                    mine[key] && styles.pickerCellMine,
-                    (pressed || disabled) && styles.chipDim,
-                  ]}
-                  hitSlop={4}
-                >
-                  <Text style={styles.pickerGlyph}>{glyph}</Text>
-                </Pressable>
+              {/* A row per band; wrapping would scramble them if the
+                  bands ever stop being equal length. */}
+              {REACTION_GROUPS.map(group => (
+                <View key={group.band} style={styles.pickerRow}>
+                  {group.items.map(({ key, glyph }) => (
+                    <Pressable
+                      key={key}
+                      onPress={() => {
+                        onReact?.(key);
+                        // Not while dimmed: GameScreen drops that tap,
+                        // and closing on a reaction that never landed
+                        // reads as a success.
+                        if (!disabled) setOpen(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.pickerCell,
+                        mine[key] && styles.pickerCellMine,
+                        (pressed || disabled) && styles.chipDim,
+                      ]}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.pickerGlyph}>{glyph}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               ))}
             </Pressable>
           </Pressable>
@@ -413,15 +449,19 @@ const styles = StyleSheet.create({
   },
   pickerSheet: {
     width: SHEET_W,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: SHEET_GAP,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: SHEET_ROW_GAP,
     padding: SHEET_PAD,
     borderRadius: 14,
     borderWidth: 2,
     borderColor: theme.colors.vibeBlue,
     backgroundColor: '#0A1A2A',
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SHEET_GAP,
   },
   pickerCell: {
     width: SHEET_CELL,

@@ -1810,12 +1810,23 @@ export default function GameScreen({ navigation, route }) {
             {/* All three share the toggle variant. Ranked was the
                 default neon-border style and the other two were
                 toggles, which read as two different kinds of thing
-                when they are simply the three ways to start a game. */}
+                when they are simply the three ways to start a game.
+
+                Practice leads and Ranked sits last, because Ranked is
+                the only one of the three that does not start a game -
+                it opens a "coming soon" alert. Leading with it put a
+                dead end at the top of the menu. */}
+            {/* Not gated on the snapple pool loading. The buttons used
+                to sit disabled - and this one read "Loading..." - until
+                the community list arrived, which made the menu feel
+                broken on every open for the sake of a check that has
+                not failed since the library grew. If a game genuinely
+                cannot start, the start path already reports it. */}
             <VibeButton
-              label="Ranked"
-              onPress={() => showAlert('Coming Soon', 'Ranked matches will be available soon!')}
+              label="Practice"
+              onPress={handlePractice}
               variant="toggle"
-              color="yellow"
+              color="cyan"
             />
             <VibeButton
               label="Custom"
@@ -1830,17 +1841,11 @@ export default function GameScreen({ navigation, route }) {
               variant="toggle"
               color="blue"
             />
-            {/* Not gated on the snapple pool loading. The buttons used
-                to sit disabled - and this one read "Loading..." - until
-                the community list arrived, which made the menu feel
-                broken on every open for the sake of a check that has
-                not failed since the library grew. If a game genuinely
-                cannot start, the start path already reports it. */}
             <VibeButton
-              label="Practice (Solo)"
-              onPress={handlePractice}
+              label="Ranked"
+              onPress={() => showAlert('Coming Soon', 'Ranked matches will be available soon!')}
               variant="toggle"
-              color="cyan"
+              color="yellow"
             />
           </View>
 

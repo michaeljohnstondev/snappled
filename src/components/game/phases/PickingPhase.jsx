@@ -278,39 +278,53 @@ export default function PickingPhase({
           }}
         />
 
-        {(user?.inventory?.mulligans || 0) > 0 && (
-          <Pressable
-            style={[styles.mulliganBtnBottom, mulliganMode && styles.mulliganBtnBottomActive]}
-            onPress={onMulliganToggle}
-          >
-            <Ionicons
-              name={mulliganMode ? 'close' : 'refresh'}
-              size={16}
-              color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
-            />
-            <Text style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}>
-              {mulliganMode ? 'Cancel' : `Mulligan (${user?.inventory?.mulligans || 0})`}
-            </Text>
-          </Pressable>
-        )}
       </View>
 
       {/* Flush submit bar — gradient + shimmer via ShimmerBar so the
           resting (blue → purple) and armed (green → yellow) states
-          both feel alive. Selected state includes the paddingBottom
-          safe-area bump via the style prop. */}
-      {selectedCard ? (
-        <ShimmerBar
-          colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
-          label="PLAY THIS SNAPPLE"
-          onPress={() => onPickCard(selectedCard)}
-        />
-      ) : (
-        <ShimmerBar
-          colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
-          label="PICK A SNAPPLE"
-        />
-      )}
+          both feel alive.
+
+          Mulligan rides IN this bar rather than above it. As its own
+          centred pill it spent a whole row of height between the cards
+          and the CTA to hold one chip - height the grid wanted, on the
+          one screen where seeing the cards matters most. Beside the CTA
+          it costs nothing: the bar was already there, and the 1/4 + 3/4
+          split is the same one BACK and SUBMIT use in the preview
+          modal, so the two bars read as the same furniture. */}
+      <View style={styles.actionRow}>
+        {(user?.inventory?.mulligans || 0) > 0 && (
+          <Pressable
+            style={[styles.mulliganChunk, mulliganMode && styles.mulliganChunkActive]}
+            onPress={onMulliganToggle}
+          >
+            <Ionicons
+              name={mulliganMode ? 'close' : 'refresh'}
+              size={18}
+              color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
+            />
+            <Text
+              style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}
+              numberOfLines={1}
+            >
+              {mulliganMode ? 'CANCEL' : `MULLIGAN (${user?.inventory?.mulligans || 0})`}
+            </Text>
+          </Pressable>
+        )}
+        {selectedCard ? (
+          <ShimmerBar
+            colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+            label="PLAY THIS SNAPPLE"
+            onPress={() => onPickCard(selectedCard)}
+            style={styles.ctaChunk}
+          />
+        ) : (
+          <ShimmerBar
+            colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
+            label="PICK A SNAPPLE"
+            style={styles.ctaChunk}
+          />
+        )}
+      </View>
 
       {/* Fullscreen preview modal — opened from either a grid tap
           (via _fromYourCard/regular) or from the YOUR CARD play icon.
@@ -490,39 +504,49 @@ const makeStyles = (t) => ({
   },
 
   // 2-col grid.
-  // Rail + mulligan occupy everything between the pinned prompt and
-  // the submit bar. ShimmerBar is in normal flow, not overlaid, so no
-  // clearance is needed — the old paddingBottom: 100 was left over from
-  // the scroll layout and was eating height the cards can now use.
+  // The rail now owns everything between the pinned prompt and the
+  // action bar - the mulligan chip used to take a row out of this and
+  // has moved into the bar. ShimmerBar is in normal flow, not overlaid,
+  // so no clearance is needed - the old paddingBottom: 100 was left
+  // over from the scroll layout and was eating height the cards use.
   railWrap: {
     flex: 1,
     justifyContent: 'center',
     paddingBottom: 8,
   },
 
-  // Mulligan chip — carried over from the previous design.
-  mulliganBtnBottom: {
-    flexDirection: 'row',
+  // The mulligan chunk and the CTA share the existing `actionRow`
+  // below - it already describes this exact split (1/4 + 3/4, stretched
+  // to one height, black top border) and was sitting unused. A second
+  // near-identical style would have shadowed it silently, since a later
+  // duplicate key just wins.
+  mulliganChunk: {
+    flex: 1,
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    marginTop: 4,
-    marginBottom: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: theme.colors.vibeGreen,
-    backgroundColor: 'rgba(0,255,65,0.1)',
+    justifyContent: 'center',
+    gap: 3,
+    paddingHorizontal: 4,
+    // Nudged up to sit level with the CTA's label, which is not
+    // centred in its own bar - ShimmerBar carries a deeper bottom
+    // padding for the home-bar safe area.
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0,255,65,0.12)',
+    borderRightWidth: 2,
+    borderRightColor: '#000',
   },
-  mulliganBtnBottomActive: {
-    borderColor: theme.colors.vibeRed,
-    backgroundColor: 'rgba(255,68,68,0.15)',
+  mulliganChunkActive: {
+    backgroundColor: 'rgba(255,68,68,0.18)',
   },
   mulliganText: {
     color: theme.colors.vibeGreen,
-    fontSize: 13,
+    // Small: the chunk is a quarter of the row and the label has to
+    // survive "MULLIGAN (3)" without wrapping.
+    fontSize: 10,
     fontWeight: 'bold',
+    letterSpacing: 0.3,
+  },
+  ctaChunk: {
+    flex: 3,
   },
 
   // YOUR CARD section at the bottom of the scroll.
