@@ -543,15 +543,20 @@ const makeStyles = (t) => ({
   actionSection: {
     paddingTop: 20,
   },
-  // Sits level with the middle of the avatar rather than pinned to the
-  // top of the block, where it read as floating above the profile
-  // instead of belonging to it.
-  // profileSection has 24 of top padding and the avatar is 80 tall, so
-  // its centre sits at 64. The button is ~38 tall including its own
-  // padding, so 45 puts the two centres level.
+  // Top edge flush with the top of the avatar.
+  //
+  // profileSection has 24 of vertical padding, so the avatar starts at
+  // y=24 - but this button carries 6 of its own padding, and it is the
+  // GLYPH that has to line up, not the touch target around it. Hence
+  // 18: the box starts six early so the icon lands on 24.
+  //
+  // It was 45, which is where the two CENTRES line up (avatar centre at
+  // 64, button ~38 tall). That measured correct and still read low: the
+  // avatar has a name and stats stacked under it and the button has
+  // nothing to balance against, so the eye pairs them by their tops.
   menuBtn: {
     position: 'absolute',
-    top: 45,
+    top: 18,
     right: 8,
     padding: 6,
     zIndex: 5,
