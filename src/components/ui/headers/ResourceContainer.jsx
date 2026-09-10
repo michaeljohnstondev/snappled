@@ -82,7 +82,10 @@ export default function ResourceContainer({ userStats }) {
         onPressIn={() => openPopup('tickets')}
         onPressOut={closePopup}
       >
-        <CurrencyIcon name="tickets" size={24} />
+        {/* A touch larger than the coin and trophy either side of it,
+            for the same reason as the store: a wide, short shape fits
+            by width and reads smaller at an equal nominal size. */}
+        <CurrencyIcon name="tickets" size={25} />
         <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
 

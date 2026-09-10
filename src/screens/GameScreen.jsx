@@ -416,6 +416,13 @@ export default function GameScreen({ navigation, route }) {
   const [game, setGame] = useState(null);
   const [hand, setHand] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
+  // One free mulligan per GAME, held in component state and never
+  // written to inventory. That is the whole point: an unused one has
+  // nowhere to accumulate, so it cannot roll over into the next game or
+  // quietly become a balance people bank. Spent free-first, so a player
+  // never burns a purchased one while the free one is still sitting
+  // there.
+  const [freeMulligan, setFreeMulligan] = useState(1);
   const [currentVoteIndex, setCurrentVoteIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [mySnapples, setMySnapples] = useState([]);
@@ -538,7 +545,6 @@ export default function GameScreen({ navigation, route }) {
   // filter the hand pool so each round reveals unseen cards.
   const [playedCardIds, setPlayedCardIds] = useState([]);
   // When true, tapping a card in the hand replaces it instead of previewing.
-  const [mulliganMode, setMulliganMode] = useState(false);
   const [showScoreboard, setShowScoreboard] = useState(false);
   // Help overlay — user-triggered via the "?" button on
   // RoundHeaderBar. Now a press-and-hold: press-in shows the tip,
@@ -869,7 +875,6 @@ export default function GameScreen({ navigation, route }) {
     setCurrentVoteIndex(0);
     setFavoriteCard(null);
     setHasVoted(false);
-    setMulliganMode(false);
     setPreviewCard(null);
   }, [gameId, game?.currentRound]);
 
@@ -1428,19 +1433,30 @@ export default function GameScreen({ navigation, route }) {
     }
   };
 
-  // Mulligan swap — replaces a hand card with a random unplayed snapple
-  // from the user's deck and decrements their inventory. Used inline by
-  // PickingPhase via the onMulliganSwap prop.
-  const handleMulliganSwap = async (card) => {
+  // Swap one hand card for a random unplayed snapple from the deck and
+  // decrement the inventory. Split from handleMulligan so the confirm
+  // step owns the decision and this owns the work.
+  const swapCard = async (card) => {
     const remaining = mySnapples.filter(s => !hand.some(h => h.id === s.id));
     if (remaining.length === 0) {
       showAlert('No Cards', 'No more cards to draw from your deck');
-      setMulliganMode(false);
       return;
     }
     const newCard = remaining[Math.floor(Math.random() * remaining.length)];
     setHand(prev => prev.map(h => (h.id === card.id ? newCard : h)));
-    setMulliganMode(false);
+    // Clear the selection: the card it pointed at is gone, and leaving
+    // it set would arm PLAY THIS SNAPPLE for a card no longer in hand.
+    setSelectedCard(null);
+
+    // Free one first, and it costs nothing anywhere - no write, no
+    // balance to decrement. Only once it is gone does this touch the
+    // purchased stock.
+    if (freeMulligan > 0) {
+      setFreeMulligan(0);
+      showToast('reward', 'Mulligan!', 'Card swapped (free)');
+      return;
+    }
+
     try {
       const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
       const { db: mDb } = await import('../services/firebase');
@@ -1449,6 +1465,39 @@ export default function GameScreen({ navigation, route }) {
       });
     } catch (e) {}
     showToast('reward', 'Mulligan!', 'Card swapped');
+  };
+
+  // Back to one whenever the game changes. Keyed on gameId rather than
+  // on a lifecycle event so rejoining the SAME game does not hand out a
+  // second free swap.
+  useEffect(() => { setFreeMulligan(1); }, [gameId]);
+
+  const mulligansLeft = freeMulligan + (user?.inventory?.mulligans || 0);
+
+  // Mulligan acts on the card you already picked.
+  //
+  // It used to be a MODE - arm the button, then tap a card, and it was
+  // gone instantly with nothing asked. Two problems: the tap that
+  // normally selects a card silently meant something else while the
+  // mode was on, and spending a limited item took one tap with no way
+  // back. Now the selection is the ordinary one and the confirm is the
+  // only place anything is spent.
+  const handleMulligan = () => {
+    if (mulligansLeft <= 0) {
+      showAlert('No Mulligans', 'You have no mulligans left.');
+      return;
+    }
+    if (!selectedCard) {
+      showAlert('Pick a Snapple', 'Select the snapple you want to replace first.');
+      return;
+    }
+    showConfirm(
+      'Replace this snapple?',
+      freeMulligan > 0
+        ? 'This swaps it for another from your deck, using your free mulligan for this game.'
+        : 'This swaps it for another from your deck and uses one mulligan.',
+      () => swapCard(selectedCard),
+    );
   };
 
   // Admin: replace the current round's prompt with a fresh one from
@@ -1546,7 +1595,6 @@ export default function GameScreen({ navigation, route }) {
     setCurrentVoteIndex(0);
     setFavoriteCard(null);
     setHasVoted(false);
-    setMulliganMode(false);
 
     if (playedThisRound) {
       setHand(prev => {
@@ -1594,7 +1642,6 @@ export default function GameScreen({ navigation, route }) {
     setCurrentVoteIndex(0);
     setIsSpectating(false);
     setPlayedCardIds([]);
-    setMulliganMode(false);
   };
 
   const handleFinish = async () => {
@@ -1709,7 +1756,6 @@ export default function GameScreen({ navigation, route }) {
           setIsSpectating(false);
           setIsPractice(false);
           setPlayedCardIds([]);
-          setMulliganMode(false);
 
           // Brief beat so the lobby paints + resource bar mounts before the
           // claim modal opens on top of it.
@@ -1972,7 +2018,6 @@ export default function GameScreen({ navigation, route }) {
         timer={timer}
         selectedCard={selectedCard}
         previewCard={previewCard}
-        mulliganMode={mulliganMode}
         isEditingPrompt={isEditingPrompt}
         editPromptText={editPromptText}
         showToast={showToast}
@@ -1989,8 +2034,8 @@ export default function GameScreen({ navigation, route }) {
           setPreviewCard(null);
         }}
         onCreatorPress={handleCreatorPress}
-        onMulliganToggle={() => setMulliganMode(prev => !prev)}
-        onMulliganSwap={handleMulliganSwap}
+        mulligansLeft={mulligansLeft}
+        onMulligan={handleMulligan}
         onEditPromptOpen={(promptText) => {
           setEditPromptText(promptText);
           setIsEditingPrompt(true);

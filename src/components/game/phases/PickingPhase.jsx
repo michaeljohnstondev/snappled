@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, Pressable, ScrollView, Modal, TextInput,
-  ActivityIndicator, StyleSheet,
+  ActivityIndicator, StyleSheet, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import RoundPromptBanner from '../round/RoundPromptBanner';
 import ReactionBar, { mineFor } from '../ReactionBar';
 import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
+import BackChunk from '../../ui/BackChunk';
 import theme from '../../../theme/themes';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
 
@@ -42,7 +43,7 @@ export default function PickingPhase({
   timer,
   selectedCard,
   previewCard,
-  mulliganMode,
+  mulligansLeft = 0,
   isEditingPrompt,
   editPromptText,
   showToast,
@@ -55,8 +56,7 @@ export default function PickingPhase({
   onHelp,
   onHelpEnd,
   onCreatorPress,
-  onMulliganToggle,
-  onMulliganSwap,
+  onMulligan,
   onEditPromptOpen,
   onEditPromptClose,
   onEditPromptTextChange,
@@ -82,6 +82,9 @@ export default function PickingPhase({
   // fresh mount so the video starts from frame 0.
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  // Up here with the other hooks: there is an early return further
+  // down, and a hook below it runs in some renders and not others.
+  const { width } = useWindowDimensions();
 
   const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
   const bumpInline = (id) => {
@@ -216,6 +219,18 @@ export default function PickingPhase({
     if (next) onPreviewCard({ ...next, _isWaiting: previewCard?._isWaiting });
   };
 
+  // Passed in, not read off inventory: the free per-game one lives in
+  // GameScreen and never lands in inventory at all.
+  const hasMulligan = mulligansLeft > 0;
+
+  // The CTA label already centres inside its own button; what it misses
+  // is the middle of the SCREEN, because that button is only 3/4 of the
+  // row once the mulligan takes a quarter. A single centred child with a
+  // right margin of W sits W/2 to the left, so a margin of one quarter
+  // of the screen moves it exactly the eighth it is out by - and falls
+  // away when there is no mulligan and the bar is full width.
+  const ctaTextStyle = hasMulligan ? { marginRight: width / 4 } : null;
+
   return (
     <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
@@ -233,9 +248,7 @@ export default function PickingPhase({
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>YOUR HAND</Text>
         <View style={{ flex: 1 }} />
-        <Text style={styles.sectionHint}>
-          {mulliganMode ? 'Tap to replace' : 'Tap to select'}
-        </Text>
+        <Text style={styles.sectionHint}>Tap to select</Text>
       </View>
 
       <View style={styles.railWrap}>
@@ -248,17 +261,12 @@ export default function PickingPhase({
             // Card body tap = SELECT + play inline once. Tap the
             // same card again to replay (playToken increments so
             // the inline player remounts). Fullscreen chip opens
-            // the full preview modal. Mulligan mode overrides.
+            // the full preview modal.
             const onCardTap = () => {
-              if (mulliganMode) {
-                onMulliganSwap(item);
-                return;
-              }
               if (onSelectCard) onSelectCard(item);
               bumpInline(item.id);
             };
             const onFullscreen = () => {
-              if (mulliganMode) return;
               setInlinePlaying({ id: null, token: 0 });
               if (onSelectCard) onSelectCard(item);
               onPreviewCard(item);
@@ -292,23 +300,18 @@ export default function PickingPhase({
           split is the same one BACK and SUBMIT use in the preview
           modal, so the two bars read as the same furniture. */}
       <View style={styles.actionRow}>
-        {(user?.inventory?.mulligans || 0) > 0 && (
-          <Pressable
-            style={[styles.mulliganChunk, mulliganMode && styles.mulliganChunkActive]}
-            onPress={onMulliganToggle}
-          >
-            <Ionicons
-              name={mulliganMode ? 'close' : 'refresh'}
-              size={18}
-              color={mulliganMode ? theme.colors.vibeRed : theme.colors.vibeGreen}
-            />
-            <Text
-              style={[styles.mulliganText, mulliganMode && { color: theme.colors.vibeRed }]}
-              numberOfLines={1}
-            >
-              {mulliganMode ? 'CANCEL' : `MULLIGAN (${user?.inventory?.mulligans || 0})`}
-            </Text>
-          </Pressable>
+        {hasMulligan && (
+          // Same chunk the preview modal's BACK uses, so the two bars
+          // are visibly the same furniture. Word only, no icon - the
+          // label already says what it does and the glyph crowded a
+          // quarter-width chunk. Turns red once armed, which is the
+          // only thing that has to differ from BACK.
+          <BackChunk
+            onPress={onMulligan}
+            style={styles.mulliganChunk}
+            label={`MULLIGAN (${mulligansLeft})`}
+            textStyle={styles.mulliganText}
+          />
         )}
         {selectedCard ? (
           <ShimmerBar
@@ -316,12 +319,14 @@ export default function PickingPhase({
             label="PLAY THIS SNAPPLE"
             onPress={() => onPickCard(selectedCard)}
             style={styles.ctaChunk}
+            textStyle={ctaTextStyle}
           />
         ) : (
           <ShimmerBar
             colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
             label="PICK A SNAPPLE"
             style={styles.ctaChunk}
+            textStyle={ctaTextStyle}
           />
         )}
       </View>
@@ -522,28 +527,13 @@ const makeStyles = (t) => ({
   // duplicate key just wins.
   mulliganChunk: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    paddingHorizontal: 4,
-    // Nudged up to sit level with the CTA's label, which is not
-    // centred in its own bar - ShimmerBar carries a deeper bottom
-    // padding for the home-bar safe area.
-    paddingBottom: 10,
-    backgroundColor: 'rgba(0,255,65,0.12)',
-    borderRightWidth: 2,
-    borderRightColor: '#000',
-  },
-  mulliganChunkActive: {
-    backgroundColor: 'rgba(255,68,68,0.18)',
   },
   mulliganText: {
-    color: theme.colors.vibeGreen,
-    // Small: the chunk is a quarter of the row and the label has to
-    // survive "MULLIGAN (3)" without wrapping.
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.3,
+    // Tighter than BACK's, which is set for a four-letter word.
+    // BackChunk shrinks to fit on top of this, so a longer count
+    // still lands on one line.
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   ctaChunk: {
     flex: 3,

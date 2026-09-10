@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 
 const GROUPS = [
@@ -31,9 +31,9 @@ const ACHIEVEMENTS = [
 
   // Winning rounds
   { id: 'rounds_1', group: 'rounds', name: 'Round Winner', desc: 'Win your first round', icon: '✋', coins: 25, xp: 15 },
-  { id: 'rounds_10', group: 'rounds', name: 'On A Roll', desc: 'Win 10 rounds', icon: '🎯', coins: 100, xp: 50 },
+  { id: 'rounds_10', group: 'rounds', name: 'On A Roll', desc: 'Win 10 rounds', icon: '🎯', coins: 100, xp: 50, mulligans: 1 },
   { id: 'rounds_50', group: 'rounds', name: 'Round Master', desc: 'Win 50 rounds', icon: '💪', coins: 300, xp: 200 },
-  { id: 'rounds_100', group: 'rounds', name: 'Dominator', desc: 'Win 100 rounds', icon: '⚡', coins: 600, xp: 400 },
+  { id: 'rounds_100', group: 'rounds', name: 'Dominator', desc: 'Win 100 rounds', icon: '⚡', coins: 600, xp: 400, mulligans: 1 },
   { id: 'sweep', group: 'rounds', name: 'Clean Sweep', desc: 'Win every round in a game', icon: '🧹', coins: 500, xp: 250 },
   { id: 'comeback', group: 'rounds', name: 'Comeback Kid', desc: 'Win a game after losing the first round', icon: '🔄', coins: 250, xp: 150 },
 
@@ -63,11 +63,11 @@ const ACHIEVEMENTS = [
   { id: 'level_100', group: 'levels', name: 'Max Level', desc: 'Reach level 100', icon: '✨', coins: 5000, xp: 0, trophies: 50 },
 
   // Trophy ranks
-  { id: 'trophies_25', group: 'trophies', name: 'Bronze', desc: 'Earn 25 trophies', icon: '🥉', coins: 200, xp: 100 },
+  { id: 'trophies_25', group: 'trophies', name: 'Bronze', desc: 'Earn 25 trophies', icon: '🥉', coins: 200, xp: 100, mulligans: 1 },
   { id: 'trophies_50', group: 'trophies', name: 'Silver', desc: 'Earn 50 trophies', icon: '🥈', coins: 400, xp: 200 },
-  { id: 'trophies_100', group: 'trophies', name: 'Gold', desc: 'Earn 100 trophies', icon: '🥇', coins: 750, xp: 400 },
+  { id: 'trophies_100', group: 'trophies', name: 'Gold', desc: 'Earn 100 trophies', icon: '🥇', coins: 750, xp: 400, mulligans: 1 },
   { id: 'trophies_250', group: 'trophies', name: 'Platinum', desc: 'Earn 250 trophies', icon: '💠', coins: 1500, xp: 750 },
-  { id: 'trophies_500', group: 'trophies', name: 'Diamond', desc: 'Earn 500 trophies', icon: '💎', coins: 3000, xp: 1500 },
+  { id: 'trophies_500', group: 'trophies', name: 'Diamond', desc: 'Earn 500 trophies', icon: '💎', coins: 3000, xp: 1500, mulligans: 2 },
 
   // Social. Both sides of a follow are worth marking, and they are not
   // the same thing: being followed is other people rating you, while
@@ -196,21 +196,26 @@ export const achievementService = {
       }
 
       if (newAchievements.length > 0) {
-        const totalCoins = newAchievements.reduce((sum, a) => sum + (a.coins || 0), 0);
-        const totalXP = newAchievements.reduce((sum, a) => sum + (a.xp || 0), 0);
-        const totalTrophies = newAchievements.reduce((sum, a) => sum + (a.trophies || 0), 0);
+        const total = (field) => newAchievements
+          .reduce((sum, a) => sum + (a[field] || 0), 0);
+        const totalCoins = total('coins');
+        const totalXP = total('xp');
+        const totalTrophies = total('trophies');
+        const totalMulligans = total('mulligans');
         const updates = {
           achievements: [...existing, ...newAchievements],
           updatedAt: serverTimestamp(),
         };
-        if (totalCoins > 0) {
-          updates['resources.coins'] = (userData.resources?.coins || 0) + totalCoins;
-        }
-        if (totalXP > 0) {
-          updates['profile.xp'] = (userData.profile?.xp || 0) + totalXP;
-        }
-        if (totalTrophies > 0) {
-          updates['resources.trophies'] = (userData.resources?.trophies || 0) + totalTrophies;
+        // increment() rather than read-then-write. The old form computed
+        // the new total from a snapshot taken earlier in this function,
+        // so a purchase or a round reward landing in between was
+        // overwritten - and a payout that silently eats currency someone
+        // just paid for is the worst version of that bug.
+        if (totalCoins > 0) updates['resources.coins'] = increment(totalCoins);
+        if (totalXP > 0) updates['profile.xp'] = increment(totalXP);
+        if (totalTrophies > 0) updates['resources.trophies'] = increment(totalTrophies);
+        if (totalMulligans > 0) {
+          updates['inventory.mulligans'] = increment(totalMulligans);
         }
         await updateDoc(doc(db, 'users', userId), updates);
       }

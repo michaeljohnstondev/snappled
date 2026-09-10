@@ -6,6 +6,7 @@ import * as Updates from 'expo-updates';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import ProfileMenu from '../components/ui/modals/ProfileMenu';
+import { isAdminUid } from '../lib/admin';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -425,6 +426,7 @@ export default function UserProfileScreen({ route, navigation }) {
         onAchievements={() => navigation.navigate('Achievements')}
         onSettings={() => navigation.navigate('Settings')}
         onSignOut={handleSignOut}
+        onAdmin={isAdminUid(user?.uid) ? () => navigation.navigate('Admin') : null}
         version={`v${APP_VERSION} · ${UPDATE_TAG}`}
       />
     </AppLayout>

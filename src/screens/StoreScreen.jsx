@@ -41,7 +41,10 @@ const BUNDLES = [
   // purchase, not the third.
   { id: 'snappled_bundle_taster', name: 'Taster Pack', coins: 100, tickets: 5, price: '$1.99', tag: 'Save 33%', gradient: ['#00FF41', '#00C6FF'] },
   { id: 'snappled_bundle_starter', name: 'Starter Pack', coins: 500, tickets: 10, price: '$4.99', tag: 'Save 25%', gradient: ['#00C6FF', '#0072FF'] },
-  { id: 'snappled_bundle_creator', name: 'Creator Pack', coins: 2000, tickets: 25, price: '$14.99', tag: 'Save 30%', gradient: ['#FFD700', '#FF8C00'] },
+  // Candy apple red into orange. It was gold into orange, and the coin
+  // art is gold - so the icon vanished into the card it was sitting on,
+  // on the one bundle where the coin count is the selling point.
+  { id: 'snappled_bundle_creator', name: 'Creator Pack', coins: 2000, tickets: 25, price: '$14.99', tag: 'Save 30%', gradient: ['#FF0800', '#FF8C00'] },
   { id: 'snappled_bundle_mega', name: 'Mega Pack', coins: 10000, tickets: 50, price: '$49.99', tag: 'Save 40%', gradient: ['#6B00CC', '#FF00FF'] },
 ];
 
@@ -188,7 +191,15 @@ export default function StoreScreen({ navigation }) {
                         </Text>
                       </View>
                       <View style={styles.bundleLine}>
-                        <CurrencyIcon name="tickets" size={20} />
+                        {/* Bigger than the coin beside it, not equal.
+                            The ticket is a wide, short shape, so
+                            `contain` fits it by WIDTH and it sits far
+                            shorter than a round coin at the same
+                            nominal size - matching the numbers made it
+                            look like the lesser of the two. Bundles
+                            only; the ticket section's own icons are
+                            large already. */}
+                        <CurrencyIcon name="tickets" size={24} />
                         <Text style={styles.bundleItem}>{bundle.tickets}</Text>
                       </View>
                     </View>

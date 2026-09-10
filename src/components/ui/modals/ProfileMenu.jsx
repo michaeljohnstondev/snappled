@@ -20,11 +20,13 @@ import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
  * @param {boolean} visible
  * @param {Function} onClose
  * @param {Function} onSettings, onAchievements, onSignOut
+ * @param {Function} onAdmin  omit for everyone who isn't an admin; the
+ *   row is only drawn when it's given
  * @param {string} version  shown, not tappable — it exists to be read
  *   out in a bug report
  */
 export default function ProfileMenu({
-  visible, onClose, onSettings, onAchievements, onSignOut, version,
+  visible, onClose, onSettings, onAchievements, onSignOut, onAdmin, version,
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -48,6 +50,18 @@ export default function ProfileMenu({
             <Text style={styles.label}>Settings</Text>
             <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
           </Pressable>
+
+          {/* Admin. Sits below the everyday rows and above the
+              divider, so it reads as an extra rather than as part of
+              the set everyone sees. Absent entirely for non-admins -
+              the caller simply doesn't pass a handler. */}
+          {onAdmin && (
+            <Pressable style={styles.row} onPress={go(onAdmin)}>
+              <Ionicons name="construct" size={20} color={theme.colors.vibeGreen} />
+              <Text style={styles.label}>Admin</Text>
+              <Ionicons name="chevron-forward" size={18} color={t.colors.textSecondary} />
+            </Pressable>
+          )}
 
           <View style={styles.divider} />
 

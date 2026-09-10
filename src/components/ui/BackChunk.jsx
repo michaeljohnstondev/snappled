@@ -14,18 +14,38 @@ import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
-export default function BackChunk({ onPress, label = 'BACK', style }) {
+/**
+ * @param {string[]} colors  override the gradient. Defaults to the
+ *   reverse-of-the-CTA purple to blue; a caller with its own state -
+ *   the mulligan chunk turning red once it is armed - passes its own.
+ * @param {object} textStyle label overrides
+ */
+export default function BackChunk({
+  onPress, label = 'BACK', style, textStyle,
+  colors = [theme.colors.vibePurple, theme.colors.vibeBlue],
+}) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={[styles.wrap, style]}>
       <LinearGradient
-        colors={[theme.colors.vibePurple, theme.colors.vibeBlue]}
+        colors={colors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <Text style={styles.label}>{label}</Text>
+        {/* Shrinks rather than wraps. The chunk is a quarter of the row,
+            which is generous for BACK and tight for a longer label like
+            MULLIGAN (2) - and a label that wraps to two lines in a bar
+            this shallow looks broken. */}
+        <Text
+          style={[styles.label, textStyle]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {label}
+        </Text>
       </LinearGradient>
     </Pressable>
   );
