@@ -142,11 +142,18 @@ const makeStyles = (t) => ({
     borderColor: theme.colors.vibeBlue,
   },
   pillText: {
-    color: theme.colors.vibeBlue,
+    // White numerals in a blue circle, rather than blue-on-blue. The
+    // ring and the arrows stay blue - the chrome is what carries the
+    // colour, and the number just has to be readable through it.
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
   },
   pillTextActive: {
+    // The exception, and it stays black. The active pill fills with
+    // solid vibeBlue, and white on #00C6FF is about 1.9:1 - the number
+    // you most need to read would be the hardest one on the row.
+    // Black on it is roughly 11:1.
     color: '#000',
     fontWeight: '900',
   },
