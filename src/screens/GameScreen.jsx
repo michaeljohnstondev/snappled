@@ -2250,8 +2250,9 @@ export default function GameScreen({ navigation, route }) {
                           />
                         )}
                       />
-                      {/* What you sent, hung off the card's corner. No
-                          chip or border — a drop shadow is enough to
+                      {/* What you sent, hung off the card's TOP-LEFT
+                          corner - the bottom-right is the add toggle's.
+                          No chip or border — a drop shadow is enough to
                           hold it over any video frame, and this sits
                           among the vote auras, which are the only
                           outlines that should read as meaningful here.
@@ -3627,10 +3628,16 @@ const makeStyles = (t) => ({
   // padding would otherwise push it away from the edge it's meant to
   // hang off.
   votingCardWrap: { position: 'relative' },
+  // Top-left, which is the only corner of the card that is free. It
+  // used to hang off the bottom-right, directly on top of the add-emoji
+  // toggle that lives at right: 2, bottom: 2 - the glyphs and the
+  // toggle read as one smudged control even though the toggle still
+  // took the tap. The other corners are spoken for: duration badge and
+  // fullscreen chip top-right, footer across the whole bottom edge.
   myReactionBadge: {
     position: 'absolute',
-    right: -5,
-    bottom: -7,
+    left: -5,
+    top: -7,
     flexDirection: 'row',
     gap: 1,
   },
