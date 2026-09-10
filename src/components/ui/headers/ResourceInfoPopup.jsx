@@ -19,6 +19,7 @@
 
 import React from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
+import CurrencyIcon from '../CurrencyIcon';
 import theme from '../../../theme/themes';
 
 /**
@@ -26,9 +27,11 @@ import theme from '../../../theme/themes';
  * @param {string} title
  * @param {string[]} bullets
  * @param {Function} onClose  backdrop tap and the Android back button
- * @param {{label: string, onPress: Function}} action  optional CTA,
- *   e.g. sending someone to the store for the resource they just
- *   tapped. Closes the popup itself before acting.
+ * @param {{label, onPress, currency, color}} action  optional CTA, e.g.
+ *   sending someone to the store for the resource they just tapped.
+ *   Closes the popup itself before acting. `currency` draws the coin or
+ *   ticket art inside the button, so it names the thing you are going
+ *   to get rather than just describing it.
  */
 export default function ResourceInfoPopup({
   visible, title, bullets, onClose, action,
@@ -56,11 +59,27 @@ export default function ResourceInfoPopup({
           </View>
 
           {action ? (
+            // Wears the app's toggle-button look - 3pt neon border on a
+            // dark fill, label in the same colour - rather than the flat
+            // filled rectangle this started as, which matched nothing
+            // else in the app. The currency art rides along so the
+            // button shows what it is offering.
             <Pressable
-              style={styles.action}
+              style={({ pressed }) => [
+                styles.action,
+                { borderColor: action.color || theme.colors.vibeBlue },
+                pressed && styles.actionPressed,
+              ]}
               onPress={() => { onClose?.(); action.onPress?.(); }}
             >
-              <Text style={styles.actionText}>{action.label}</Text>
+              {action.currency ? (
+                <CurrencyIcon name={action.currency} size={22} />
+              ) : null}
+              <Text
+                style={[styles.actionText, { color: action.color || theme.colors.vibeBlue }]}
+              >
+                {action.label}
+              </Text>
             </Pressable>
           ) : null}
         </Pressable>
@@ -121,17 +140,24 @@ const styles = StyleSheet.create({
   action: {
     marginTop: 18,
     alignSelf: 'stretch',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: theme.colors.vibeBlue,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 3,
+    borderRadius: theme.sizes.buttonRadius,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  actionPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   actionText: {
-    // Black on vibeBlue: white on that fill is about 1.9:1.
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: theme.fonts.main,
+    textAlign: 'center',
   },
 });

@@ -81,9 +81,20 @@ export default function ResourceContainer({ userStats }) {
   // would send someone to look for something that isn't sold.
   const goToStore = (section) => () => navigation.navigate('Store', { section });
   const popupAction = popup === 'tickets'
-    ? { label: 'Get Tickets', onPress: goToStore('tickets') }
+    ? {
+      label: 'Get Tickets',
+      onPress: goToStore('tickets'),
+      currency: 'tickets',
+      color: theme.colors.vibeGreen,
+    }
     : popup === 'coins'
-      ? { label: 'Get Coins', onPress: goToStore('coins') }
+      ? {
+        label: 'Get Coins',
+        onPress: goToStore('coins'),
+        currency: 'coins',
+        // Gold, to match the coin art sitting next to it.
+        color: theme.colors.vibeYellow,
+      }
       : null;
 
   // Level popup bullets get the live XP progress prepended so the
