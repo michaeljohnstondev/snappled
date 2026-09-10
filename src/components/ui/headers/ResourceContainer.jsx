@@ -1,10 +1,10 @@
-// Resource bar at the top of the app. Every stat pill is press-and-
-// hold: hold on a resource to see a brief popup explaining what it
-// is / how to get it / what it's for. Release to dismiss. No tap
-// actions — the previous onTokenPress → open-token-modal shortcut
-// on tickets conflicted with the press-in popup UX (short taps
-// briefly flashed the popup then opened the modal). Store surface
-// is reachable via the store tab.
+// Resource bar at the top of the app. TAP a stat pill for a popup
+// explaining what it is and where it comes from; tap anywhere to
+// dismiss. It was press-and-hold, released to dismiss, which nothing on
+// screen suggested and which could not carry an action - your finger
+// being down is the only reason the popup exists, so there is nothing
+// free to press. Latched, it can offer the store for the thing you just
+// found you were out of.
 //
 // The level pill uses a shades-of-blue LinearGradient behind the
 // XP fill so the resource bar feels alive without the extreme
@@ -14,33 +14,45 @@ import React, { useEffect, useRef, useState } from "react";
 import CurrencyIcon from '../CurrencyIcon';
 import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation } from "@react-navigation/native";
 import { levelService } from "../../../services/levelService";
 import TickingNumber from "../TickingNumber";
 import ResourceInfoPopup from "./ResourceInfoPopup";
 import theme from "../../../theme/themes";
 
-// Copy for each resource popup. Keep bullets short — this is a
-// glance-and-release tooltip, not a manual.
+// Copy for each resource popup. Keep bullets short - this is a glance,
+// not a manual.
+//
+// Checked against what the code actually pays out, because most of this
+// was wrong. Every "leveling up" claim was false: levelService is pure
+// XP maths with no payout in it at all, so levels currently buy you the
+// number and nothing else. Achievements pay coins, XP, trophies and
+// mulligans - never tickets. And trophies come from finishing a game,
+// not from levelling.
 const RESOURCE_INFO = {
   tickets: {
     title: 'Tickets',
     bullets: [
       'Used to create your own prompts',
-      'Earn from the store, leveling up, achievements, and winning games',
+      'Earn one when someone keeps a snapple you made',
+      'Or buy them in the store',
     ],
   },
   coins: {
     title: 'Coins',
     bullets: [
       'Used to buy snapples and items',
-      'Earn from leveling up, achievements, winning games, and selling snapples',
+      'Earn from placing well in games, achievements, and selling snapples',
     ],
   },
   trophies: {
     title: 'Trophies',
     bullets: [
-      'Your competitive rank across ranked games',
-      'Earn trophies by winning ranked games',
+      'Your competitive rank',
+      // The payout table is [5, 3, 1, 0, -1, -2] by placement, so the
+      // bottom two lose them. Worth saying: a rank you can only gain is
+      // not a rank.
+      'Won by placing in the top three - the bottom two lose them',
     ],
   },
   // level's bullets get an inline XP-progress line prepended at render.
@@ -48,18 +60,31 @@ const RESOURCE_INFO = {
     title: 'Level',
     bullets: [
       'Earn XP by creating snapples and playing games',
-      'Leveling up unlocks coin, ticket, and trophy rewards',
+      'Shows how much you have played',
     ],
   },
 };
 
 export default function ResourceContainer({ userStats }) {
+  const navigation = useNavigation();
   const xp = userStats.xp || 0;
   const levelInfo = levelService.getLevelInfo(xp);
   const [popup, setPopup] = useState(null);
 
-  const openPopup = (key) => setPopup(key);
+  // Toggle: tapping the pill that is already open closes it, so the
+  // pill you pressed is never a dead press.
+  const togglePopup = (key) => setPopup(prev => (prev === key ? null : key));
   const closePopup = () => setPopup(null);
+
+  // Only the two you can actually buy. A trophy has no store shelf and
+  // a level is not a thing you purchase, so offering a button there
+  // would send someone to look for something that isn't sold.
+  const goToStore = (section) => () => navigation.navigate('Store', { section });
+  const popupAction = popup === 'tickets'
+    ? { label: 'Get Tickets', onPress: goToStore('tickets') }
+    : popup === 'coins'
+      ? { label: 'Get Coins', onPress: goToStore('coins') }
+      : null;
 
   // Level popup bullets get the live XP progress prepended so the
   // player sees exactly how far they are from the next level.
@@ -79,8 +104,7 @@ export default function ResourceContainer({ userStats }) {
     <View style={styles.statsRow}>
       <Pressable
         style={styles.statItem}
-        onPressIn={() => openPopup('tickets')}
-        onPressOut={closePopup}
+        onPress={() => togglePopup('tickets')}
       >
         {/* A touch larger than the coin and trophy either side of it,
             for the same reason as the store: a wide, short shape fits
@@ -91,8 +115,7 @@ export default function ResourceContainer({ userStats }) {
 
       <Pressable
         style={styles.statItem}
-        onPressIn={() => openPopup('coins')}
-        onPressOut={closePopup}
+        onPress={() => togglePopup('coins')}
       >
         <CurrencyIcon name="coins" size={24} />
         <TickingNumber
@@ -104,8 +127,7 @@ export default function ResourceContainer({ userStats }) {
 
       <Pressable
         style={styles.statItem}
-        onPressIn={() => openPopup('trophies')}
-        onPressOut={closePopup}
+        onPress={() => togglePopup('trophies')}
       >
         <FlashOverlay value={userStats.trophies || 0} />
         <CurrencyIcon name="trophies" size={24} />
@@ -114,8 +136,7 @@ export default function ResourceContainer({ userStats }) {
 
       <Pressable
         style={styles.levelItem}
-        onPressIn={() => openPopup('level')}
-        onPressOut={closePopup}
+        onPress={() => togglePopup('level')}
       >
         {/* Base gradient (two shades of blue) — sits under the fill
             so even 0% progress reads as "alive" chrome, not a dead
@@ -144,6 +165,8 @@ export default function ResourceContainer({ userStats }) {
         visible={!!popupContent}
         title={popupContent?.title}
         bullets={popupContent?.bullets}
+        action={popupAction}
+        onClose={closePopup}
       />
     </View>
   );

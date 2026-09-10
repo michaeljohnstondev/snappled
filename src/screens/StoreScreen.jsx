@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,12 +67,23 @@ const DECK_UPGRADE_PRICES = [500, 1000, 2500, 5000, 7500];
 const DECK_BIG_INCREMENT = 25;
 const DECK_BIG_PRICE = 10000;
 
-export default function StoreScreen({ navigation }) {
+export default function StoreScreen({ navigation, route }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { user, userCurrency } = useAuth();
   const { showConfirm, showAlert } = useModal();
-  const [activeSection, setActiveSection] = useState('bundles');
+  // Opens on whichever shelf the caller asked for - the resource bar's
+  // popup sends people here for the exact currency they just ran out
+  // of, and landing them on Bundles would make them go looking for it.
+  const [activeSection, setActiveSection] = useState(route?.params?.section || 'bundles');
+
+  // The Store is a TAB, so it stays mounted: navigating to it again
+  // updates params without remounting, and the initial state above
+  // would never run a second time.
+  useEffect(() => {
+    const section = route?.params?.section;
+    if (section) setActiveSection(section);
+  }, [route?.params?.section]);
 
   const handleRealMoneyPurchase = (item) => {
     Alert.alert('Coming Soon', 'In-app purchases will be available at launch!');
