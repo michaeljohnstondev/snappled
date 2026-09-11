@@ -16,6 +16,7 @@ import { prefetchVideo } from '../../../services/videoCache';
 import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
 import { snappleService } from '../../../services/snappleService';
+import CurrencyIcon from '../CurrencyIcon';
 import theme from '../../../theme/themes';
 import { shareService } from '../../../services/shareService';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
@@ -444,17 +445,25 @@ export default function SnappleOverlay({
             <View style={styles.actionGroup}>
               <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
                 <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
-                  <Ionicons name={userInteraction.hasPurchased ? "checkmark" : "diamond"} size={20} style={{ marginTop: 2 }} color={userInteraction.hasPurchased ? theme.colors.vibeGreen : theme.colors.vibeBlue} />
+                  {/* A coin, not a gem. This is the last call site
+                      still drawing the old blue diamond next to a
+                      COIN price - in games a gem is conventionally a
+                      separate premium currency, so it named something
+                      the player cannot spend. */}
+                  {userInteraction.hasPurchased ? (
+                    <Ionicons name="checkmark" size={20} style={{ marginTop: 2 }} color={theme.colors.vibeGreen} />
+                  ) : (
+                    <CurrencyIcon name="coins" size={22} />
+                  )}
                 </View>
               </Pressable>
-              {/* Owned state still surfaces the current price under
-                  "Owned" — signals that the snapple has resale value
-                  without hiding the number entirely. */}
+              {/* Just "Owned" once it is yours. The price used to stay
+                  underneath as a resale hint, but a price tag on a
+                  thing you already bought reads as a charge, not as
+                  value - and it is the one number that cannot do
+                  anything for you here. */}
               {userInteraction.hasPurchased ? (
-                <View style={styles.buyLabelStack}>
-                  <Text style={[styles.actionCount, styles.ownedLabel]}>Owned</Text>
-                  <Text style={styles.ownedPrice}>{metrics.currentPrice}c</Text>
-                </View>
+                <Text style={[styles.actionCount, styles.ownedLabel]}>Owned</Text>
               ) : (
                 <Text style={styles.actionCount}>{metrics.currentPrice}</Text>
               )}
@@ -768,23 +777,8 @@ const makeStyles = (t) => ({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  // Owned-state label stack — "Owned" on top (green) with the
-  // current price muted underneath so users still see resale value.
-  buyLabelStack: {
-    alignItems: 'center',
-  },
   ownedLabel: {
     color: theme.colors.vibeGreen,
-  },
-  ownedPrice: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 10,
-    fontWeight: theme.fontWeights.semiBold,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    marginTop: 1,
   },
   videoInfo: {
     position: 'absolute',

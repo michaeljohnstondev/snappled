@@ -1484,7 +1484,8 @@ export default function GameScreen({ navigation, route }) {
   // only place anything is spent.
   const handleMulligan = () => {
     if (mulligansLeft <= 0) {
-      showAlert('No Mulligans', 'You have no mulligans left.');
+      showAlert('No Replaces Left',
+        'You have used your free replace this game. Buy mulligans in the store.');
       return;
     }
     if (!selectedCard) {
@@ -1493,9 +1494,11 @@ export default function GameScreen({ navigation, route }) {
     }
     showConfirm(
       'Replace this snapple?',
+      // The free one is not an item, so it doesn't name one. The paid
+      // one does, because that is what the store sold you.
       freeMulligan > 0
-        ? 'This swaps it for another from your deck, using your free mulligan for this game.'
-        : 'This swaps it for another from your deck and uses one mulligan.',
+        ? 'Swaps it for another from your deck. Free once per game.'
+        : 'Swaps it for another from your deck, using one mulligan.',
       () => swapCard(selectedCard),
     );
   };

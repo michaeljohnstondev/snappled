@@ -223,13 +223,17 @@ export default function PickingPhase({
   // GameScreen and never lands in inventory at all.
   const hasMulligan = mulligansLeft > 0;
 
-  // The CTA label already centres inside its own button; what it misses
-  // is the middle of the SCREEN, because that button is only 3/4 of the
-  // row once the mulligan takes a quarter. A single centred child with a
-  // right margin of W sits W/2 to the left, so a margin of one quarter
-  // of the screen moves it exactly the eighth it is out by - and falls
-  // away when there is no mulligan and the bar is full width.
-  const ctaTextStyle = hasMulligan ? { marginRight: width / 4 } : null;
+  // The CTA label centres inside its own button, but the button is only
+  // 3/4 of the row once the mulligan takes a quarter, so the label sits
+  // an eighth of the screen right of centre. Nudge it back.
+  //
+  // translateX, NOT a margin. A margin shifts the label by eating
+  // layout space, which leaves "PLAY THIS SNAPPLE" about 195pt to fit
+  // 210pt of text - so it wrapped to two lines and took the whole bar's
+  // height with it. A transform moves the glyphs and touches nothing.
+  const ctaTextStyle = hasMulligan
+    ? { transform: [{ translateX: -width / 8 }] }
+    : null;
 
   return (
     <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
@@ -301,16 +305,16 @@ export default function PickingPhase({
           modal, so the two bars read as the same furniture. */}
       <View style={styles.actionRow}>
         {hasMulligan && (
-          // Same chunk the preview modal's BACK uses, so the two bars
-          // are visibly the same furniture. Word only, no icon - the
-          // label already says what it does and the glyph crowded a
-          // quarter-width chunk. Turns red once armed, which is the
-          // only thing that has to differ from BACK.
+          // The same chunk the preview modal's BACK uses, down to the
+          // label size - "REPLACE" is short enough not to need its own.
+          // Says what it does rather than what it is called; "mulligan"
+          // is the item you buy, "replace" is the thing that happens.
+          // No count: the number lives in the store and on the confirm,
+          // and a tally on a button is noise at the moment you press it.
           <BackChunk
             onPress={onMulligan}
             style={styles.mulliganChunk}
-            label={`MULLIGAN (${mulligansLeft})`}
-            textStyle={styles.mulliganText}
+            label="REPLACE"
           />
         )}
         {selectedCard ? (
@@ -527,13 +531,6 @@ const makeStyles = (t) => ({
   // duplicate key just wins.
   mulliganChunk: {
     flex: 1,
-  },
-  mulliganText: {
-    // Tighter than BACK's, which is set for a four-letter word.
-    // BackChunk shrinks to fit on top of this, so a longer count
-    // still lands on one line.
-    fontSize: 11,
-    letterSpacing: 0.5,
   },
   ctaChunk: {
     flex: 3,
