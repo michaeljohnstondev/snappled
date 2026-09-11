@@ -295,20 +295,18 @@ export default function PickingPhase({
             style={styles.actionBackFlex}
           />
         )}
-        {selectedCard ? (
-          <ShimmerBar
-            colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
-            label="PLAY THIS SNAPPLE"
-            onPress={() => onPickCard(selectedCard)}
-            style={styles.actionSubmitChunk}
-          />
-        ) : (
-          <ShimmerBar
-            colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
-            label="PICK A SNAPPLE"
-            style={styles.actionSubmitChunk}
-          />
-        )}
+        {/* One bar, not two. The resting state used to wear a
+            different gradient, which made the bar look like it was
+            swapped out for another control the moment you picked a
+            card - it is the same button either way, and only the word
+            and whether it does anything change. Omitting onPress is
+            what makes it inert. */}
+        <ShimmerBar
+          colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+          label={selectedCard ? 'PLAY THIS SNAPPLE' : 'PICK A SNAPPLE'}
+          onPress={selectedCard ? () => onPickCard(selectedCard) : undefined}
+          style={styles.actionSubmitChunk}
+        />
       </View>
 
       {/* Fullscreen preview modal — opened from either a grid tap

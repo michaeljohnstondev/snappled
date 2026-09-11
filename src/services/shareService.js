@@ -21,6 +21,8 @@
  */
 
 import { Share } from 'react-native';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from './firebase';
 
 // Where a non-user lands. The per-snapple page plays the clip and hands
 // them a download link; the bare URL is the fallback when there's no id.
@@ -38,10 +40,66 @@ const SHARE_URL = 'https://snappled.com';
  * the caption drawn over the video — same clip, right context, nothing
  * re-rendered.
  */
-function snappleUrl(snappleId, prompt) {
+function snappleUrl(snappleId, prompt, code) {
   if (!snappleId) return SHARE_URL;
   const base = `${SHARE_URL}/s/${snappleId}`;
+  if (code) return `${base}?pc=${code}`;
+  // Legacy shape, and the fallback when the code could not be stored.
   return prompt ? `${base}?p=${encodeURIComponent(prompt)}` : base;
+}
+
+/**
+ * 53-bit string hash (cyrb53), base36.
+ *
+ * Deterministic on purpose: the same prompt text must always produce the
+ * same code, because that is the entire point. A random id per share
+ * would give every message a URL nobody has ever fetched.
+ */
+function hashPrompt(str) {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/**
+ * Short code for a prompt, stored so the share page can read it back.
+ *
+ * Spelling the prompt into the URL made every share a URL that had never
+ * been requested before, so nothing - not WhatsApp's preview cache, not
+ * the Hosting CDN - could ever be reused. Every single send was a cold
+ * fetch of the page AND the poster, which is exactly when an unfurl
+ * comes back half-built: sometimes a full card, sometimes a card with no
+ * image, sometimes no card at all. Hashing means two people sharing the
+ * same round hit the same warm URL.
+ *
+ * Returns null if the code could not be stored, and the caller falls
+ * back to spelling it out. A long URL beats a card with no title.
+ */
+async function ensurePromptCode(prompt) {
+  const text = String(prompt || '').trim();
+  if (!text) return null;
+  const code = hashPrompt(text);
+  try {
+    const ref = doc(db, 'sharePrompts', code);
+    // Read first: the doc is immutable once written (see rules), so a
+    // blind write would be denied for every prompt after its first use -
+    // which is most of them.
+    const existing = await getDoc(ref);
+    if (!existing.exists()) {
+      await setDoc(ref, { text, createdAt: serverTimestamp() });
+    }
+    return code;
+  } catch (error) {
+    console.warn('[ShareService] prompt code failed:', error?.message);
+    return null;
+  }
 }
 
 
@@ -112,8 +170,8 @@ export const shareService = {
    * creatorUsername stays in the signature only so existing callers
    * do not have to change shape.
    */
-  buildSnappleCaption(prompt, creatorUsername, snappleId) {
-    return snappleUrl(snappleId, prompt);
+  buildSnappleCaption(prompt, creatorUsername, snappleId, code) {
+    return snappleUrl(snappleId, prompt, code);
   },
 
   /** Share one snapple from the feed / overlay. */
@@ -126,9 +184,10 @@ export const shareService = {
   async shareSnapple(snapple, promptOverride) {
     if (!snapple) return { success: false, error: 'No snapple' };
 
+    const code = await ensurePromptCode(promptOverride);
     return shareVideo({
       caption: this.buildSnappleCaption(
-        promptOverride, snapple.creatorUsername, snapple.id),
+        promptOverride, snapple.creatorUsername, snapple.id, code),
       dialogTitle: 'Share Snapple',
     });
   },
@@ -143,31 +202,31 @@ export const shareService = {
     // Not even a winner line. The card carries the round's prompt as
     // its title and the clip as its image, which is the whole joke;
     // text above it only competes with what it is introducing.
+    const code = await ensurePromptCode(prompt);
     return shareVideo({
-      caption: snappleUrl(winningSubmission?.snappleId, prompt),
+      caption: snappleUrl(winningSubmission?.snappleId, prompt, code),
       dialogTitle: 'Share Round',
     });
   },
 
-  /** Share the final scoreboard plus the winner's clip. */
+  /**
+   * Share the winner's clip at the end of a game.
+   *
+   * The link and nothing else, same as the other two. It used to carry
+   * a winner line and the whole scoreboard above the URL, which is why
+   * three kinds of share arrived looking like three different products:
+   * this one as a wall of text with a link buried at the bottom, the
+   * other two as a bare card.
+   *
+   * The standings went with it. A scoreboard is noise to whoever
+   * receives this - they were not in the game, the names mean nothing
+   * to them, and six lines of it bury the clip that is the actual joke.
+   * `rewards` stays in the signature so callers need not change shape.
+   */
   async shareGameResult({ rewards = [], winningSubmission, prompt }) {
-    const winner = rewards[0];
-    const board = rewards
-      .map(p => `#${p.placement} ${p.username} — ${p.points} pts`)
-      .join('\n');
-
-    const caption = [
-      // Same reasoning as shareRound: the prompt is the card's title via
-      // ?p=, so repeating it here says it twice in one message.
-      winner ? `${winner.username} won on Snappled` : 'Game over on Snappled',
-      '',
-      board,
-      '',
-      `Watch it — ${snappleUrl(winningSubmission?.snappleId, prompt)}`,
-    ].filter(Boolean).join('\n');
-
+    const code = await ensurePromptCode(prompt);
     return shareVideo({
-      caption,
+      caption: snappleUrl(winningSubmission?.snappleId, prompt, code),
       dialogTitle: 'Share Result',
     });
   },

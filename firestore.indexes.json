@@ -73,6 +73,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "snapples",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "poolEligible",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totalVotes",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

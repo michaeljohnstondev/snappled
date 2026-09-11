@@ -1323,4 +1323,5 @@ exports.revenueCatWebhook = require('./iap').revenueCatWebhook;
 exports.onPromptScoreInputChanged = require('./promptScore').onPromptScoreInputChanged;
 exports.onPromptVoteWritten = require('./promptVotes').onPromptVoteWritten;
 exports.onPromptReported = require('./promptModeration').onPromptReported;
+exports.onSnappleEligibilityChanged = require('./snappleEligibility').onSnappleEligibilityChanged;
 exports.getShareCard = require('./shareRender').getShareCard;

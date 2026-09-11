@@ -148,9 +148,32 @@ exports.snappleShare = functions.https.onRequest(async (req, res) => {
   // round's prompt, not the one the clip was recorded for. Passing it in
   // the URL means the same clip can unfurl with the right context on
   // every share, with no re-render.
-  const promptOverride = req.query && typeof req.query.p === 'string'
+  //
+  // Two shapes. `pc` is a short code looked up in sharePrompts, which is
+  // what the app sends now: spelling the prompt into the query string
+  // made every share a URL nobody had ever requested, so no cache could
+  // be reused and each send was a cold fetch of this page and the
+  // poster. `p` is the old literal, still honoured because links already
+  // sent to people have to keep working.
+  let promptOverride = req.query && typeof req.query.p === 'string'
     ? req.query.p.slice(0, 200)
     : '';
+
+  const promptCode = req.query && typeof req.query.pc === 'string'
+    ? req.query.pc.slice(0, 32)
+    : '';
+  if (promptCode && /^[a-z0-9]+$/i.test(promptCode)) {
+    try {
+      const codeSnap = await admin.firestore()
+        .collection('sharePrompts').doc(promptCode).get();
+      if (codeSnap.exists) {
+        promptOverride = String(codeSnap.data().text || '').slice(0, 200);
+      }
+    } catch (error) {
+      // A missed lookup costs the card its title, not the page.
+      console.error('[snappleShare] prompt code lookup failed', promptCode, error);
+    }
+  }
 
   let card = null;
   let failure = null;

@@ -30,6 +30,24 @@ const SNAPPLES_COLLECTION = 'snapples';
 const REPORTS_COLLECTION = 'reports';
 const USERS_COLLECTION = 'users';
 
+/**
+ * createdAt as milliseconds, whichever way it was stored.
+ *
+ * 48 of the 59 snapples hold an ISO STRING and 11 a Firestore Timestamp.
+ * Reading only `.seconds` scored every string one as 0, so they all tied
+ * and kept whatever order the previous sort left them in - which is why
+ * a grid labelled "newest" was showing most-voted instead, and a
+ * brand-new snapple could be missing from the first page of it.
+ */
+function createdMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'string') return Date.parse(value) || 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value.seconds) return value.seconds * 1000;
+  if (value._seconds) return value._seconds * 1000;
+  return 0;
+}
+
 export const snappleService = {
   async createSnapple(snappleData) {
     try {
@@ -296,34 +314,67 @@ export const snappleService = {
   // the limit budget.
   async getActiveSnapples(limitCount = 200) {
     try {
-      const q = query(
+      // Indexed query, not a scan. This used to fetch limit(2000) and
+      // apply the four pool conditions in JavaScript, so Firestore billed
+      // 2,000 document reads to return 200 - at 2,000 daily players,
+      // around 12 million reads a day for this one call. `poolEligible`
+      // is those four conditions precomputed by a trigger (see
+      // functions/snappleEligibility.js), which lets the filter, the
+      // sort and the limit all happen server-side. It now reads exactly
+      // as many documents as it returns.
+      const snap = await getDocs(query(
+        collection(db, SNAPPLES_COLLECTION),
+        where('poolEligible', '==', true),
+        orderBy('totalVotes', 'desc'),
+        limit(limitCount),
+      ));
+
+      if (!snap.empty) {
+        const rows = [];
+        snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+        return { success: true, snapples: rows };
+      }
+
+      // Empty means either there genuinely are none, or the flag has not
+      // been backfilled onto this collection yet. Falling back keeps the
+      // app working either way - the old path is correct, just expensive,
+      // and it stops being reached the moment the backfill lands.
+      return await this.getActiveSnapplesLegacy(limitCount);
+    } catch (error) {
+      // A missing composite index throws here. Same reasoning: degrade to
+      // the slow path rather than hand the caller an empty hand.
+      console.warn('[SnappleService] pool query fell back:', error?.message);
+      return await this.getActiveSnapplesLegacy(limitCount);
+    }
+  },
+
+  /** The pre-index scan. Correct, and costs a read per document held. */
+  async getActiveSnapplesLegacy(limitCount = 200) {
+    try {
+      const querySnapshot = await getDocs(query(
         collection(db, SNAPPLES_COLLECTION),
         limit(2000),
-      );
+      ));
 
-      const querySnapshot = await getDocs(q);
       const snapples = [];
-
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Pool filters: private snapples (creator opted out of public
-        // visibility), and excludeFromPool snapples (admin quality gate
-        // — see schema comment in createSnapple). Both stay playable
-        // from the creator's / owner's own deck via drawHand-from-
-        // ownedSnapples; this filter only governs what BOTS draw and
-        // what pads the hands of players whose own deck is too small.
+        // Private snapples (creator opted out of public visibility) and
+        // excludeFromPool ones (admin quality gate) are both still
+        // playable from their owner's deck via drawHand-from-
+        // ownedSnapples; this governs what BOTS draw and what pads a
+        // hand when someone's own deck is too small.
         if (
-          data.isActive !== false &&
-          data.isBanned !== true &&
-          data.isPrivate !== true &&
-          data.excludeFromPool !== true
+          data.isActive !== false
+          && data.isBanned !== true
+          && data.isPrivate !== true
+          && data.excludeFromPool !== true
         ) {
           snapples.push({ id: doc.id, ...data });
         }
       });
 
       snapples.sort((a, b) => (b.totalVotes || 0) - (a.totalVotes || 0));
-
       return { success: true, snapples: snapples.slice(0, limitCount) };
     } catch (error) {
       console.error('Error fetching active snapples:', error);
@@ -344,15 +395,37 @@ export const snappleService = {
    * Recency at least changes.
    */
   async getPoolSnapples(limitCount = 500) {
-    const result = await this.getActiveSnapples(limitCount);
-    if (!result.success) return result;
+    try {
+      const snap = await getDocs(query(
+        collection(db, SNAPPLES_COLLECTION),
+        limit(2000),
+      ));
 
-    const out = [...(result.snapples || [])].sort((a, b) => {
-      const at = a.createdAt?.seconds || a.createdAt?._seconds || 0;
-      const bt = b.createdAt?.seconds || b.createdAt?._seconds || 0;
-      return bt - at;
-    });
-    return { success: true, snapples: out };
+      const out = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        // The BROWSE rule, matching getSnapplesByPrompt - deliberately
+        // NOT getActiveSnapples'. That one also drops excludeFromPool,
+        // which is a gate on what BOTS draw into a hand; its own comment
+        // says those snapples "stay browsable, ownable, and buyable from
+        // the prompt grid". Delegating to it applied a game-hand filter
+        // to a browse surface, so 13 of 58 snapples were listed when you
+        // opened a prompt but invisible to the count advertising it.
+        if (
+          data.isActive !== false
+          && data.isBanned !== true
+          && data.isPrivate !== true
+        ) {
+          out.push({ id: d.id, ...data });
+        }
+      });
+
+      out.sort((a, b) => createdMs(b.createdAt) - createdMs(a.createdAt));
+      return { success: true, snapples: out.slice(0, limitCount) };
+    } catch (error) {
+      console.error('[SnappleService] getPoolSnapples error:', error);
+      return { success: false, error: 'Failed to fetch pool snapples' };
+    }
   },
 
   async getTrendingSnapples(limitCount = 10) {

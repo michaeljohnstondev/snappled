@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -113,17 +113,47 @@ export default function PromptsScreen({ navigation }) {
   // snapples exist, not to be the destination.
   const poolShown = useMemo(() => pool.slice(0, POOL_SHOWN), [pool]);
 
-  // promptId -> how many snapples answer it, derived from the pool
-  // rather than queried. The pool is every public snapple and each one
-  // carries its promptId, so the counts are already in hand.
-  const snappleCounts = useMemo(() => {
-    const m = new Map();
+  // How many snapples answer each prompt, derived from the pool rather
+  // than queried.
+  //
+  // Indexed by promptId AND by prompt text, because that is how
+  // getSnapplesByPrompt finds them and the number has to agree with the
+  // list it is advertising. A prompt that expires and comes back gets a
+  // NEW activePrompts doc id while the snapples keep pointing at the old
+  // one - so an id-only count went blank on every recycled prompt even
+  // though tapping it still listed them. Only one of the 24 live prompts
+  // had an id that any snapple still matched.
+  //
+  // Sets of ids, not tallies: a snapple matching on both keys must not
+  // be counted twice.
+  const snappleIndex = useMemo(() => {
+    const byId = new Map();
+    const byText = new Map();
+    const add = (map, key, id) => {
+      if (!key) return;
+      const set = map.get(key);
+      if (set) set.add(id);
+      else map.set(key, new Set([id]));
+    };
     pool.forEach((snap) => {
-      if (!snap.promptId) return;
-      m.set(snap.promptId, (m.get(snap.promptId) || 0) + 1);
+      add(byId, snap.promptId, snap.id);
+      add(byText, snap.prompt || snap.promptText, snap.id);
     });
-    return m;
+    return { byId, byText };
   }, [pool]);
+
+  // Exact text match, not the normalised key, because that is what
+  // getSnapplesByPrompt uses. A cleverer match here would make the chip
+  // promise more snapples than the list can show.
+  const countFor = useCallback((prompt) => {
+    const byId = snappleIndex.byId.get(prompt?.id);
+    const byText = snappleIndex.byText.get(prompt?.text);
+    if (!byId) return byText ? byText.size : 0;
+    if (!byText) return byId.size;
+    const union = new Set(byId);
+    byText.forEach(id => union.add(id));
+    return union.size;
+  }, [snappleIndex]);
 
   // One-line intro, the same idea as the in-game phase intros. Shown
   // ONCE EVER rather than once per session: unlike a round, this screen
@@ -188,6 +218,13 @@ export default function PromptsScreen({ navigation }) {
   }, []);
 
   const loadData = async () => {
+    // Started BEFORE the prompts are awaited, not after. The chips are
+    // drawn from this, so sequencing it behind the prompt fetch is what
+    // made them show up a beat after the cards they belong to.
+    const poolPromise = snappleService.getPoolSnapples()
+      .then(r => (r?.success ? r.snapples || [] : []))
+      .catch(() => []);
+
     const { prompts: allPrompts } = await promptRotationService.getActivePrompts();
     setPrompts(allPrompts);
 
@@ -201,14 +238,8 @@ export default function PromptsScreen({ navigation }) {
         .catch(() => {});
     }
 
-    // Best-effort and after the prompts, which are what the screen is
-    // for. A pool that fails to load should cost nothing but itself.
-    try {
-      const { success, snapples } = await snappleService.getPoolSnapples();
-      if (success) setPool(snapples || []);
-    } catch (e) {
-      // Non-fatal; the section just doesn't render.
-    }
+    // Best-effort: a pool that fails to load costs nothing but itself.
+    setPool(await poolPromise);
   };
 
   const handlePromptPress = (prompt, index) => {
@@ -494,10 +525,10 @@ export default function PromptsScreen({ navigation }) {
                       reason to tap it.
                       Counted from the pool already loaded for the grid
                       below, so it costs no extra read. */}
-                  {snappleCounts.get(prompt.id) > 0 && (
+                  {countFor(prompt) > 0 && (
                     <View style={styles.countChip}>
                       <Text style={styles.countChipText}>
-                        {snappleCounts.get(prompt.id)}
+                        {countFor(prompt)}
                       </Text>
                     </View>
                   )}
