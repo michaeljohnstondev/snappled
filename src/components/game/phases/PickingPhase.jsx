@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, Pressable, ScrollView, Modal, TextInput,
-  ActivityIndicator, StyleSheet, useWindowDimensions,
+  ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,9 +82,6 @@ export default function PickingPhase({
   // fresh mount so the video starts from frame 0.
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  // Up here with the other hooks: there is an early return further
-  // down, and a hook below it runs in some renders and not others.
-  const { width } = useWindowDimensions();
 
   const [inlinePlaying, setInlinePlaying] = useState({ id: null, token: 0 });
   const bumpInline = (id) => {
@@ -223,18 +220,6 @@ export default function PickingPhase({
   // GameScreen and never lands in inventory at all.
   const hasMulligan = mulligansLeft > 0;
 
-  // The CTA label centres inside its own button, but the button is only
-  // 3/4 of the row once the mulligan takes a quarter, so the label sits
-  // an eighth of the screen right of centre. Nudge it back.
-  //
-  // translateX, NOT a margin. A margin shifts the label by eating
-  // layout space, which leaves "PLAY THIS SNAPPLE" about 195pt to fit
-  // 210pt of text - so it wrapped to two lines and took the whole bar's
-  // height with it. A transform moves the glyphs and touches nothing.
-  const ctaTextStyle = hasMulligan
-    ? { transform: [{ translateX: -width / 8 }] }
-    : null;
-
   return (
     <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
@@ -292,29 +277,22 @@ export default function PickingPhase({
 
       </View>
 
-      {/* Flush submit bar — gradient + shimmer via ShimmerBar so the
-          resting (blue → purple) and armed (green → yellow) states
-          both feel alive.
+      {/* The scoring screen's action row, verbatim: BackChunk at flex
+          1, ShimmerBar at flex 3, stretched to one height under a black
+          top border. Only the label and the handler differ.
 
-          Mulligan rides IN this bar rather than above it. As its own
-          centred pill it spent a whole row of height between the cards
-          and the CTA to hold one chip - height the grid wanted, on the
-          one screen where seeing the cards matters most. Beside the CTA
-          it costs nothing: the bar was already there, and the 1/4 + 3/4
-          split is the same one BACK and SUBMIT use in the preview
-          modal, so the two bars read as the same furniture. */}
+          Everything I added on top of this pattern is what broke it. A
+          right margin to pull the CTA label onto the screen's centre
+          made it wrap, because a margin shifts a centred child by
+          eating the space it needs. A translateX instead moved it
+          under the button beside it. The label fits its own 3/4 chunk
+          unaided - the layout was never the thing that needed fixing. */}
       <View style={styles.actionRow}>
         {hasMulligan && (
-          // The same chunk the preview modal's BACK uses, down to the
-          // label size - "REPLACE" is short enough not to need its own.
-          // Says what it does rather than what it is called; "mulligan"
-          // is the item you buy, "replace" is the thing that happens.
-          // No count: the number lives in the store and on the confirm,
-          // and a tally on a button is noise at the moment you press it.
           <BackChunk
             onPress={onMulligan}
-            style={styles.mulliganChunk}
             label="REPLACE"
+            style={styles.actionBackFlex}
           />
         )}
         {selectedCard ? (
@@ -322,15 +300,13 @@ export default function PickingPhase({
             colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
             label="PLAY THIS SNAPPLE"
             onPress={() => onPickCard(selectedCard)}
-            style={styles.ctaChunk}
-            textStyle={ctaTextStyle}
+            style={styles.actionSubmitChunk}
           />
         ) : (
           <ShimmerBar
             colors={[theme.colors.vibeBlue, theme.colors.vibeNeonPurple]}
             label="PICK A SNAPPLE"
-            style={styles.ctaChunk}
-            textStyle={ctaTextStyle}
+            style={styles.actionSubmitChunk}
           />
         )}
       </View>
@@ -513,27 +489,25 @@ const makeStyles = (t) => ({
   },
 
   // 2-col grid.
-  // The rail now owns everything between the pinned prompt and the
-  // action bar - the mulligan chip used to take a row out of this and
-  // has moved into the bar. ShimmerBar is in normal flow, not overlaid,
-  // so no clearance is needed - the old paddingBottom: 100 was left
-  // over from the scroll layout and was eating height the cards use.
+  // The rail owns everything between the pinned prompt and the action
+  // bar. The bar is in normal flow, not overlaid, so no clearance is
+  // needed here.
   railWrap: {
     flex: 1,
     justifyContent: 'center',
     paddingBottom: 8,
   },
 
-  // The mulligan chunk and the CTA share the existing `actionRow`
-  // below - it already describes this exact split (1/4 + 3/4, stretched
-  // to one height, black top border) and was sitting unused. A second
-  // near-identical style would have shadowed it silently, since a later
-  // duplicate key just wins.
-  mulliganChunk: {
-    flex: 1,
+  // Same names and values as the scoring screen's row, so the two bars
+  // cannot drift apart.
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: 3,
+    borderTopColor: '#000',
   },
-  ctaChunk: {
-    flex: 3,
+  actionBackFlex: {
+    flex: 1,
   },
 
   // YOUR CARD section at the bottom of the scroll.
@@ -567,29 +541,6 @@ const makeStyles = (t) => ({
     fontWeight: '600',
   },
 
-  // (Legacy submitBar / submitBarDisabled / submitBarText styles
-  // removed — flush CTA now handled by <ShimmerBar>.)
-
-  // Split action row: 1/4 Back chunk, 3/4 primary CTA. Same
-  // full-width footprint as the plain submit bar.
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderTopWidth: 3,
-    borderTopColor: '#000',
-  },
-  actionBackChunk: {
-    flex: 1,
-    paddingTop: 20,
-    paddingBottom: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Dim cyan-tinted dark background so it reads as chrome (not a
-    // primary action) but stays inside the neon vibe palette.
-    backgroundColor: 'rgba(10, 18, 40, 0.95)',
-    borderRightWidth: 2,
-    borderRightColor: '#000',
-  },
   actionBackText: {
     // Matches PLAY THIS SNAPPLE typography (900 weight, 3pt tracking)
     // just shorter + cyan so the two chunks read as one bar even
