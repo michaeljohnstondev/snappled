@@ -18,7 +18,6 @@ import PromptSortDeck from './PromptSortDeck';
 import SectionTabs from './SectionTabs';
 import CreatePromptCard from './CreatePromptCard';
 import CurrencyIcon from './CurrencyIcon';
-import RoundStartOverlay from '../game/RoundStartOverlay';
 import {
   gamePromptService, costForSeason, GAME_PROMPT_MAX_LEN,
 } from '../../services/gamePromptService';
@@ -32,25 +31,6 @@ const FILTERS = [
   { label: 'Mine', value: 'mine' },
 ];
 
-// How it works, in the same full-screen card games use to explain a
-// phase - rather than lines of grey subtext that sat on the screen for
-// good once you'd read them. No season numbers and no mention of the
-// beta: the rules are the same either way.
-const INTRO = {
-  title: 'Game Prompts',
-  bullets: [
-    'These are what each round asks the room',
-    'Swipe right to keep a prompt, left to cut it',
-    'Suggest your own \u2014 the best-ranked make the deck',
-    'Tap the flag to report one',
-  ],
-};
-
-// Module scope, so it resets only when the app restarts. This panel
-// mounts when the Game Prompts tab is opened, so "first mount" is "first
-// time the tab is tapped" - the intro shows then and not on every
-// switch back, which is how the games treat their phase intros.
-let introShownThisSession = false;
 
 /**
  * @param {object} user
@@ -68,13 +48,6 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [intro, setIntro] = useState(false);
-
-  useEffect(() => {
-    if (introShownThisSession) return;
-    introShownThisSession = true;
-    setIntro(true);
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,11 +112,9 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.seasonRow}>
+        {/* Help lives on the screen's tab row, not here - one "?" in one
+            place for both tabs beats each panel growing its own. */}
         <Text style={styles.season}>{`SEASON ${displaySeason}`}</Text>
-        {/* The same "?" games use, reopening the intro on demand. */}
-        <Pressable style={styles.helpBtn} onPress={() => setIntro(true)} hitSlop={8}>
-          <Text style={styles.helpText}>?</Text>
-        </Pressable>
       </View>
 
       {/* Same card the Snapple tab opens on. Full width, so unlike the
@@ -212,13 +183,6 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
         ))
       )}
 
-      <RoundStartOverlay
-        visible={intro}
-        title={INTRO.title}
-        bullets={INTRO.bullets}
-        onDismiss={() => setIntro(false)}
-      />
-
       <Modal visible={composing} transparent animationType="fade"
         onRequestClose={() => setComposing(false)}>
         <Pressable style={styles.backdrop} onPress={() => setComposing(false)}>
@@ -265,14 +229,6 @@ const makeStyles = (t) => ({
     marginTop: 4, marginBottom: 14,
   },
   season: { color: theme.colors.vibeYellow, fontSize: 18, fontWeight: '900', letterSpacing: 2 },
-  // Matches the in-game help button in RoundHeaderBar exactly.
-  helpBtn: {
-    width: 26, height: 26, borderRadius: 13,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  helpText: { color: 'white', fontSize: 13, fontWeight: '900', lineHeight: 15 },
   costChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10,

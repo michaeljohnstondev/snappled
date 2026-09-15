@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
@@ -27,6 +26,31 @@ import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 // only way to reintroduce the screen if its copy ever changes
 // meaningfully.
 const PROMPTS_INTRO_KEY = 'promptsIntroSeen:v1';
+
+// What the "?" explains, per tab. Both tabs answer to one button in the
+// tab row rather than each growing its own - the help is always in the
+// same place, and what it says follows the tab you are on.
+const HELP = {
+  snapple: {
+    title: 'Snapple Prompts',
+    bullets: [
+      'Prompts are ideas for making snapples',
+      'Tap one to browse the snapples answering it',
+      'Swipe a prompt right if it is good, left if it is weak',
+      'Hit CREATE A PROMPT to add your own',
+      'Each prompt is live for 24 hours, then a new one takes over',
+    ],
+  },
+  game: {
+    title: 'Game Prompts',
+    bullets: [
+      'These are what each round asks the room',
+      'Swipe right to keep a prompt, left to cut it',
+      'Suggest your own \u2014 the best-ranked make the deck',
+      'Tap the flag to report one',
+    ],
+  },
+};
 
 // How many snapples the pool draws. Twelve is four rows of three -
 // enough to show the place is alive without turning a screen about
@@ -119,46 +143,46 @@ export default function PromptsScreen({ navigation }) {
   // ONCE EVER rather than once per session: unlike a round, this screen
   // is somewhere you return to constantly, and a tap-to-dismiss card on
   // every visit is a toll rather than an explanation.
-  const [showIntro, setShowIntro] = useState(false);
+  // null, or which tab's help is open.
+  const [help, setHelp] = useState(null);
   useEffect(() => {
     let cancelled = false;
     AsyncStorage.getItem(PROMPTS_INTRO_KEY)
-      .then((seen) => { if (!seen && !cancelled) setShowIntro(true); })
+      .then((seen) => { if (!seen && !cancelled) setHelp('snapple'); })
       // Storage unavailable just means it is not shown. Better than
       // showing it forever on a device that cannot remember.
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
+  // The game tab explains itself the first time it is opened each
+  // session, the way a game shows a phase intro on round one rather than
+  // every round. The "?" brings it back after that.
+  const gameHelpSeen = useRef(false);
+  useEffect(() => {
+    if (section !== 'game' || gameHelpSeen.current) return;
+    gameHelpSeen.current = true;
+    setHelp('game');
+  }, [section]);
+
   const dismissIntro = () => {
-    setShowIntro(false);
+    setHelp(null);
     AsyncStorage.setItem(PROMPTS_INTRO_KEY, '1').catch(() => {});
   };
   const [selectedPromptForInfo, setSelectedPromptForInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [minutesLeft, setMinutesLeft] = useState(0);
-
-  // Countdown timer — minutes until next hour
+  // Reload when the hour turns. This used to also drive a visible
+  // countdown, but how long a prompt lasts is a fact you need once and
+  // it is in the help now - so the minute-by-minute state that only
+  // existed to render it is gone, and the reload it was sharing an
+  // interval with is all that remains.
   useEffect(() => {
-    const calcMinutes = () => {
-      const now = new Date();
-      return 59 - now.getMinutes();
-    };
-    setMinutesLeft(calcMinutes());
     const interval = setInterval(() => {
-      const mins = calcMinutes();
-      setMinutesLeft(mins);
-      // Reload prompts when a new hour hits
-      if (mins === 59) loadData();
+      if (new Date().getMinutes() === 0) loadData();
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
-
-  const formatTimer = () => {
-    const m = minutesLeft;
-    return `${m}m`;
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const seededRef = useRef(false);
 
@@ -412,15 +436,21 @@ export default function PromptsScreen({ navigation }) {
         {/* No "Prompts" title. The tabs and the nav bar both already say
             where you are, so a heading above them only repeated it and
             pushed the content down. */}
-        <SectionTabs
-          options={[
-            { label: 'Snapple Prompts', value: 'snapple' },
-            { label: 'Game Prompts', value: 'game' },
-          ]}
-          value={section}
-          onChange={setSection}
-          style={styles.sectionTabs}
-        />
+        <View style={styles.tabRow}>
+          <SectionTabs
+            options={[
+              { label: 'Snapple Prompts', value: 'snapple' },
+              { label: 'Game Prompts', value: 'game' },
+            ]}
+            value={section}
+            onChange={setSection}
+            style={styles.tabsFlex}
+          />
+          {/* The same "?" the game header uses. */}
+          <Pressable style={styles.helpBtn} onPress={() => setHelp(section)} hitSlop={8}>
+            <Text style={styles.helpText}>?</Text>
+          </Pressable>
+        </View>
 
         {/* Game tab is outside the loading gate: it has nothing to do with
             the snapple prompts that gate is waiting on. */}
@@ -445,17 +475,6 @@ export default function PromptsScreen({ navigation }) {
             />
           }
         >
-          {/* The rotation timer is a snapple-prompt thing only - game
-              prompts change by season, and a countdown on that tab would
-              promise something that isn't coming in the next hour. */}
-          <View style={styles.timerRow}>
-            <View style={styles.timerPill}>
-              <Ionicons name="time-outline" size={14} color={theme.colors.vibeBlue} />
-              <Text style={styles.timerLabel}>Next prompt in</Text>
-              <Text style={styles.timerText}>{formatTimer()}</Text>
-            </View>
-          </View>
-
           <View style={styles.promptsList}>
             <CreatePromptCard label="Create a Prompt" onPress={handleCreatePrompt} />
 
@@ -545,11 +564,13 @@ export default function PromptsScreen({ navigation }) {
         </ScrollView>
         )}
 
+        {/* How long a prompt lasts is said once, in here. It was a live
+            countdown pinned above the list, which is a lot of permanent
+            furniture for a fact you need once. */}
         <RoundStartOverlay
-          visible={showIntro}
-          title="Prompts"
-          sub={'Prompts are ideas for making snapples. Tap one to browse '
-            + 'snapples, or create your own.'}
+          visible={!!help}
+          title={HELP[help]?.title}
+          bullets={HELP[help]?.bullets}
           onDismiss={dismissIntro}
         />
 
@@ -591,37 +612,23 @@ const makeStyles = (t) => ({
     flex: 1,
     paddingBottom: 80,
   },
-  sectionTabs: {
+  tabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     marginHorizontal: 20,
     marginTop: 12,
     marginBottom: 12,
   },
-  timerRow: {
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    marginBottom: 12,
+  tabsFlex: { flex: 1 },
+  // Matches the in-game help button in RoundHeaderBar.
+  helpBtn: {
+    width: 26, height: 26, borderRadius: 13,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  timerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 198, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: theme.colors.vibeBlue,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  timerLabel: {
-    color: t.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: theme.fontWeights.semiBold,
-  },
-  timerText: {
-    color: theme.colors.vibeBlue,
-    fontSize: 14,
-    fontWeight: theme.fontWeights.bold,
-  },
+  helpText: { color: 'white', fontSize: 13, fontWeight: '900', lineHeight: 15 },
   scrollView: {
     flex: 1,
   },
