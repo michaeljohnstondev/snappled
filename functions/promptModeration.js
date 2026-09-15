@@ -71,6 +71,17 @@ async function banPromptText(text, reason, reportCount) {
     await Promise.all(matches.docs.map(d => d.ref.delete()));
   }
 
+  // Game prompts are MARKED rather than deleted. They carry a creator
+  // and a paid fee, and a banned one is excluded everywhere by status -
+  // the draw, the rank deck and the list all skip it - so the record of
+  // what was banned and who wrote it survives for an appeal or a repeat
+  // offender check.
+  const games = await db.collection('gamePrompts').where('textKey', '==', textKey).get();
+  await Promise.all(games.docs.map(d => d.ref.update({
+    status: 'banned',
+    bannedAt: admin.firestore.FieldValue.serverTimestamp(),
+  })));
+
   // Recycled copies are keyed by document id rather than textKey, so
   // they need matching on the normalized text instead.
   const recycled = await db.collection('recycledPrompts').get();
@@ -99,6 +110,12 @@ exports.onPromptReported = functions.firestore
     const promptId = report.promptId;
     if (!promptId) return null;
 
+    // Game prompts and live snapple prompts share this pipeline. A game
+    // prompt is read aloud to a whole room mid-game, so it has at least
+    // as much reason to be reportable as the rotating kind - and until
+    // now nothing could report one at all.
+    const target = report.target === 'gamePrompts' ? 'gamePrompts' : 'activePrompts';
+
     const reports = await db.collection('promptReports')
       .where('promptId', '==', promptId)
       .get();
@@ -106,15 +123,15 @@ exports.onPromptReported = functions.firestore
 
     // Keep the running total visible to the admin screen even before
     // the threshold, so a prompt trending toward a ban can be seen.
-    const activeRef = db.collection('activePrompts').doc(promptId);
-    const active = await activeRef.get();
-    if (!active.exists) return null;
+    const ref = db.collection(target).doc(promptId);
+    const promptSnap = await ref.get();
+    if (!promptSnap.exists) return null;
 
-    await activeRef.update({ reportCount: count }).catch(() => {});
+    await ref.update({ reportCount: count }).catch(() => {});
     if (count < REPORT_BAN_THRESHOLD) return null;
 
     await banPromptText(
-      active.data().text,
+      promptSnap.data().text,
       report.reason || 'reported by the community',
       count,
     );

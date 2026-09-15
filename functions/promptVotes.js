@@ -43,6 +43,9 @@ const db = admin.firestore();
 const FIELDS = {
   activePrompts: { like: 'likeCount', dislike: 'dislikeCount' },
   promptPool: { like: 'likeCountLifetime', dislike: 'dislikeCountLifetime' },
+  // Per-season counts: rollover deletes these votes, and the delta logic
+  // below walks the counts back to zero as it does.
+  gamePrompts: { like: 'likeCount', dislike: 'dislikeCount' },
 };
 
 /**
@@ -75,6 +78,16 @@ exports.onPromptVoteWritten = functions.firestore
 
     const prev = before ? before.value : 0;
     const next = after ? after.value : 0;
+
+    // A FIRST vote on a prompt is a ranking, and earns a reward. Only on
+    // create: flipping a like to a dislike is the same ranking changing
+    // its mind, not a second one, and paying for it would let anyone mint
+    // tickets by swiping one card back and forth.
+    if (!before && after && after.userId) {
+      require('./gamePrompts').recordRanking(after.userId)
+        .catch(e => console.warn('[votes] ranking reward failed:', e.message));
+    }
+
     if (prev === next) return null;
 
     const doc = after || before;

@@ -773,6 +773,37 @@ export default function AdminScreen({ navigation }) {
             }}
           />
           <UtilButton
+            label="End Season"
+            desc="Preview first, then roll over: live prompts voted down retire, winning candidates join the deck, votes reset for the new season"
+            color={theme.colors.vibeYellow}
+            onPress={async () => {
+              try {
+                // Always a dry run first. Rollover retires prompts and
+                // wipes every game-prompt vote; showing the tally before
+                // committing is the only undo there is.
+                const fn = httpsCallable(functions, 'rolloverSeason');
+                const { data: p } = await fn({ dryRun: true });
+                // Ending the beta is the public launch, so it says so -
+                // "End Season 0" would read like a mistake.
+                showConfirm(
+                  p.from === 0 ? 'Launch Season 1?' : `End Season ${p.from}?`,
+                  (p.from === 0 ? 'Beta rankings become the official deck. ' : '')
+                    + `Season ${p.to} will have ${p.live + p.promoted} live prompts: `
+                    + `${p.live} kept, ${p.promoted} promoted. `
+                    + `${p.retired} retire, ${p.carried} candidates carry over. `
+                    + 'All game-prompt votes reset. This cannot be undone.',
+                  async () => {
+                    try {
+                      const { data: r } = await fn({});
+                      showAlert(r.from === 0 ? 'Season 1 is live' : 'Season started',
+                        `Now in Season ${r.to}.`);
+                    } catch (e) { showError('Rollover failed', e.message); }
+                  },
+                );
+              } catch (e) { showError('Error', e.message); }
+            }}
+          />
+          <UtilButton
             label="Reset Game Prompt Usage"
             desc="Set usageCount back to 0 on every gamePrompts doc — least-used rotation starts fresh"
             color={theme.colors.vibeBlue}

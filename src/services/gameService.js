@@ -1134,6 +1134,12 @@ export const gameService = {
       // Bucket by usageCount tier.
       const byTier = new Map();
       snapshot.forEach(d => {
+        // Only this season's live deck plays. Candidates haven't won the
+        // vote, retired ones lost it, and banned ones were reported out -
+        // none of those may be read aloud to a room. A prompt with no
+        // status predates seasons and is treated as live.
+        const status = d.data().status;
+        if (status && status !== 'live') return;
         const usage = d.data().usageCount || 0;
         if (!byTier.has(usage)) byTier.set(usage, []);
         byTier.get(usage).push({ id: d.id, text: d.data().text });

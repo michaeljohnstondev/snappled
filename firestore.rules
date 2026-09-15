@@ -2,6 +2,12 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Mirrors src/lib/admin.js and functions/gamePrompts.js.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid in ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
+    }
+
     // Users - own data only
     match /users/{userId} {
       allow read: if request.auth != null;
@@ -177,7 +183,7 @@ service cloud.firestore {
         && voteId == request.resource.data.target + '_'
           + request.resource.data.promptId + '_' + request.auth.uid
         && request.resource.data.value in [1, -1]
-        && request.resource.data.target in ['activePrompts', 'promptPool'];
+        && request.resource.data.target in ['activePrompts', 'promptPool', 'gamePrompts'];
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
@@ -230,11 +236,33 @@ service cloud.firestore {
     }
 
     // Game prompts
+    // Game prompts.
+    //
+    // These were open to any signed-in user for create, update AND
+    // delete - which, once players can pay for them, would let anyone
+    // skip the fee, rewrite a live prompt that a whole room reads aloud,
+    // flip a candidate straight to 'live', or delete the collection.
+    //
+    // Players create through the createGamePrompt function, which charges
+    // the fee and checks the ban list in one transaction. The only write a
+    // client may make directly is the usage bump when a game draws the
+    // prompt, and only by exactly one.
     match /gamePrompts/{promptId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['usageCount'])
+          && request.resource.data.usageCount
+            == resource.data.get('usageCount', 0) + 1);
+    }
+
+    // Season state. Read by everyone to show "Season N"; written only by
+    // the rolloverSeason function.
+    match /config/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
 
     // Hourly prompts

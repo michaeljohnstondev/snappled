@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
-import PromptSortDeck from '../components/ui/PromptSortDeck';
+import GamePromptsPanel from '../components/ui/GamePromptsPanel';
+import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
 import SwipeToRate from '../components/ui/SwipeToRate';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
@@ -36,6 +37,10 @@ export default function PromptsScreen({ navigation }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { user, userCurrency, pendingAchievements, clearPendingAchievements } = useAuth();
+  // Snapple prompts are the live rotation you record against; game
+  // prompts are what a round asks the room. Two different things that
+  // were never presented as such - the game ones had no screen at all.
+  const [section, setSection] = useState('snapple');
   const { showToast } = useModal();
 
   // Show pending achievements from login check
@@ -452,14 +457,35 @@ export default function PromptsScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Prompts</Text>
-          <View style={styles.timerPill}>
-            <Ionicons name="time-outline" size={14} color={theme.colors.vibeBlue} />
-            <Text style={styles.timerLabel}>Next prompt in</Text>
-            <Text style={styles.timerText}>{formatTimer()}</Text>
-          </View>
+          {/* The rotation timer belongs to snapple prompts only. Game
+              prompts change by season, and a countdown on that tab would
+              promise something that isn't coming in the next hour. */}
+          {section === 'snapple' && (
+            <View style={styles.timerPill}>
+              <Ionicons name="time-outline" size={14} color={theme.colors.vibeBlue} />
+              <Text style={styles.timerLabel}>Next prompt in</Text>
+              <Text style={styles.timerText}>{formatTimer()}</Text>
+            </View>
+          )}
         </View>
 
-        {showLoadingState ? (
+        <VibeSegmentedControl
+          options={[
+            { label: 'Snapple Prompts', value: 'snapple' },
+            { label: 'Game Prompts', value: 'game' },
+          ]}
+          selectedValue={section}
+          onSelect={setSection}
+          style={styles.sectionTabs}
+        />
+
+        {/* Game tab is outside the loading gate: it has nothing to do with
+            the snapple prompts that gate is waiting on. */}
+        {section === 'game' ? (
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <GamePromptsPanel user={user} tickets={userCurrency?.tokens || 0} />
+          </ScrollView>
+        ) : showLoadingState ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
             <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
             <Text style={{ color: t.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
@@ -545,16 +571,6 @@ export default function PromptsScreen({ navigation }) {
               </SwipeToRate>
             ))}
           </View>
-
-          {/* Community prompt sorting.
-              Sits between the live prompts and the snapple pool because
-              that is the honest order: what is running now, then what
-              might run next. Renders nothing when there is nothing left
-              to sort, so it never shows an empty box. */}
-          <PromptSortDeck
-            userId={user?.uid}
-            liveTexts={prompts.map(p => p.text)}
-          />
 
           {/* Browse pool.
               Global rather than per prompt, which was the obvious
@@ -652,6 +668,10 @@ const makeStyles = (t) => ({
     color: t.colors.textPrimary,
     fontSize: 28,
     fontWeight: theme.fontWeights.bold,
+  },
+  sectionTabs: {
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
   timerPill: {
     flexDirection: 'row',

@@ -860,7 +860,13 @@ exports.shuffleGameDecks = functions.https.onCall(async (data, context) => {
   // Get all game prompts
   const promptsQuery = await db.collection('gamePrompts').get();
   const prompts = [];
-  promptsQuery.forEach(doc => prompts.push(doc.data().text));
+  // Same rule as the client draw: only the live deck. A deck shuffled
+  // here is played verbatim, so a banned or losing prompt must not get in.
+  promptsQuery.forEach((doc) => {
+    const status = doc.data().status;
+    if (status && status !== 'live') return;
+    prompts.push(doc.data().text);
+  });
 
   if (prompts.length < 5) {
     throw new functions.https.HttpsError('failed-precondition', 'Not enough game prompts');
@@ -1125,6 +1131,14 @@ exports.onNewSnapple = functions.firestore
     const snapple = snap.data() || {};
     const snappleId = context.params.snappleId;
 
+    // The ticket faucet. Ahead of the private/inactive returns below:
+    // making a snapple is the effort being paid for, whether or not it
+    // goes in the public pool. Capped per day inside the grant.
+    if (snapple.creatorId) {
+      require('./gamePrompts').grantSnappleTickets(snapple.creatorId)
+        .catch(e => console.warn('[onNewSnapple] ticket grant failed:', e.message));
+    }
+
     if (snapple.isPrivate === true) return;
     if (snapple.isActive === false || snapple.isBanned === true) return;
     if (!snapple.creatorId) return;
@@ -1324,4 +1338,6 @@ exports.onPromptScoreInputChanged = require('./promptScore').onPromptScoreInputC
 exports.onPromptVoteWritten = require('./promptVotes').onPromptVoteWritten;
 exports.onPromptReported = require('./promptModeration').onPromptReported;
 exports.onSnappleEligibilityChanged = require('./snappleEligibility').onSnappleEligibilityChanged;
+exports.createGamePrompt = require('./gamePrompts').createGamePrompt;
+exports.rolloverSeason = require('./gamePrompts').rolloverSeason;
 exports.getShareCard = require('./shareRender').getShareCard;

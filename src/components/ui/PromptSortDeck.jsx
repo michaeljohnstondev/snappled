@@ -17,6 +17,7 @@ import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from './SwipeCard';
 import { promptVoteService } from '../../services/promptVoteService';
+import { gamePromptService } from '../../services/gamePromptService';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
@@ -32,7 +33,14 @@ const DECK_SIZE = 10;
  * @param {Function} onSorted  optional, fired after each vote with the
  *   running count so the parent can react (a reward, a nudge)
  */
-export default function PromptSortDeck({ userId, liveTexts, onSorted }) {
+export default function PromptSortDeck({
+  userId, liveTexts, onSorted,
+  // Which prompts it sorts. Game prompts rank this season's deck and
+  // next season's candidates; the default is the snapple prompt pool.
+  target = 'promptPool',
+  title = 'HELP SORT THESE',
+  subtitle = 'Not live yet — decide what makes the cut',
+}) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [deck, setDeck] = useState([]);
@@ -43,15 +51,15 @@ export default function PromptSortDeck({ userId, liveTexts, onSorted }) {
   const load = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
-    const { prompts } = await promptVoteService.getUnsortedPool(
-      userId, DECK_SIZE, liveTexts || [],
-    );
+    const { prompts } = target === 'gamePrompts'
+      ? await gamePromptService.getUnsorted(userId, DECK_SIZE)
+      : await promptVoteService.getUnsortedPool(userId, DECK_SIZE, liveTexts || []);
     setDeck(prompts);
     setIndex(0);
     setLoading(false);
     // Deliberately not keyed on liveTexts: the rotation changing under
     // someone mid-swipe should not reshuffle the stack in their hands.
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, target]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 
@@ -66,8 +74,8 @@ export default function PromptSortDeck({ userId, liveTexts, onSorted }) {
       onSorted?.(next);
       return next;
     });
-    promptVoteService.vote(prompt.id, userId, value, 'promptPool');
-  }, [userId, onSorted]);
+    promptVoteService.vote(prompt.id, userId, value, target);
+  }, [userId, onSorted, target]);
 
   if (loading) {
     return (
@@ -104,10 +112,10 @@ export default function PromptSortDeck({ userId, liveTexts, onSorted }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
-        <Text style={styles.label}>HELP SORT THESE</Text>
+        <Text style={styles.label}>{title}</Text>
         <Text style={styles.counter}>{index + 1}/{deck.length}</Text>
       </View>
-      <Text style={styles.sub}>Not live yet — decide what makes the cut</Text>
+      <Text style={styles.sub}>{subtitle}</Text>
 
       <SwipeCard
         key={current.id}

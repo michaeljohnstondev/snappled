@@ -10,6 +10,7 @@ const GROUPS = [
   { key: 'levels', label: 'Levels' },
   { key: 'trophies', label: 'Trophies' },
   { key: 'social', label: 'Social' },
+  { key: 'ranking', label: 'Ranking' },
 ];
 
 const ACHIEVEMENTS = [
@@ -63,6 +64,12 @@ const ACHIEVEMENTS = [
   { id: 'level_100', group: 'levels', name: 'Max Level', desc: 'Reach level 100', icon: '✨', coins: 5000, xp: 0, trophies: 50 },
 
   // Trophy ranks
+  // Ranking. Pays tickets, since ranking is what decides which prompts
+  // make a season and tickets are what prompts are bought with.
+  { id: 'ranked_10', group: 'ranking', name: 'Tastemaker', desc: 'Rank 10 prompts', icon: '👍', coins: 50, xp: 25, tickets: 5 },
+  { id: 'ranked_50', group: 'ranking', name: 'Critic', desc: 'Rank 50 prompts', icon: '🧐', coins: 150, xp: 75, tickets: 15 },
+  { id: 'ranked_250', group: 'ranking', name: 'Season Shaper', desc: 'Rank 250 prompts', icon: '🗳️', coins: 500, xp: 250, tickets: 50 },
+
   { id: 'trophies_25', group: 'trophies', name: 'Bronze', desc: 'Earn 25 trophies', icon: '🥉', coins: 200, xp: 100, mulligans: 1 },
   { id: 'trophies_50', group: 'trophies', name: 'Silver', desc: 'Earn 50 trophies', icon: '🥈', coins: 400, xp: 200 },
   { id: 'trophies_100', group: 'trophies', name: 'Gold', desc: 'Earn 100 trophies', icon: '🥇', coins: 750, xp: 400, mulligans: 1 },
@@ -185,6 +192,11 @@ export const achievementService = {
           case 'trophies_100': earned = (stats.trophies || 0) >= 100; break;
           case 'trophies_250': earned = (stats.trophies || 0) >= 250; break;
           case 'trophies_500': earned = (stats.trophies || 0) >= 500; break;
+
+          // Ranking - counted server-side on every first vote.
+          case 'ranked_10': earned = (stats.promptsRanked || 0) >= 10; break;
+          case 'ranked_50': earned = (stats.promptsRanked || 0) >= 50; break;
+          case 'ranked_250': earned = (stats.promptsRanked || 0) >= 250; break;
         }
 
         if (earned) {
@@ -202,6 +214,7 @@ export const achievementService = {
         const totalXP = total('xp');
         const totalTrophies = total('trophies');
         const totalMulligans = total('mulligans');
+        const totalTickets = total('tickets');
         const updates = {
           achievements: [...existing, ...newAchievements],
           updatedAt: serverTimestamp(),
@@ -217,6 +230,7 @@ export const achievementService = {
         if (totalMulligans > 0) {
           updates['inventory.mulligans'] = increment(totalMulligans);
         }
+        if (totalTickets > 0) updates['resources.tokens'] = increment(totalTickets);
         await updateDoc(doc(db, 'users', userId), updates);
       }
 

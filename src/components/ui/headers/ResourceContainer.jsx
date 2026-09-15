@@ -34,7 +34,7 @@ const RESOURCE_INFO = {
     title: 'Tickets',
     bullets: [
       'Used to create your own prompts',
-      'Earn one when someone keeps a snapple you made',
+      'Earn them by posting snapples and ranking prompts',
       'Or buy them in the store',
     ],
   },
