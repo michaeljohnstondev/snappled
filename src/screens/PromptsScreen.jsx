@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, Animated, ActivityIndicator } from 'react-native';
+import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
 import SnappleOverlay from '../components/ui/modals/SnappleOverlay';
 import GamePromptsPanel from '../components/ui/GamePromptsPanel';
-import VibeSegmentedControl from '../components/ui/VibeSegmentedControl';
+import SectionTabs from '../components/ui/SectionTabs';
+import CreatePromptCard from '../components/ui/CreatePromptCard';
 import SwipeToRate from '../components/ui/SwipeToRate';
 import SnappleThumbnail from '../components/ui/SnappleThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
@@ -21,7 +22,6 @@ import { userService } from '../services/userService';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 // Bumping this string re-shows the intro to everyone, which is the
 // only way to reintroduce the screen if its copy ever changes
@@ -56,51 +56,6 @@ export default function PromptsScreen({ navigation }) {
       clearPendingAchievements();
     }
   }, [pendingAchievements]);
-
-  // Animated gradient for create card
-  const gradientAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(gradientAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: false,
-        }),
-        Animated.delay(5000),
-        Animated.timing(gradientAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  const animatedStart = {
-    x: gradientAnim.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [0, 1, 0],
-    }),
-    y: gradientAnim.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [0, 0.5, 0],
-    }),
-  };
-
-  const animatedEnd = {
-    x: gradientAnim.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [1, 0, 1],
-    }),
-    y: gradientAnim.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [1, 0.5, 1],
-    }),
-  };
 
   // State
   const [prompts, setPrompts] = useState([]);
@@ -454,28 +409,16 @@ export default function PromptsScreen({ navigation }) {
   return (
     <AppLayout navigation={navigation} active="prompts">
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Prompts</Text>
-          {/* The rotation timer belongs to snapple prompts only. Game
-              prompts change by season, and a countdown on that tab would
-              promise something that isn't coming in the next hour. */}
-          {section === 'snapple' && (
-            <View style={styles.timerPill}>
-              <Ionicons name="time-outline" size={14} color={theme.colors.vibeBlue} />
-              <Text style={styles.timerLabel}>Next prompt in</Text>
-              <Text style={styles.timerText}>{formatTimer()}</Text>
-            </View>
-          )}
-        </View>
-
-        <VibeSegmentedControl
+        {/* No "Prompts" title. The tabs and the nav bar both already say
+            where you are, so a heading above them only repeated it and
+            pushed the content down. */}
+        <SectionTabs
           options={[
             { label: 'Snapple Prompts', value: 'snapple' },
             { label: 'Game Prompts', value: 'game' },
           ]}
-          selectedValue={section}
-          onSelect={setSection}
+          value={section}
+          onChange={setSection}
           style={styles.sectionTabs}
         />
 
@@ -502,27 +445,19 @@ export default function PromptsScreen({ navigation }) {
             />
           }
         >
+          {/* The rotation timer is a snapple-prompt thing only - game
+              prompts change by season, and a countdown on that tab would
+              promise something that isn't coming in the next hour. */}
+          <View style={styles.timerRow}>
+            <View style={styles.timerPill}>
+              <Ionicons name="time-outline" size={14} color={theme.colors.vibeBlue} />
+              <Text style={styles.timerLabel}>Next prompt in</Text>
+              <Text style={styles.timerText}>{formatTimer()}</Text>
+            </View>
+          </View>
+
           <View style={styles.promptsList}>
-            {/* Create Prompt Card */}
-            <Pressable
-              style={styles.promptCard}
-              onPress={handleCreatePrompt}
-              delayPressIn={0}
-              delayPressOut={0}
-            >
-              {({ pressed }) => (
-                <AnimatedLinearGradient
-                  colors={[theme.colors.vibeRoyalBlue, theme.colors.vibeCyan, theme.colors.vibeRoyalBlue]}
-                  start={animatedStart}
-                  end={animatedEnd}
-                  style={[styles.cardGradient, { opacity: pressed ? 0.8 : 1 }]}
-                >
-                  <View style={styles.cardContent}>
-                    <Text style={styles.createCardText}>Create a Prompt</Text>
-                  </View>
-                </AnimatedLinearGradient>
-              )}
-            </Pressable>
+            <CreatePromptCard label="Create a Prompt" onPress={handleCreatePrompt} />
 
             {prompts.map((prompt, index) => (
               // Rating lived inside PromptInfoOverlay, which you had to
@@ -656,22 +591,15 @@ const makeStyles = (t) => ({
     flex: 1,
     paddingBottom: 80,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: t.colors.textPrimary,
-    fontSize: 28,
-    fontWeight: theme.fontWeights.bold,
-  },
   sectionTabs: {
-    marginHorizontal: 16,
-    marginBottom: 8,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  timerRow: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
   timerPill: {
     flexDirection: 'row',
@@ -692,11 +620,6 @@ const makeStyles = (t) => ({
   timerText: {
     color: theme.colors.vibeBlue,
     fontSize: 14,
-    fontWeight: theme.fontWeights.bold,
-  },
-  createCardText: {
-    color: t.colors.textPrimary,
-    fontSize: 16,
     fontWeight: theme.fontWeights.bold,
   },
   scrollView: {

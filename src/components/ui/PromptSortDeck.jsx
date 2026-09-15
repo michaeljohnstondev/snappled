@@ -115,7 +115,9 @@ export default function PromptSortDeck({
         <Text style={styles.label}>{title}</Text>
         <Text style={styles.counter}>{index + 1}/{deck.length}</Text>
       </View>
-      <Text style={styles.sub}>{subtitle}</Text>
+      {/* Optional. The game tab passes none - its how-to lives in the
+          intro card instead of a line of subtext under every heading. */}
+      {subtitle ? <Text style={styles.sub}>{subtitle}</Text> : <View style={styles.subSpacer} />}
 
       <SwipeCard
         key={current.id}
@@ -169,6 +171,7 @@ const makeStyles = (t) => ({
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
+  subSpacer: { height: 12 },
   sub: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 11,
