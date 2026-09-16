@@ -1828,17 +1828,10 @@ export default function GameScreen({ navigation, route }) {
     return (
       <AppLayout navigation={navigation} active="play">
         <View style={styles.lobbyContent}>
-          {/* The real mark, not a stock controller glyph. Uses the
-              adaptive-icon asset because it's the S on transparency —
-              it sits on the gradient without a plate behind it. */}
-          <Image
-            source={require('../../assets/images/icon-android.png')}
-            style={styles.lobbyMark}
-            resizeMode="contain"
-          />
-          {/* The wordmark, not a Text node. System type set in caps
-              beside custom lettering read as a placeholder next to the
-              mark above it. */}
+          {/* Wordmark alone. The S sat above it as a separate asset on a
+              different palette - cyan-to-purple with a gold bolt over
+              cyan-to-green with a magenta edge - so the two read as two
+              logos stacked rather than one. */}
           <Image
             source={require('../../assets/images/wordmark.png')}
             style={styles.lobbyWordmark}
@@ -2867,21 +2860,12 @@ const makeStyles = (t) => ({
   lobbyContent: {
     flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingTop: 16, paddingBottom: 80, gap: 16,
   },
-  lobbyMark: {
-    width: 132,
-    height: 132,
-    // Negative, deliberately. This is the adaptive-icon asset, which
-    // has roughly a quarter of its height as transparent safe-area
-    // padding baked in - so the visible S stops well short of the box
-    // and left a gap that looked like a layout mistake.
-    marginBottom: -26,
-  },
   // 4.61:1 after trimming, so the height follows the width rather than
   // being guessed at. Trimmed to its own artwork, so unlike the icon
   // above it there is no baked padding to cancel out.
   lobbyWordmark: {
-    width: 240,
-    height: 52,
+    width: 300,
+    height: 65,
   },
   lobbySubtitle: {
     color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20,
