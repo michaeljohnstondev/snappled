@@ -44,7 +44,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    // The resource pills bring their own padding and their own border,
+    // so they already read as separated from the edge. 16 on top of
+    // that was the header padding doing the pills' job twice over.
+    paddingVertical: 9,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     gap: 12,

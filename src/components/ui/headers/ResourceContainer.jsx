@@ -121,8 +121,9 @@ export default function ResourceContainer({ userStats }) {
             it, not a touch. `size` bounds a square, and the ticket is a
             wide, short shape - so it fits by width, leaves the height
             unused, and reads smaller than a round coin at the same
-            nominal size. 25 was not enough to correct for that; the
-            row's height is set by the text, so this has room. */}
+            nominal size. 25 was not enough to correct for that. The
+            pills are a fixed 34 tall, which is what this has to fit
+            inside. */}
         <CurrencyIcon name="tickets" size={32} />
         <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
@@ -230,7 +231,12 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: "rgba(0, 198, 255, 0.12)",
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    // A fixed height rather than vertical padding, so all four pills
+    // match. Padding made each one as tall as whatever it contained,
+    // and the ticket icon is the tallest thing in the row - its pill
+    // stood proud of the coin and trophy either side of it.
+    height: 34,
+    justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(0, 198, 255, 0.35)",
@@ -250,7 +256,7 @@ const styles = StyleSheet.create({
   levelItem: {
     position: 'relative',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    height: 34,
     borderRadius: 12,
     overflow: 'hidden',
     minWidth: 60,
