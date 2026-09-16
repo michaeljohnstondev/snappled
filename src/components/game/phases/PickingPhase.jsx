@@ -20,6 +20,7 @@ import HandCardThumbnail from '../round/HandCardThumbnail';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import RoundPromptBanner from '../round/RoundPromptBanner';
 import ReactionBar, { mineFor } from '../ReactionBar';
+import PlayerActions from '../PlayerActions';
 import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
 import ShimmerBar from '../../ui/ShimmerBar';
 import BackChunk from '../../ui/BackChunk';
@@ -186,13 +187,16 @@ export default function PickingPhase({
             onClose={onClosePreview}
             primaryLabel={null}
             overlaySlot={
-              <CreatorActionRow
+              <PlayerActions
                 submission={previewCard}
-                currentUser={user}
-                ownedSnappleIds={userCurrency.ownedSnapples || []}
-                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
+                user={user}
+                userCurrency={userCurrency}
                 showToast={showToast}
                 showError={showError}
+                prompt={currentPrompt}
+                onReact={onReact ? (key) => onReact(previewCard.uid || user?.uid, key) : undefined}
+                mine={mineFor(game.reactions, previewCard.uid || user?.uid, user?.uid)}
+                reactionsDisabled={reactionCooling}
               />
             }
           />
@@ -338,16 +342,22 @@ export default function PickingPhase({
             ) : null
           }
           overlaySlot={
-            previewCard._isWaiting ? (
-              <CreatorActionRow
-                submission={previewCard}
-                currentUser={user}
-                ownedSnappleIds={userCurrency.ownedSnapples || []}
-                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
-                showToast={showToast}
-                showError={showError}
-              />
-            ) : null
+            // Was `_isWaiting ? row : null`, so browsing your own hand
+            // offered nothing at all - no share, no buy, no report.
+            // Reactions only once the round is waiting: before that
+            // nobody has submitted, so there is nothing to react to.
+            <PlayerActions
+              submission={previewCard}
+              user={user}
+              userCurrency={userCurrency}
+              showToast={showToast}
+              showError={showError}
+              prompt={currentPrompt}
+              onReact={previewCard._isWaiting && onReact
+                ? (key) => onReact(previewCard.uid || user?.uid, key) : undefined}
+              mine={mineFor(game.reactions, previewCard.uid || user?.uid, user?.uid)}
+              reactionsDisabled={reactionCooling}
+            />
           }
         />
       )}

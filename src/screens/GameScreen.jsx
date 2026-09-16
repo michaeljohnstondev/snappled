@@ -38,6 +38,7 @@ import RoundPromptBanner from '../components/game/round/RoundPromptBanner';
 import { COUNTDOWN_SECONDS } from '../components/game/CountdownOverlay';
 import HandCardThumbnail from '../components/game/round/HandCardThumbnail';
 import RoundStartOverlay from '../components/game/RoundStartOverlay';
+import PlayerActions from '../components/game/PlayerActions';
 import theme from '../theme/themes';
 import { PLAYER_PALETTE, buildPlayerColors } from '../lib/playerColors';
 import { soundService } from '../services/soundService';
@@ -1993,6 +1994,10 @@ export default function GameScreen({ navigation, route }) {
           onCreatorPress={handleCreatorPress}
           isAdmin={isAdmin}
           onExcludeFromPool={handleExcludeFromPool}
+          user={user}
+          userCurrency={userCurrency}
+          showToast={showToast}
+          showError={showError}
         />
         <RoundStartOverlay
           visible={!!roundAlert}
@@ -2380,11 +2385,10 @@ export default function GameScreen({ navigation, route }) {
             }
             overlaySlot={
               <>
-                <CreatorActionRow
+                <PlayerActions
                   submission={previewCard}
-                  currentUser={user}
-                  ownedSnappleIds={userCurrency.ownedSnapples || []}
-                  wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
+                  user={user}
+                  userCurrency={userCurrency}
                   showToast={showToast}
                   showError={showError}
                   prompt={game.prompts?.[game.currentRound - 1]}
@@ -2663,14 +2667,16 @@ export default function GameScreen({ navigation, route }) {
               ) : null
             }
             overlaySlot={
-              <CreatorActionRow
+              <PlayerActions
                 submission={previewCard}
-                currentUser={user}
-                ownedSnappleIds={userCurrency.ownedSnapples || []}
-                wishlistedSnappleIds={userCurrency.wishlistedSnapples || []}
+                user={user}
+                userCurrency={userCurrency}
                 showToast={showToast}
                 showError={showError}
                 prompt={game.prompts?.[game.currentRound - 1]}
+                onReact={(key) => handleReact(previewCard.uid, key)}
+                mine={mineFor(game.reactions, previewCard.uid, user?.uid)}
+                reactionsDisabled={reactionCooling}
               />
             }
           />

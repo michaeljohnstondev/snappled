@@ -26,7 +26,6 @@ const WELCOME = {
     'Record your own, or collect ones other people made',
     'In a game, everyone plays a snapple for each round’s prompt',
     'The best one wins the round!',
-    'Your deck is what you bring — build it before you play',
   ],
 };
 

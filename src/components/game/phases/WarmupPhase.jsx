@@ -10,6 +10,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import PreviewModal from '../PreviewModal';
+import PlayerActions from '../PlayerActions';
 import RoundHeaderBar from '../round/RoundHeaderBar';
 import HandCardThumbnail from '../round/HandCardThumbnail';
 import HandCardRail, { CARD_ASPECT } from '../round/HandCardRail';
@@ -35,6 +36,13 @@ export default function WarmupPhase({
   onCreatorPress,
   isAdmin,
   onExcludeFromPool,
+  // Needed for the player's action rail. This screen had none, so
+  // opening a card here was the one place you could not share, buy or
+  // report the thing you were looking at.
+  user,
+  userCurrency,
+  showToast,
+  showError,
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -138,6 +146,20 @@ export default function WarmupPhase({
             ? () => stepPreview(1) : undefined}
           onPrev={previewAt > 0 ? () => stepPreview(-1) : undefined}
           primaryLabel={null}
+          overlaySlot={
+            <PlayerActions
+              submission={previewCard}
+              user={user}
+              userCurrency={userCurrency}
+              showToast={showToast}
+              showError={showError}
+              // No prompt here on purpose. Warmup hides the round's
+              // prompt until picking, so passing it would leak an
+              // unrevealed prompt into a share. Without one, a share
+              // carries the clip's own prompt, which is what sharing
+              // from warmup actually means.
+            />
+          }
           topRightSlot={
             isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) ? (
               <Pressable
