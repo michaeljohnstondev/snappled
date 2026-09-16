@@ -6,7 +6,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Reanimated, { LinearTransition } from 'react-native-reanimated';
-import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import { useRewardClaim } from '../store/RewardClaimContext';
@@ -429,10 +428,6 @@ export default function GameScreen({ navigation, route }) {
   const [currentVoteIndex, setCurrentVoteIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [mySnapples, setMySnapples] = useState([]);
-  // Whether loadSnapples has finished. Distinct from hasDeck: before
-  // the load lands, "no deck" and "don't know yet" look identical, and
-  // the lobby needs to tell them apart to hold the layout still.
-  const [deckLoaded, setDeckLoaded] = useState(false);
   const [allSnapples, setAllSnapples] = useState([]);
   // Mirror allSnapples in a ref so async schedulers (bot picks, retries)
   // always see the latest pool without stale-closure problems.
@@ -676,8 +671,6 @@ export default function GameScreen({ navigation, route }) {
     cancelPendingBots();
   }, [game?.phase, game?.currentRound]);
 
-  const hasDeck = mySnapples.length >= 6;
-
   // Schedule bot picks once per pickDeadline when PICKING is active —
   // bots fire on randomized 4-8s delays so the round doesn't slam shut.
   useEffect(() => {
@@ -908,7 +901,7 @@ export default function GameScreen({ navigation, route }) {
     if (!inDrawingPhase) return;
     if (hand.length > 0) return;
     if (mySnapples.length === 0 && allSnapples.length === 0) return;
-    setHand(gameService.drawHand(getHandSnapples(), allSnapples));
+    setHand(gameService.drawHand(getHandSnapples(), getPadSnapples()));
   }, [game?.phase, game?.currentRound, mySnapples.length, allSnapples.length, hand.length]);
 
   // Admin shadow-ban auto-replace. When an admin excludes a snapple
@@ -985,22 +978,30 @@ export default function GameScreen({ navigation, route }) {
     return () => navigation.setOptions({ tabBarStyle: undefined });
   }, [navigation, gameId, game]);
 
-  // Load snapples + check for active game on mount.
+  // Check for an active game to rejoin. Cheap: one document read.
   useEffect(() => {
-    loadSnapples();
     checkActiveGame();
   }, []);
 
-  // Refetch snapples whenever GameScreen gains focus (e.g. user just
-  // recorded a new one and came back). Without this, the deck stays
-  // frozen at whatever was loaded the first time the screen mounted —
-  // so new snapples never appeared in subsequent games. Skips while
-  // a game is active to avoid changing mySnapples mid-round.
-  useFocusEffect(
-    useCallback(() => {
-      if (!gameId) loadSnapples();
-    }, [gameId])
-  );
+  // Snapples load when a game begins, not before.
+  //
+  // This used to run on mount AND on every focus, which meant opening
+  // the Play tab fetched the community pool, every snapple you ever
+  // made, and every card you own - a menu of four buttons paying for a
+  // deck nobody had asked to play yet. Worse, the menu waited on it:
+  // the deck toggle could not render until the answer arrived.
+  //
+  // Nothing needs the deck until there is a hand to draw, and the draw
+  // effect already re-runs when mySnapples arrives. Loading here also
+  // means the deck is always fresh for the game about to start, which
+  // is what the focus refetch was really for.
+  const deckRequestedFor = useRef(null);
+  useEffect(() => {
+    if (!gameId) { deckRequestedFor.current = null; return; }
+    if (deckRequestedFor.current === gameId) return;
+    deckRequestedFor.current = gameId;
+    loadSnapples();
+  }, [gameId]);
 
   // Detect an in-progress game to rejoin on app relaunch. Reads the
   // user doc's `activeGameId` (a single doc read regardless of how
@@ -1275,30 +1276,34 @@ export default function GameScreen({ navigation, route }) {
       setMySnapples(uniqueById);
     } catch (error) {
       console.error('[GameScreen] Error loading snapples:', error);
-    } finally {
-      // Whatever happened, stop reserving space for a toggle that is
-      // never going to arrive.
-      setDeckLoaded(true);
     }
   };
 
-  // Hand-draw pool. Until the user has 100+ of their own snapples, we
-  // always mix in the community pool so games never feel like the same
-  // 6 cards every round. After 100 they have enough variety on their
-  // own. Random-cards toggle still forces pure community.
+  // What a hand is drawn from. Two modes and no arithmetic: My Deck is
+  // your snapples, Random Cards is the community pool. drawHand takes
+  // this first and pads from getPadSnapples() only if it comes up
+  // short, so "My Deck" means your cards and falls back rather than
+  // diluting.
+  //
+  // There used to be two thresholds here. Own 100+ snapples and the
+  // community was dropped entirely; own fewer than 6 and the toggle did
+  // not appear at all. In between, "My Deck" quietly shuffled your
+  // snapples into 200 community ones and dealt from the mix - so the
+  // button said My Deck and handed you other people's. All of it was
+  // the code counting your deck to decide what you meant.
   const getHandSnapples = () => {
-    let source;
-    if (useRandomCards) {
-      source = allSnapples;
-    } else if (mySnapples.length >= 100) {
-      source = mySnapples;
-    } else {
-      const ownIds = new Set(mySnapples.map(s => s.id));
-      const community = allSnapples.filter(s => !ownIds.has(s.id));
-      source = [...mySnapples, ...community];
-    }
+    const source = useRandomCards ? allSnapples : mySnapples;
     if (playedCardIds.length === 0) return source;
     return source.filter(s => !playedCardIds.includes(s.id));
+  };
+
+  // The community pool, used to fill a hand your own deck cannot.
+  // Excludes cards already played this game, which the padding inside
+  // drawHand has no way to know about on its own.
+  const getPadSnapples = () => {
+    const ownIds = new Set(mySnapples.map(s => s.id));
+    return allSnapples.filter(
+      s => !ownIds.has(s.id) && !playedCardIds.includes(s.id));
   };
 
   // Schedule a bot pick with a random 4-8s delay. Reads allSnapples via a
@@ -1814,19 +1819,19 @@ export default function GameScreen({ navigation, route }) {
             resizeMode="contain"
           />
 
-          {/* Deck choice.
-              Rendered from the first frame, invisible until the deck is
-              known, so it takes up its space immediately. It used to be
-              gated on hasDeck alone: the wordmark is a bundled asset and
-              painted at once, then this appeared whenever the snapple
-              load finished and shoved the buttons down the screen. A
-              menu that rearranges itself under your thumb is worse than
-              one that waits. */}
-          {(hasDeck || !deckLoaded) && (
-            <View
-              style={[styles.deckChoice, !deckLoaded && styles.deckChoiceWaiting]}
-              pointerEvents={deckLoaded ? 'auto' : 'none'}
-            >
+          {/* Deck choice. A preference, not a report on your
+              collection - so it renders immediately and never waits on
+              anything. It used to be gated on hasDeck, which needed the
+              whole deck loaded to answer, so the menu painted its
+              wordmark and then rearranged itself when the snapples
+              landed.
+
+              Too small a deck is no longer a reason to hide it either:
+              drawHand pads a short deck from the community pool, so
+              picking "My Deck" with four snapples gets you those four
+              plus enough others to play. That degrades better than a
+              toggle that silently isn't there. */}
+          <View style={styles.deckChoice}>
               <Pressable
                 style={[styles.deckOption, !useRandomCards && styles.deckOptionActive]}
                 onPress={() => setUseRandomCards(false)}
@@ -2860,9 +2865,6 @@ const makeStyles = (t) => ({
   deckChoice: {
     flexDirection: 'row', gap: 12, marginTop: 8,
   },
-  // Occupies its space without drawing anything, so the buttons below
-  // sit at their final position from the first frame.
-  deckChoiceWaiting: { opacity: 0 },
   deckOption: {
     paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20,
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)',
