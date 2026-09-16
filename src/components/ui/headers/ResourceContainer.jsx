@@ -145,7 +145,9 @@ export default function ResourceContainer({ userStats }) {
         onPress={() => togglePopup('trophies')}
       >
         <FlashOverlay value={userStats.trophies || 0} />
-        <CurrencyIcon name="trophies" size={24} />
+        {/* Up from 24. The pills are a fixed 34 now, so the art had
+            headroom it was not using. */}
+        <CurrencyIcon name="trophies" size={29} />
         <TickingNumber value={userStats.trophies || 0} style={styles.statText} />
       </Pressable>
 

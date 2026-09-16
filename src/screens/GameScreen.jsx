@@ -429,6 +429,10 @@ export default function GameScreen({ navigation, route }) {
   const [currentVoteIndex, setCurrentVoteIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [mySnapples, setMySnapples] = useState([]);
+  // Whether loadSnapples has finished. Distinct from hasDeck: before
+  // the load lands, "no deck" and "don't know yet" look identical, and
+  // the lobby needs to tell them apart to hold the layout still.
+  const [deckLoaded, setDeckLoaded] = useState(false);
   const [allSnapples, setAllSnapples] = useState([]);
   // Mirror allSnapples in a ref so async schedulers (bot picks, retries)
   // always see the latest pool without stale-closure problems.
@@ -1257,19 +1261,24 @@ export default function GameScreen({ navigation, route }) {
       const created = await snappleService.getSnapplesByCreator(user.uid, 200);
       const ownedCardIds = userCurrency.ownedSnapples || userCurrency.ownedCards || [];
 
-      const ownedCards = [];
-      for (const id of ownedCardIds) {
-        try {
-          const r = await snappleService.getSnapple(id);
-          if (r?.success && r.snapple) ownedCards.push(r.snapple);
-        } catch (e) {}
-      }
+      // All at once, not one after another. This was an await inside a
+      // for loop, so owning thirty cards meant thirty sequential round
+      // trips before the deck was known — and the deck toggle is what
+      // the lobby is waiting on, so the whole menu visibly assembled
+      // itself in stages behind a wordmark that had already painted.
+      const ownedCards = (await Promise.all(
+        ownedCardIds.map(id => snappleService.getSnapple(id).catch(() => null)),
+      )).filter(r => r?.success && r.snapple).map(r => r.snapple);
 
       const merged = [...(created.snapples || []), ...ownedCards];
       const uniqueById = Array.from(new Map(merged.map(s => [s.id, s])).values());
       setMySnapples(uniqueById);
     } catch (error) {
       console.error('[GameScreen] Error loading snapples:', error);
+    } finally {
+      // Whatever happened, stop reserving space for a toggle that is
+      // never going to arrive.
+      setDeckLoaded(true);
     }
   };
 
@@ -1805,9 +1814,19 @@ export default function GameScreen({ navigation, route }) {
             resizeMode="contain"
           />
 
-          {/* Deck choice */}
-          {hasDeck && (
-            <View style={styles.deckChoice}>
+          {/* Deck choice.
+              Rendered from the first frame, invisible until the deck is
+              known, so it takes up its space immediately. It used to be
+              gated on hasDeck alone: the wordmark is a bundled asset and
+              painted at once, then this appeared whenever the snapple
+              load finished and shoved the buttons down the screen. A
+              menu that rearranges itself under your thumb is worse than
+              one that waits. */}
+          {(hasDeck || !deckLoaded) && (
+            <View
+              style={[styles.deckChoice, !deckLoaded && styles.deckChoiceWaiting]}
+              pointerEvents={deckLoaded ? 'auto' : 'none'}
+            >
               <Pressable
                 style={[styles.deckOption, !useRandomCards && styles.deckOptionActive]}
                 onPress={() => setUseRandomCards(false)}
@@ -2841,6 +2860,9 @@ const makeStyles = (t) => ({
   deckChoice: {
     flexDirection: 'row', gap: 12, marginTop: 8,
   },
+  // Occupies its space without drawing anything, so the buttons below
+  // sit at their final position from the first frame.
+  deckChoiceWaiting: { opacity: 0 },
   deckOption: {
     paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20,
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)',
