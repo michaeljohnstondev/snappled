@@ -1119,6 +1119,43 @@ exports.onFollowerAdded = functions.firestore
     }
   });
 
+/**
+ * awardCreationXP — pay XP for making a snapple, once per prompt.
+ *
+ * The once-per-prompt rule is what stops someone farming XP by
+ * answering the same prompt ten times, and it is why the check and the
+ * write have to be one transaction: the old client version read the
+ * earned list, then wrote, with an animation in between.
+ *
+ * A recycled prompt gets a new id, so the same TEXT coming back around
+ * is a fresh cycle and pays again. That is deliberate.
+ */
+async function awardCreationXP(uid, promptId) {
+  const userRef = db.collection('users').doc(uid);
+  const FV = admin.firestore.FieldValue;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) return;
+    const data = snap.data();
+
+    if (promptId && (data.xpEarnedPrompts || []).includes(promptId)) return;
+
+    const boosts = data.boosts || {};
+    const nowISO = new Date().toISOString();
+    const xp = (boosts.xpBoost && boosts.xpBoost > nowISO) ? 150 : 75;
+
+    const updates = {
+      'profile.experience': FV.increment(xp),
+      'profile.xp': FV.increment(xp),
+      'stats.videosCreated': FV.increment(1),
+      updatedAt: FV.serverTimestamp(),
+    };
+    if (promptId) updates.xpEarnedPrompts = FV.arrayUnion(promptId);
+    tx.update(userRef, updates);
+  });
+}
+
 // ── New snapple from someone I follow ──
 // Trigger fires on snapple doc create. Skips private snapples,
 // blocked/muted actors, and toggle-off followers. Debounces bursts:
@@ -1137,6 +1174,12 @@ exports.onNewSnapple = functions.firestore
     if (snapple.creatorId) {
       require('./gamePrompts').grantSnappleTickets(snapple.creatorId)
         .catch(e => console.warn('[onNewSnapple] ticket grant failed:', e.message));
+      // XP for making the thing. Also ahead of the returns, and for the
+      // same reason. This used to run on the phone, inside an animation
+      // callback, incrementing its own profile.xp — which made levels
+      // free to anyone willing to call updateDoc twice.
+      awardCreationXP(snapple.creatorId, snapple.promptId)
+        .catch(e => console.warn('[onNewSnapple] xp grant failed:', e.message));
     }
 
     if (snapple.isPrivate === true) return;
@@ -1421,6 +1464,12 @@ exports.onPromptScoreInputChanged = require('./promptScore').onPromptScoreInputC
 exports.onPromptVoteWritten = require('./promptVotes').onPromptVoteWritten;
 exports.onPromptReported = require('./promptModeration').onPromptReported;
 exports.onSnappleEligibilityChanged = require('./snappleEligibility').onSnappleEligibilityChanged;
+exports.purchaseStoreItem = require('./store').purchaseStoreItem;
+exports.summonPrompt = require('./summonPrompt').summonPrompt;
+exports.purchaseExtraSlot = require('./store').purchaseExtraSlot;
+exports.spendMulligan = require('./store').spendMulligan;
+exports.claimGameReward = require('./gameRewards').claimGameReward;
+exports.checkAchievements = require('./achievements').checkAchievements;
 exports.createGamePrompt = require('./gamePrompts').createGamePrompt;
 exports.rolloverSeason = require('./gamePrompts').rolloverSeason;
 exports.getShareCard = require('./shareRender').getShareCard;

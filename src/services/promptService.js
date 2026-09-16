@@ -238,143 +238,31 @@ class PromptService {
   //   { status: 'revived',  promptId, prompt }   (was in pool, now active)
   //   { status: 'created',  promptId, prompt }   (new in pool + active)
   // The caller is responsible for charging the user (we don't touch tickets here).
+  /**
+   * summonPrompt - put a prompt into rotation.
+   *
+   * All of this used to happen here: ban check, searching the four
+   * prompt collections, writing the prompt, then debiting a ticket as a
+   * separate write afterwards. A client that skipped that last step got
+   * prompts for free, which is not a thing a ticket bought with real
+   * money can allow. It all lives in functions/summonPrompt.js now, in
+   * one transaction.
+   *
+   * `userId` and `username` stay in the signature because every caller
+   * passes them; the server trusts neither. The uid comes from the auth
+   * token, and the username is only ever a display string.
+   */
   async summonPrompt({ text, userId, username }) {
     try {
-      const cleanText = String(text || '').trim();
-      if (!cleanText) return { success: false, error: 'Empty prompt text' };
-      const textKey = normalizePromptText(cleanText);
-      if (!textKey) return { success: false, error: 'Empty prompt text after normalization' };
-
-      // 1. Permaban check (doc id = textKey).
-      const banDoc = await getDoc(doc(db, 'bannedPromptTexts', textKey));
-      if (banDoc.exists()) {
-        return { success: true, status: 'banned' };
-      }
-
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const lockoutAt = new Date(Date.now() + (24 * 60 - 10) * 60 * 1000).toISOString();
-      const nowISO = new Date().toISOString();
-
-      // 2. Already in active?
-      const activeMatch = await getDocs(query(
-        collection(db, 'activePrompts'),
-        where('textKey', '==', textKey),
-        limit(1),
-      ));
-      if (!activeMatch.empty) {
-        const d = activeMatch.docs[0];
-        return { success: true, status: 'already_active', promptId: d.id, prompt: { id: d.id, ...d.data() } };
-      }
-
-      // 3. On deck? Promote.
-      const onDeckMatch = await getDocs(query(
-        collection(db, 'onDeckPrompts'),
-        where('textKey', '==', textKey),
-        limit(1),
-      ));
-      if (!onDeckMatch.empty) {
-        const d = onDeckMatch.docs[0];
-        const data = d.data();
-        const promoted = {
-          ...data,
-          textKey,
-          createdAt: nowISO,
-          expiresAt,
-          lockoutAt,
-          isSystem: data.isSystem ?? false,
-          likeCount: 0,
-          dislikeCount: 0,
-          likes: [],
-          dislikes: [],
-          reports: [],
-          reportCount: 0,
-          participantCount: 0,
-          totalViews: 0,
-          summonedBy: userId,
-          summonedFrom: 'onDeck',
-        };
-        const newRef = await addDoc(collection(db, 'activePrompts'), promoted);
-        await deleteDoc(doc(db, 'onDeckPrompts', d.id)).catch(() => {});
-        return { success: true, status: 'promoted', promptId: newRef.id, prompt: { id: newRef.id, ...promoted } };
-      }
-
-      // 4. In pool? Revive (lifetime stats stay on the pool doc).
-      const poolMatch = await getDocs(query(
-        collection(db, 'promptPool'),
-        where('textKey', '==', textKey),
-        limit(1),
-      ));
-      if (!poolMatch.empty) {
-        const d = poolMatch.docs[0];
-        const data = d.data();
-        const revived = {
-          text: data.text || cleanText,
-          textKey,
-          category: data.category || 'user',
-          createdBy: data.createdBy || userId,
-          creatorUsername: data.creatorUsername || username || 'anonymous',
-          createdAt: nowISO,
-          expiresAt,
-          lockoutAt,
-          isSystem: data.isSystem ?? false,
-          likeCount: 0,
-          dislikeCount: 0,
-          likes: [],
-          dislikes: [],
-          reports: [],
-          reportCount: 0,
-          participantCount: 0,
-          totalViews: 0,
-          revivedBy: userId,
-          poolDocId: d.id,
-        };
-        const newRef = await addDoc(collection(db, 'activePrompts'), revived);
-        await updateDoc(doc(db, 'promptPool', d.id), {
-          instanceCount: increment(1),
-          lastRevivedAt: nowISO,
-        }).catch(() => {});
-        return { success: true, status: 'revived', promptId: newRef.id, prompt: { id: newRef.id, ...revived } };
-      }
-
-      // 5. Fresh create — write to pool AND active so future summons revive
-      // instead of duplicating.
-      const baseFields = {
-        text: cleanText,
-        textKey,
-        createdBy: userId,
-        creatorUsername: username || 'anonymous',
-        category: 'user',
-        createdAt: nowISO,
-        isSystem: false,
-      };
-      const poolRef = await addDoc(collection(db, 'promptPool'), {
-        ...baseFields,
-        likeCountLifetime: 0,
-        dislikeCountLifetime: 0,
-        participantCountLifetime: 0,
-        totalViewsLifetime: 0,
-        instanceCount: 1,
-        lastRevivedAt: nowISO,
-      });
-      const activeFields = {
-        ...baseFields,
-        expiresAt,
-        lockoutAt,
-        likeCount: 0,
-        dislikeCount: 0,
-        likes: [],
-        dislikes: [],
-        reports: [],
-        reportCount: 0,
-        participantCount: 0,
-        totalViews: 0,
-        poolDocId: poolRef.id,
-      };
-      const activeRef = await addDoc(collection(db, 'activePrompts'), activeFields);
-      return { success: true, status: 'created', promptId: activeRef.id, prompt: { id: activeRef.id, ...activeFields } };
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('./firebase');
+      const fn = httpsCallable(functions, 'summonPrompt');
+      const res = await fn({ text, username });
+      return res.data;
     } catch (error) {
       console.error('[PromptService] summonPrompt error:', error);
-      return { success: false, error: error.message };
+      // HttpsError messages are written to be shown to the player.
+      return { success: false, error: error?.message || 'Could not create that prompt.' };
     }
   }
 

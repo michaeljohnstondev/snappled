@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, arrayUnion, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 const GROUPS = [
@@ -111,130 +111,23 @@ export const achievementService = {
     }
   },
 
+  /**
+   * checkAndAward - award anything newly earned.
+   *
+   * `userId` and `stats` are ignored. They used to BE the check: each
+   * caller assembled its own stats object and this paid out against
+   * whatever arrived, onto whatever account was named. The server
+   * derives both now, from the caller's own token. The arguments stay
+   * in the signature because four screens pass them and removing them
+   * would be a rename, not a fix.
+   */
   async checkAndAward(userId, stats) {
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (!userDoc.exists()) return [];
-
-      const userData = userDoc.data();
-      const existing = userData.achievements || [];
-      const existingIds = new Set(existing.map(a => a.id));
-      const newAchievements = [];
-
-      for (const achievement of ACHIEVEMENTS) {
-        if (existingIds.has(achievement.id)) continue;
-
-        let earned = false;
-
-        switch (achievement.id) {
-          // Creation
-          case 'first_snapple': earned = (stats.videosCreated || 0) >= 1; break;
-          case 'snapple_5': earned = (stats.videosCreated || 0) >= 5; break;
-          case 'snapple_25': earned = (stats.videosCreated || 0) >= 25; break;
-          case 'snapple_50': earned = (stats.videosCreated || 0) >= 50; break;
-          case 'snapple_100': earned = (stats.videosCreated || 0) >= 100; break;
-          case 'multi_prompt': earned = (stats.uniquePromptsUsed || 0) >= 10; break;
-
-          // Likes
-          case 'likes_10': earned = (stats.totalLikesReceived || stats.totalLikes || 0) >= 10; break;
-          case 'likes_50': earned = (stats.totalLikesReceived || stats.totalLikes || 0) >= 50; break;
-          case 'likes_100': earned = (stats.totalLikesReceived || stats.totalLikes || 0) >= 100; break;
-          case 'likes_500': earned = (stats.totalLikesReceived || stats.totalLikes || 0) >= 500; break;
-          case 'likes_1000': earned = (stats.totalLikesReceived || stats.totalLikes || 0) >= 1000; break;
-          case 'single_like_25': earned = (stats.maxLikesOnOne || 0) >= 25; break;
-
-          // Rounds
-          case 'rounds_1': earned = (stats.roundsWon || 0) >= 1; break;
-          case 'rounds_10': earned = (stats.roundsWon || 0) >= 10; break;
-          case 'rounds_50': earned = (stats.roundsWon || 0) >= 50; break;
-          case 'rounds_100': earned = (stats.roundsWon || 0) >= 100; break;
-          case 'sweep': earned = (stats.cleanSweeps || 0) >= 1; break;
-          case 'comeback': earned = (stats.comebacks || 0) >= 1; break;
-
-          // Games
-          case 'first_win': earned = (stats.gamesWon || 0) >= 1; break;
-          case 'wins_5': earned = (stats.gamesWon || 0) >= 5; break;
-          case 'wins_10': earned = (stats.gamesWon || 0) >= 10; break;
-          case 'wins_25': earned = (stats.gamesWon || 0) >= 25; break;
-          case 'wins_50': earned = (stats.gamesWon || 0) >= 50; break;
-          case 'wins_100': earned = (stats.gamesWon || 0) >= 100; break;
-          case 'win_streak_3': earned = (stats.winStreak || 0) >= 3; break;
-          case 'win_streak_5': earned = (stats.winStreak || 0) >= 5; break;
-
-          // Sales
-          case 'first_sale': earned = (stats.snapplesSold || 0) >= 1; break;
-          case 'sales_10': earned = (stats.snapplesSold || 0) >= 10; break;
-          case 'sales_50': earned = (stats.snapplesSold || 0) >= 50; break;
-          case 'sales_100': earned = (stats.snapplesSold || 0) >= 100; break;
-          case 'revenue_10k': earned = (stats.totalRevenue || 0) >= 10000; break;
-
-          // Levels
-          case 'level_5': earned = (stats.level || 1) >= 5; break;
-          case 'level_10': earned = (stats.level || 1) >= 10; break;
-          case 'level_25': earned = (stats.level || 1) >= 25; break;
-          case 'level_50': earned = (stats.level || 1) >= 50; break;
-          case 'level_75': earned = (stats.level || 1) >= 75; break;
-          case 'level_100': earned = (stats.level || 1) >= 100; break;
-
-          // Social
-          case 'followers_1': earned = (stats.followerCount || 0) >= 1; break;
-          case 'followers_10': earned = (stats.followerCount || 0) >= 10; break;
-          case 'followers_50': earned = (stats.followerCount || 0) >= 50; break;
-          case 'followers_100': earned = (stats.followerCount || 0) >= 100; break;
-          case 'followers_500': earned = (stats.followerCount || 0) >= 500; break;
-          case 'following_5': earned = (stats.followingCount || 0) >= 5; break;
-          case 'following_25': earned = (stats.followingCount || 0) >= 25; break;
-          case 'mutual_10': earned = (stats.mutualCount || 0) >= 10; break;
-
-          // Trophy ranks
-          case 'trophies_25': earned = (stats.trophies || 0) >= 25; break;
-          case 'trophies_50': earned = (stats.trophies || 0) >= 50; break;
-          case 'trophies_100': earned = (stats.trophies || 0) >= 100; break;
-          case 'trophies_250': earned = (stats.trophies || 0) >= 250; break;
-          case 'trophies_500': earned = (stats.trophies || 0) >= 500; break;
-
-          // Ranking - counted server-side on every first vote.
-          case 'ranked_10': earned = (stats.promptsRanked || 0) >= 10; break;
-          case 'ranked_50': earned = (stats.promptsRanked || 0) >= 50; break;
-          case 'ranked_250': earned = (stats.promptsRanked || 0) >= 250; break;
-        }
-
-        if (earned) {
-          newAchievements.push({
-            ...achievement,
-            earnedAt: new Date().toISOString(),
-          });
-        }
-      }
-
-      if (newAchievements.length > 0) {
-        const total = (field) => newAchievements
-          .reduce((sum, a) => sum + (a[field] || 0), 0);
-        const totalCoins = total('coins');
-        const totalXP = total('xp');
-        const totalTrophies = total('trophies');
-        const totalMulligans = total('mulligans');
-        const totalTickets = total('tickets');
-        const updates = {
-          achievements: [...existing, ...newAchievements],
-          updatedAt: serverTimestamp(),
-        };
-        // increment() rather than read-then-write. The old form computed
-        // the new total from a snapshot taken earlier in this function,
-        // so a purchase or a round reward landing in between was
-        // overwritten - and a payout that silently eats currency someone
-        // just paid for is the worst version of that bug.
-        if (totalCoins > 0) updates['resources.coins'] = increment(totalCoins);
-        if (totalXP > 0) updates['profile.xp'] = increment(totalXP);
-        if (totalTrophies > 0) updates['resources.trophies'] = increment(totalTrophies);
-        if (totalMulligans > 0) {
-          updates['inventory.mulligans'] = increment(totalMulligans);
-        }
-        if (totalTickets > 0) updates['resources.tokens'] = increment(totalTickets);
-        await updateDoc(doc(db, 'users', userId), updates);
-      }
-
-      return newAchievements;
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('./firebase');
+      const fn = httpsCallable(functions, 'checkAchievements');
+      const res = await fn({});
+      return res.data?.earned || [];
     } catch (e) {
       console.error('[Achievements] Check error:', e);
       return [];

@@ -14,6 +14,7 @@ import { useRewardClaim } from '../store/RewardClaimContext';
 import { useUploadQueue } from '../store/UploadQueueContext';
 import { snappleService } from '../services/snappleService';
 import { promptService } from '../services/promptService';
+import storeService from '../services/storeService';
 import { achievementService } from '../services/achievementService';
 import { levelService } from '../services/levelService';
 import theme from '../theme/themes';
@@ -24,7 +25,7 @@ export default function VideoPreviewScreen({ route, navigation }) {
   const styles = useThemedStyles(makeStyles);
   const { recordedVideo, cameraFacing } = route.params || {};
   const initialPrompt = route.params?.prompt;
-  const { user, userCurrency, updateUserCurrency } = useAuth();
+  const { user, userCurrency, updateUserCurrencyLocal } = useAuth();
   const { showSuccess, showError, showConfirm, showAlert, showToast } = useModal();
   const { flyRewards } = useRewardClaim();
   const { enqueueUpload } = useUploadQueue();
@@ -142,11 +143,20 @@ export default function VideoPreviewScreen({ route, navigation }) {
             'Extra Snapple',
             `You have ${count} snapple${count > 1 ? 's' : ''} for this prompt. Extra slot costs ${price.toLocaleString()} coins.`,
             async () => {
-              if ((userCurrency.coins || 0) < price) {
-                showError('Not Enough Coins', `You need ${price.toLocaleString()} coins`);
+              // The price above is what the confirm says; the server
+              // recounts and charges. It also owns the balance check —
+              // checking here and charging there is how you get a
+              // purchase that passes on the phone and fails in flight.
+              const res = await storeService.buyExtraSlot(activePrompt.id);
+              if (!res.success) {
+                showError('Not Enough Coins', res.error);
                 return;
               }
-              await updateUserCurrency({ coins: (userCurrency.coins || 0) - price });
+              if (res.charged) {
+                updateUserCurrencyLocal({
+                  coins: (userCurrency.coins || 0) - res.charged,
+                });
+              }
               askSaveThenSubmit(activePrompt);
             }
           );
@@ -232,20 +242,12 @@ export default function VideoPreviewScreen({ route, navigation }) {
         const now = new Date().toISOString();
         const xpAmount = (boosts.xpBoost && boosts.xpBoost > now) ? 150 : 75;
 
-        flyRewards({
-          rewards: { xp: xpAmount },
-          commit: async () => {
-            const updates = {
-              'profile.experience': xpInc(xpAmount),
-              'profile.xp': xpInc(xpAmount),
-              'stats.videosCreated': xpInc(1),
-            };
-            if (submitPrompt?.id) {
-              updates.xpEarnedPrompts = xpUnion(submitPrompt.id);
-            }
-            await xpUpdate(xpDoc(xpDb, 'users', user.uid), updates).catch(() => {});
-          },
-        });
+        // The XP itself is granted by the onNewSnapple trigger, in one
+        // transaction with the once-per-prompt check. This animation
+        // used to BE the grant — it wrote profile.xp from its own
+        // commit callback, so the level ladder was the phone's to
+        // climb. Now it only shows what the server already did.
+        flyRewards({ rewards: { xp: xpAmount } });
 
         const afterLevel = levelService.getLevelFromXP(beforeXP + xpAmount);
         if (afterLevel > beforeLevel) {
@@ -415,11 +417,10 @@ export default function VideoPreviewScreen({ route, navigation }) {
           showError('Not Allowed', 'This prompt isn\'t allowed.');
           return;
         }
-        // Already live → no ticket charged. Otherwise deduct 1.
+        // The ticket is charged inside summonPrompt, in the same
+        // transaction that decides the outcome — so this only reports
+        // what happened. Already live means it was free.
         if (result.status !== 'already_active') {
-          await updateDoc(doc(db, 'users', user.uid), {
-            'resources.tokens': increment(-1),
-          });
           showToast('reward', 'Prompt Created!', '-1 ticket');
         }
         handlePickPrompt(result.prompt);

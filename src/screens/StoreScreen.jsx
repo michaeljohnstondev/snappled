@@ -6,12 +6,9 @@ import CurrencyIcon from '../components/ui/CurrencyIcon';
 import AppLayout from '../components/ui/layout/AppLayout';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
-import { doc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import storeService from '../services/storeService';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
-
-const BOOST_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 // ids are the store product ids from src/lib/products.js. They were
 // local strings matching nothing; Apple will not let a product id be
@@ -48,6 +45,11 @@ const BUNDLES = [
   { id: 'snappled_bundle_mega', name: 'Mega Pack', coins: 10000, tickets: 50, price: '$49.99', tag: 'Save 40%', gradient: ['#6B00CC', '#FF00FF'] },
 ];
 
+// The coin prices below, and the deck ladder further down, are what the
+// shelf DISPLAYS. functions/store.js holds the same numbers and is the
+// one that gets charged — change a price there or it does not change.
+// Duplicated on purpose: the alternative is a round trip before the
+// store can draw itself, to show numbers that move about once a year.
 const BOOSTS = [
   { id: 'trophy_boost', name: 'Trophy Boost', description: '2x trophies from games for 24 hours', coinPrice: 3000, icon: 'trophy' },
   { id: 'xp_boost', name: 'XP Boost', description: '2x XP from all actions for 24 hours', coinPrice: 3000, icon: 'flash' },
@@ -108,47 +110,18 @@ export default function StoreScreen({ navigation, route }) {
       return;
     }
     showConfirm('Confirm Purchase', `Buy ${item.name} for ${item.coinPrice.toLocaleString()} coins?`, async () => {
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        const updates = {
-          'resources.coins': increment(-item.coinPrice),
-        };
-
-        // Boosts — set expiry timestamp
-        if (item.id === 'trophy_boost') {
-          updates['boosts.trophyBoost'] = new Date(Date.now() + BOOST_DURATION).toISOString();
-        } else if (item.id === 'xp_boost') {
-          updates['boosts.xpBoost'] = new Date(Date.now() + BOOST_DURATION).toISOString();
-        }
-
-        // Game items — increment quantity
-        else if (item.id === 'mulligan') {
-          updates['inventory.mulligans'] = increment(1);
-        } else if (item.id === 'shield') {
-          updates['inventory.shields'] = increment(1);
-        }
-
-        // Upgrades — permanent
-        else if (item.id === 'deck_size_up') {
-          const current = user?.upgrades?.maxDeckSize || DECK_SIZE_START;
-          const inc = current < 100 ? DECK_SIZE_INCREMENT : DECK_BIG_INCREMENT;
-          updates['upgrades.maxDeckSize'] = current + inc;
-        } else if (item.id === 'spotlight') {
-          updates['inventory.spotlights'] = increment(1);
-        }
-
-        // Log purchase
-        updates['purchases'] = arrayUnion({
-          itemId: item.id,
-          name: item.name,
-          coinPrice: item.coinPrice,
-          purchasedAt: new Date().toISOString(),
-        });
-
-        await updateDoc(userRef, updates);
-        showAlert('Purchased!', `You got ${item.name}!`);
-      } catch (e) {
-        showAlert('Error', 'Purchase failed. Try again.');
+      // Only the id goes over the wire. The price above is what the
+      // shelf SAYS; what the purchase costs is decided in the callable,
+      // reading this account's real balance. Sending the price from
+      // here is how a modified client used to buy a 5,000-coin Shield
+      // for nothing.
+      const res = await storeService.purchase(item.id);
+      if (res.success) {
+        showAlert('Purchased!', `You got ${res.name || item.name}!`);
+      } else {
+        // The server writes these to be read by the person who hit the
+        // button - "You need 5,000 coins and have 300", not a code.
+        showAlert('Purchase Failed', res.error);
       }
     });
   };

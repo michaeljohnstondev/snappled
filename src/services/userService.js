@@ -298,94 +298,18 @@ export const userService = {
     }
   },
 
-  async updateCoins(userId, amount) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, {
-        "resources.coins": increment(amount),
-        updatedAt: serverTimestamp(),
-      });
+  // updateCoins / updateTopicTokens / updateTrophies / updateTickets /
+  // updateReceivedCoins lived here: five thin wrappers that incremented
+  // a balance from the client. None of them had a caller, and none of
+  // them could have one now - resources are server-only, so the writes
+  // would be rejected. Currency is earned by a trigger or spent through
+  // a callable; see functions/store.js and functions/gameRewards.js.
 
-      return { success: true };
-    } catch (error) {
-      console.error("Error updating coins:", error);
-      return { success: false, error: "Failed to update coins" };
-    }
-  },
 
-  async updateTopicTokens(userId, amount) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, {
-        "resources.tokens": increment(amount),
-        updatedAt: serverTimestamp(),
-      });
+  // updateXP lived here. XP is granted by the onNewSnapple trigger
+  // and by claimGameReward now - a level ladder the client can climb
+  // by calling updateDoc is not a ladder. It had no callers anyway.
 
-      return { success: true };
-    } catch (error) {
-      console.error("Error updating topic tokens:", error);
-      return { success: false, error: "Failed to update topic tokens" };
-    }
-  },
-
-  async updateTrophies(userId, amount) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      if (amount < 0) {
-        const userData = await this.getUserData(userId);
-        const current = userData?.resources?.trophies || 0;
-        if (current + amount < 0) amount = -current; // clamp to 0
-        if (amount === 0) return { success: true };
-      }
-      await updateDoc(userRef, {
-        "resources.trophies": increment(amount),
-        "stats.totalTrophiesSpent":
-          amount < 0 ? increment(Math.abs(amount)) : increment(0),
-        updatedAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error updating trophies:", error);
-      return { success: false, error: "Failed to update trophies" };
-    }
-  },
-
-  // Legacy method for backwards compatibility
-  async updateTickets(userId, amount) {
-    return this.updateTrophies(userId, amount);
-  },
-
-  async updateReceivedCoins(userId, amount) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, {
-        "resources.receivedCoins": increment(amount),
-        updatedAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error updating received coins:", error);
-      return { success: false, error: "Failed to update received coins" };
-    }
-  },
-
-  async updateXP(userId, amount) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, {
-        "profile.xp": increment(amount),
-        "profile.experience": increment(amount),
-        updatedAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error updating XP:", error);
-      return { success: false, error: "Failed to update XP" };
-    }
-  },
 
   async addStrike(userId, reason) {
     try {
@@ -448,32 +372,11 @@ export const userService = {
     }
   },
 
-  async addOwnedSnapple(userId, snappleId) {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      const userDoc = await getDoc(userRef);
+  // addOwnedSnapple lived here: a read-then-write that SET the whole
+  // ownedSnapples array back, racing every concurrent arrayUnion, and
+  // bumped a purchase stat that achievements pay out on. Ownership is
+  // granted by the purchaseSnapple callable. No callers.
 
-      if (!userDoc.exists()) {
-        return { success: false, error: "User not found" };
-      }
-
-      const currentSnapples = userDoc.data().ownedSnapples || [];
-      if (currentSnapples.includes(snappleId)) {
-        return { success: false, error: "Snapple already owned" };
-      }
-
-      await updateDoc(userRef, {
-        ownedSnapples: [...currentSnapples, snappleId],
-        "stats.totalSnapplesPurchased": increment(1),
-        updatedAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error("Error adding owned snapple:", error);
-      return { success: false, error: "Failed to add snapple to collection" };
-    }
-  },
 
   async updateProfile(userId, profileData) {
     try {
@@ -780,17 +683,16 @@ export const userService = {
         return { success: false, error: "User not found" };
       }
 
-      // Build the update object
+      // Build the update object.
+      //
+      // coins / tokens / trophies are accepted and IGNORED. They used to
+      // be written straight through, as a whole-value SET, from whatever
+      // number the screen was holding - which made every balance in the
+      // app editable by the phone holding it and, separately, meant two
+      // screens disagreeing about your coins would fight over the doc.
+      // Callers still pass them so the local state in AuthContext can
+      // move immediately; the server decides what they actually are.
       const resourceUpdates = {};
-      if (updates.coins !== undefined) {
-        resourceUpdates['resources.coins'] = updates.coins;
-      }
-      if (updates.tokens !== undefined) {
-        resourceUpdates['resources.tokens'] = updates.tokens;
-      }
-      if (updates.trophies !== undefined) {
-        resourceUpdates['resources.trophies'] = updates.trophies;
-      }
       // Top-level fields (collections, wishlist, etc)
       if (updates.ownedSnapples !== undefined) {
         resourceUpdates.ownedSnapples = updates.ownedSnapples;

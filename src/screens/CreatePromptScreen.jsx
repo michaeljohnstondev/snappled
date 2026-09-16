@@ -22,7 +22,7 @@ import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 export default function CreatePromptScreen({ navigation }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { user, userCurrency, updateUserCurrency } = useAuth();
+  const { user, userCurrency, updateUserCurrencyLocal } = useAuth();
   const { showAlert, showSuccess, showError } = useModal();
   const [promptText, setPromptText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,10 +72,11 @@ export default function CreatePromptScreen({ navigation }) {
         return;
       }
 
-      // Charge ticket on every successful create — internal status (created /
-      // revived / promoted) is invisible to the user; from their POV they just
-      // made a prompt.
-      await updateUserCurrency({ tokens: userCurrency.tokens - 1 });
+      // The ticket was charged by summonPrompt, in the same transaction
+      // that decided the outcome. This only moves the number on screen
+      // so the resource bar doesn't lag a beat behind — the balance it
+      // is mirroring was already set on the server.
+      updateUserCurrencyLocal({ tokens: (userCurrency.tokens || 0) - 1 });
       showSuccess('Prompt Created!', 'Your prompt is now live in the community.');
       setTimeout(() => navigation.goBack(), 1500);
     } catch (error) {

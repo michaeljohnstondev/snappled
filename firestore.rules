@@ -58,11 +58,50 @@ service cloud.firestore {
       }
 
       allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Signup writes the starting balance, so create cannot simply
+      // forbid resources the way update does — it can bound them. A new
+      // account starts on 100 coins and 10 tickets; anything above that
+      // is someone writing their own opening balance.
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.get('resources', {}).get('coins', 0) <= 100
+        && request.resource.data.get('resources', {}).get('tokens', 0) <= 10
+        && request.resource.data.get('resources', {}).get('trophies', 0) == 0;
+      // Everything with a price on it. None of these may be written by
+      // any client, including on your own document: coins and tickets
+      // are bought with real money, and the rest is what that money
+      // buys. They are written by callables and triggers, which use the
+      // Admin SDK and do not pass through these rules at all.
+      //
+      // stats is in the list because achievements pay out against it —
+      // an editable stats.gamesWon is an editable coin balance with one
+      // extra step.
+      function ownedByServer() {
+        return [
+          'resources', 'inventory', 'upgrades', 'boosts',
+          'achievements', 'purchases', 'stats', 'xpEarnedPrompts',
+        ];
+      }
+
+      // profile holds bio and avatar, which people edit, alongside xp
+      // and experience, which they must not. affectedKeys() cannot see
+      // inside a map, so these two are compared by value.
+      function profileXpUnchanged() {
+        return request.resource.data.get('profile', {}).get('xp', 0)
+                 == resource.data.get('profile', {}).get('xp', 0)
+          && request.resource.data.get('profile', {}).get('experience', 0)
+                 == resource.data.get('profile', {}).get('experience', 0);
+      }
+
       // isAdmin covers the ban and grant buttons on AdminScreen, which
-      // are the only other writes aimed at somebody else's document.
-      allow update: if request.auth != null
-        && (request.auth.uid == userId || isAdmin() || isSocialWriteByOther());
+      // are the only client writes that are meant to reach past all of
+      // this — and the only ones aimed at somebody else's document.
+      allow update: if request.auth != null && (
+        isAdmin()
+        || (request.auth.uid == userId
+            && !changed().hasAny(ownedByServer())
+            && profileXpUnchanged())
+        || isSocialWriteByOther()
+      );
       allow delete: if false;
     }
 

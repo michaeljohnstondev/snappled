@@ -13,6 +13,8 @@ import { useRewardClaim } from '../store/RewardClaimContext';
 import { prefetchVideo } from '../services/videoCache';
 import { thumbnailService } from '../services/thumbnailService';
 import { gameService, GAME_PHASES } from '../services/gameService';
+import gameRewardService from '../services/gameRewardService';
+import storeService from '../services/storeService';
 import SnappleThumbnailImg from '../components/ui/SnappleThumbnail';
 import { snappleService } from '../services/snappleService';
 import { userService } from '../services/userService';
@@ -403,7 +405,7 @@ function RoundResultsReveal({
 export default function GameScreen({ navigation, route }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { user, userCurrency } = useAuth();
+  const { user, userCurrency, updateUserCurrencyLocal } = useAuth();
   const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
   const isAdmin = ADMIN_UIDS.includes(user?.uid);
   // Admin-only inline edit on the round's prompt banner. Mirrors the pattern
@@ -1444,27 +1446,35 @@ export default function GameScreen({ navigation, route }) {
       return;
     }
     const newCard = remaining[Math.floor(Math.random() * remaining.length)];
-    setHand(prev => prev.map(h => (h.id === card.id ? newCard : h)));
-    // Clear the selection: the card it pointed at is gone, and leaving
-    // it set would arm PLAY THIS SNAPPLE for a card no longer in hand.
-    setSelectedCard(null);
+
+    // Swap the card, and clear the selection with it: the card it
+    // pointed at is gone, and leaving it set would arm PLAY THIS
+    // SNAPPLE for a card no longer in hand.
+    const doSwap = () => {
+      setHand(prev => prev.map(h => (h.id === card.id ? newCard : h)));
+      setSelectedCard(null);
+    };
 
     // Free one first, and it costs nothing anywhere - no write, no
     // balance to decrement. Only once it is gone does this touch the
     // purchased stock.
     if (freeMulligan > 0) {
       setFreeMulligan(0);
+      doSwap();
       showToast('reward', 'Mulligan!', 'Card swapped (free)');
       return;
     }
 
-    try {
-      const { doc: mDoc, updateDoc: mUpdate, increment: mInc } = await import('firebase/firestore');
-      const { db: mDb } = await import('../services/firebase');
-      await mUpdate(mDoc(mDb, 'users', user.uid), {
-        'inventory.mulligans': mInc(-1),
-      });
-    } catch (e) {}
+    // Charge BEFORE swapping. The old order swapped first and then
+    // decremented, swallowing any failure — so a player with none got
+    // the swap anyway and went quietly into negative stock. The server
+    // refuses at zero, and a refusal has to leave the hand alone.
+    const spent = await storeService.spendMulligan();
+    if (!spent.success) {
+      showAlert('No Mulligans', spent.error);
+      return;
+    }
+    doSwap();
     showToast('reward', 'Mulligan!', 'Card swapped');
   };
 
@@ -1661,78 +1671,35 @@ export default function GameScreen({ navigation, route }) {
             .filter(p => p.uid !== user.uid && !p.uid?.startsWith('bot_'))
             .map(() => 1); // TODO: track player levels in game doc
 
-          // XP only flows from ranked games. Same gating as trophies — until
-          // ranked exists, custom + practice award nothing. When ranked ships,
-          // condition this on a `ranked` flag stored on the game doc.
-          let xpEarned = 0;
-          // Trophies only flow from ranked games. Ranked isn't implemented yet
-          // so for now: practice and custom both award zero. When ranked ships,
-          // gate this on a `ranked` flag stored on the game doc.
-          let trophiesEarned = 0;
-          let coinsEarned = myReward.coinsEarned || 0;
-
-          const { doc, updateDoc, increment, getDoc } = await import('firebase/firestore');
+          // The payout happens on the server, BEFORE the game doc is
+          // archived below - the server recomputes placement from that
+          // document's scores, so it has to still be there to read.
+          // This used to be worked out here: placement, payout table
+          // and boost multiplier all decided by the phone, then written
+          // straight onto its own balance.
+          const claim = await gameRewardService.claim(gameId);
+          if (!claim.success) {
+            console.error('[GameScreen] reward claim failed:', claim.error);
+          }
+          // Read-only from here down: the streak and achievement checks
+          // below want the balances the claim just wrote.
+          const { doc, getDoc } = await import('firebase/firestore');
           const { db } = await import('../services/firebase');
-
-          // Check active boosts
-          const boostSnap = await getDoc(doc(db, 'users', user.uid));
-          const boosts = boostSnap.data()?.boosts || {};
-          const now = new Date().toISOString();
-          if (boosts.xpBoost && boosts.xpBoost > now) {
-            xpEarned = xpEarned * 2;
-          }
-          if (boosts.trophyBoost && boosts.trophyBoost > now && trophiesEarned > 0) {
-            trophiesEarned = trophiesEarned * 2;
-          }
-
-          // Check shield — block trophy loss
-          const inventory = boostSnap.data()?.inventory || {};
-          let shieldUsed = false;
-          if (trophiesEarned < 0 && (inventory.shields || 0) > 0) {
-            trophiesEarned = 0;
-            shieldUsed = true;
-          }
-
-          // Build the commit function — runs at the apex of the fly animation
-          // so resource bar values tick up as icons land. Uses Firestore
-          // increments for atomicity (no read-then-write race when the user
-          // currency listener is mid-update). All resource/stat changes go
-          // through one updateDoc so the AuthContext listener fires once
-          // with the full new state.
           const userRef = doc(db, 'users', user.uid);
-          const commit = async () => {
-            try {
-              const updates = {
-                'profile.experience': increment(xpEarned),
-                'profile.xp': increment(xpEarned),
-                'stats.gamesPlayed': increment(1),
-                'stats.totalCoinsEarned': increment(coinsEarned),
-              };
-              if (myReward.placement === 1) {
-                updates['stats.gamesWon'] = increment(1);
-              }
-              if (coinsEarned > 0) {
-                updates['resources.coins'] = increment(coinsEarned);
-              }
-              if (trophiesEarned !== 0) {
-                updates['resources.trophies'] = increment(trophiesEarned);
-              }
-              if (shieldUsed) {
-                updates['inventory.shields'] = increment(-1);
-              }
-              await updateDoc(userRef, updates);
+          const coinsEarned = claim.coins || 0;
+          const trophiesEarned = claim.trophies || 0;
+          const xpEarned = claim.xp || 0;
+          const shieldUsed = !!claim.shieldUsed;
 
-              // Win streak — read-then-write, separate doc update.
-              if (myReward.placement === 1) {
-                const afterSnap = await getDoc(userRef);
-                const streak = (afterSnap.data()?.stats?.winStreak || 0) + 1;
-                await updateDoc(userRef, { 'stats.winStreak': streak });
-              } else {
-                await updateDoc(userRef, { 'stats.winStreak': 0 });
-              }
-            } catch (e) {
-              console.error('[GameScreen] commit error:', e);
-            }
+          // Runs at the apex of the fly animation so the resource bar
+          // ticks up as the icons land. Local only now - the balance it
+          // is moving towards was already set by the claim above, and
+          // the AuthContext listener will confirm it either way.
+          const commit = async () => {
+            updateUserCurrencyLocal({
+              coins: (userCurrency?.coins || 0) + coinsEarned,
+              trophies: (userCurrency?.trophies || 0) + trophiesEarned,
+            });
           };
 
           // Tear down the game first so the user lands on the lobby (with the
