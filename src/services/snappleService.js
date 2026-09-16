@@ -739,33 +739,14 @@ export const snappleService = {
     }
   },
 
-  // cleanupSnappleReferences — before deleting a snapple, iterate
-  // its inverse-index arrays (wishlistedBy, likedBy, dislikedBy,
-  // owners) and arrayRemove the snappleId from each touched user's
-  // corresponding forward-index array. Prevents ghost ids surviving
-  // on user docs after a snapple deletion. Batched per user to keep
-  // writes atomic per doc.
-  async cleanupSnappleReferences(snappleId, snappleData) {
-    try {
-      const wishlisters = snappleData.wishlistedBy || [];
-      const likers = snappleData.likedBy || [];
-      const dislikers = snappleData.dislikedBy || [];
-      const owners = snappleData.owners || [];
-      const touched = new Set([...wishlisters, ...likers, ...dislikers, ...owners]);
-
-      for (const uid of touched) {
-        const updates = { updatedAt: serverTimestamp() };
-        if (wishlisters.includes(uid)) updates.wishlistedSnapples = arrayRemove(snappleId);
-        if (likers.includes(uid)) updates.likedSnapples = arrayRemove(snappleId);
-        if (dislikers.includes(uid)) updates.dislikedSnapples = arrayRemove(snappleId);
-        if (owners.includes(uid)) updates.ownedSnapples = arrayRemove(snappleId);
-        await updateDoc(doc(db, USERS_COLLECTION, uid), updates).catch(() => {});
-      }
-    } catch (error) {
-      console.error('[SnappleService] cleanupSnappleReferences error:', error);
-    }
-  },
-
+  // deleteSnapple — remove a snapple you created, plus its video file.
+  //
+  // The cascade that used to live here (clearing the id off everyone
+  // who owned / wishlisted / liked / disliked it, and refunding its
+  // buyers) now runs in the onSnappleDeleted trigger. Those writes land
+  // on other people's user documents, and no client should have that
+  // reach - it is what kept the /users rule wide open. The trigger has
+  // the snapshot, so it has everything the cascade needs.
   async deleteSnapple(snappleId, userId) {
     try {
       const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
@@ -780,24 +761,13 @@ export const snappleService = {
         return { success: false, error: 'Only the creator can delete this snapple' };
       }
 
-      // Cascade: clear this snappleId out of every user's forward
-      // indexes (owned / wishlisted / liked / disliked) BEFORE deleting
-      // the doc so users don't end up with ghost ids. Runs regardless
-      // of whether there are other owners — refunded buyers still need
-      // their ownedSnapples arrays cleaned.
-      await this.cleanupSnappleReferences(snappleId, data);
-
-      // Refund any other buyers first so their coins are back before
-      // the source doc disappears.
       const otherOwners = (data.owners || []).filter(id => id !== userId);
-      if (otherOwners.length > 0) {
-        await this.refundBuyers(snappleId, data);
-      }
 
-      // Full nuke — doc + Storage file. Runs in both branches so the
-      // .mp4 never orphans in the bucket (used to only delete the file
-      // when nobody else owned it, which left buyer-owned videos as
-      // paid-for storage nobody could ever play).
+      // Doc + Storage file, unconditionally. The file used to be kept
+      // whenever somebody else owned a copy, which left buyer-owned
+      // videos sitting in the bucket as paid-for storage nobody could
+      // ever play — the buyers get refunded, so there is nothing left
+      // to play them with.
       await deleteDoc(snappleRef);
       try {
         const { ref: storageRef, deleteObject } = await import('firebase/storage');
@@ -816,36 +786,6 @@ export const snappleService = {
     } catch (error) {
       console.error('Error deleting snapple:', error);
       return { success: false, error: 'Failed to delete snapple' };
-    }
-  },
-
-  async refundBuyers(snappleId, snappleData) {
-    try {
-      const purchases = (snappleData.priceHistory || []).filter(p => p.buyer);
-
-      for (const purchase of purchases) {
-        if (!purchase.buyer || purchase.buyer === snappleData.creatorId) continue;
-
-        const buyerRef = doc(db, 'users', purchase.buyer);
-        await updateDoc(buyerRef, {
-          'resources.coins': increment(purchase.price || 0),
-          ownedSnapples: arrayRemove(snappleId),
-          updatedAt: serverTimestamp(),
-        }).catch(() => {});
-
-        // Log the refund
-        await setDoc(doc(collection(db, 'refunds')), {
-          snappleId,
-          buyerId: purchase.buyer,
-          amount: purchase.price || 0,
-          reason: 'creator_deleted',
-          createdAt: serverTimestamp(),
-        }).catch(() => {});
-      }
-
-      console.log(`[SnappleService] Refunded ${purchases.length} buyers for snapple ${snappleId}`);
-    } catch (error) {
-      console.error('[SnappleService] Error refunding buyers:', error);
     }
   },
 

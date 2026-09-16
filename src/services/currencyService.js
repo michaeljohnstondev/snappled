@@ -292,80 +292,13 @@ export const currencyService = {
     }
   },
 
-  async giftCoins(fromUserId, toUserId, amount, message = '') {
-    try {
-      return await runTransaction(db, async (transaction) => {
-        const fromUserRef = doc(db, 'users', fromUserId);
-        const toUserRef = doc(db, 'users', toUserId);
-        
-        const fromUserDoc = await transaction.get(fromUserRef);
-        const toUserDoc = await transaction.get(toUserRef);
-        
-        if (!fromUserDoc.exists() || !toUserDoc.exists()) {
-          throw new Error('One or both users not found');
-        }
-        
-        const fromUserData = fromUserDoc.data();
-        
-        if (fromUserData.coins < amount) {
-          throw new Error(`Insufficient coins to gift. Have ${fromUserData.coins}, trying to gift ${amount}`);
-        }
-        
-        // Update sender
-        transaction.update(fromUserRef, {
-          coins: increment(-amount),
-          'stats.totalCoinsSpent': increment(amount),
-          updatedAt: serverTimestamp()
-        });
-        
-        // Update recipient
-        transaction.update(toUserRef, {
-          receivedCoins: increment(amount),
-          updatedAt: serverTimestamp()
-        });
-        
-        // Create transaction records
-        const senderTransactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
-        const recipientTransactionRef = doc(collection(db, TRANSACTIONS_COLLECTION));
-        
-        transaction.set(senderTransactionRef, {
-          userId: fromUserId,
-          type: 'coin_gift_sent',
-          amount: -amount,
-          currency: 'coins',
-          metadata: {
-            recipientId: toUserId,
-            message
-          },
-          timestamp: serverTimestamp()
-        });
-        
-        transaction.set(recipientTransactionRef, {
-          userId: toUserId,
-          type: 'coin_gift_received',
-          amount: amount,
-          currency: 'receivedCoins',
-          metadata: {
-            senderId: fromUserId,
-            message
-          },
-          timestamp: serverTimestamp()
-        });
-        
-        return {
-          success: true,
-          amountGifted: amount,
-          senderCoinsRemaining: fromUserData.coins - amount
-        };
-      });
-    } catch (error) {
-      console.error('Error gifting coins:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to gift coins'
-      };
-    }
-  },
+  // giftCoins lived here: a client-side transfer that wrote coins onto
+  // ANOTHER user's document. It had no callers, and it also read the
+  // wrong fields (`coins` / `receivedCoins`; balances moved under
+  // `resources.*` a long time ago), so it would have thrown on the
+  // first real gift. Removed rather than fixed - if gifting comes back
+  // it belongs in a callable, where the sender's balance can be checked
+  // somewhere the sender cannot edit.
 
   async getUserTransactions(userId, limit = 20) {
     try {

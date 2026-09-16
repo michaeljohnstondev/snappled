@@ -1220,10 +1220,29 @@ exports.onNewSnapple = functions.firestore
 // to be read back to find it. Best-effort: a snapple whose poster was
 // never generated has nothing to remove, and failing to tidy a JPEG must
 // never surface as a failed delete.
+// onSnappleDeleted — everything a deleted snapple leaves behind.
+//
+// Three jobs, all of which used to run on the client inside
+// deleteSnapple(): drop the poster, clear the id out of every user who
+// owned / wishlisted / liked / disliked it, and refund whoever bought
+// it. The last two write to OTHER PEOPLE'S user documents, which is
+// exactly the hole that forced `allow update: if request.auth != null`
+// on /users - a rule that let any signed-in account edit any other
+// account's coins. A trigger has the authority those writes need, so
+// the client no longer does, and the rule can close.
+//
+// It also fixes an ordering bug for free. On the client the refunds
+// ran BEFORE deleteDoc, so a delete that failed mid-way had already
+// paid the buyers back while they kept the snapple. Here the delete is
+// what summons the work, so the two can't disagree.
 exports.onSnappleDeleted = functions.firestore
   .document('snapples/{snappleId}')
   .onDelete(async (snapshot, context) => {
-    const file = `shared/${context.params.snappleId}-poster.jpg`;
+    const snappleId = context.params.snappleId;
+    const data = snapshot.data() || {};
+    const FV = admin.firestore.FieldValue;
+
+    const file = `shared/${snappleId}-poster.jpg`;
     try {
       await admin.storage().bucket().file(file).delete();
     } catch (e) {
@@ -1231,6 +1250,70 @@ exports.onSnappleDeleted = functions.firestore
       if (e.code !== 404) {
         console.warn('[onSnappleDeleted] poster cleanup failed:', file, e.message);
       }
+    }
+
+    // Refunds first, so a buyer's coins are decided before their
+    // ownedSnapples entry is swept: the refund is keyed off
+    // priceHistory, not off the arrays being cleaned below.
+    const refunded = new Map();
+    for (const purchase of (data.priceHistory || [])) {
+      const buyer = purchase.buyer;
+      if (!buyer || buyer === data.creatorId) continue;
+      // Someone who bought the same snapple twice gets both payments
+      // back; one entry per purchase is the whole point of the log.
+      refunded.set(buyer, (refunded.get(buyer) || 0) + (purchase.price || 0));
+    }
+
+    // Every user this snapple is still referenced by. The inverse
+    // indexes on the snapple are the only record of who to clean, and
+    // they die with the doc - this snapshot is the last chance to read
+    // them.
+    const wishlisters = data.wishlistedBy || [];
+    const likers = data.likedBy || [];
+    const dislikers = data.dislikedBy || [];
+    const owners = data.owners || [];
+    const touched = new Set([
+      ...wishlisters, ...likers, ...dislikers, ...owners, ...refunded.keys(),
+    ]);
+
+    for (const uid of touched) {
+      const updates = { updatedAt: FV.serverTimestamp() };
+      if (wishlisters.includes(uid)) updates.wishlistedSnapples = FV.arrayRemove(snappleId);
+      if (likers.includes(uid)) updates.likedSnapples = FV.arrayRemove(snappleId);
+      if (dislikers.includes(uid)) updates.dislikedSnapples = FV.arrayRemove(snappleId);
+      if (owners.includes(uid) || refunded.has(uid)) {
+        updates.ownedSnapples = FV.arrayRemove(snappleId);
+      }
+      const amount = refunded.get(uid) || 0;
+      if (amount > 0) updates['resources.coins'] = FV.increment(amount);
+      try {
+        await db.collection('users').doc(uid).update(updates);
+      } catch (e) {
+        // A deleted account is the ordinary reason this misses. One
+        // stale reference is not worth failing the rest of the sweep.
+        console.warn('[onSnappleDeleted] user cleanup failed:', uid, e.message);
+      }
+    }
+
+    // Audit trail, written after the money moves so a refund can never
+    // be logged as paid when it wasn't.
+    for (const [buyerId, amount] of refunded) {
+      try {
+        await db.collection('refunds').add({
+          snappleId,
+          buyerId,
+          amount,
+          reason: 'creator_deleted',
+          createdAt: FV.serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn('[onSnappleDeleted] refund log failed:', buyerId, e.message);
+      }
+    }
+
+    if (refunded.size || touched.size) {
+      console.log(`[onSnappleDeleted] ${snappleId}: refunded ${refunded.size}, `
+        + `cleaned ${touched.size} user(s)`);
     }
   });
 

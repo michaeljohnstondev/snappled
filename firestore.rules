@@ -8,11 +8,61 @@ service cloud.firestore {
         && request.auth.uid in ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
     }
 
-    // Users - own data only
+    // Users - your own document, plus the one thing other people
+    // legitimately do to yours: add or remove THEMSELVES from your
+    // social lists.
+    //
+    // This used to be `allow update: if request.auth != null`, which
+    // meant any signed-in account could write any other account's
+    // document - set their own coins to a million, or empty someone
+    // else's. It stayed open because follow and block genuinely write
+    // to the other person's doc, so "own doc only" broke them. The fix
+    // is to say precisely what a stranger may do instead of giving up.
     match /users/{userId} {
+
+      // The keys that changed at the top level of the document.
+      // affectedKeys() is top-level only, so a write to
+      // 'social.followers' shows up here as 'social'.
+      function changed() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      // A social list before and after, with the caller's own uid taken
+      // out of both. If those match, the only thing the caller did to
+      // that list was add or remove themselves - which is exactly what
+      // following and blocking are. Anyone trying to drop a third party
+      // from your followers, or stuff the list with ids that aren't
+      // theirs, changes the comparison and is refused.
+      //
+      // get() with a default matters: older accounts predate some of
+      // these lists, and reading a missing field would error the whole
+      // rule into a denial.
+      function onlySelfIn(list) {
+        return request.resource.data.get('social', {}).get(list, [])
+                 .removeAll([request.auth.uid])
+            == resource.data.get('social', {}).get(list, [])
+                 .removeAll([request.auth.uid]);
+      }
+
+      // What one user may do to another's document. Nothing but social,
+      // and inside social nothing but their own membership.
+      function isSocialWriteByOther() {
+        return changed().hasOnly(['social', 'updatedAt'])
+          && request.resource.data.get('social', {})
+               .diff(resource.data.get('social', {})).affectedKeys()
+               .hasOnly(['following', 'followers', 'blockedUsers', 'blockedBy'])
+          && onlySelfIn('following')
+          && onlySelfIn('followers')
+          && onlySelfIn('blockedUsers')
+          && onlySelfIn('blockedBy');
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null;
+      // isAdmin covers the ban and grant buttons on AdminScreen, which
+      // are the only other writes aimed at somebody else's document.
+      allow update: if request.auth != null
+        && (request.auth.uid == userId || isAdmin() || isSocialWriteByOther());
       allow delete: if false;
     }
 
