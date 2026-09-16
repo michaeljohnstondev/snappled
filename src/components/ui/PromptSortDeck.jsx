@@ -32,12 +32,16 @@ const DECK_SIZE = 10;
  *   with its own rating buttons further up the screen
  * @param {Function} onSorted  optional, fired after each vote with the
  *   running count so the parent can react (a reward, a nudge)
+ * @param {Function} onReport  optional, called with the card on top.
+ *   Lives here rather than in the parent because the deck is what knows
+ *   which prompt you are looking at.
  */
 export default function PromptSortDeck({
   userId, liveTexts, onSorted,
   // Which prompts it sorts. Game prompts rank this season's deck and
   // next season's candidates; the default is the snapple prompt pool.
   target = 'promptPool',
+  onReport,
   title = 'HELP SORT THESE',
   subtitle = 'Not live yet — decide what makes the cut',
 }) {
@@ -147,6 +151,17 @@ export default function PromptSortDeck({
           <Ionicons name="thumbs-up" size={22} color={theme.colors.vibeGreen} />
         </Pressable>
       </View>
+
+      {/* Under the verdict buttons, not beside them. Reporting is a
+          different kind of act from rating - rare, and not a third
+          opinion - so it should not sit in the row you are tapping
+          quickly. */}
+      {onReport ? (
+        <Pressable style={styles.report} onPress={() => onReport(current)} hitSlop={8}>
+          <Ionicons name="flag-outline" size={13} color={t.colors.textSecondary} />
+          <Text style={styles.reportText}>Report</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -214,6 +229,12 @@ const makeStyles = (t) => ({
   },
   actionWeak: { borderColor: theme.colors.vibeRed },
   actionFun: { borderColor: theme.colors.vibeGreen },
+
+  report: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 16,
+    paddingVertical: 4, paddingHorizontal: 10,
+  },
+  reportText: { color: t.colors.textSecondary, fontSize: 12, fontWeight: '600' },
 
   donePane: { alignItems: 'center', gap: 8, paddingVertical: 24 },
   doneTitle: { color: t.colors.textPrimary, fontSize: 20, fontWeight: 'bold' },

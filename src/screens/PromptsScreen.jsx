@@ -165,6 +165,11 @@ export default function PromptsScreen({ navigation }) {
     setHelp('game');
   }, [section]);
 
+  // Once the game tab has been opened it stays mounted, hidden rather
+  // than unmounted, for the rest of the visit.
+  const [gameOpened, setGameOpened] = useState(false);
+  useEffect(() => { if (section === 'game') setGameOpened(true); }, [section]);
+
   const dismissIntro = () => {
     setHelp(null);
     AsyncStorage.setItem(PROMPTS_INTRO_KEY, '1').catch(() => {});
@@ -452,13 +457,15 @@ export default function PromptsScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {/* Game tab is outside the loading gate: it has nothing to do with
-            the snapple prompts that gate is waiting on. */}
-        {section === 'game' ? (
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <GamePromptsPanel user={user} tickets={userCurrency?.tokens || 0} />
-          </ScrollView>
-        ) : showLoadingState ? (
+        {/* Both tabs stay mounted and the inactive one is hidden, rather
+            than swapping one out for the other. Unmounting threw away
+            everything the tab had loaded, so coming back re-read the
+            whole game prompt collection - about 151 documents to show
+            ten cards - and dealt you a fresh stack from the top. Hidden,
+            a return costs nothing and you are still on the card you were
+            looking at. */}
+        <View style={[styles.pane, section !== 'snapple' && styles.paneHidden]}>
+        {showLoadingState ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
             <ActivityIndicator size="large" color={theme.colors.vibeBlue} />
             <Text style={{ color: t.colors.textSecondary, fontSize: 14 }}>Loading prompts...</Text>
@@ -563,6 +570,17 @@ export default function PromptsScreen({ navigation }) {
           )}
         </ScrollView>
         )}
+        </View>
+
+        {/* Mounted only after the tab is first opened, so someone who
+            never visits it never pays for it. */}
+        {gameOpened && (
+          <View style={[styles.pane, section !== 'game' && styles.paneHidden]}>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+              <GamePromptsPanel user={user} tickets={userCurrency?.tokens || 0} />
+            </ScrollView>
+          </View>
+        )}
 
         {/* How long a prompt lasts is said once, in here. It was a live
             countdown pinned above the list, which is a lot of permanent
@@ -621,6 +639,10 @@ const makeStyles = (t) => ({
     marginBottom: 12,
   },
   tabsFlex: { flex: 1 },
+  pane: { flex: 1 },
+  // display:none keeps the subtree mounted and its state intact while
+  // taking it out of the layout entirely.
+  paneHidden: { display: 'none' },
   // Matches the in-game help button in RoundHeaderBar.
   helpBtn: {
     width: 26, height: 26, borderRadius: 13,

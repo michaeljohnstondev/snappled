@@ -1,21 +1,25 @@
 // GamePromptsPanel.jsx — the Game Prompts tab.
 //
 // Game prompts are what a round asks the room. This is where players
-// rank this season's deck, see the candidates competing for next
-// season, and pay tickets to submit their own. At rollover the best-
-// voted become the next season's deck, so the community authors each
-// season.
+// rank them and pay tickets to suggest their own; at season rollover the
+// best-ranked become the next season's deck, so the community authors
+// each season.
+//
+// One job per screen: a card to suggest, and a stack to rank. It used to
+// also list every live prompt and candidate behind Top / New / Mine
+// filters, which was a second way to look at the same prompts the deck
+// was already handing you one at a time - and a list you scroll past is
+// not how any of this gets decided. Ranking is, so ranking is what is
+// here.
 //
 // Follows PromptSortDeck's precedent of talking to its own service
 // rather than threading all of this through an already long screen.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, Pressable, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import PromptSortDeck from './PromptSortDeck';
-import SectionTabs from './SectionTabs';
 import CreatePromptCard from './CreatePromptCard';
 import CurrencyIcon from './CurrencyIcon';
 import {
@@ -24,13 +28,6 @@ import {
 import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
-
-const FILTERS = [
-  { label: 'Top', value: 'top' },
-  { label: 'New', value: 'new' },
-  { label: 'Mine', value: 'mine' },
-];
-
 
 /**
  * @param {object} user
@@ -42,25 +39,17 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   const { showConfirm, showError, showToast } = useModal();
 
   const [season, setSeason] = useState(0);
-  const [filter, setFilter] = useState('top');
-  const [prompts, setPrompts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [s, { prompts: rows }] = await Promise.all([
-      gamePromptService.getSeason(),
-      gamePromptService.list({ filter, userId: user?.uid }),
-    ]);
-    setSeason(s);
-    setPrompts(rows);
-    setLoading(false);
-  }, [filter, user?.uid]);
-
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    gamePromptService.getSeason()
+      .then(s => { if (!cancelled) setSeason(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const cost = costForSeason(season);
 
@@ -89,11 +78,11 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
         setComposing(false);
         showToast('reward', 'Prompt submitted',
           cost > 0 ? `-${cost} tickets` : 'Up for the vote');
-        load();
       },
     );
   };
 
+  /** Report whichever prompt is on top of the stack. */
   const report = (prompt) => showConfirm(
     'Report this prompt?',
     'Prompts reported by several players are removed from every game.',
@@ -124,14 +113,10 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
         label="Suggest a Game Prompt"
         height={96}
         onPress={() => setComposing(true)}
-        accessory={cost > 0 ? (
+        accessory={(
           <View style={styles.costChip}>
-            <CurrencyIcon name="tickets" size={16} />
-            <Text style={styles.costText}>{cost}</Text>
-          </View>
-        ) : (
-          <View style={styles.costChip}>
-            <Text style={styles.costText}>FREE</Text>
+            {cost > 0 ? <CurrencyIcon name="tickets" size={16} /> : null}
+            <Text style={styles.costText}>{cost > 0 ? cost : 'FREE'}</Text>
           </View>
         )}
       />
@@ -142,46 +127,9 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
           target="gamePrompts"
           title="RANK GAME PROMPTS"
           subtitle={null}
+          onReport={report}
         />
       ) : null}
-
-      <SectionTabs
-        options={FILTERS}
-        value={filter}
-        onChange={setFilter}
-        style={styles.filters}
-      />
-
-      {loading ? (
-        <ActivityIndicator color={theme.colors.vibeBlue} style={styles.spinner} />
-      ) : prompts.length === 0 ? (
-        <Text style={styles.empty}>
-          {filter === 'mine' ? 'You haven’t submitted a prompt yet.' : 'No prompts here yet.'}
-        </Text>
-      ) : (
-        prompts.map(p => (
-          <View key={p.id} style={styles.row}>
-            <View style={styles.rowMain}>
-              <Text style={styles.rowText}>{p.text}</Text>
-              <View style={styles.meta}>
-                <Text style={[styles.badge,
-                  p.status === 'candidate' ? styles.badgeCandidate : styles.badgeLive]}>
-                  {p.status === 'candidate' ? 'CANDIDATE' : 'LIVE'}
-                </Text>
-                <Ionicons name="thumbs-up" size={12} color={t.colors.textSecondary} />
-                <Text style={styles.metaText}>{p.likeCount || 0}</Text>
-                <Ionicons name="thumbs-down" size={12} color={t.colors.textSecondary} />
-                <Text style={styles.metaText}>{p.dislikeCount || 0}</Text>
-              </View>
-            </View>
-            {p.createdBy !== user?.uid && (
-              <Pressable onPress={() => report(p)} hitSlop={10} style={styles.flag}>
-                <Ionicons name="flag-outline" size={18} color={t.colors.textSecondary} />
-              </Pressable>
-            )}
-          </View>
-        ))
-      )}
 
       <Modal visible={composing} transparent animationType="fade"
         onRequestClose={() => setComposing(false)}>
@@ -235,25 +183,6 @@ const makeStyles = (t) => ({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   costText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-  filters: { marginTop: 24, marginBottom: 12 },
-  spinner: { marginTop: 24 },
-  empty: { color: t.colors.textSecondary, textAlign: 'center', marginTop: 24 },
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  rowMain: { flex: 1 },
-  rowText: { color: t.colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
-  metaText: { color: t.colors.textSecondary, fontSize: 12, marginRight: 6 },
-  badge: {
-    fontSize: 9, fontWeight: '900', letterSpacing: 1,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1,
-    marginRight: 6, overflow: 'hidden',
-  },
-  badgeLive: { color: theme.colors.vibeGreen, borderColor: theme.colors.vibeGreen },
-  badgeCandidate: { color: theme.colors.vibeYellow, borderColor: theme.colors.vibeYellow },
-  flag: { paddingLeft: 12 },
   backdrop: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'center', paddingHorizontal: 24,

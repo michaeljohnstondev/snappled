@@ -6,6 +6,7 @@ import { useAuth } from '../../../store/AuthContext';
 import HomeHeader from '../headers/HomeHeader';
 import UpdateBanner from '../UpdateBanner';
 import UploadProgressToast from '../UploadProgressToast';
+import WelcomeOverlay from '../WelcomeOverlay';
 import { useAppUpdate } from '../../../hooks/useAppUpdate';
 import theme from '../../../theme/themes';
 import { useTheme, useThemedStyles } from '../../../theme/ThemeContext';
@@ -64,6 +65,11 @@ export default function AppLayout({ navigation, children, hideHeader = false }) 
       <UpdateBanner visible={isUpdateReady} onRestart={applyUpdate} />
 
       <UploadProgressToast />
+
+      {/* Here rather than on a screen, because a new account does not
+          reliably land on any one screen - and it only ever shows once
+          per account, so every screen wrapping it costs nothing. */}
+      <WelcomeOverlay userId={user?.uid} />
     </LinearGradient>
   );
 }

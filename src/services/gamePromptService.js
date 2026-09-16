@@ -32,6 +32,26 @@ export function costForSeason(season) {
 // a curated, seasonal set measured in hundreds, not an open feed.
 const LIST_LIMIT = 400;
 
+// The Game Prompts tab unmounts when you switch tabs, so every visit was
+// re-reading the whole collection to show ten cards: 138 prompt reads
+// plus the season plus the vote lookup, about 151 reads a visit, and a
+// visible pause each time you came back.
+//
+// The prompts are cached and the VOTES deliberately are not. The list
+// changes when somebody submits (rare, and create() clears this); which
+// prompts you have already ranked changes every time you swipe, and
+// getting that wrong would hand you a card you just voted on. The votes
+// are also the cheap half - a handful of id lookups against the
+// expensive full-collection read.
+const CACHE_MS = 5 * 60 * 1000;
+let promptCache = null;   // { at, rows }
+let seasonCache = null;   // { at, season }
+
+/** Drop the cached list, so the next read sees a just-added prompt. */
+function invalidate() {
+  promptCache = null;
+}
+
 /** Normalise a Firestore timestamp or ISO string to ms. */
 function toMs(v) {
   if (!v) return 0;
@@ -63,13 +83,16 @@ class GamePromptService {
    * Checked by type rather than `|| 1`, which read season 0 as 1.
    */
   async getSeason() {
+    if (seasonCache && Date.now() - seasonCache.at < CACHE_MS) return seasonCache.season;
     try {
       const snap = await getDoc(doc(db, 'config', 'season'));
       const current = snap.exists() ? snap.data().current : undefined;
-      return typeof current === 'number' ? current : 0;
+      const season = typeof current === 'number' ? current : 0;
+      seasonCache = { at: Date.now(), season };
+      return season;
     } catch (error) {
       console.warn('[GamePromptService] getSeason failed:', error?.message);
-      return 0;
+      return seasonCache ? seasonCache.season : 0;
     }
   }
 
@@ -80,15 +103,21 @@ class GamePromptService {
    * appear - they are out of circulation, and listing a banned prompt
    * would put the thing moderation just removed back in front of people.
    */
-  async list({ filter = 'top', userId } = {}) {
+  async list({ filter = 'top', userId, fresh = false } = {}) {
     try {
-      const snap = await getDocs(query(
-        collection(db, 'gamePrompts'),
-        where('status', 'in', ['live', 'candidate']),
-        limit(LIST_LIMIT),
-      ));
-      let rows = [];
-      snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+      let rows;
+      if (!fresh && promptCache && Date.now() - promptCache.at < CACHE_MS) {
+        rows = promptCache.rows.slice();
+      } else {
+        const snap = await getDocs(query(
+          collection(db, 'gamePrompts'),
+          where('status', 'in', ['live', 'candidate']),
+          limit(LIST_LIMIT),
+        ));
+        rows = [];
+        snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+        promptCache = { at: Date.now(), rows: rows.slice() };
+      }
 
       if (filter === 'mine') rows = rows.filter(r => r.createdBy === userId);
 
@@ -138,6 +167,8 @@ class GamePromptService {
     try {
       const fn = httpsCallable(functions, 'createGamePrompt');
       const res = await fn({ text });
+      // The new prompt has to be visible on the next read.
+      invalidate();
       return { success: true, ...res.data };
     } catch (error) {
       // HttpsError messages are written to be shown to the player.
