@@ -19,8 +19,11 @@
 // something else.
 
 import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import CreatorActionRow from './CreatorActionRow';
 import ReactionBar from './ReactionBar';
+import theme from '../../theme/themes';
 
 /**
  * @param {object} submission   the card on screen
@@ -39,6 +42,18 @@ export default function PlayerActions({
 }) {
   return (
     <>
+      {/* Says so out loud. Private is a state you set once and then
+          forget, and it quietly changes what every other button here
+          does - nobody else can be sold it, and the share link only
+          opens for people you send it to. Worth a word before someone
+          wonders why their clip never shows up anywhere. */}
+      {submission?.isPrivate ? (
+        <View style={styles.private}>
+          <Ionicons name="lock-closed" size={11} color={theme.colors.vibeYellow} />
+          <Text style={styles.privateText}>PRIVATE</Text>
+        </View>
+      ) : null}
+
       <CreatorActionRow
         submission={submission}
         currentUser={user}
@@ -63,3 +78,25 @@ export default function PlayerActions({
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  private: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.vibeYellow,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  privateText: {
+    color: theme.colors.vibeYellow,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+});

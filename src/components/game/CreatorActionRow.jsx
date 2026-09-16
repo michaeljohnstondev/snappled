@@ -118,13 +118,38 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   // Share a link to this snapple. `prompt` is the ROUND's prompt when
   // this rail is on a game player — the clip is answering that, not the
   // prompt it was recorded for, and the share page takes the override.
-  const handleShare = async () => {
-    if (busy || !snappleId) return;
+  const doShare = async () => {
     setBusy(true);
     try {
+      // Flip the link open BEFORE the sheet appears. If the share sheet
+      // is where someone copies the link, the link has to already work -
+      // marking it afterwards would leave the first recipient looking at
+      // "this snapple is private".
+      if (isPrivate && isMine) {
+        await snappleService.markSharedPrivately(snappleId, currentUser?.uid);
+      }
       await shareService.shareSnapple(
         { ...submission, id: snappleId }, prompt);
     } finally { setBusy(false); }
+  };
+
+  const handleShare = () => {
+    if (busy || !snappleId) return;
+    // Sharing a private snapple is the one action here that changes what
+    // private MEANS for that clip: the link stops refusing people. That
+    // is a decision worth showing someone before they make it, not a
+    // side effect they discover afterwards.
+    if (isPrivate && isMine) {
+      showConfirm?.(
+        'Share a private snapple?',
+        'Anyone you send the link to will be able to watch it. It still '
+        + 'stays out of the pool, the grids and everyone\u2019s hand \u2014 the '
+        + 'link is the only way in.',
+        doShare,
+      );
+      return;
+    }
+    doShare();
   };
 
   // Creator name hidden in-phase per user request — all snapples are
@@ -134,10 +159,13 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   // or missing creatorId). Otherwise the wrap's semi-transparent
   // black bg shows through as a mystery rectangle over the video.
   // Share is the exception: it targets the snapple, not its creator, so
-  // it's just as valid on your own. Private ones are excluded — that link
-  // renders "this snapple is private" to whoever opens it.
+  // it's just as valid on your own - including a private one. Sharing
+  // your own private snapple is a deliberate choice to show it, and
+  // handleShare marks it link-viewable so the page stops refusing it.
+  // Somebody ELSE's private snapple still cannot be shared: that is
+  // their decision, not the viewer's.
   const hasActions = !isMine && !!creatorId;
-  const canShare = !!snappleId && !isPrivate;
+  const canShare = !!snappleId && (!isPrivate || isMine);
   if (!hasActions && !canShare) return null;
   return (
     <View style={styles.rail}>

@@ -191,7 +191,12 @@ exports.snappleShare = functions.https.onRequest(async (req, res) => {
           title: 'Snapple not found',
           body: 'It may have expired, or the link is incomplete.',
         };
-      } else if (snap.data().isPrivate) {
+      } else if (snap.data().isPrivate && !snap.data().sharedPrivately) {
+        // Private AND never shared by its creator. A snapple id is short
+        // enough to guess at, so a private clip nobody chose to send
+        // stays unreachable. Once the creator shares it themselves the
+        // flag is set and the link works - unlisted rather than public,
+        // since it still never rejoins the pool, the grids or a hand.
         failure = {
           title: 'This snapple is private',
           body: 'Its creator has not shared it publicly.',

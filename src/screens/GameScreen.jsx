@@ -1836,7 +1836,14 @@ export default function GameScreen({ navigation, route }) {
             style={styles.lobbyMark}
             resizeMode="contain"
           />
-          <Text style={styles.lobbyTitle}>Snappled</Text>
+          {/* The wordmark, not a Text node. System type set in caps
+              beside custom lettering read as a placeholder next to the
+              mark above it. */}
+          <Image
+            source={require('../../assets/images/wordmark.png')}
+            style={styles.lobbyWordmark}
+            resizeMode="contain"
+          />
 
           {/* Deck choice */}
           {hasDeck && (
@@ -2869,9 +2876,12 @@ const makeStyles = (t) => ({
     // and left a gap that looked like a layout mistake.
     marginBottom: -26,
   },
-  lobbyTitle: {
-    color: theme.colors.vibeBlue, fontSize: 32, fontWeight: theme.fontWeights.bold,
-    letterSpacing: 2, textTransform: 'uppercase',
+  // 4.61:1 after trimming, so the height follows the width rather than
+  // being guessed at. Trimmed to its own artwork, so unlike the icon
+  // above it there is no baked padding to cancel out.
+  lobbyWordmark: {
+    width: 240,
+    height: 52,
   },
   lobbySubtitle: {
     color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20,

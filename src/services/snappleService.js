@@ -630,6 +630,38 @@ export const snappleService = {
   // ADMIN_UIDS is hardcoded across screens for now (see AdminScreen,
   // GameScreen, UserMenu) — keep this list in sync if it ever moves
   // into a shared constants file.
+  /**
+   * Mark a private snapple as shared by link.
+   *
+   * Private snapples are not readable from the share page, which is
+   * correct: an id is short and a private clip should not be one guess
+   * away. But the CREATOR sharing their own is the one case where being
+   * seen is the whole intent, so sharing flips this flag and the page
+   * honours it. Unlisted, not public - it never rejoins the pool, the
+   * grids or anyone's hand, and the link is the only way in.
+   *
+   * Only the creator may set it; the page ignores it on anything else.
+   */
+  async markSharedPrivately(snappleId, userId) {
+    try {
+      if (!snappleId || !userId) return { success: false, error: 'missing id' };
+      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
+      const snappleDoc = await getDoc(snappleRef);
+      if (!snappleDoc.exists()) return { success: false, error: 'Snapple not found' };
+      if (snappleDoc.data().creatorId !== userId) {
+        return { success: false, error: 'Not your snapple' };
+      }
+      await updateDoc(snappleRef, {
+        sharedPrivately: true,
+        sharedPrivatelyAt: new Date().toISOString(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[SnappleService] markSharedPrivately error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   async setSnappleExcludeFromPool(snappleId, userId, excludeFromPool) {
     try {
       const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
