@@ -21,9 +21,10 @@ import { gamePromptService } from '../../services/gamePromptService';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
-// How many cards one sitting holds. Short on purpose: a stack that ends
-// feels finishable, and the section reloads for anyone who wants more.
-const DECK_SIZE = 10;
+// How many cards the pool deck pulls in one go. It is a fetch window,
+// not a quota — whatever comes back is all rankable in one sitting.
+// Game prompts take the whole unsorted list instead; see getUnsorted.
+const POOL_DECK_SIZE = 40;
 
 /**
  * @param {string} userId
@@ -56,8 +57,8 @@ export default function PromptSortDeck({
     if (!userId) return;
     setLoading(true);
     const { prompts } = target === 'gamePrompts'
-      ? await gamePromptService.getUnsorted(userId, DECK_SIZE)
-      : await promptVoteService.getUnsortedPool(userId, DECK_SIZE, liveTexts || []);
+      ? await gamePromptService.getUnsorted(userId)
+      : await promptVoteService.getUnsortedPool(userId, POOL_DECK_SIZE, liveTexts || []);
     setDeck(prompts);
     setIndex(0);
     setLoading(false);
@@ -115,9 +116,13 @@ export default function PromptSortDeck({
 
   return (
     <View style={styles.wrap}>
+      {/* No counter. It read "3/10", which made a stack of ten look
+          like an assignment with a finish line - and now that the deck
+          holds everything unsorted, the honest number would be "3/312",
+          which is worse. Rank until you are bored; the done pane says
+          how many you got through. */}
       <View style={styles.headerRow}>
         <Text style={styles.label}>{title}</Text>
-        <Text style={styles.counter}>{index + 1}/{deck.length}</Text>
       </View>
       {/* Optional. The game tab passes none - its how-to lives in the
           intro card instead of a line of subtext under every heading. */}
@@ -130,7 +135,6 @@ export default function PromptSortDeck({
         leftLabel="WEAK"
         rightLabel="FUN"
       >
-        <Text style={styles.cardCategory}>{current.category}</Text>
         <Text style={styles.cardText}>{current.text}</Text>
         <Text style={styles.cardHint}>{'swipe left if weak · right if fun'}</Text>
       </SwipeCard>
@@ -181,11 +185,6 @@ const makeStyles = (t) => ({
     fontWeight: 'bold',
     letterSpacing: 1.5,
   },
-  counter: {
-    color: t.colors.textSecondary,
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-  },
   subSpacer: { height: 12 },
   sub: {
     color: 'rgba(255,255,255,0.4)',
@@ -196,14 +195,6 @@ const makeStyles = (t) => ({
     marginBottom: 12,
   },
 
-  cardCategory: {
-    color: theme.colors.vibeBlue,
-    fontSize: 11,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 16,
-  },
   cardText: {
     color: t.colors.textPrimary,
     fontSize: 22,

@@ -140,21 +140,28 @@ class GamePromptService {
    * Candidates first: they are the ones competing for next season and
    * the ones with no votes yet, so they are where a vote does the most.
    */
-  async getUnsorted(userId, count = 10) {
+  async getUnsorted(userId) {
     try {
       const { prompts } = await this.list({ filter: 'new', userId });
       const mine = await promptVoteService.getMyVotes(
         userId, 'gamePrompts', prompts.map(p => p.id),
       );
+      // Everything they have not voted on, not a fixed ten. The deck
+      // used to hand out a short stack and stop; if someone wants to
+      // rank the whole season there is no reason to make them reload
+      // for each batch.
+      //
+      // No category either. It said "candidate" or "live this season",
+      // which is a fact about the prompt's standing, not about whether
+      // it is funny - and putting it on the card invites people to rank
+      // what is already winning rather than what they actually like.
+      // The pool deck dropped its categories too: nobody is going to
+      // file their own prompt under a heading, so the field was always
+      // going to read "general" on everything a user ever wrote.
       const rows = prompts
         .filter(p => mine[p.id] === undefined && p.createdBy !== userId)
         .sort((a, b) => (a.status === 'candidate' ? -1 : 0) - (b.status === 'candidate' ? -1 : 0))
-        .slice(0, count)
-        .map(p => ({
-          id: p.id,
-          text: p.text,
-          category: p.status === 'candidate' ? 'candidate' : 'live this season',
-        }));
+        .map(p => ({ id: p.id, text: p.text }));
       return { success: true, prompts: rows };
     } catch (error) {
       console.error('[GamePromptService] getUnsorted failed:', error);

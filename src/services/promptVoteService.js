@@ -162,7 +162,7 @@ class PromptVoteService {
         // now — it already has its own rating buttons further up the
         // same screen, and calling it "not live yet" would be a lie.
         if (live.has(normalize(p.text))) return;
-        candidates.push({ id: d.id, text: p.text, category: p.category || 'general' });
+        candidates.push({ id: d.id, text: p.text });
       });
 
       const mine = await this.getMyVotes(

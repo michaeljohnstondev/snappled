@@ -117,10 +117,13 @@ export default function ResourceContainer({ userStats }) {
         style={styles.statItem}
         onPress={() => togglePopup('tickets')}
       >
-        {/* A touch larger than the coin and trophy either side of it,
-            for the same reason as the store: a wide, short shape fits
-            by width and reads smaller at an equal nominal size. */}
-        <CurrencyIcon name="tickets" size={25} />
+        {/* Noticeably larger than the coin and trophy either side of
+            it, not a touch. `size` bounds a square, and the ticket is a
+            wide, short shape - so it fits by width, leaves the height
+            unused, and reads smaller than a round coin at the same
+            nominal size. 25 was not enough to correct for that; the
+            row's height is set by the text, so this has room. */}
+        <CurrencyIcon name="tickets" size={32} />
         <TickingNumber value={userStats.tokens || 0} style={styles.statText} />
       </Pressable>
 
