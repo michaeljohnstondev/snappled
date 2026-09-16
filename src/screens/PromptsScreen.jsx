@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, ScrollView, View, Text, Image, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
@@ -438,16 +438,10 @@ export default function PromptsScreen({ navigation }) {
   return (
     <AppLayout navigation={navigation} active="prompts">
 
-        {/* The wordmark, not a "Prompts" heading. The tabs and the nav
-            bar already say which screen this is, so a title said it a
-            third time - the mark says whose app it is instead, which
-            nothing else on the screen was doing. */}
-        <Image
-          source={require('../../assets/images/wordmark.png')}
-          style={styles.brand}
-          resizeMode="contain"
-        />
-
+        {/* Nothing above the tabs. A masthead here was tried and looked
+            wrong: on the play screen the wordmark is the whole point of
+            the screen, over a list it is just a band of logo you scroll
+            past. The tabs and the nav bar already say where you are. */}
         <View style={styles.tabRow}>
           <SectionTabs
             options={[
@@ -636,15 +630,6 @@ const makeStyles = (t) => ({
   safeArea: {
     flex: 1,
     paddingBottom: 80,
-  },
-  // 4.61:1, so height follows width. Smaller than the play screen's 240
-  // - there it is the hero, here it is a masthead over a screen that
-  // has its own content to get to.
-  brand: {
-    width: 150,
-    height: 33,
-    alignSelf: 'center',
-    marginTop: 14,
   },
   tabRow: {
     flexDirection: 'row',
