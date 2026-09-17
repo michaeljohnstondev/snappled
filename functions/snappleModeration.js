@@ -17,7 +17,10 @@
 // the actual decision gets made; this just stops the clock running
 // while it waits.
 
-const functions = require('firebase-functions');
+// v1 explicitly: firebase-functions v5+ made the root import the v2
+// API, which has no functions.firestore.document. Same note as the top
+// of index.js.
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
 const db = admin.firestore();
