@@ -574,29 +574,32 @@ export const snappleService = {
     }
   },
 
+  /**
+   * Report a snapple.
+   *
+   * Keyed <snappleId>_<uid>, the same one-report-per-person rule the
+   * prompts use. It used to take an auto-id and increment the snapple's
+   * count from here, so one person could report the same clip twenty
+   * times - inflating the count, flooding the admin queue, and making
+   * the number useless as a signal precisely when it mattered. Now a
+   * second report from the same person overwrites their first.
+   *
+   * The count itself is the trigger's job. A tally the reporter can
+   * write is not a tally.
+   */
   async reportSnapple(snappleId, userId, reason, description = '') {
     try {
-      const reportDoc = {
+      if (!snappleId || !userId) return { success: false, error: 'Missing ids' };
+      const reportId = `${snappleId}_${userId}`;
+      await setDoc(doc(db, REPORTS_COLLECTION, reportId), {
         snappleId,
         reporterId: userId,
         reason, // 'inappropriate', 'spam', 'copyright', 'other'
         description,
         status: 'pending', // pending, reviewed, resolved
-        createdAt: serverTimestamp()
-      };
-      
-      const reportRef = doc(collection(db, REPORTS_COLLECTION));
-      await setDoc(reportRef, reportDoc);
-      
-      // Update snapple report count
-      const snappleRef = doc(db, SNAPPLES_COLLECTION, snappleId);
-      await updateDoc(snappleRef, {
-        reports: increment(1),
-        isReported: true,
-        updatedAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
-      
-      return { success: true, reportId: reportRef.id };
+      return { success: true, reportId };
     } catch (error) {
       console.error('Error reporting snapple:', error);
       return { success: false, error: 'Failed to report snapple' };

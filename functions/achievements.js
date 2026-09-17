@@ -7,11 +7,10 @@
 // followers award" was whatever the caller said it was, and the payout
 // went straight onto the caller's own balance.
 //
-// So the stats are derived here now, from the user document and from
-// the snapples they actually created. The client keeps its own copy of
-// the catalogue for the achievements SCREEN - showing someone what
-// they are working towards is a display job - but nothing it computes
-// decides a payout.
+// So the stats are derived here now, from the user document alone. The
+// client keeps its own copy of the catalogue for the achievements
+// SCREEN - showing someone what they are working towards is a display
+// job - but nothing it computes decides a payout.
 //
 // Every condition in the old switch was the same shape, `stat >= n`,
 // so the table below replaces it outright. Adding an achievement is a
@@ -100,12 +99,19 @@ function levelFromXP(totalXP) {
 /**
  * deriveStats — everything the catalogue can be checked against.
  *
- * Counters the app maintains as it goes (games won, rounds won, sales)
- * are read off the user document. The social and creation numbers are
- * COUNTED here instead, from the follower arrays and from the user's
- * own snapples, because those are the ones the client used to hand in.
+ * Reads only the user document. No queries, which is the whole point:
+ * this runs on login, after every game, after every upload and every
+ * time the achievements screen opens, and the first version counted a
+ * user's likes by fetching every snapple they had ever made. Fine at
+ * six users; at a thousand snapples it was the most expensive call in
+ * the app, and it fired four ways.
+ *
+ * The counts it used to compute are maintained as they happen instead —
+ * videosCreated and xpEarnedPrompts by onNewSnapple, the like totals by
+ * onSnappleLikesChanged. Social is counted from arrays already on the
+ * document, which costs nothing.
  */
-async function deriveStats(uid, userData) {
+function deriveStats(uid, userData) {
   const stats = Object.assign({}, userData.stats || {});
   const social = userData.social || {};
   const followers = social.followers || [];
@@ -119,25 +125,19 @@ async function deriveStats(uid, userData) {
   stats.level = levelFromXP(
     (userData.profile && (userData.profile.xp || userData.profile.experience)) || 0);
 
-  // One query for every creation and likes milestone. A user with
-  // thousands of snapples makes this heavy, which is why the callable
-  // is only invoked at moments something could plausibly have changed
-  // rather than on every render.
-  const mine = await db.collection('snapples').where('creatorId', '==', uid).get();
-  let totalLikes = 0;
-  let maxLikesOnOne = 0;
-  const prompts = new Set();
-  mine.forEach((d) => {
-    const s = d.data();
-    const likes = s.likeCount || (s.likedBy || []).length || 0;
-    totalLikes += likes;
-    if (likes > maxLikesOnOne) maxLikesOnOne = likes;
-    if (s.promptId) prompts.add(s.promptId);
-  });
-  stats.videosCreated = Math.max(stats.videosCreated || 0, mine.size);
-  stats.totalLikesReceived = totalLikes;
-  stats.maxLikesOnOne = maxLikesOnOne;
-  stats.uniquePromptsUsed = prompts.size;
+  // xpEarnedPrompts is the list of prompts this user has been paid XP
+  // for, one entry per prompt, appended by onNewSnapple. That is the
+  // same thing as "distinct prompts answered", so the unique-prompt
+  // milestone needs no separate counter and no query.
+  stats.uniquePromptsUsed = (userData.xpEarnedPrompts || []).length;
+
+  // videosCreated, totalLikesReceived and maxLikesOnOne are maintained
+  // by triggers. Defaulted here so an account that predates them reads
+  // as zero rather than undefined — run scripts/backfillUserStats.js to
+  // give existing users their real numbers.
+  stats.videosCreated = stats.videosCreated || 0;
+  stats.totalLikesReceived = stats.totalLikesReceived || 0;
+  stats.maxLikesOnOne = stats.maxLikesOnOne || 0;
 
   return stats;
 }
@@ -161,7 +161,7 @@ exports.checkAchievements = functions.https.onCall(async (data, context) => {
   if (!userSnap.exists) {
     throw new functions.https.HttpsError('not-found', 'No account found.');
   }
-  const stats = await deriveStats(uid, userSnap.data());
+  const stats = deriveStats(uid, userSnap.data());
 
   return db.runTransaction(async (tx) => {
     // Re-read inside the transaction: the achievement list is what we
