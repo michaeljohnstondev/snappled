@@ -18,7 +18,7 @@
 // know one.
 
 import { Platform } from 'react-native';
-import Purchases from 'react-native-purchases';
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
 // Public SDK keys, in the source on purpose.
 //
@@ -64,6 +64,13 @@ const purchaseService = {
     if (!key || !uid) return false;
     if (configuredFor === uid) return true;
     try {
+      // RevenueCat's own logs say why a product did not come back -
+      // wrong bundle id, agreement not active, product not fetched from
+      // the store - none of which reaches us through getProducts, which
+      // just returns an empty array. Left on: this app has no secrets in
+      // its purchase path, and a store that silently sells nothing is
+      // far more expensive than a noisy log.
+      Purchases.setLogLevel(LOG_LEVEL.DEBUG);
       await Purchases.configure({ apiKey: key, appUserID: uid });
       configuredFor = uid;
       return true;
@@ -115,7 +122,21 @@ const purchaseService = {
     try {
       const products = await Purchases.getProducts([productId]);
       if (!products.length) {
-        return { success: false, error: 'That pack is not available right now.' };
+        // An empty array, not an error: the store was asked and had
+        // nothing to say about this id. On iOS that is usually an IAP
+        // that has never been submitted, or a Paid Apps agreement that
+        // has not propagated; on Android it is nearly always an app
+        // installed outside Play, because Billing only answers an app
+        // signed with the Play key and installed through a track.
+        console.warn(
+          `[PurchaseService] store returned no product for "${productId}" `
+          + `(${Platform.OS}). Check RevenueCat debug logs above.`,
+        );
+        return {
+          success: false,
+          error: 'That pack is not available right now. It may still be '
+            + 'syncing with the store — try again in a few minutes.',
+        };
       }
       await Purchases.purchaseStoreProduct(products[0]);
       return { success: true };

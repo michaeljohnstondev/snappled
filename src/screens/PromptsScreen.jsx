@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
@@ -472,20 +472,11 @@ export default function PromptsScreen({ navigation }) {
   return (
     <AppLayout navigation={navigation} active="prompts">
 
-        {/* A masthead was tried here once with the old wordmark and
-            pulled again - over a list it read as a band of logo you
-            scroll past rather than anything you look at. Back with the
-            new mark, which earns the space: smaller than the play
-            screen's, because there it IS the screen and here it is a
-            heading over content. */}
-        <View style={styles.masthead}>
-          <Image
-            source={require('../../assets/images/wordmark.png')}
-            style={styles.wordmark}
-            resizeMode="contain"
-          />
-        </View>
-
+        {/* No masthead. Tried twice now - once with the old wordmark
+            and once with the new - and the objection was never the art:
+            a list screen cannot spare the vertical space, and the mark
+            reads as a band you scroll past rather than a heading. It
+            belongs where it IS the screen, which is the play menu. */}
         <View style={styles.tabRow}>
           {/* "Snapple" and "Game", not "Snapple Prompts" and "Game
               Prompts". Both ended in the same word, on a screen you
@@ -684,17 +675,6 @@ const makeStyles = (t) => ({
   safeArea: {
     flex: 1,
     paddingBottom: 80,
-  },
-  masthead: {
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  // 200x43 is the mark's own aspect (2109x453). Two thirds of the play
-  // screen's 300 - enough to read as the app's name, not so much that
-  // it competes with the prompts underneath it.
-  wordmark: {
-    width: 200,
-    height: 43,
   },
   tabRow: {
     flexDirection: 'row',
