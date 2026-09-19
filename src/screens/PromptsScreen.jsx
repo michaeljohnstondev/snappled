@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppLayout from '../components/ui/layout/AppLayout';
 import PromptInfoOverlay from '../components/ui/modals/PromptInfoOverlay';
@@ -472,15 +472,35 @@ export default function PromptsScreen({ navigation }) {
   return (
     <AppLayout navigation={navigation} active="prompts">
 
-        {/* Nothing above the tabs. A masthead here was tried and looked
-            wrong: on the play screen the wordmark is the whole point of
-            the screen, over a list it is just a band of logo you scroll
-            past. The tabs and the nav bar already say where you are. */}
+        {/* A masthead was tried here once with the old wordmark and
+            pulled again - over a list it read as a band of logo you
+            scroll past rather than anything you look at. Back with the
+            new mark, which earns the space: smaller than the play
+            screen's, because there it IS the screen and here it is a
+            heading over content. */}
+        <View style={styles.masthead}>
+          <Image
+            source={require('../../assets/images/wordmark.png')}
+            style={styles.wordmark}
+            resizeMode="contain"
+          />
+        </View>
+
         <View style={styles.tabRow}>
+          {/* "Snapple" and "Game", not "Snapple Prompts" and "Game
+              Prompts". Both ended in the same word, on a screen you
+              reached by tapping Prompts in the nav bar - so the repeated
+              noun carried no information and was the entire reason the
+              longer label ellipsised to "Snapple Promp...". The tabs
+              share this row with the help button, so each gets rather
+              less than half the width.
+
+              Singular on purpose: "Snapples" would read as the videos,
+              and this tab lists the prompts you record them against. */}
           <SectionTabs
             options={[
-              { label: 'Snapple Prompts', value: 'snapple' },
-              { label: 'Game Prompts', value: 'game' },
+              { label: 'Snapple', value: 'snapple' },
+              { label: 'Game', value: 'game' },
             ]}
             value={section}
             onChange={setSection}
@@ -664,6 +684,17 @@ const makeStyles = (t) => ({
   safeArea: {
     flex: 1,
     paddingBottom: 80,
+  },
+  masthead: {
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  // 200x43 is the mark's own aspect (2109x453). Two thirds of the play
+  // screen's 300 - enough to read as the app's name, not so much that
+  // it competes with the prompts underneath it.
+  wordmark: {
+    width: 200,
+    height: 43,
   },
   tabRow: {
     flexDirection: 'row',
