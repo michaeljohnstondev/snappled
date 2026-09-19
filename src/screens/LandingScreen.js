@@ -360,13 +360,13 @@ const makeStyles = (t) => ({
     // clear the fold on a small phone.
     marginBottom: 24,
   },
-  // 300x62 is the wordmark's own aspect (2164x448 after trimming), so
+  // 300x64 is the wordmark's own aspect (2109x453 after trimming), so
   // resizeMode contain fills the box instead of letterboxing inside it.
   // Same dimensions as the play screen - it is the same mark and there
   // is no reason for it to be two sizes.
   wordmark: {
     width: 300,
-    height: 62,
+    height: 64,
   },
   formContainer: {
     // Was 40, which left a canyon between the password field and the

@@ -7,6 +7,7 @@ import { achievementService } from "../services/achievementService";
 import { levelService } from "../services/levelService";
 import { fcmService } from "../services/fcmServiceWrapper";
 import purchaseService from "../services/purchaseService";
+import giftService from "../services/giftService";
 
 const AuthContext = createContext({});
 
@@ -24,6 +25,10 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pendingAchievements, setPendingAchievements] = useState([]);
+  // Gifts sent to everybody, claimed on arrival. Held here rather than
+  // shown here: AuthContext has no modal, and the achievement check
+  // already uses this hand-off.
+  const [pendingGifts, setPendingGifts] = useState([]);
 
   const unsubUserDoc = useRef(null);
   // Track the last-authenticated uid so logout can clear the FCM
@@ -163,6 +168,14 @@ export function AuthProvider({ children }) {
                 console.error('[AuthContext] Achievement check error:', e);
               }
             }, 3000);
+
+            // Anything the supreme leader has handed out since this
+            // player last opened the app. Almost always returns nothing,
+            // which costs one query; the balance itself is moved by the
+            // server, and the listener above brings the new number back.
+            giftService.claim().then((gifts) => {
+              if (gifts.length) setPendingGifts(gifts);
+            });
           } else {
             console.log('[AuthContext] User data not found in database for:', firebaseUser.uid);
             setUser(null);
@@ -245,11 +258,14 @@ export function AuthProvider({ children }) {
   };
 
   const clearPendingAchievements = () => setPendingAchievements([]);
+  const clearPendingGifts = () => setPendingGifts([]);
 
   const value = {
     user,
     userCurrency,
     updateUserCurrencyLocal,
+    pendingGifts,
+    clearPendingGifts,
     isLoading,
     isAuthenticated,
     refreshUserCurrency,

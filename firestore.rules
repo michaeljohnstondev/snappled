@@ -304,6 +304,28 @@ service cloud.firestore {
     }
 
     // Refunds ledger
+    // Gifts sent to every player. Written only by createGlobalGift and
+    // claimed only by claimGifts, both callables using the Admin SDK,
+    // which does not pass through these rules at all — so no client
+    // write is legitimate here, admin included. The admin screen calls
+    // the function rather than writing the document.
+    //
+    // Readable so a client could show gift history if that ever exists;
+    // reading one grants nothing, because the grant is the claim and the
+    // claim is server-side.
+    match /globalGifts/{giftId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // The idempotency keys for the above. A client that could write its
+    // own claim document could block a gift it had not received, or
+    // delete one to collect twice.
+    match /giftClaims/{claimId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     match /refunds/{refundId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;

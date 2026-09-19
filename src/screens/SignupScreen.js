@@ -293,7 +293,7 @@ const makeStyles = (t) => ({
   // Matches the landing screen and the play screen: one mark, one size.
   wordmark: {
     width: 260,
-    height: 54,
+    height: 56,
     marginBottom: 8,
   },
   title: {

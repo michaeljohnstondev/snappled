@@ -85,7 +85,13 @@ export default function ResourceContainer({ userStats }) {
       label: 'Get Tickets',
       onPress: goToStore('tickets'),
       currency: 'tickets',
-      color: theme.colors.vibeGreen,
+      // Magenta, because the ticket art is magenta. This was vibeGreen
+      // for no reason connected to anything on screen - the coin button
+      // right next to it is gold to match the coin, so the odd one out
+      // read as a different KIND of button rather than the same button
+      // for a different currency. #FF10F0 is within a shade of the
+      // ticket's own brightest highlight (#f000f0).
+      color: theme.colors.vibePink,
     }
     : popup === 'coins'
       ? {

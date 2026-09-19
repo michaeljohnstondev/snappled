@@ -60,12 +60,42 @@ const POOL_SHOWN = 12;
 export default function PromptsScreen({ navigation }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { user, userCurrency, pendingAchievements, clearPendingAchievements } = useAuth();
+  const {
+    user, userCurrency, pendingAchievements, clearPendingAchievements,
+    pendingGifts, clearPendingGifts,
+  } = useAuth();
   // Snapple prompts are the live rotation you record against; game
   // prompts are what a round asks the room. Two different things that
   // were never presented as such - the game ones had no screen at all.
   const [section, setSection] = useState('snapple');
-  const { showToast } = useModal();
+  const { showToast, showSuccess } = useModal();
+
+  // A gift from the supreme leader. Claimed by AuthContext on sign-in,
+  // announced here - the Prompts tab is where the app opens, so this is
+  // the first screen with a modal to show it in.
+  //
+  // One alert covering everything claimed, not one per gift: someone
+  // returning after a fortnight of generosity should not have to dismiss
+  // five dialogs before they can use the app.
+  useEffect(() => {
+    if (pendingGifts.length === 0) return;
+    const coins = pendingGifts.reduce((n, g) => n + (g.coins || 0), 0);
+    const tickets = pendingGifts.reduce((n, g) => n + (g.tickets || 0), 0);
+    const parts = [];
+    if (coins) parts.push(`${coins.toLocaleString()} coins`);
+    if (tickets) parts.push(`${tickets.toLocaleString()} tickets`);
+    // The admin's own words, when they wrote any. The most recent gift
+    // speaks for the batch rather than stacking every message.
+    const note = pendingGifts.find(g => g.message)?.message;
+    showSuccess(
+      'A Gift From Your Supreme Leader',
+      `${parts.join(' and ')} have been added to your account.`
+      + (note ? `
+
+"${note}"` : ''),
+    );
+    clearPendingGifts();
+  }, [pendingGifts]);
 
   // Show pending achievements from login check
   useEffect(() => {

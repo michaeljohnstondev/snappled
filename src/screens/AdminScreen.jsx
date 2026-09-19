@@ -10,6 +10,7 @@ import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import VibeButton from '../components/ui/VibeButton';
 import PromptCurator from '../components/admin/PromptCurator';
+import giftService from '../services/giftService';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -275,6 +276,44 @@ export default function AdminScreen({ navigation }) {
     });
   };
 
+  // Gift-everybody state. Separate from the per-user grant above: that
+  // one writes a balance directly (admins are exempt from the rule that
+  // stops clients touching resources), this one writes a single gift
+  // document that players claim when they next open the app.
+  const [giftCoins, setGiftCoins] = useState('');
+  const [giftTickets, setGiftTickets] = useState('');
+  const [giftMessage, setGiftMessage] = useState('');
+  const [giftSending, setGiftSending] = useState(false);
+
+  const sendGift = (coins, tickets, message) => {
+    if (coins === 0 && tickets === 0) {
+      showError('Empty Gift', 'Set coins or tickets first.');
+      return;
+    }
+    const parts = [];
+    if (coins) parts.push(`${coins.toLocaleString()} coins`);
+    if (tickets) parts.push(`${tickets.toLocaleString()} tickets`);
+    // Confirmed, because this one cannot be taken back. Every player
+    // who opens the app collects it, and there is no unsend.
+    showConfirm(
+      'Gift Every Player?',
+      `${parts.join(' and ')} to everyone.
+
+This cannot be undone.`,
+      async () => {
+        setGiftSending(true);
+        const res = await giftService.send({ coins, tickets, message });
+        setGiftSending(false);
+        if (res.success) {
+          showAlert('Gift Sent', `${parts.join(' and ')} — players collect it on their next open.`);
+          setGiftCoins(''); setGiftTickets(''); setGiftMessage('');
+        } else {
+          showError('Failed', res.error);
+        }
+      },
+    );
+  };
+
   const [grantUserId, setGrantUserId] = useState(null);
   const [grantCoins, setGrantCoins] = useState('');
   const [grantTickets, setGrantTickets] = useState('');
@@ -377,6 +416,7 @@ export default function AdminScreen({ navigation }) {
     { label: 'Users', value: 'users' },
     { label: 'Games', value: 'games' },
     { label: 'Create', value: 'create' },
+    { label: 'Gift', value: 'gift' },
     { label: 'Utils', value: 'utils' },
   ];
 
@@ -574,6 +614,72 @@ export default function AdminScreen({ navigation }) {
 
       {activeTab === 'curate' ? (
         <PromptCurator />
+      ) : activeTab === 'gift' ? (
+        <ScrollView style={styles.utilsSection} contentContainerStyle={{ paddingBottom: 40 }}>
+          <Text style={styles.giftIntro}>
+            One gift document, claimed by each player when they next open
+            the app. Costs one write no matter how many players there are,
+            and nobody can collect the same gift twice.
+          </Text>
+
+          <Text style={styles.giftLabel}>PRESETS</Text>
+          <UtilButton
+            label="Small — 250 coins, 10 tickets"
+            desc="A thank-you. About two snapple purchases and two days of tickets."
+            color={theme.colors.vibeBlue}
+            onPress={() => sendGift(250, 10, giftMessage.trim())}
+          />
+          <UtilButton
+            label="Medium — 1,000 coins, 25 tickets"
+            desc="An apology, or a launch present. Five days of ticket income."
+            color={theme.colors.vibeYellow}
+            onPress={() => sendGift(1000, 25, giftMessage.trim())}
+          />
+          <UtilButton
+            label="Bundle — 2,000 coins, 100 tickets"
+            desc="Generous. 100 tickets is a whole game topic."
+            color={theme.colors.vibePink}
+            onPress={() => sendGift(2000, 100, giftMessage.trim())}
+          />
+
+          <Text style={styles.giftLabel}>CUSTOM</Text>
+          <View style={styles.grantRow}>
+            <TextInput
+              style={styles.grantInput}
+              placeholder="Coins"
+              placeholderTextColor="#888"
+              keyboardType="number-pad"
+              value={giftCoins}
+              onChangeText={setGiftCoins}
+            />
+            <TextInput
+              style={styles.grantInput}
+              placeholder="Tickets"
+              placeholderTextColor="#888"
+              keyboardType="number-pad"
+              value={giftTickets}
+              onChangeText={setGiftTickets}
+            />
+          </View>
+          <TextInput
+            style={[styles.grantInput, styles.giftMessage]}
+            placeholder="Message (optional) — shown in the alert"
+            placeholderTextColor="#888"
+            value={giftMessage}
+            onChangeText={setGiftMessage}
+            maxLength={200}
+          />
+          <UtilButton
+            label={giftSending ? 'Sending…' : 'Send Custom Gift'}
+            desc="Server caps a single gift at 10,000 coins and 1,000 tickets."
+            color={theme.colors.vibeGreen}
+            onPress={() => sendGift(
+              parseInt(giftCoins) || 0,
+              parseInt(giftTickets) || 0,
+              giftMessage.trim(),
+            )}
+          />
+        </ScrollView>
       ) : activeTab === 'utils' ? (
         <ScrollView style={styles.utilsSection} contentContainerStyle={{ paddingBottom: 40 }}>
           <UtilButton
@@ -1364,6 +1470,14 @@ const makeStyles = (t) => ({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: t.colors.inputBackground },
   actionBtnLabel: { color: t.colors.textSecondary, fontSize: 12, fontWeight: '600' },
   grantRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  giftIntro: {
+    color: t.colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 16,
+  },
+  giftLabel: {
+    color: t.colors.textSecondary, fontSize: 11, fontWeight: 'bold',
+    letterSpacing: 1.5, marginTop: 20, marginBottom: 8,
+  },
+  giftMessage: { marginTop: 8, paddingVertical: 10 },
   grantInput: { flex: 1, backgroundColor: t.colors.inputBackground, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: t.colors.textPrimary, fontSize: 13 },
   grantBtn: { padding: 6 },
 });

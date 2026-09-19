@@ -2849,10 +2849,10 @@ const makeStyles = (t) => ({
   // being guessed at. Trimmed to its own artwork, so unlike the icon
   // above it there is no baked padding to cancel out.
   lobbyWordmark: {
-    // Matches the art's own aspect (2164x448), so contain fills the box
+    // Matches the art's own aspect (2109x453), so contain fills the box
     // rather than letterboxing the mark inside a slightly wrong one.
     width: 300,
-    height: 62,
+    height: 64,
   },
   lobbySubtitle: {
     color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20,
