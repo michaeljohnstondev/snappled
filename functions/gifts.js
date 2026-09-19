@@ -1,4 +1,4 @@
-// gifts.js — presents from the supreme leader.
+// gifts.js — one present, sent to every player at once.
 //
 // An admin gives every player coins and tickets at once. The naive
 // version of that is a fan-out: loop the users collection and increment

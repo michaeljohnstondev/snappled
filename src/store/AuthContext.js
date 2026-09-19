@@ -169,7 +169,7 @@ export function AuthProvider({ children }) {
               }
             }, 3000);
 
-            // Anything the supreme leader has handed out since this
+            // Anything an admin has gifted everybody since this
             // player last opened the app. Almost always returns nothing,
             // which costs one query; the balance itself is moved by the
             // server, and the listener above brings the new number back.

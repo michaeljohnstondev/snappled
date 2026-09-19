@@ -68,9 +68,9 @@ export default function PromptsScreen({ navigation }) {
   // prompts are what a round asks the room. Two different things that
   // were never presented as such - the game ones had no screen at all.
   const [section, setSection] = useState('snapple');
-  const { showToast, showSuccess } = useModal();
+  const { showToast, showAlert } = useModal();
 
-  // A gift from the supreme leader. Claimed by AuthContext on sign-in,
+  // A gift sent to everybody. Claimed by AuthContext on sign-in,
   // announced here - the Prompts tab is where the app opens, so this is
   // the first screen with a modal to show it in.
   //
@@ -87,9 +87,13 @@ export default function PromptsScreen({ navigation }) {
     // The admin's own words, when they wrote any. The most recent gift
     // speaks for the batch rather than stacking every message.
     const note = pendingGifts.find(g => g.message)?.message;
-    showSuccess(
-      'A Gift From Your Supreme Leader',
-      `${parts.join(' and ')} have been added to your account.`
+    // showAlert, not showSuccess: 'success' is a bright green #00FF41
+    // with a tick, which is the styling for a thing you just did. A
+    // gift is not something you did - it arrived. The default info
+    // styling is cyan with no icon, which is calmer and truer.
+    showAlert(
+      'A Gift From Snappled',
+      `${parts.join(' and ')} are in your account.`
       + (note ? `
 
 "${note}"` : ''),

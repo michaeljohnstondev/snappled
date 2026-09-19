@@ -1509,16 +1509,19 @@ export default function GameScreen({ navigation, route }) {
   // only place anything is spent.
   const handleMulligan = () => {
     if (mulligansLeft <= 0) {
-      showAlert('No Replaces Left',
-        'You have used your free replace this game. Buy mulligans in the store.');
+      showAlert('No Swaps Left',
+        'You have used your free swap this game. Buy mulligans in the store.');
       return;
     }
     if (!selectedCard) {
-      showAlert('Pick a Snapple', 'Select the snapple you want to replace first.');
+      showAlert('Pick a Snapple', 'Select the snapple you want to swap first.');
       return;
     }
+    // SWAP is the action; a Mulligan is the item it spends. The store
+    // sells Mulligans, so the copy keeps both words rather than
+    // renaming a thing people may already own.
     showConfirm(
-      'Replace this snapple?',
+      'Swap this snapple?',
       // The free one is not an item, so it doesn't name one. The paid
       // one does, because that is what the store sold you.
       freeMulligan > 0
@@ -1883,12 +1886,6 @@ export default function GameScreen({ navigation, route }) {
               color="yellow"
             />
           </View>
-
-          {allSnapples.length < 4 && (
-            <Text style={styles.warningText}>
-              Need at least 4 snapples in the community to play
-            </Text>
-          )}
 
           <Pressable style={styles.spectateBtn} onPress={handleSpectate}>
             <Ionicons name="eye" size={16} color={t.colors.textSecondary} />
@@ -2930,9 +2927,6 @@ const makeStyles = (t) => ({
   },
   lobbyButtons: { width: '100%', gap: 12, marginTop: 16 },
   customMenu: { width: '100%', gap: 10, paddingLeft: 20 },
-  warningText: {
-    color: theme.colors.vibeRed, fontSize: 13, textAlign: 'center', marginTop: 8,
-  },
   waitingText: { color: t.colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   // Picking
   promptBanner: {

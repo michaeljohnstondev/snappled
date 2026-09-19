@@ -295,7 +295,7 @@ export default function PickingPhase({
         {hasMulligan && (
           <BackChunk
             onPress={onMulligan}
-            label="REPLACE"
+            label="SWAP"
             style={styles.actionBackFlex}
           />
         )}

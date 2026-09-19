@@ -85,13 +85,18 @@ export default function ResourceContainer({ userStats }) {
       label: 'Get Tickets',
       onPress: goToStore('tickets'),
       currency: 'tickets',
-      // Magenta, because the ticket art is magenta. This was vibeGreen
-      // for no reason connected to anything on screen - the coin button
-      // right next to it is gold to match the coin, so the odd one out
-      // read as a different KIND of button rather than the same button
-      // for a different currency. #FF10F0 is within a shade of the
-      // ticket's own brightest highlight (#f000f0).
+      // Two colours off the same artwork. The ticket is a magenta
+      // highlight on a purple body, so the label takes the highlight
+      // and the frame takes the body - which is how the art reads at a
+      // glance. This was vibeGreen for both, for no reason connected to
+      // anything on screen, while the coin button beside it is gold to
+      // match the coin.
+      //
+      // vibePink #FF10F0 sits within a shade of the ticket's brightest
+      // highlight (#f000f0); vibePurple #6B00CC within a shade of its
+      // most common body tone (#7800d8).
       color: theme.colors.vibePink,
+      borderColor: theme.colors.vibePurple,
     }
     : popup === 'coins'
       ? {

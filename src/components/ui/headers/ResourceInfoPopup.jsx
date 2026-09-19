@@ -27,7 +27,8 @@ import theme from '../../../theme/themes';
  * @param {string} title
  * @param {string[]} bullets
  * @param {Function} onClose  backdrop tap and the Android back button
- * @param {{label, onPress, currency, color}} action  optional CTA, e.g.
+ * @param {{label, onPress, currency, color, borderColor}} action  optional
+ *   CTA, e.g.
  *   sending someone to the store for the resource they just tapped.
  *   Closes the popup itself before acting. `currency` draws the coin or
  *   ticket art inside the button, so it names the thing you are going
@@ -67,7 +68,16 @@ export default function ResourceInfoPopup({
             <Pressable
               style={({ pressed }) => [
                 styles.action,
-                { borderColor: action.color || theme.colors.vibeBlue },
+                // borderColor is separate from the text colour so a
+                // button can wear two colours from the same artwork -
+                // the ticket is a magenta highlight on a purple body,
+                // so its CTA is magenta text in a purple frame. Falls
+                // back to the text colour, which is what every other
+                // caller passes.
+                {
+                  borderColor: action.borderColor || action.color
+                    || theme.colors.vibeBlue,
+                },
                 pressed && styles.actionPressed,
               ]}
               onPress={() => { onClose?.(); action.onPress?.(); }}
