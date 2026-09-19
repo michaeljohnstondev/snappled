@@ -163,13 +163,17 @@ export default function LandingScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Wordmark alone, same as the play screen. This was the S
+              icon above the name set in the app font - two marks in two
+              different treatments, stacked, reading as two logos rather
+              than one. The wordmark already contains the S and the
+              bolt, so the icon was saying it twice. */}
           <View style={styles.header}>
             <Image
-              source={require('../../assets/images/icon-android.png')}
-              style={styles.mark}
+              source={require('../../assets/images/wordmark.png')}
+              style={styles.wordmark}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Snappled</Text>
           </View>
 
           {/* Social first, and above the fold. The email form used to
@@ -356,15 +360,13 @@ const makeStyles = (t) => ({
     // clear the fold on a small phone.
     marginBottom: 24,
   },
-  mark: {
-    width: 120,
-    height: 120,
-  },
-  title: {
-    fontSize: 48,
-    fontFamily: theme.fonts.bold,
-    color: t.colors.textPrimary,
-    textAlign: 'center',
+  // 300x62 is the wordmark's own aspect (2164x448 after trimming), so
+  // resizeMode contain fills the box instead of letterboxing inside it.
+  // Same dimensions as the play screen - it is the same mark and there
+  // is no reason for it to be two sizes.
+  wordmark: {
+    width: 300,
+    height: 62,
   },
   formContainer: {
     // Was 40, which left a canyon between the password field and the

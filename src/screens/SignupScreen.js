@@ -107,7 +107,7 @@ export default function SignupScreen({ navigation }) {
       if (result.success) {
         Alert.alert(
           'Account Created! 🎉',
-          `Welcome to Snappled, @${formData.username}!\n\nYou've been given:\n• 100 coins 🪙\n• 10 topic tickets 🎫\n\nTime to start creating!`,
+          `Welcome to Snappled, @${formData.username}!\n\nYou've been given:\n• 100 coins 🪙\n• 25 tickets 🎫\n\nTime to start creating!`,
           [{ 
             text: 'Continue', 
             onPress: () => {
@@ -146,13 +146,15 @@ export default function SignupScreen({ navigation }) {
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
         <View style={styles.header}>
           <Image
-            source={require('../../assets/images/icon-android.png')}
-            style={styles.mark}
+            source={require('../../assets/images/wordmark.png')}
+            style={styles.wordmark}
             resizeMode="contain"
           />
           {/* Same mark and the same plain voice as the landing screen.
               "Join Snappled! 🎬" and "Welcome Back! 👋" were two
-              different apps talking to you two screens apart. */}
+              different apps talking to you two screens apart - and the
+              S icon here against the wordmark next door was the same
+              mistake in pictures. */}
           <Text style={styles.title}>Create account</Text>
         </View>
 
@@ -288,9 +290,10 @@ const makeStyles = (t) => ({
     marginTop: 32,
     marginBottom: theme.sizes.spacing?.lg || 24,
   },
-  mark: {
-    width: 96,
-    height: 96,
+  // Matches the landing screen and the play screen: one mark, one size.
+  wordmark: {
+    width: 260,
+    height: 54,
     marginBottom: 8,
   },
   title: {

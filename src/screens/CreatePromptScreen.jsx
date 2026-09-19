@@ -42,7 +42,7 @@ export default function CreatePromptScreen({ navigation }) {
     }
 
     if (userCurrency.tokens < 1) {
-      showError('Insufficient Tickets', 'You need at least 1 topic ticket to create a prompt');
+      showError('Insufficient Tickets', 'You need at least 1 ticket to create a prompt');
       return;
     }
 
@@ -108,7 +108,7 @@ export default function CreatePromptScreen({ navigation }) {
                 <Text style={styles.guidelinesLink}>View Guidelines</Text>
               </Pressable>
               <View style={styles.tokenInfo}>
-                <Text style={styles.tokenText}>🎫 Cost: 1 Topic Ticket</Text>
+                <Text style={styles.tokenText}>🎫 Cost: 1 Ticket</Text>
                 <Text style={styles.balanceText}>
                   Your balance: {userCurrency.tokens || 0} tickets
                 </Text>

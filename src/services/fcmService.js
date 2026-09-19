@@ -282,6 +282,26 @@ class FCMService {
     }
   }
 
+  // openProfile — someone else's profile, WITH the tab bar.
+  //
+  // OtherPersonsProfile is registered twice on purpose (see
+  // Navigation.js): once inside the Profile tab's stack, and once at
+  // the root for callers that live outside the tabs. React Navigation
+  // resolves the closest match, so tapping a profile from anywhere in
+  // the app lands on the tab-hosted copy and the bar stays put.
+  //
+  // A notification does not come from anywhere in the app. It navigates
+  // through navigationRef, which IS the root navigator, so the closest
+  // match is the root copy - a profile with no tab bar and no way back
+  // except the system gesture. Naming the full path puts it inside the
+  // tab where every other route to this screen ends up.
+  openProfile(userId) {
+    this.navigationRef.navigate('Main', {
+      screen: 'Profile',
+      params: { screen: 'OtherPersonsProfile', params: { userId } },
+    });
+  }
+
   // navigateFromNotification — routes a notification payload to the
   // right screen. Called from both foreground toast tap AND background
   // tap. Supported types map to Snappled's actual routes.
@@ -301,13 +321,13 @@ class FCMService {
       switch (type) {
         case 'new_follower':
         case 'mutual_follow':
-          if (userId) this.navigationRef.navigate('OtherPersonsProfile', { userId });
+          if (userId) this.openProfile(userId);
           break;
         case 'followed_user_snapple':
           // Land on the creator's profile — user can tap the specific
           // snapple from their created grid. Deep-linking directly to
           // a single snapple would need a dedicated route.
-          if (userId) this.navigationRef.navigate('OtherPersonsProfile', { userId });
+          if (userId) this.openProfile(userId);
           break;
         case 'game_invite':
           if (gameId) this.navigationRef.navigate('Game', { gameId });
