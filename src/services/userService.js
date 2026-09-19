@@ -21,7 +21,15 @@ const USERS_COLLECTION = "users";
 const SNAPPLE_PROMPTS_COLLECTION = "snapplePrompts";
 const STARTING_COINS = 100;
 const STARTING_TROPHIES = 0;
-const STARTING_TOPIC_TOKENS = 10;
+// Five days of income. Enough to make a handful of snapple prompts and
+// feel that tickets are a thing you spend, nowhere near the 100 a game
+// topic costs - that one is meant to be saved for.
+//
+// The Firestore field stays `resources.tokens`. Renaming a live field
+// means migrating every user document and every read of it for no
+// user-visible gain, so the name is grandfathered and the UI word is
+// the one that counts: TICKETS everywhere a person can see.
+const STARTING_TICKETS = 25;
 
 export const userService = {
   async createUser(userData) {
@@ -77,7 +85,7 @@ export const userService = {
         email: email.toLowerCase(),
         resources: {
           coins: STARTING_COINS,
-          tokens: STARTING_TOPIC_TOKENS,
+          tokens: STARTING_TICKETS,
           trophies: STARTING_TROPHIES,
           receivedCoins: 0, // Gifted/earned coins separate from purchased
         },

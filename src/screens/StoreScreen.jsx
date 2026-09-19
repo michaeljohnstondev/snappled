@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import CurrencyIcon from '../components/ui/CurrencyIcon';
@@ -7,6 +7,7 @@ import AppLayout from '../components/ui/layout/AppLayout';
 import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import storeService from '../services/storeService';
+import purchaseService from '../services/purchaseService';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -21,28 +22,30 @@ const COIN_PACKS = [
 ];
 
 const TICKET_PACKS = [
-  { id: 'snappled_tickets_5', tickets: 5, price: '$1.99', tag: null },
-  { id: 'snappled_tickets_10', tickets: 10, price: '$2.99', tag: null },
-  { id: 'snappled_tickets_25', tickets: 25, price: '$5.99', tag: 'Best Value' },
+  { id: 'snappled_tickets_30', tickets: 30, price: '$1.99', tag: null },
+  { id: 'snappled_tickets_100', tickets: 100, price: '$4.99', tag: 'Popular' },
+  { id: 'snappled_tickets_250', tickets: 250, price: '$9.99', tag: 'Best Value' },
 ];
 
+// Tags are qualitative on purpose. They used to be "Save 33%" and
+// friends, computed against the standalone packs - Taster's 33% was
+// $0.99 of coins plus $1.99 of tickets against $1.99. The moment the
+// ticket packs were rebalanced every one of those percentages became a
+// false claim, silently, in a screen that takes money. A tag that has
+// to be recomputed whenever any other price moves will eventually be
+// wrong; one that says which bundle suits you cannot be.
 const BUNDLES = [
   // Impulse tier. Priced under the psychological two-dollar line and
   // sized so it is a taste rather than a substitute for the Starter -
-  // 100 coins buys two snapples, not a habit.
-  //
-  // Its per-dollar value is deliberately the best on the board: bought
-  // separately this is $2.98 ($0.99 + $1.99), so $1.99 is a third off,
-  // against 25-30% higher up. That inverts the usual "bigger is better
-  // value" ladder on purpose, because the hard step is the FIRST
-  // purchase, not the third.
-  { id: 'snappled_bundle_taster', name: 'Taster Pack', coins: 100, tickets: 5, price: '$1.99', tag: 'Save 33%', gradient: ['#00FF41', '#00C6FF'] },
-  { id: 'snappled_bundle_starter', name: 'Starter Pack', coins: 500, tickets: 10, price: '$4.99', tag: 'Save 25%', gradient: ['#00C6FF', '#0072FF'] },
+  // 100 coins buys two snapples, not a habit. The hard step is the
+  // FIRST purchase, not the third, so this one carries real value.
+  { id: 'snappled_bundle_taster', name: 'Taster Pack', coins: 100, tickets: 25, price: '$1.99', tag: 'Try It', gradient: ['#00FF41', '#00C6FF'] },
+  { id: 'snappled_bundle_starter', name: 'Starter Pack', coins: 500, tickets: 50, price: '$4.99', tag: 'Popular', gradient: ['#00C6FF', '#0072FF'] },
   // Candy apple red into orange. It was gold into orange, and the coin
   // art is gold - so the icon vanished into the card it was sitting on,
   // on the one bundle where the coin count is the selling point.
-  { id: 'snappled_bundle_creator', name: 'Creator Pack', coins: 2000, tickets: 25, price: '$14.99', tag: 'Save 30%', gradient: ['#FF0800', '#FF8C00'] },
-  { id: 'snappled_bundle_mega', name: 'Mega Pack', coins: 10000, tickets: 50, price: '$49.99', tag: 'Save 40%', gradient: ['#6B00CC', '#FF00FF'] },
+  { id: 'snappled_bundle_creator', name: 'Creator Pack', coins: 2000, tickets: 125, price: '$14.99', tag: 'For Creators', gradient: ['#FF0800', '#FF8C00'] },
+  { id: 'snappled_bundle_mega', name: 'Mega Pack', coins: 10000, tickets: 300, price: '$49.99', tag: 'Best Value', gradient: ['#6B00CC', '#FF00FF'] },
 ];
 
 // The coin prices below, and the deck ladder further down, are what the
@@ -78,6 +81,9 @@ export default function StoreScreen({ navigation, route }) {
   // popup sends people here for the exact currency they just ran out
   // of, and landing them on Bundles would make them go looking for it.
   const [activeSection, setActiveSection] = useState(route?.params?.section || 'bundles');
+  // Which product is mid-charge, so a double tap cannot open two store
+  // sheets for the same pack.
+  const [buying, setBuying] = useState(null);
 
   // The Store is a TAB, so it stays mounted: navigating to it again
   // updates params without remounting, and the initial state above
@@ -87,8 +93,32 @@ export default function StoreScreen({ navigation, route }) {
     if (section) setActiveSection(section);
   }, [route?.params?.section]);
 
-  const handleRealMoneyPurchase = (item) => {
-    Alert.alert('Coming Soon', 'In-app purchases will be available at launch!');
+  // Real money. The coins do NOT arrive when this resolves — the store
+  // tells RevenueCat, RevenueCat tells our webhook, and the webhook
+  // credits the account. That round trip is usually a second or two,
+  // and the AuthContext listener on the user document is what makes the
+  // number move. So this confirms the charge and says the balance is on
+  // its way; claiming "you got 500 coins" here would be the client
+  // deciding what a purchase is worth, which is the one thing the whole
+  // design refuses to let it do.
+  const handleRealMoneyPurchase = async (item) => {
+    if (!purchaseService.isAvailable()) {
+      showAlert('Coming Soon', 'In-app purchases will be available at launch!');
+      return;
+    }
+    if (buying) return;
+    setBuying(item.id);
+    const res = await purchaseService.purchase(item.id);
+    setBuying(null);
+    // Cancelling is not a failure. They know they cancelled; telling
+    // them so is just an extra tap.
+    if (res.cancelled) return;
+    if (res.success) {
+      showAlert('Thank you!', 'Your purchase is on its way — your balance '
+        + 'will update in a moment.');
+    } else {
+      showAlert('Purchase Failed', res.error);
+    }
   };
 
   const handleCoinPurchase = (item) => {

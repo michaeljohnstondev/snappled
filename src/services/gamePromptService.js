@@ -20,7 +20,7 @@ import { promptVoteService } from './promptVoteService';
 // what is actually charged, so a stale number here costs a wrong label,
 // never a wrong charge.
 const BETA_GAME_PROMPT_COST = 0;
-const GAME_PROMPT_COST = 25;
+const GAME_PROMPT_COST = 100;
 export const GAME_PROMPT_MAX_LEN = 80;
 
 /** What a submission costs in a given season. Free during the beta. */

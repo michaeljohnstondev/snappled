@@ -254,11 +254,8 @@ export default function VideoPreviewScreen({ route, navigation }) {
           setTimeout(() => showToast('level_up', `Level ${afterLevel}!`, `${levelService.xpForLevel(afterLevel + 1)} XP to next level`), 1500);
         }
 
-        const afterSnap = await xpGet(xpDoc(xpDb, 'users', user.uid));
-        const stats = afterSnap.data()?.stats || {};
-        stats.level = afterLevel;
-        stats.trophies = afterSnap.data()?.resources?.trophies || 0;
-        const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+        // Derives its own stats server-side now; nothing to pass.
+        const newAchievements = await achievementService.checkAndAward();
         newAchievements.forEach((a, i) => {
           const rewards = [];
           if (a.coins) rewards.push(`+${a.coins}c`);

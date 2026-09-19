@@ -60,11 +60,17 @@ service cloud.firestore {
       allow read: if request.auth != null;
       // Signup writes the starting balance, so create cannot simply
       // forbid resources the way update does — it can bound them. A new
-      // account starts on 100 coins and 10 tickets; anything above that
+      // account starts on 100 coins and 25 tickets; anything above that
       // is someone writing their own opening balance.
+      //
+      // These two numbers mirror STARTING_COINS and STARTING_TOPIC_TOKENS
+      // in src/services/userService.js. Raise one there without raising
+      // it here and every new signup is rejected — the account is created
+      // in Auth and then has no document, which is a worse failure than
+      // it sounds.
       allow create: if request.auth != null && request.auth.uid == userId
         && request.resource.data.get('resources', {}).get('coins', 0) <= 100
-        && request.resource.data.get('resources', {}).get('tokens', 0) <= 10
+        && request.resource.data.get('resources', {}).get('tokens', 0) <= 25
         && request.resource.data.get('resources', {}).get('trophies', 0) == 0;
       // Everything with a price on it. None of these may be written by
       // any client, including on your own document: coins and tickets

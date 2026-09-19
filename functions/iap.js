@@ -32,13 +32,13 @@ const PRODUCTS = {
   snappled_coins_500: { coins: 500 },
   snappled_coins_1000: { coins: 1000 },
   snappled_coins_5000: { coins: 5000 },
-  snappled_tickets_5: { tickets: 5 },
-  snappled_tickets_10: { tickets: 10 },
-  snappled_tickets_25: { tickets: 25 },
-  snappled_bundle_taster: { coins: 100, tickets: 5 },
-  snappled_bundle_starter: { coins: 500, tickets: 10 },
-  snappled_bundle_creator: { coins: 2000, tickets: 25 },
-  snappled_bundle_mega: { coins: 10000, tickets: 50 },
+  snappled_tickets_30: { tickets: 30 },
+  snappled_tickets_100: { tickets: 100 },
+  snappled_tickets_250: { tickets: 250 },
+  snappled_bundle_taster: { coins: 100, tickets: 25 },
+  snappled_bundle_starter: { coins: 500, tickets: 50 },
+  snappled_bundle_creator: { coins: 2000, tickets: 125 },
+  snappled_bundle_mega: { coins: 10000, tickets: 300 },
 };
 
 /**
@@ -62,7 +62,14 @@ function authorized(req) {
  * already succeeded - so without this a slow response would grant the
  * same pack twice.
  */
-exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
+// The secret is bound through Secret Manager rather than a .env file.
+// It is the one credential that can cause currency to be granted, so it
+// should not sit in the deploy bundle — runWith injects it into the
+// process at runtime and Google holds the only copy. Rotating it is
+// `firebase functions:secrets:set` plus a redeploy, with no code change.
+exports.revenueCatWebhook = functions
+  .runWith({ secrets: ['REVENUECAT_WEBHOOK_SECRET'] })
+  .https.onRequest(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('POST only');
   if (!authorized(req)) return res.status(401).send('unauthorized');
 

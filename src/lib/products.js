@@ -34,16 +34,22 @@ export const PRODUCTS = {
   snappled_coins_1000: { coins: 1000, price: '$6.99' },
   snappled_coins_5000: { coins: 5000, price: '$29.99' },
 
-  // Ticket packs
-  snappled_tickets_5: { tickets: 5, price: '$1.99' },
-  snappled_tickets_10: { tickets: 10, price: '$2.99' },
-  snappled_tickets_25: { tickets: 25, price: '$5.99' },
+  // Ticket packs. The amounts are set from the 100-ticket game topic:
+  // the middle pack is exactly one topic, the small one is a top-up,
+  // and the large one is two and a half with the best rate. The old
+  // 5/10/25 packs were priced as if tickets were scarce when the game
+  // handed out 25 a day - the largest sold for $5.99 what you earned by
+  // lunchtime.
+  snappled_tickets_30: { tickets: 30, price: '$1.99' },
+  snappled_tickets_100: { tickets: 100, price: '$4.99' },
+  snappled_tickets_250: { tickets: 250, price: '$9.99' },
 
-  // Bundles
-  snappled_bundle_taster: { coins: 100, tickets: 5, price: '$1.99' },
-  snappled_bundle_starter: { coins: 500, tickets: 10, price: '$4.99' },
-  snappled_bundle_creator: { coins: 2000, tickets: 25, price: '$14.99' },
-  snappled_bundle_mega: { coins: 10000, tickets: 50, price: '$49.99' },
+  // Bundles. Ticket counts scaled with everything else; these ids carry
+  // no amount in them, so they were free to rebalance.
+  snappled_bundle_taster: { coins: 100, tickets: 25, price: '$1.99' },
+  snappled_bundle_starter: { coins: 500, tickets: 50, price: '$4.99' },
+  snappled_bundle_creator: { coins: 2000, tickets: 125, price: '$14.99' },
+  snappled_bundle_mega: { coins: 10000, tickets: 300, price: '$49.99' },
 };
 
 /** What a product awards, or null if the id is unknown. */

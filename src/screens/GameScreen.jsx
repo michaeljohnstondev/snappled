@@ -1779,14 +1779,8 @@ export default function GameScreen({ navigation, route }) {
           // Check achievements
           try {
             const { default: achievementService } = await import('../services/achievementService');
-            const afterSnap = await getDoc(userRef);
-            const afterData = afterSnap.data();
-            const stats = {
-              ...(afterData?.stats || {}),
-              level: afterLevel,
-              trophies: afterData?.resources?.trophies || 0,
-            };
-            const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+            // Derives its own stats server-side now; nothing to pass.
+            const newAchievements = await achievementService.checkAndAward();
             newAchievements.forEach((a, i) => {
               const ach = [];
               if (a.coins) ach.push(`+${a.coins}c`);

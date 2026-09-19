@@ -29,29 +29,48 @@ const db = admin.firestore();
 const ADMIN_UIDS = ['SrB8T1TmftQzu90H7phQkRJXkRn2'];
 
 // ── Economy ──
+//
+// A game topic is meant to be the expensive thing in the app. It goes
+// into a SEASON - it is read aloud to every room that plays, and it
+// outlives the person who wrote it - so it should cost roughly twenty
+// days of ordinary play to make one. That is the whole shape of the
+// ticket economy, and every number below is set from it:
+//
+//   100 tickets per topic, against 5 a day free = ~20 days
+//
+// The first version got this badly wrong. The faucet ran at 25 a day
+// against a 25-ticket topic, so a topic cost one day, and the largest
+// ticket pack in the store sold for $5.99 what the game handed out
+// every morning. Tickets could never have sold, and they were never
+// scarce enough to be worth saving.
+//
+// 5/day is a FLOOR, not the whole supply. Ranking achievements already
+// pay 70 tickets across their three tiers, and level-ups and chests are
+// meant to pay too - so a player who does more than the minimum gets
+// there faster than twenty days. The daily cap only stops someone
+// farming the floor in an afternoon.
+//
 // Free during the beta (season 0). The beta exists to build Season 1's
 // deck, so the more suggestions it gets to rank the better that deck is,
 // and a fee is only friction. DAILY_PROMPT_SUBMISSIONS is the brake on
 // spam instead of the price.
 const BETA_GAME_PROMPT_COST = 0;
-// The launch price. Deliberately low to start: it is easy to raise a
-// price once there is a real economy to read, and hard to cut one
-// without angering everyone who already paid the old rate. Tune it with
-// TICKETS_PER_SNAPPLE - moving one without the other floods or empties
-// the pool.
-const GAME_PROMPT_COST = 25;
+const GAME_PROMPT_COST = 100;
 const DAILY_PROMPT_SUBMISSIONS = 5;
-const TICKETS_PER_SNAPPLE = 5;
+
+// The faucet: 3 + 2 = 5 a day.
+const TICKETS_PER_SNAPPLE = 1;
+// Only the first few snapples a day pay. Without a cap the faucet pays
+// per upload, and the cheapest way to buy a game topic becomes
+// recording twenty throwaway clips.
+const DAILY_TICKET_SNAPPLES = 3;
 // Ranking pays too, because a ranked prompt is the whole point of the
 // season. But a swipe costs nothing to make, so it pays little and stops
 // paying fast - uncapped, the most profitable thing in the app would be
-// swiping without reading.
+// swiping without reading. The long tail is paid by the ranked_10 /
+// ranked_50 / ranked_250 achievements instead, which cannot be farmed.
 const TICKETS_PER_RANKING = 1;
-const DAILY_RANKING_REWARDS = 10;
-// Only the first few snapples a day pay. Without a cap the faucet pays
-// per upload, and the cheapest way to buy a game prompt becomes
-// recording twenty throwaway clips.
-const DAILY_TICKET_SNAPPLES = 3;
+const DAILY_RANKING_REWARDS = 2;
 
 // ── Submission limits ──
 const MIN_LEN = 6;

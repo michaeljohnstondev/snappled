@@ -6,6 +6,7 @@ import { userService } from "../services/userService";
 import { achievementService } from "../services/achievementService";
 import { levelService } from "../services/levelService";
 import { fcmService } from "../services/fcmServiceWrapper";
+import purchaseService from "../services/purchaseService";
 
 const AuthContext = createContext({});
 
@@ -38,6 +39,18 @@ export function AuthProvider({ children }) {
       if (unsubUserDoc.current) {
         unsubUserDoc.current();
         unsubUserDoc.current = null;
+      }
+
+      // Tell RevenueCat who is buying, before any store screen can be
+      // opened. It passes this uid to our webhook as `app_user_id` and
+      // the webhook credits exactly that document — so configuring late,
+      // or with a stale uid after an account switch, pays the wrong
+      // person. Fire-and-forget: it returns false rather than throwing
+      // when there is no key yet, and nothing else here depends on it.
+      if (firebaseUser?.uid) {
+        purchaseService.configure(firebaseUser.uid).catch((e) => {
+          console.warn('[AuthContext] RevenueCat configure failed:', e);
+        });
       }
 
       // If we're transitioning from an authed user → logged out (or
@@ -81,8 +94,8 @@ export function AuthProvider({ children }) {
             setUserCurrency({
               userId: firebaseUser.uid,
               coins: userData.resources?.coins || userData.coins || 0,
-              tokens: userData.resources?.tokens || userData.topicTokens || 0,
-              trophies: userData.resources?.trophies || userData.tickets || 0,
+              tokens: userData.resources?.tokens || 0,
+              trophies: userData.resources?.trophies || 0,
               level: userData.profile?.level || 1,
               xp: userData.profile?.xp || 0,
               ownedSnapples: userData.ownedSnapples || [],
@@ -109,8 +122,8 @@ export function AuthProvider({ children }) {
               setUserCurrency(prev => ({
                 ...prev,
                 coins: d.resources?.coins || d.coins || 0,
-                tokens: d.resources?.tokens || d.topicTokens || 0,
-                trophies: d.resources?.trophies || d.tickets || 0,
+                tokens: d.resources?.tokens || 0,
+                trophies: d.resources?.trophies || 0,
                 level: d.profile?.level || 1,
                 xp: d.profile?.xp || 0,
                 ownedSnapples: d.ownedSnapples || [],
@@ -133,47 +146,19 @@ export function AuthProvider({ children }) {
               }) : prev);
             });
 
-            // Check achievements on login (delayed so it doesn't block render)
+            // Check achievements on login, delayed so it does not
+            // block render.
+            //
+            // The argument is gone. This used to assemble a stats object
+            // first - including a query for EVERY snapple this user had
+            // ever made, on every single login, to add up likes - and
+            // pass it in. checkAndAward is a callable now and derives
+            // its own stats server-side from counters, so all of that
+            // was a read the app paid for and the server discarded.
             setTimeout(async () => {
               try {
-                const savedStats = userData.stats || {};
-                let totalLikes = 0, maxLikesOnOne = 0, uniquePrompts = new Set();
-                try {
-                  const snapQ = query(collection(db, 'snapples'), where('creatorId', '==', firebaseUser.uid));
-                  const snapSnap = await getDocs(snapQ);
-                  snapSnap.forEach(d => {
-                    const s = d.data();
-                    const likes = s.likes || s.likeCount || 0;
-                    totalLikes += likes;
-                    if (likes > maxLikesOnOne) maxLikesOnOne = likes;
-                    if (s.promptId) uniquePrompts.add(s.promptId);
-                  });
-                } catch (e) {}
-                // Follow counts for the social achievements. Read
-                // straight off the user doc rather than counted - the
-                // arrays ARE the source of truth, and mutuals is the
-                // intersection, which is the only one needing work.
-                const social = userData.social || {};
-                const followers = social.followers || [];
-                const following = social.following || [];
-                const followerSet = new Set(followers);
-                const mutualCount = following.filter(id => followerSet.has(id)).length;
-
-                const stats = {
-                  ...savedStats,
-                  followerCount: followers.length,
-                  followingCount: following.length,
-                  mutualCount,
-                  totalLikesReceived: totalLikes,
-                  maxLikesOnOne,
-                  uniquePromptsUsed: uniquePrompts.size,
-                  level: levelService.getLevelFromXP(userData.profile?.xp || userData.profile?.experience || 0),
-                  trophies: userData.resources?.trophies || 0,
-                };
-                const newAchievements = await achievementService.checkAndAward(firebaseUser.uid, stats);
-                if (newAchievements.length > 0) {
-                  setPendingAchievements(newAchievements);
-                }
+                const earned = await achievementService.checkAndAward();
+                if (earned.length > 0) setPendingAchievements(earned);
               } catch (e) {
                 console.error('[AuthContext] Achievement check error:', e);
               }
@@ -215,8 +200,8 @@ export function AuthProvider({ children }) {
         setUserCurrency({
           userId: user.uid,
           coins: userData.resources?.coins || userData.coins || 0,
-          tokens: userData.resources?.tokens || userData.topicTokens || 0,
-          trophies: userData.resources?.trophies || userData.tickets || 0,
+          tokens: userData.resources?.tokens || 0,
+          trophies: userData.resources?.trophies || 0,
           level: userData.profile?.level || 1,
           ownedSnapples: userData.ownedSnapples || [],
           wishlistedSnapples: userData.wishlistedSnapples || [],

@@ -19,31 +19,20 @@ import { userService } from './userService';
 const TRANSACTIONS_COLLECTION = 'transactions';
 const SNAPPLES_COLLECTION = 'snapples';
 
-// Pricing configuration
+// Pricing configuration.
+//
+// Only `snapple` is read (by calculateSnapplePrice). This also held a
+// `topicToken` block - coins-per-ticket with bulk discounts - and a
+// `ticket` block from an older economy where "ticket" meant what is now
+// a trophy. Neither had a caller, and both described prices that do not
+// exist: tickets are earned or bought with real money, never with coins.
 const PRICING_CONFIG = {
   snapple: {
     basePrice: 10, // Base price in coins
     priceMultiplier: 1.15, // Exponential growth factor
     maxPrice: 1000 // Maximum price cap
-  },
-  topicToken: {
-    price: 25, // Price in coins to buy 1 topic token
-    bulkDiscounts: {
-      5: 0.1,   // 10% discount for 5 tokens
-      10: 0.2,  // 20% discount for 10 tokens
-      25: 0.3   // 30% discount for 25 tokens
-    }
-  },
-  ticket: {
-    price: 2, // Price in coins to buy 1 ticket (legacy system)
-    bulkDiscounts: {
-      25: 0.05,  // 5% discount for 25 tickets
-      50: 0.1,   // 10% discount for 50 tickets
-      100: 0.15  // 15% discount for 100 tickets
-    }
   }
 };
-
 export const currencyService = {
   // purchaseSnapple / purchaseTopicTokens / purchaseTickets lived
   // here: three client-side transactions that read a price, checked a

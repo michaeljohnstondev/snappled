@@ -1,0 +1,133 @@
+// purchaseService.js — buying coins and tickets with real money.
+//
+// Deliberately thin, and it grants nothing. The flow is:
+//
+//   app  -> RevenueCat SDK -> Apple / Google   (the charge)
+//   store -> RevenueCat -> revenueCatWebhook   (the grant)
+//
+// The second line never passes through this app, which is the point.
+// The client reports nothing about what it bought and is not believed
+// about anything; the webhook reads the product id off a receipt the
+// stores validated and looks the amount up in its own catalogue. A
+// modified build can at most buy something and not be told about it.
+//
+// So there is a lag: the balance arrives when the webhook lands, not
+// when the sheet closes. Usually a second or two. The AuthContext
+// listener on the user document is what actually updates the number on
+// screen - purchase() does not return a balance, because it does not
+// know one.
+
+import { Platform } from 'react-native';
+import Purchases from 'react-native-purchases';
+
+// Public SDK keys, in the source on purpose.
+//
+// These are public by design: they identify the app to RevenueCat and
+// can grant nothing. The credential that CAN cause coins to be granted
+// is the webhook's shared secret, and that lives in Google Secret
+// Manager where no client ever sees it.
+//
+// Committed rather than read from the environment because an
+// EXPO_PUBLIC_ variable is inlined into the JS bundle at build time
+// anyway - so it ends up shipped to every device either way, and the
+// only thing the env indirection adds is a way for a build to silently
+// come out with no key and a store that quietly says "Coming Soon".
+// The repo already commits google-services.json and the iOS plist for
+// exactly the same reason.
+//
+// The env var still wins if set, so a fork or a staging project can
+// point elsewhere without editing this file.
+const API_KEYS = {
+  ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY
+    || 'appl_odcXLdFvEmNjTCqHfsTfmmQTneU',
+  android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY
+    || 'goog_sVnEUeuxQqysRqoUeHfSrrRYsjS',
+};
+
+let configuredFor = null;
+
+const purchaseService = {
+  /**
+   * configure — point the SDK at this signed-in user.
+   *
+   * The uid matters more than it looks: RevenueCat sends it to the
+   * webhook as `app_user_id`, and the webhook credits exactly that
+   * document. Configure with the wrong id and someone else gets the
+   * coins. Called on sign-in and again on account switch.
+   *
+   * Returns false when there is no key for this platform, which is the
+   * normal state until the RevenueCat project exists - the store's real
+   * money shelves stay disabled rather than throwing.
+   */
+  async configure(uid) {
+    const key = API_KEYS[Platform.OS];
+    if (!key || !uid) return false;
+    if (configuredFor === uid) return true;
+    try {
+      await Purchases.configure({ apiKey: key, appUserID: uid });
+      configuredFor = uid;
+      return true;
+    } catch (error) {
+      console.error('[PurchaseService] configure failed:', error);
+      return false;
+    }
+  },
+
+  /** Whether real-money purchases can be attempted at all right now. */
+  isAvailable() {
+    return !!API_KEYS[Platform.OS] && !!configuredFor;
+  },
+
+  /**
+   * getPrices — localized price strings, keyed by product id.
+   *
+   * Apple and Google both require the price shown to be the one the
+   * store will charge, in the user's own currency. The hardcoded
+   * "$4.99" in the store is a placeholder for exactly this; anything
+   * missing here keeps the placeholder rather than showing a blank.
+   */
+  async getPrices(productIds) {
+    if (!this.isAvailable()) return {};
+    try {
+      const products = await Purchases.getProducts(productIds);
+      const out = {};
+      products.forEach((p) => { out[p.identifier] = p.priceString; });
+      return out;
+    } catch (error) {
+      console.error('[PurchaseService] getPrices failed:', error);
+      return {};
+    }
+  },
+
+  /**
+   * purchase — charge for one product.
+   *
+   * Resolves once the STORE is done, which is not the same as the coins
+   * having arrived; see the note at the top of this file. A user
+   * cancelling is not an error worth showing them - they know they
+   * cancelled - so it comes back as a distinct flag rather than a
+   * message.
+   */
+  async purchase(productId) {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'Purchases are not available yet.' };
+    }
+    try {
+      const products = await Purchases.getProducts([productId]);
+      if (!products.length) {
+        return { success: false, error: 'That pack is not available right now.' };
+      }
+      await Purchases.purchaseStoreProduct(products[0]);
+      return { success: true };
+    } catch (error) {
+      if (error?.userCancelled) return { success: false, cancelled: true };
+      console.error('[PurchaseService] purchase failed:', error);
+      return {
+        success: false,
+        error: error?.message || 'Purchase failed. You have not been charged.',
+      };
+    }
+  },
+};
+
+export default purchaseService;

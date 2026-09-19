@@ -27,44 +27,12 @@ export default function AchievementsScreen({ navigation }) {
   const checkAll = async () => {
     if (!user?.uid) return;
 
-    const userSnap = await getDoc(doc(db, 'users', user.uid));
-    const userData = userSnap.data() || {};
-    const savedStats = userData.stats || {};
-
-    let totalLikes = 0, maxLikesOnOne = 0, uniquePrompts = new Set();
-    try {
-      const snapQ = query(collection(db, 'snapples'), where('creatorId', '==', user.uid));
-      const snapSnap = await getDocs(snapQ);
-      snapSnap.forEach(d => {
-        const s = d.data();
-        const likes = s.likes || s.likeCount || 0;
-        totalLikes += likes;
-        if (likes > maxLikesOnOne) maxLikesOnOne = likes;
-        if (s.promptId) uniquePrompts.add(s.promptId);
-      });
-    } catch (e) {}
-
-    // Same social counts AuthContext builds. Both call sites have to
-    // supply them or an achievement would unlock on one screen and stay
-    // locked on the other.
-    const social = userData.social || {};
-    const followers = social.followers || [];
-    const following = social.following || [];
-    const followerSet = new Set(followers);
-
-    const stats = {
-      ...savedStats,
-      followerCount: followers.length,
-      followingCount: following.length,
-      mutualCount: following.filter(id => followerSet.has(id)).length,
-      totalLikesReceived: totalLikes,
-      maxLikesOnOne,
-      uniquePromptsUsed: uniquePrompts.size,
-      level: levelService.getLevelFromXP(userData.profile?.xp || userData.profile?.experience || 0),
-      trophies: userData.resources?.trophies || 0,
-    };
-
-    const newAchievements = await achievementService.checkAndAward(user.uid, stats);
+    // No stats assembled here any more. This screen used to read the
+    // user document AND query every snapple they had made, just to hand
+    // the totals to checkAndAward - which is a callable now and derives
+    // them server-side from counters. Opening the achievements screen
+    // was one of the four places paying for that query.
+    const newAchievements = await achievementService.checkAndAward();
     newAchievements.forEach((a, i) => {
       const rewards = [];
       if (a.coins) rewards.push(`+${a.coins}c`);
