@@ -32,7 +32,7 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
           numbers need. This takes some of that back, so if the coin or
           trophy figures start truncating at four digits, this is why. */}
       <Image
-        source={require('../../../assets/images/logo-s.png')}
+        source={require('../../../../assets/images/logo-s.png')}
         style={styles.logo}
         resizeMode="contain"
       />
