@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Image } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ResourceContainer from './ResourceContainer';
 import UserMenu from '../UserMenu';
@@ -22,21 +22,10 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
 
   return (
     <View style={styles.header}>
-      {/* The S, trimmed out of the adaptive icon into its own asset -
-          icon-android.png carries Android's safe-zone padding, so the
-          art fills only 52% of that canvas and would have rendered at
-          half whatever size it was given.
-
-          Worth watching: the person badge used to sit here and was
-          removed partly because it cost the resource row the width its
-          numbers need. This takes some of that back, so if the coin or
-          trophy figures start truncating at four digits, this is why. */}
-      <Image
-        source={require('../../../../assets/images/logo-s.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-
+      {/* Nothing to the left of the resources. The S was tried here
+          and removed: the row is the numbers, and a mark beside them
+          took width the figures need without telling anyone anything
+          the nav bar does not already say. */}
       <ResourceContainer userStats={userStats} />
 
       <UserMenu
@@ -51,14 +40,6 @@ export default function HomeHeader({ userStats, onProfilePress, onAdminPress, us
 }
 
 const styles = StyleSheet.create({
-  // 34x30 is the trimmed art's own aspect (532x468), matched to the
-  // 34pt height of the resource pills beside it so the row reads as one
-  // band rather than a logo floating next to some buttons.
-  logo: {
-    width: 34,
-    height: 30,
-    marginRight: 10,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

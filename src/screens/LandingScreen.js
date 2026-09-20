@@ -190,12 +190,13 @@ export default function LandingScreen({ navigation }) {
                 onPress={() => handleSocialSignIn('apple')}
                 disabled={isLoading || googleLoading || appleLoading}
                 style={({ pressed }) => [
+                  styles.socialButton,
                   styles.appleButton,
                   { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
                 ]}
               >
                 <Text style={styles.appleLogo}></Text>
-                <Text style={styles.appleButtonText}>
+                <Text style={styles.socialButtonText}>
                   {appleLoading ? 'Signing in...' : 'Sign in with Apple'}
                 </Text>
               </Pressable>
@@ -205,6 +206,7 @@ export default function LandingScreen({ navigation }) {
               onPress={() => handleSocialSignIn('google')}
               disabled={isLoading || googleLoading || appleLoading}
               style={({ pressed }) => [
+                styles.socialButton,
                 styles.googleButton,
                 { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
               ]}
@@ -212,7 +214,7 @@ export default function LandingScreen({ navigation }) {
               <View style={styles.googleIconContainer}>
                 <Text style={styles.googleG}>G</Text>
               </View>
-              <Text style={styles.googleButtonText}>
+              <Text style={styles.socialButtonText}>
                 {googleLoading ? 'Signing in...' : 'Sign in with Google'}
               </Text>
             </Pressable>
@@ -226,6 +228,7 @@ export default function LandingScreen({ navigation }) {
               <VibeButton
                 label="Sign in with email"
                 onPress={() => setShowEmail(true)}
+                variant="toggle"
                 color="purple"
                 style={styles.emailButton}
               />
@@ -350,15 +353,16 @@ const makeStyles = (t) => ({
   scrollContent: {
     flexGrow: 1,
     padding: theme.sizes.spacing?.lg || 24,
-    // Was 80. The mark does not need a third of the screen above it.
-    paddingTop: 40,
     justifyContent: 'center',
   },
+  // One rhythm down the screen: the gap under the mark is the same 28
+  // as the gap between every button. It was 24 under the mark against a
+  // 20 between buttons - close enough to look like a mistake rather
+  // than a decision, and the mark ended up sitting slightly too close
+  // to the first button.
   header: {
     alignItems: 'center',
-    // Was 60. The mark carries the space now, and the buttons need to
-    // clear the fold on a small phone.
-    marginBottom: 24,
+    marginBottom: 28,
   },
   // 300x64 is the wordmark's own aspect (2109x453 after trimming), so
   // resizeMode contain fills the box instead of letterboxing inside it.
@@ -414,7 +418,7 @@ const makeStyles = (t) => ({
     opacity: 0.6,
   },
   buttonContainer: {
-    gap: 20,
+    gap: 28,
     alignItems: 'center',
   },
   signupContainer: {
@@ -455,16 +459,37 @@ const makeStyles = (t) => ({
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
-  appleButton: {
+  // Apple, Google and email now share a shape: full width, 52 tall,
+  // radius 12, a 3pt border and a dark translucent fill - the toggle
+  // VibeButton's look, which is the one the rest of the app uses. They
+  // were three different buttons before: Apple a black slab, Google a
+  // white Google-branded slab, email a layered neon VibeButton.
+  //
+  // Apple's fill stays black on purpose. Apple's guidelines prescribe
+  // black, white or white-outline for Sign in with Apple, and review
+  // does look - so it gets the set's shape and keeps its own fill.
+  socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    height: 48,
+    height: 52,
+    borderRadius: theme.sizes.buttonRadius,
+    borderWidth: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  appleButton: {
     backgroundColor: '#000000',
-    borderRadius: 24,
-    borderWidth: 2,
+    borderColor: t.colors.textPrimary,
+  },
+  googleButton: {
     borderColor: theme.colors.vibeBlue,
+  },
+  socialButtonText: {
+    color: t.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: theme.fonts.main,
   },
   appleLogo: {
     color: t.colors.textPrimary,
@@ -472,39 +497,21 @@ const makeStyles = (t) => ({
     marginRight: 10,
     marginTop: -2,
   },
-  appleButtonText: {
-    color: t.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    height: 48,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: theme.colors.vibeBlue,
-  },
+  // The G keeps its own colour on its own white disc. Google's branding
+  // rules are about the mark, not the button around it, so the button
+  // can join the set as long as the G does not change.
   googleIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   googleG: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#4285F4',
-  },
-  googleButtonText: {
-    color: '#1f1f1f',
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
