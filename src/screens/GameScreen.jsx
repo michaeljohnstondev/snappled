@@ -1262,22 +1262,31 @@ export default function GameScreen({ navigation, route }) {
 
       if (!user?.uid) return;
 
-      // Build the user's playable deck: every snapple they created (no
-      // global-cap eviction) plus every owned card by id. De-dupe by id.
-      const created = await snappleService.getSnapplesByCreator(user.uid, 200);
-      const ownedCardIds = userCurrency.ownedSnapples || userCurrency.ownedCards || [];
+      // THE DECK is what gets dealt. ownedCards is the list curated in
+      // DeckBuilder, capped by upgrades.maxDeckSize.
+      //
+      // This used to load every snapple you had created PLUS every one
+      // you owned, and deal from all of it - so the deck was a list you
+      // could arrange that changed nothing, DeckBuilder was decorative,
+      // and the maxDeckSize upgrade in the store sold a cap that was
+      // never read anywhere in the app. The toggle said "My Deck" and
+      // meant "everything of mine".
+      //
+      // ownedSnapples is the fallback for accounts that predate the
+      // migration; without it their first game after this update would
+      // deal nothing but community cards. See scripts/backfillDecks.js.
+      const deckIds = (userCurrency.ownedCards?.length
+        ? userCurrency.ownedCards
+        : userCurrency.ownedSnapples) || [];
 
       // All at once, not one after another. This was an await inside a
-      // for loop, so owning thirty cards meant thirty sequential round
-      // trips before the deck was known — and the deck toggle is what
-      // the lobby is waiting on, so the whole menu visibly assembled
-      // itself in stages behind a wordmark that had already painted.
-      const ownedCards = (await Promise.all(
-        ownedCardIds.map(id => snappleService.getSnapple(id).catch(() => null)),
+      // for loop, so a fifty-card deck meant fifty sequential round
+      // trips before the game could deal.
+      const deck = (await Promise.all(
+        deckIds.map(id => snappleService.getSnapple(id).catch(() => null)),
       )).filter(r => r?.success && r.snapple).map(r => r.snapple);
 
-      const merged = [...(created.snapples || []), ...ownedCards];
-      const uniqueById = Array.from(new Map(merged.map(s => [s.id, s])).values());
+      const uniqueById = Array.from(new Map(deck.map(s => [s.id, s])).values());
       setMySnapples(uniqueById);
     } catch (error) {
       console.error('[GameScreen] Error loading snapples:', error);
@@ -1481,7 +1490,10 @@ export default function GameScreen({ navigation, route }) {
       setFreeMulligan(0);
       setSwappedThisRound(true);
       doSwap();
-      showToast('reward', 'Mulligan!', 'Card swapped (free)');
+      // No toast. The card in your hand visibly changes, which is the
+      // confirmation - a banner saying so on top of it is something
+      // else to read for news you already have. Toasts are for
+      // achievements, which you would otherwise miss entirely.
       return;
     }
 
@@ -1489,7 +1501,7 @@ export default function GameScreen({ navigation, route }) {
     // decremented, swallowing any failure — so a player with none got
     // the swap anyway and went quietly into negative stock. The server
     // refuses at zero, and a refusal has to leave the hand alone.
-    const spent = await storeService.spendMulligan();
+    const spent = await storeService.spendSwap();
     if (!spent.success) {
       // Title was a hardcoded "No Mulligans", so a server error arrived
       // as "No Mulligans / Sign in first." - two unrelated statements
@@ -1500,7 +1512,6 @@ export default function GameScreen({ navigation, route }) {
     }
     setSwappedThisRound(true);
     doSwap();
-    showToast('reward', 'Mulligan!', 'Card swapped');
   };
 
   // Back to one whenever the game changes. Keyed on gameId rather than
@@ -1531,7 +1542,7 @@ export default function GameScreen({ navigation, route }) {
     }
     if (mulligansLeft <= 0) {
       showAlert('No Swaps Left',
-        'You have used your free swap this game. Buy mulligans in the store.');
+        'You have used your free swap this game. Buy more in the store.');
       return;
     }
     if (!selectedCard) {
@@ -1547,7 +1558,7 @@ export default function GameScreen({ navigation, route }) {
       // one does, because that is what the store sold you.
       freeMulligan > 0
         ? 'Swaps it for another from your deck. Free once per game.'
-        : 'Swaps it for another from your deck, using one mulligan.',
+        : 'Swaps it for another from your deck, using one swap.',
       () => swapCard(selectedCard),
     );
   };

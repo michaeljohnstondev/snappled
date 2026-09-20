@@ -8,6 +8,7 @@ import { useAuth } from '../store/AuthContext';
 import { useModal } from '../store/ModalContext';
 import storeService from '../services/storeService';
 import purchaseService from '../services/purchaseService';
+import { DECK_SIZE_START } from '../lib/products';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -59,11 +60,14 @@ const BOOSTS = [
 ];
 
 const GAME_ITEMS = [
-  { id: 'mulligan', name: 'Mulligan', description: 'Discard a card and draw a new one during pick phase', coinPrice: 500, icon: 'refresh' },
+  // The id stays `mulligan`: it is the key functions/store.js prices
+  // the item by, the same way a product id is. The WORD is Swap
+  // everywhere a person can read it.
+  { id: 'mulligan', name: 'Swap', description: 'Swap a card out of your hand during the pick phase', coinPrice: 500, icon: 'refresh' },
   { id: 'shield', name: 'Shield', description: 'Block all trophy loss from one game', coinPrice: 5000, icon: 'shield' },
 ];
 
-const DECK_SIZE_START = 50;
+// Shared with the create flow and DeckBuilder; see src/lib/products.js.
 const DECK_SIZE_INCREMENT = 10;
 const DECK_SIZE_MAX = 500;
 // 50→60: 500, 60→70: 1000, 70→80: 2500, 80→90: 5000, 90→100: 7500

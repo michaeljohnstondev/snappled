@@ -35,6 +35,11 @@ const ACHIEVEMENTS = [
   { id: 'rounds_10', group: 'rounds', name: 'On A Roll', desc: 'Win 10 rounds', icon: '🎯', coins: 100, xp: 50, mulligans: 1 },
   { id: 'rounds_50', group: 'rounds', name: 'Round Master', desc: 'Win 50 rounds', icon: '💪', coins: 300, xp: 200 },
   { id: 'rounds_100', group: 'rounds', name: 'Dominator', desc: 'Win 100 rounds', icon: '⚡', coins: 600, xp: 400, mulligans: 1 },
+  // Paid swaps only - the free one each game is an allowance and
+  // never reaches the server to be counted.
+  { id: 'swaps_5', group: 'rounds', name: 'Second Thoughts', desc: 'Use 5 swaps', icon: '🔀', coins: 100, xp: 50 },
+  { id: 'swaps_25', group: 'rounds', name: 'Picky', desc: 'Use 25 swaps', icon: '♻️', coins: 300, xp: 150 },
+  { id: 'swaps_100', group: 'rounds', name: 'Never Satisfied', desc: 'Use 100 swaps', icon: '🌀', coins: 800, xp: 400 },
   { id: 'sweep', group: 'rounds', name: 'Clean Sweep', desc: 'Win every round in a game', icon: '🧹', coins: 500, xp: 250 },
   { id: 'comeback', group: 'rounds', name: 'Comeback Kid', desc: 'Win a game after losing the first round', icon: '🔄', coins: 250, xp: 150 },
 

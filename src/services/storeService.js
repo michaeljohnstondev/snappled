@@ -34,13 +34,21 @@ const storeService = {
   },
 
   /**
-   * spendMulligan — consume one purchased mulligan.
+   * spendSwap — consume one purchased swap.
    *
    * The free one each game never gets here; it lives in GameScreen's
    * state so it cannot be banked. Fails rather than going negative, so
    * the caller must swap the card only once this succeeds.
+   *
+   * ONE WORD: it is a Swap everywhere a person can read it. The
+   * callable is still named spendMulligan and the balance still lives
+   * at inventory.mulligans - renaming a deployed function means
+   * deleting and recreating it, and renaming a live field means
+   * migrating every user document, neither of which buys anything a
+   * comment does not. Same call as resources.tokens being the field
+   * behind the word "tickets".
    */
-  async spendMulligan() {
+  async spendSwap() {
     try {
       const fn = httpsCallable(functions, 'spendMulligan');
       const res = await fn({});
@@ -48,7 +56,7 @@ const storeService = {
     } catch (error) {
       return {
         success: false,
-        error: error?.message || 'You have no mulligans left.',
+        error: error?.message || 'You have no swaps left.',
       };
     }
   },

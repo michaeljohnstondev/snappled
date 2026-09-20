@@ -79,7 +79,9 @@ const CATALOGUE = {
     }),
   },
   mulligan: {
-    name: 'Mulligan',
+    // Shown on the receipt in `purchases`. Swap is the word; the
+    // catalogue key stays `mulligan` because it is an id.
+    name: 'Swap',
     price: 500,
     apply: () => ({ 'inventory.mulligans': FV.increment(1) }),
   },
@@ -134,10 +136,16 @@ exports.spendMulligan = functions.https.onCall(async (data, context) => {
     const held = (snap.data().inventory && snap.data().inventory.mulligans) || 0;
     if (held < 1) {
       throw new functions.https.HttpsError(
-        'failed-precondition', 'You have no mulligans left.');
+        'failed-precondition', 'You have no swaps left.');
     }
     tx.update(userRef, {
       'inventory.mulligans': FV.increment(-1),
+      // Counts PAID swaps only. The free one each game never reaches
+      // the server, which is the right line to draw: the free swap is
+      // an allowance, and this counts the ones somebody chose to spend
+      // on. Same transaction as the spend, so the count cannot drift
+      // from the balance.
+      'stats.swapsUsed': FV.increment(1),
       updatedAt: FV.serverTimestamp(),
     });
     return { success: true, remaining: held - 1 };

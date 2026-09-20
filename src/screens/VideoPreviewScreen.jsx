@@ -15,6 +15,7 @@ import { useUploadQueue } from '../store/UploadQueueContext';
 import { snappleService } from '../services/snappleService';
 import { promptService } from '../services/promptService';
 import storeService from '../services/storeService';
+import { DECK_SIZE_START } from '../lib/products';
 import { achievementService } from '../services/achievementService';
 import { levelService } from '../services/levelService';
 import theme from '../theme/themes';
@@ -304,9 +305,19 @@ export default function VideoPreviewScreen({ route, navigation }) {
       try {
         const { doc: docRef, updateDoc: update, arrayUnion: aUnion } = await import('firebase/firestore');
         const { db: database } = await import('../services/firebase');
-        await update(docRef(database, 'users', user.uid), {
-          ownedSnapples: aUnion(newSnappleId),
-        }).catch(() => {});
+        // Collection always; deck as well if there is room. The deck
+        // is what gets dealt, so a save that only filled the collection
+        // would leave the card unplayable until somebody went and
+        // curated it in - that is the step this removes. A full deck
+        // still keeps the card, it just keeps it one move away.
+        const deck = userCurrency.ownedCards || [];
+        const max = user?.upgrades?.maxDeckSize || DECK_SIZE_START;
+        const fitsInDeck = deck.length < max;
+
+        const updates = { ownedSnapples: aUnion(newSnappleId) };
+        if (fitsInDeck) updates.ownedCards = aUnion(newSnappleId);
+        await update(docRef(database, 'users', user.uid), updates).catch(() => {});
+
       } catch (e) {}
     }
   };
@@ -343,12 +354,32 @@ export default function VideoPreviewScreen({ route, navigation }) {
   // Ask the user up front whether to keep this snapple in their
   // collection, then hand off to doSubmit which enqueues + pops back.
   // Save is the default; the alert dismisses to Save on accidental tap.
+  // One question. Making a snapple should be easy and so should
+  // keeping it, so this asks the only thing that needs an answer -
+  // do you want it - and works out where it goes on its own.
+  //
+  // Deck if there is room, collection if there is not. The deck is
+  // what gets dealt and the collection is everything you own, so a
+  // full deck is not a reason to interrupt somebody: the card is kept
+  // either way and they can move it in DeckBuilder whenever they like.
+  // A second dialog at this moment would be asking them to do deck
+  // management in the middle of posting.
   const askSaveThenSubmit = (submitPrompt) => {
+    const deck = userCurrency.ownedCards || [];
+    const max = user?.upgrades?.maxDeckSize || DECK_SIZE_START;
+    const deckFull = deck.length >= max;
+
     showAlert(
       'Save this snapple?',
-      'Saved snapples stay in your collection. Discarded snapples stay live on the prompt for others to save or wishlist — they only disappear if nobody claims them by the time the prompt ends.',
+      (deckFull
+        ? `Your deck is full (${deck.length}/${max}), so this goes to your `
+          + 'collection - swap it into your deck any time from Deck Builder.'
+        : `It goes into your deck (${deck.length}/${max} used), ready to play.`)
+      + '\n\nSkip it and it still goes live on the prompt for '
+      + 'others to save - it only disappears if nobody claims it before '
+      + 'the prompt ends.',
       [
-        { text: 'Discard', onPress: () => doSubmit(submitPrompt, 'discard') },
+        { text: 'Just Post It', onPress: () => doSubmit(submitPrompt, 'discard') },
         { text: 'Save', onPress: () => doSubmit(submitPrompt, 'save') },
       ],
     );

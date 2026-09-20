@@ -19,6 +19,13 @@
 
 export const PRODUCT_TYPE = 'consumable';
 
+// Deck size a new account starts with. Mirrors DECK_SIZE_START in
+// functions/store.js, which is the copy that actually prices an
+// upgrade. Lives here because three screens need to know the default:
+// the store to price the next rung, DeckBuilder to cap the list, and
+// the create flow to ask whether there is room for one more.
+export const DECK_SIZE_START = 50;
+
 /**
  * Everything purchasable for real money.
  *
