@@ -272,17 +272,18 @@ export default function LoadingPhase({
         colors={t.colors.gameBackgroundGradient}
         style={StyleSheet.absoluteFill}
       />
-      {/* Same lockup as the play menu — the adaptive-icon asset is the
-          S on transparency, so it sits on the gradient without a plate,
-          and the name is typed rather than the splash's baked-in
-          wordmark, which is white and would vanish in light theme. */}
+      {/* The wordmark, same as the play menu. This was the S icon with
+          the name typed under it, because the old wordmark was white
+          and would have vanished on the light theme's background. The
+          new one is blue with a magenta rim and reads on either, so the
+          reason for the two-piece lockup is gone - and it was saying
+          the name twice, once as a mark and once as text. */}
       <View style={styles.brandBlock}>
         <Image
-          source={require('../../../../assets/images/icon-android.png')}
-          style={styles.brandMark}
+          source={require('../../../../assets/images/wordmark.png')}
+          style={styles.wordmark}
           resizeMode="contain"
         />
-        <Text style={styles.brandName}>Snappled</Text>
       </View>
 
       <View style={styles.pctBlock}>
@@ -366,25 +367,23 @@ const makeStyles = (t) => ({
     alignItems: 'center',
     marginBottom: 28,
   },
-  brandMark: {
-    width: 96,
-    height: 96,
-  },
-  brandName: {
-    color: theme.colors.vibeBlue,
-    fontSize: 24,
-    fontWeight: theme.fontWeights.bold,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: 2,
+  // 220x47 is the mark's own aspect (2109x453). Shorter than the 96pt
+  // icon plus its typed name, which suits this screen: the percentage
+  // is the thing being watched and the logo only sets the scene.
+  wordmark: {
+    width: 220,
+    height: 47,
   },
   pctBlock: {
     alignItems: 'center',
     marginBottom: 36,
     width: '100%',
   },
+  // White, not vibeBlue. The wordmark above is the colour on this
+  // screen now; when the mark, the percentage and the stage line were
+  // all the same blue the whole thing read as one blue smear.
   pctText: {
-    color: theme.colors.vibeBlue,
+    color: t.colors.textPrimary,
     fontSize: 64,
     fontWeight: '900',
     letterSpacing: 2,
@@ -440,7 +439,7 @@ const makeStyles = (t) => ({
   },
   pipTextFailed: { color: theme.colors.vibeRed },
   stageLine: {
-    color: theme.colors.vibeBlue,
+    color: t.colors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.5,

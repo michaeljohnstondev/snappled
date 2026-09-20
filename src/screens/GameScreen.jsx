@@ -425,6 +425,11 @@ export default function GameScreen({ navigation, route }) {
   // never burns a purchased one while the free one is still sitting
   // there.
   const [freeMulligan, setFreeMulligan] = useState(1);
+  // One swap per round, regardless of how many mulligans are owned.
+  // Without it a player with stock could sit there swapping until the
+  // deck ran out and effectively pick from their whole collection,
+  // which is not a hand of cards any more.
+  const [swappedThisRound, setSwappedThisRound] = useState(false);
   const [currentVoteIndex, setCurrentVoteIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [mySnapples, setMySnapples] = useState([]);
@@ -1474,6 +1479,7 @@ export default function GameScreen({ navigation, route }) {
     // purchased stock.
     if (freeMulligan > 0) {
       setFreeMulligan(0);
+      setSwappedThisRound(true);
       doSwap();
       showToast('reward', 'Mulligan!', 'Card swapped (free)');
       return;
@@ -1485,9 +1491,14 @@ export default function GameScreen({ navigation, route }) {
     // refuses at zero, and a refusal has to leave the hand alone.
     const spent = await storeService.spendMulligan();
     if (!spent.success) {
-      showAlert('No Mulligans', spent.error);
+      // Title was a hardcoded "No Mulligans", so a server error arrived
+      // as "No Mulligans / Sign in first." - two unrelated statements
+      // stapled together, and the wrong one was the loud one. Let the
+      // server's own message be the message.
+      showAlert("Couldn't Swap", spent.error);
       return;
     }
+    setSwappedThisRound(true);
     doSwap();
     showToast('reward', 'Mulligan!', 'Card swapped');
   };
@@ -1496,8 +1507,13 @@ export default function GameScreen({ navigation, route }) {
   // on a lifecycle event so rejoining the SAME game does not hand out a
   // second free swap.
   useEffect(() => { setFreeMulligan(1); }, [gameId]);
+  // Reset per ROUND, not per game - the free mulligan is the per-game
+  // allowance and this is the per-round one.
+  useEffect(() => { setSwappedThisRound(false); }, [gameId, game?.currentRound]);
 
-  const mulligansLeft = freeMulligan + (user?.inventory?.mulligans || 0);
+  const mulligansLeft = swappedThisRound
+    ? 0
+    : freeMulligan + (user?.inventory?.mulligans || 0);
 
   // Mulligan acts on the card you already picked.
   //
@@ -1508,6 +1524,11 @@ export default function GameScreen({ navigation, route }) {
   // back. Now the selection is the ordinary one and the confirm is the
   // only place anything is spent.
   const handleMulligan = () => {
+    if (swappedThisRound) {
+      showAlert('Already Swapped',
+        'One swap per round. Play this hand.');
+      return;
+    }
     if (mulligansLeft <= 0) {
       showAlert('No Swaps Left',
         'You have used your free swap this game. Buy mulligans in the store.');

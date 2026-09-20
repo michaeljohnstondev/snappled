@@ -228,25 +228,31 @@ export default function PickingPhase({
     <LinearGradient colors={t.colors.gameBackgroundGradient} style={styles.container}>
       <RoundHeaderBar phase="picking" timerSec={timer} onHelp={onHelp} onHelpEnd={onHelpEnd} />
 
-      {/* The prompt is pinned. It used to scroll away with the grid,
-          which meant you could be choosing a card with the thing
-          you're answering off-screen. Only the cards move now. */}
-      <RoundPromptBanner
-        prompt={currentPrompt}
-        round={game.currentRound}
-        roundLimit={roundLimitShown}
-        onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
-      />
-
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>YOUR HAND</Text>
-        <View style={{ flex: 1 }} />
-        <Text style={styles.sectionHint}>Tap to select</Text>
-      </View>
-
+      {/* The prompt scrolls with the grid rather than being pinned
+          above it. Pinning was the earlier call - you could otherwise
+          choose a card with the thing you are answering off-screen -
+          but it costs roughly a card and a half of vertical space on
+          every phone, permanently, to solve a problem one upward flick
+          fixes. It rides inside the rail's own ScrollView; a second
+          ScrollView around it would nest two vertical scrollers. */}
       <View style={styles.railWrap}>
         <HandCardRail
           grid
+          header={(
+            <>
+              <RoundPromptBanner
+                prompt={currentPrompt}
+                round={game.currentRound}
+                roundLimit={roundLimitShown}
+                onEdit={isAdmin ? () => onEditPromptOpen(currentPrompt) : undefined}
+              />
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>YOUR HAND</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={styles.sectionHint}>Tap to select</Text>
+              </View>
+            </>
+          )}
           cards={hand}
           renderCard={(item) => {
             const isSelected = selectedCard?.id === item.id;

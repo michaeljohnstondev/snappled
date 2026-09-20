@@ -60,9 +60,14 @@ export const CARD_HEIGHT = Math.round(CARD_WIDTH / CARD_ASPECT);
  * @param {Array} cards        the hand
  * @param {Function} renderCard (card, index) => node, rendered at CARD_WIDTH
  * @param {Function} keyExtractor optional; defaults to card.id
+ * @param {node} header  grid only - rendered above the cards INSIDE the
+ *   scroll view, so a caller can let a prompt banner scroll away with
+ *   the grid. Putting it above the rail instead would pin it, and
+ *   wrapping the rail in another ScrollView would nest two vertical
+ *   scrollers, which fight each other.
  */
 export default function HandCardRail({
-  cards = [], renderCard, keyExtractor, grid = false,
+  cards = [], renderCard, keyExtractor, grid = false, header = null,
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -77,6 +82,7 @@ export default function HandCardRail({
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
+        {header}
         {cards.map((item, index) => (
           <View
             key={(keyExtractor && keyExtractor(item, index))

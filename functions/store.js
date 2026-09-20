@@ -13,7 +13,13 @@
 // thing costs and what it gives you is answered in one transaction the
 // buyer cannot reach.
 
-const functions = require('firebase-functions');
+// v1 explicitly. The bare require is the v2 API in firebase-functions
+// v5+, and a v2 onCall handler is passed ONE argument - so the
+// (data, context) signature below silently bound context to
+// something that is not the auth context, context.auth came back
+// undefined, and every call threw 'unauthenticated'. Every other
+// function in this codebase is 1st gen; see the top of index.js.
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
 const db = admin.firestore();
