@@ -82,7 +82,12 @@ export default function HandCardRail({
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
-        {header}
+        {/* Full width on purpose. The grid container is a wrapping
+            ROW, so a header dropped in bare becomes a flex item beside
+            the cards and gets squeezed into a tall thin column - which
+            is exactly what happened. width 100% makes flexWrap give it
+            its own line. */}
+        {header ? <View style={styles.gridHeader}>{header}</View> : null}
         {cards.map((item, index) => (
           <View
             key={(keyExtractor && keyExtractor(item, index))
@@ -132,6 +137,9 @@ const makeStyles = (t) => ({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingBottom: 12,
+  },
+  gridHeader: {
+    width: '100%',
   },
   // Same numbers as votingCell / auraCellLarge.
   gridCell: {
