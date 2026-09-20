@@ -107,6 +107,57 @@ const purchaseService = {
   },
 
   /**
+   * diagnose — ask the store about every product and report what it
+   * says. Admin tooling, not a user path.
+   *
+   * getProducts returns the ones it found and silently omits the rest,
+   * so asking for one id and getting nothing tells you only that
+   * something is wrong. Asking for all eleven separates the cases:
+   *
+   *   none found      the app is not talking to billing at all - not
+   *                   installed through a store track, no licence
+   *                   tester, or the agreement has not propagated
+   *   some found      the missing ones are misconfigured individually
+   *   all found       the problem is downstream of the lookup
+   *
+   * Also reports whether the SDK reached RevenueCat's backend, which
+   * fails for a different set of reasons than the store does.
+   */
+  async diagnose(productIds) {
+    const lines = [];
+    lines.push(`platform: ${Platform.OS}`);
+    lines.push(`configured: ${configuredFor ? 'yes' : 'NO'}`);
+    lines.push(`key: ${(API_KEYS[Platform.OS] || '(none)').slice(0, 9)}…`);
+
+    if (!configuredFor) {
+      lines.push('');
+      lines.push('SDK never configured - sign out and in again.');
+      return lines.join('\n');
+    }
+
+    try {
+      const info = await Purchases.getCustomerInfo();
+      lines.push(`backend: ok (app_user_id ${info.originalAppUserId})`);
+    } catch (e) {
+      lines.push(`backend: FAILED - ${e?.message || e}`);
+    }
+
+    try {
+      const found = await Purchases.getProducts(productIds);
+      const ids = new Set(found.map(p => p.identifier));
+      lines.push('');
+      lines.push(`store returned ${found.length} of ${productIds.length}`);
+      productIds.forEach((id) => {
+        const p = found.find(x => x.identifier === id);
+        lines.push(`${ids.has(id) ? '  OK  ' : '  --  '}${id}${p ? `  ${p.priceString}` : ''}`);
+      });
+    } catch (e) {
+      lines.push(`getProducts THREW: ${e?.message || e}`);
+    }
+    return lines.join('\n');
+  },
+
+  /**
    * purchase — charge for one product.
    *
    * Resolves once the STORE is done, which is not the same as the coins

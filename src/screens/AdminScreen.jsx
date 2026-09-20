@@ -11,6 +11,8 @@ import { useModal } from '../store/ModalContext';
 import VibeButton from '../components/ui/VibeButton';
 import PromptCurator from '../components/admin/PromptCurator';
 import giftService from '../services/giftService';
+import purchaseService from '../services/purchaseService';
+import { PRODUCTS } from '../lib/products';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -682,6 +684,15 @@ This cannot be undone.`,
         </ScrollView>
       ) : activeTab === 'utils' ? (
         <ScrollView style={styles.utilsSection} contentContainerStyle={{ paddingBottom: 40 }}>
+          <UtilButton
+            label="Check Store Products"
+            desc="Ask Apple/Google about all 11 IAPs and report which come back"
+            color={theme.colors.vibePink}
+            onPress={async () => {
+              const report = await purchaseService.diagnose(Object.keys(PRODUCTS));
+              showAlert('Store Diagnostic', report);
+            }}
+          />
           <UtilButton
             label="Force Rotation"
             desc="Pop oldest live prompt, add new one from on deck, replenish on deck"
