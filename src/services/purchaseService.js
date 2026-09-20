@@ -18,7 +18,21 @@
 // know one.
 
 import { Platform } from 'react-native';
-import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL, PURCHASE_TYPE } from 'react-native-purchases';
+
+// Everything Snappled sells is a one-time purchase. getProducts takes
+// an optional type and DEFAULTS TO SUBSCRIPTIONS on Android, so asking
+// without it made RevenueCat query Play for subscriptions by these
+// ids - Play has none, correctly returned PRODUCT_NOT_FOUND for all
+// eleven, and the store looked broken in a way that pointed at
+// everything except the query:
+//
+//   UnfetchedProduct{productId='snappled_coins_100',
+//                    productType='subs', statusCode=3}
+//
+// Two days went into Play Console - licence testing, tester opt-in,
+// propagation windows, signing keys, the store listing - before anyone
+// read the log line that named the type.
 
 // Public SDK keys, in the source on purpose.
 //
@@ -96,7 +110,7 @@ const purchaseService = {
   async getPrices(productIds) {
     if (!this.isAvailable()) return {};
     try {
-      const products = await Purchases.getProducts(productIds);
+      const products = await Purchases.getProducts(productIds, PURCHASE_TYPE.INAPP);
       const out = {};
       products.forEach((p) => { out[p.identifier] = p.priceString; });
       return out;
@@ -143,7 +157,7 @@ const purchaseService = {
     }
 
     try {
-      const found = await Purchases.getProducts(productIds);
+      const found = await Purchases.getProducts(productIds, PURCHASE_TYPE.INAPP);
       const ids = new Set(found.map(p => p.identifier));
       lines.push('');
       lines.push(`store returned ${found.length} of ${productIds.length}`);
@@ -171,7 +185,7 @@ const purchaseService = {
       return { success: false, error: 'Purchases are not available yet.' };
     }
     try {
-      const products = await Purchases.getProducts([productId]);
+      const products = await Purchases.getProducts([productId], PURCHASE_TYPE.INAPP);
       if (!products.length) {
         // An empty array, not an error: the store was asked and had
         // nothing to say about this id. On iOS that is usually an IAP
