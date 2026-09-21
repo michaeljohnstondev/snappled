@@ -26,6 +26,7 @@ import {
   gamePromptService, costForSeason, GAME_PROMPT_MAX_LEN,
 } from '../../services/gamePromptService';
 import { useModal } from '../../store/ModalContext';
+import { isAdminUid } from '../../lib/admin';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 
@@ -36,10 +37,14 @@ import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
 export default function GamePromptsPanel({ user, tickets = 0 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { showConfirm, showError, showToast } = useModal();
+  const { showConfirm, showError, showToast, showAlert } = useModal();
   // What is wrong with the draft, shown under the field when they try
   // to submit. Empty string means nothing is wrong yet.
   const [problem, setProblem] = useState('');
+  // Non-null when the composer is editing an existing prompt rather
+  // than writing a new one. The sheet is the same either way; only what
+  // submit does with it changes.
+  const [editing, setEditing] = useState(null);
 
   const [season, setSeason] = useState(0);
   const [composing, setComposing] = useState(false);
@@ -60,7 +65,7 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   // place in the vote rather than a guaranteed slot - the part people
   // most need to know before they pay, not after. Free in the beta, so
   // there is nothing to warn about there.
-  const submit = () => {
+  const submit = async () => {
     const text = draft.trim();
     // A dimmed button tells you it will not work and nothing about
     // why. This one always presses and says what is missing.
@@ -73,6 +78,21 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
       return;
     }
     setProblem('');
+
+    // Editing an existing prompt costs nothing and skips the confirm:
+    // it is an admin correcting wording, not a player spending tickets
+    // on a submission that goes up for a vote.
+    if (editing) {
+      setSubmitting(true);
+      const res = await gamePromptService.adminUpdateText(editing.id, text);
+      setSubmitting(false);
+      if (!res.success) { showError('Could Not Save', res.error); return; }
+      setDraft('');
+      setEditing(null);
+      setComposing(false);
+      return;
+    }
+
     if (tickets < cost) {
       showError('Not Enough Tickets',
         `Creating a game prompt costs ${cost} tickets. You have ${tickets}.`);
@@ -96,6 +116,56 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
         setDraft('');
         setComposing(false);
       },
+    );
+  };
+
+  /**
+   * Admin: edit, retire or delete the prompt on top of the stack.
+   *
+   * The rules let isAdmin() write gamePrompts directly, so these are
+   * plain client writes rather than callables - the enforcement is in
+   * Firestore, not in whether this button is drawn. create() is the
+   * exception because it charges, and a price cannot come from the
+   * buyer.
+   *
+   * Retire is offered above delete because it is almost always the
+   * right one: list() reads only live and candidate, so retiring takes
+   * a prompt out of circulation while keeping the votes cast on it.
+   */
+  const manage = (prompt) => {
+    showAlert(
+      'Manage Prompt',
+      `"${prompt.text}"`,
+      [
+        {
+          text: 'Edit Text',
+          onPress: () => {
+            setEditing(prompt);
+            setDraft(prompt.text);
+            setComposing(true);
+          },
+        },
+        {
+          text: 'Retire',
+          onPress: async () => {
+            const res = await gamePromptService.adminSetStatus(prompt.id, 'retired');
+            if (!res.success) showError('Could Not Retire', res.error);
+          },
+        },
+        {
+          text: 'Delete',
+          onPress: () => showConfirm(
+            'Delete this prompt?',
+            'Gone for good. Votes cast on it are orphaned rather than '
+            + 'undone - Retire keeps them.',
+            async () => {
+              const res = await gamePromptService.adminDelete(prompt.id);
+              if (!res.success) showError('Could Not Delete', res.error);
+            },
+          ),
+        },
+        { text: 'Cancel' },
+      ],
     );
   };
 
@@ -145,12 +215,13 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
           title="RANK GAME PROMPTS"
           subtitle={null}
           onReport={report}
+          onAdmin={isAdminUid(user.uid) ? manage : undefined}
         />
       ) : null}
 
       <Modal visible={composing} transparent animationType="fade"
-        onRequestClose={() => setComposing(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setComposing(false)}>
+        onRequestClose={() => { setComposing(false); setEditing(null); }}>
+        <Pressable style={styles.backdrop} onPress={() => { setComposing(false); setEditing(null); }}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <Text style={styles.sheetTitle}>NEW GAME PROMPT</Text>
             <TextInput
@@ -183,7 +254,7 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
               {submitting
                 ? <ActivityIndicator color="#000" />
                 : <Text style={styles.submitText}>
-                  {cost > 0 ? `SUBMIT FOR ${cost}` : 'SUBMIT'}
+                  {editing ? 'SAVE' : (cost > 0 ? `SUBMIT FOR ${cost}` : 'SUBMIT')}
                 </Text>}
             </Pressable>
           </Pressable>

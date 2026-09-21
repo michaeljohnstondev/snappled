@@ -11,10 +11,12 @@
 
 import { db, functions } from './firebase';
 import {
-  collection, doc, getDoc, getDocs, setDoc, query, where, limit,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
+  query, where, limit,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { promptVoteService } from './promptVoteService';
+import { normalizePromptText } from '../utils/promptKey';
 
 // Mirrors functions/gamePrompts.js. Display only - the server decides
 // what is actually charged, so a stale number here costs a wrong label,
@@ -166,6 +168,72 @@ class GamePromptService {
     } catch (error) {
       console.error('[GamePromptService] getUnsorted failed:', error);
       return { success: false, prompts: [] };
+    }
+  }
+
+  /**
+   * Admin: rewrite a prompt's text.
+   *
+   * Direct client write, unlike create - the rules allow isAdmin() to
+   * update gamePrompts, so this is enforced by Firestore rather than by
+   * the button being hidden. create goes through a callable because it
+   * CHARGES, and a price cannot be set by the buyer.
+   *
+   * textKey moves with the text: it is what de-dupes submissions, so
+   * leaving it stale would let somebody re-submit the old wording as
+   * new.
+   */
+  async adminUpdateText(promptId, text) {
+    try {
+      const clean = String(text || '').trim();
+      if (!clean) return { success: false, error: 'Empty prompt' };
+      await updateDoc(doc(db, 'gamePrompts', promptId), {
+        text: clean,
+        textKey: normalizePromptText(clean),
+        editedAt: new Date().toISOString(),
+      });
+      invalidate();
+      return { success: true };
+    } catch (error) {
+      console.error('[GamePromptService] adminUpdateText failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Admin: move a prompt between live, candidate and retired.
+   *
+   * Retiring is the soft delete - list() only reads live and candidate,
+   * so a retired prompt leaves circulation without taking its vote
+   * history with it. Reach for remove() only when the text itself
+   * should not exist.
+   */
+  async adminSetStatus(promptId, status) {
+    try {
+      if (!['live', 'candidate', 'retired'].includes(status)) {
+        return { success: false, error: 'Unknown status' };
+      }
+      await updateDoc(doc(db, 'gamePrompts', promptId), {
+        status,
+        statusChangedAt: new Date().toISOString(),
+      });
+      invalidate();
+      return { success: true };
+    } catch (error) {
+      console.error('[GamePromptService] adminSetStatus failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /** Admin: delete outright. Votes cast on it are orphaned, not undone. */
+  async adminDelete(promptId) {
+    try {
+      await deleteDoc(doc(db, 'gamePrompts', promptId));
+      invalidate();
+      return { success: true };
+    } catch (error) {
+      console.error('[GamePromptService] adminDelete failed:', error);
+      return { success: false, error: error.message };
     }
   }
 

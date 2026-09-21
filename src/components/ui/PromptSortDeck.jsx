@@ -43,6 +43,10 @@ export default function PromptSortDeck({
   // next season's candidates; the default is the snapple prompt pool.
   target = 'promptPool',
   onReport,
+  // Admin only, and only where a caller passes it - the game prompts
+  // panel does, the snapple pool deck does not. Called with the card on
+  // top, same as onReport.
+  onAdmin,
   title = 'HELP SORT THESE',
   subtitle = 'Not live yet — decide what makes the cut',
 }) {
@@ -160,12 +164,22 @@ export default function PromptSortDeck({
           different kind of act from rating - rare, and not a third
           opinion - so it should not sit in the row you are tapping
           quickly. */}
-      {onReport ? (
-        <Pressable style={styles.report} onPress={() => onReport(current)} hitSlop={8}>
-          <Ionicons name="flag-outline" size={13} color={t.colors.textSecondary} />
-          <Text style={styles.reportText}>Report</Text>
-        </Pressable>
-      ) : null}
+      <View style={styles.footerRow}>
+        {onReport ? (
+          <Pressable style={styles.report} onPress={() => onReport(current)} hitSlop={8}>
+            <Ionicons name="flag-outline" size={13} color={t.colors.textSecondary} />
+            <Text style={styles.reportText}>Report</Text>
+          </Pressable>
+        ) : null}
+        {onAdmin ? (
+          <Pressable style={styles.report} onPress={() => onAdmin(current)} hitSlop={8}>
+            <Ionicons name="construct-outline" size={13} color={theme.colors.vibeYellow} />
+            <Text style={[styles.reportText, { color: theme.colors.vibeYellow }]}>
+              Manage
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -221,6 +235,9 @@ const makeStyles = (t) => ({
   actionWeak: { borderColor: theme.colors.vibeRed },
   actionFun: { borderColor: theme.colors.vibeGreen },
 
+  footerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
   report: {
     flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 16,
     paddingVertical: 4, paddingHorizontal: 10,
