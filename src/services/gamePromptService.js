@@ -142,9 +142,14 @@ class GamePromptService {
    * Candidates first: they are the ones competing for next season and
    * the ones with no votes yet, so they are where a vote does the most.
    */
-  async getUnsorted(userId) {
+  async getUnsorted(userId, { fresh = false } = {}) {
     try {
-      const { prompts } = await this.list({ filter: 'new', userId });
+      // `fresh` skips the five-minute list cache. Tapping "Sort more"
+      // is somebody asking whether anything NEW has arrived, and
+      // answering that from a cache up to five minutes old means the
+      // prompt submitted a minute ago is invisible and the button looks
+      // broken.
+      const { prompts } = await this.list({ filter: 'new', userId, fresh });
       const mine = await promptVoteService.getMyVotes(
         userId, 'gamePrompts', prompts.map(p => p.id),
       );

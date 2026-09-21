@@ -56,16 +56,23 @@ export default function PromptSortDeck({
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [sorted, setSorted] = useState(0);
+  // True once a deliberate refresh has come back with nothing. Distinct
+  // from an empty first load: it means we looked again, just now, and
+  // there really is nothing new.
+  const [exhausted, setExhausted] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     if (!userId) return;
     setLoading(true);
     const { prompts } = target === 'gamePrompts'
-      ? await gamePromptService.getUnsorted(userId)
+      ? await gamePromptService.getUnsorted(userId, { fresh })
       : await promptVoteService.getUnsortedPool(userId, POOL_DECK_SIZE, liveTexts || []);
     setDeck(prompts);
     setIndex(0);
     setLoading(false);
+    // Only a refresh can conclude "nothing new" - the first load
+    // returning empty just means you are caught up already.
+    if (fresh) setExhausted(prompts.length === 0);
     // Deliberately not keyed on liveTexts: the rotation changing under
     // someone mid-swipe should not reshuffle the stack in their hands.
   }, [userId, target]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,9 +117,18 @@ export default function PromptSortDeck({
           <Text style={styles.doneSub}>
             You sorted {sorted} {sorted === 1 ? 'prompt' : 'prompts'}
           </Text>
-          <Pressable style={styles.reload} onPress={load}>
-            <Text style={styles.reloadText}>Sort more</Text>
-          </Pressable>
+          {/* Says so when there is nothing left, rather than offering a
+              button that looks broken. Tapping Sort more with an empty
+              well used to do exactly nothing on screen. */}
+          {exhausted ? (
+            <Text style={styles.doneSub}>
+              That's everything for now — check back when new ones arrive.
+            </Text>
+          ) : (
+            <Pressable style={styles.reload} onPress={() => load(true)}>
+              <Text style={styles.reloadText}>Sort more</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
