@@ -351,13 +351,24 @@ export const commentService = {
         );
       }
 
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const comments = [];
-        querySnapshot.forEach((doc) => {
-          comments.push({ id: doc.id, ...doc.data() });
-        });
-        callback(comments);
-      });
+      // The error handler is not optional. This query needs a composite
+      // index on snappleId + parentCommentId + isDeleted + createdAt,
+      // and there was none - so onSnapshot failed, threw into nothing,
+      // and the thread simply never updated. A silent listener is
+      // indistinguishable from a quiet conversation.
+      const unsubscribe = onSnapshot(
+        q,
+        (querySnapshot) => {
+          const comments = [];
+          querySnapshot.forEach((doc) => {
+            comments.push({ id: doc.id, ...doc.data() });
+          });
+          callback(comments);
+        },
+        (error) => {
+          console.error('[CommentService] live comments failed:', error.message);
+        },
+      );
 
       return unsubscribe;
     } catch (error) {

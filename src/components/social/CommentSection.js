@@ -8,9 +8,11 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import VibeButton from '../ui/VibeButton';
 import theme from '../../theme/themes';
@@ -279,25 +281,6 @@ export default function CommentSection({
             <Text style={styles.actionText}>Reply</Text>
           </TouchableOpacity>
 
-          {/* Mute lives on top-level comments only: a thread IS its root
-              comment, so offering it on a reply would be asking which
-              thread you meant. Shown on every root rather than only the
-              ones you are in - the one you most want to mute is often
-              the one you are about to be dragged into. */}
-          {!comment.parentCommentId && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => toggleThreadMute(comment.id)}
-            >
-              <Text style={styles.actionIcon}>
-                {mutedThreads.has(comment.id) ? '🔕' : '🔔'}
-              </Text>
-              <Text style={styles.actionText}>
-                {mutedThreads.has(comment.id) ? 'Muted' : 'Mute'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
           {comment.replies > 0 && (
             <TouchableOpacity 
               style={styles.actionButton}
@@ -385,6 +368,24 @@ export default function CommentSection({
               <Text style={styles.title}>Comments</Text>
               <Text style={styles.subtitle}>{snappleTitle}</Text>
             </View>
+            {/* One mute for the whole conversation, in the header.
+                It was a bell on every top-level comment, which asked
+                you to mute threads one at a time on a screen where the
+                thing you want to stop is the snapple pinging you at
+                all. Muting is keyed by snappleId now, not by root
+                comment. */}
+            <TouchableOpacity
+              onPress={() => toggleThreadMute(snappleId)}
+              style={styles.closeButton}
+            >
+              <Ionicons
+                name={mutedThreads.has(snappleId)
+                  ? 'notifications-off' : 'notifications-outline'}
+                size={20}
+                color={mutedThreads.has(snappleId)
+                  ? theme.colors.vibeYellow : t.colors.textSecondary}
+              />
+            </TouchableOpacity>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
@@ -439,9 +440,12 @@ export default function CommentSection({
               onPress={handleAddComment}
               disabled={!newComment.trim() || isLoading}
             >
-              <Text style={styles.sendButtonText}>
-                {isLoading ? '⏳' : '🚀'}
-              </Text>
+              {/* A paper plane, not a rocket. 🚀 is "launch" or
+                  "this is going great" - it does not mean send to
+                  anyone who has not been told it does. */}
+              {isLoading
+                ? <ActivityIndicator size="small" color="white" />
+                : <Ionicons name="send" size={18} color="white" />}
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -500,10 +504,13 @@ const makeStyles = (t) => ({
     marginBottom: 8,
     gap: 8,
   },
+  // theme.colors.primary does not exist - there is no `primary` in the
+  // palette at all - so this resolved to undefined and React Native
+  // fell back to black text on a near-black sheet.
   username: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.primary,
+    color: theme.colors.vibeBlue,
   },
   timestamp: {
     fontSize: 12,

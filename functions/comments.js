@@ -7,7 +7,7 @@
 // room since they were written.
 //
 // This is the trigger that was missing. It reuses deliverNotification
-// from index.js, which is the one place that checks blocks, mutes and
+// from notify.js, which is the one place that checks blocks, mutes and
 // per-type toggles and then writes the in-app doc and sends the FCM -
 // so comments get the same treatment as follows and game invites
 // rather than a second, parallel path that drifts.
@@ -33,6 +33,7 @@
 // has no functions.firestore.document. Same note as the top of index.js.
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const { deliverNotification } = require('./notify');
 
 const db = admin.firestore();
 const FV = admin.firestore.FieldValue;
@@ -91,7 +92,12 @@ exports.onCommentCreated = functions.firestore
       try {
         const u = await db.collection('users').doc(uid).get();
         if (!u.exists) continue;
-        if ((u.data().mutedThreads || []).includes(rootId)) continue;
+        // Keyed by snappleId: the mute control is one switch in the
+        // thread header covering that snapple's whole conversation,
+        // not a per-root-comment toggle. rootId is still accepted so
+        // anything muted under the old per-thread control stays muted.
+        const muted = u.data().mutedThreads || [];
+        if (muted.includes(snappleId) || muted.includes(rootId)) continue;
         kept.push(uid);
       } catch (e) {
         console.warn('[comments] mute check failed', uid, e.message);
@@ -101,10 +107,9 @@ exports.onCommentCreated = functions.firestore
     const who = comment.username || 'Someone';
     const body = preview(comment.text);
 
-    const deliver = require('./index').deliverNotification;
     for (const uid of kept) {
       try {
-        await deliver({
+        await deliverNotification({
           targetUserId: uid,
           actorUserId: author,
           settingsKey: 'comments',
