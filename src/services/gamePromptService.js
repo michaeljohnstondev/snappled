@@ -177,6 +177,35 @@ class GamePromptService {
   }
 
   /**
+   * Every prompt this user has submitted, whatever its standing.
+   *
+   * Deliberately NOT list({ filter: 'mine' }): that reads only live and
+   * candidate, so a prompt that had been retired or banned would quietly
+   * vanish from the submissions of the person who paid a hundred tickets
+   * for it. Your own prompts are the one place the whole truth belongs,
+   * including the bad news.
+   *
+   * Single-field equality, so no composite index is needed.
+   */
+  async getMine(userId) {
+    if (!userId) return { success: true, prompts: [] };
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'gamePrompts'),
+        where('createdBy', '==', userId),
+        limit(100),
+      ));
+      const rows = [];
+      snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
+      return { success: true, prompts: rows };
+    } catch (error) {
+      console.error('[GamePromptService] getMine failed:', error);
+      return { success: false, prompts: [] };
+    }
+  }
+
+  /**
    * Admin: rewrite a prompt's text.
    *
    * Direct client write, unlike create - the rules allow isAdmin() to

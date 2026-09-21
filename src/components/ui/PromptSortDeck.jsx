@@ -48,7 +48,12 @@ export default function PromptSortDeck({
   // top, same as onReport.
   onAdmin,
   title = 'HELP SORT THESE',
-  subtitle = 'Not live yet — decide what makes the cut',
+  subtitle = 'Not live yet - decide what makes the cut',
+  // Shown when there is nothing in the stack at all. Worth overriding:
+  // "you have ranked everything" and "the pool is empty" are different
+  // facts, and only the caller knows which deck this is.
+  emptyTitle = 'All caught up',
+  emptySub = 'You have ranked everything there is right now.',
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -101,32 +106,42 @@ export default function PromptSortDeck({
     );
   }
 
-  // Nothing waiting: either the pool is genuinely sorted or this user
-  // has been through everything currently unused. Both are a good
-  // outcome and neither deserves an error.
-  if (!deck.length) return null;
-
   const current = deck[index];
 
+  // Two ways to land here, and they are not the same message. Either the
+  // stack ran out under you after some swipes, or there was nothing in
+  // it when the screen opened. The second case used to `return null`,
+  // which drew literally nothing - so somebody who had ranked every
+  // prompt got a blank gap where the deck should be, indistinguishable
+  // from a screen that had failed to load. Both cases say something now.
   if (!current) {
+    const swiped = sorted > 0;
     return (
       <View style={styles.wrap}>
         <View style={styles.donePane}>
-          <Ionicons name="checkmark-circle" size={48} color={theme.colors.vibeGreen} />
-          <Text style={styles.doneTitle}>Nice work</Text>
+          <Ionicons
+            name={swiped ? 'checkmark-circle' : 'albums-outline'}
+            size={48}
+            color={swiped ? theme.colors.vibeGreen : t.colors.textSecondary}
+          />
+          <Text style={styles.doneTitle}>{swiped ? 'Nice work' : emptyTitle}</Text>
           <Text style={styles.doneSub}>
-            You sorted {sorted} {sorted === 1 ? 'prompt' : 'prompts'}
+            {swiped
+              ? `You sorted ${sorted} ${sorted === 1 ? 'prompt' : 'prompts'}`
+              : emptySub}
           </Text>
           {/* Says so when there is nothing left, rather than offering a
-              button that looks broken. Tapping Sort more with an empty
+              button that looks broken. Tapping "Sort more" on an empty
               well used to do exactly nothing on screen. */}
           {exhausted ? (
             <Text style={styles.doneSub}>
-              That's everything for now — check back when new ones arrive.
+              {"That's everything for now - check back when new ones arrive."}
             </Text>
           ) : (
             <Pressable style={styles.reload} onPress={() => load(true)}>
-              <Text style={styles.reloadText}>Sort more</Text>
+              <Text style={styles.reloadText}>
+                {swiped ? 'Sort more' : 'Check for new'}
+              </Text>
             </Pressable>
           )}
         </View>

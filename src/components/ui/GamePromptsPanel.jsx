@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import PromptSortDeck from './PromptSortDeck';
 import CreatePromptCard from './CreatePromptCard';
+import MySubmissions from './MySubmissions';
 import CurrencyIcon from './CurrencyIcon';
 import {
   gamePromptService, costForSeason, GAME_PROMPT_MAX_LEN,
@@ -50,6 +51,10 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Bumped after anything that changes what you have submitted, so the
+  // receipt below the deck re-reads instead of going stale until the
+  // tab is left and come back to.
+  const [submissionsKey, setSubmissionsKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +92,7 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
       const res = await gamePromptService.adminUpdateText(editing.id, text);
       setSubmitting(false);
       if (!res.success) { showError('Could Not Save', res.error); return; }
+      setSubmissionsKey(k => k + 1);
       setDraft('');
       setEditing(null);
       setComposing(false);
@@ -113,6 +119,7 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
         // the third telling of the same thing. It was also type
         // 'reward', reading "REWARD!" over a gift icon, for an action
         // that SPENDS a hundred tickets.
+        setSubmissionsKey(k => k + 1);
         setDraft('');
         setComposing(false);
       },
@@ -216,8 +223,15 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
           subtitle={null}
           onReport={report}
           onAdmin={isAdminUid(user.uid) ? manage : undefined}
+          emptyTitle="No new prompts to rank"
+          emptySub={'You have ranked every game prompt in the season. New '
+            + 'ones land here as players submit them.'}
         />
       ) : null}
+
+      {/* Under the deck, because the deck is the job and this is the
+          receipt. Draws nothing until you have actually submitted one. */}
+      <MySubmissions userId={user?.uid} refreshKey={submissionsKey} />
 
       <Modal visible={composing} transparent animationType="fade"
         onRequestClose={() => { setComposing(false); setEditing(null); }}>
@@ -246,16 +260,25 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
                 <Text style={styles.balance}>{`You have ${tickets}`}</Text>
               </View>
             )}
+            {/* Keeps its label and its full colour while it works. It
+                used to drop to 40% opacity and swap the text for a
+                spinner, which reads as "this button is disabled and
+                something went wrong" rather than "this is in progress" -
+                the two states a button can be in that look most alike
+                and mean the least alike. */}
             <Pressable
-              style={[styles.submit, submitting && styles.submitOff]}
+              style={({ pressed }) => [styles.submit, pressed && styles.submitPressed]}
               onPress={submit}
               disabled={submitting}
             >
-              {submitting
-                ? <ActivityIndicator color="#000" />
-                : <Text style={styles.submitText}>
-                  {editing ? 'SAVE' : (cost > 0 ? `SUBMIT FOR ${cost}` : 'SUBMIT')}
-                </Text>}
+              <View style={styles.submitRow}>
+                {submitting ? <ActivityIndicator color="#fff" size="small" /> : null}
+                <Text style={styles.submitText}>
+                  {submitting
+                    ? (editing ? 'SAVING' : 'SUBMITTING')
+                    : (editing ? 'SAVE' : (cost > 0 ? `SUBMIT FOR ${cost}` : 'SUBMIT'))}
+                </Text>
+              </View>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -296,16 +319,24 @@ const makeStyles = (t) => ({
   counter: { color: t.colors.textSecondary, fontSize: 11, textAlign: 'right', marginTop: 4 },
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
   balance: { color: t.colors.textSecondary, fontSize: 13 },
+  // The house green button: deep fill, neon border, white label. The
+  // fill used to be vibeGreen (#00FF41) itself, which is bright enough
+  // that only black text is legible on it - so white was not a colour
+  // swap, it needed the darker fill VibeButton's green variant already
+  // uses everywhere else in the app.
   submit: {
-    marginTop: 16, paddingVertical: 13, borderRadius: 12,
-    backgroundColor: theme.colors.vibeGreen, alignItems: 'center',
+    marginTop: 16, minHeight: 48, borderRadius: 12,
+    backgroundColor: '#228B22',
+    borderWidth: 2, borderColor: theme.colors.vibeGreen,
+    alignItems: 'center', justifyContent: 'center',
   },
+  submitPressed: { opacity: 0.8 },
+  submitRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   problem: {
     color: theme.colors.vibeRed,
     fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
   },
-  submitOff: { opacity: 0.4 },
-  submitText: { color: '#000', fontWeight: '900', letterSpacing: 1.5 },
+  submitText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 1.5 },
 });
