@@ -152,6 +152,7 @@ export const userService = {
               newFollower: true,
               followBack: true,
               followedUserSnapple: true,
+              comments: true,
               gameInvite: true,
               newPrompts: true,
             },

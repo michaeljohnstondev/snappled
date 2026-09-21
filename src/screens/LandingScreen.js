@@ -168,7 +168,7 @@ export default function LandingScreen({ navigation }) {
               different treatments, stacked, reading as two logos rather
               than one. The wordmark already contains the S and the
               bolt, so the icon was saying it twice. */}
-          <View style={styles.header}>
+          <View style={showEmail ? styles.header : styles.headerHalf}>
             <Image
               source={require('../../assets/images/wordmark.png')}
               style={styles.wordmark}
@@ -181,45 +181,38 @@ export default function LandingScreen({ navigation }) {
               screen - people were typing out an account because they
               never saw the one-tap option below it. The easiest way in
               should be the one you see without scrolling. */}
-          <View style={styles.buttonContainer}>
+          <View style={[styles.buttonContainer, !showEmail && styles.buttonHalf]}>
             {/* Hidden while the email form is open. Two ways in on one
                 screen is a choice to make; once the choice is made,
                 the other one is just noise above the keyboard. */}
+            {/* All three are VibeButtons now, which is what the app's
+                buttons look like. They were three bespoke Pressables -
+                a black Apple slab, a white Google slab with a coloured
+                G on a disc, and a purple toggle - and the toggle
+                variant in particular is the flat recessive style, not
+                the layered neon one every primary action uses.
+
+                Dropping the G logo is what made this possible: the
+                default VibeButton renders its label inside a Text, so a
+                View child could not go in it. Text-only buttons can
+                just BE VibeButtons instead of imitating them. */}
             {!showEmail && Platform.OS === 'ios' && (
-              <Pressable
+              <VibeButton
+                label={appleLoading ? 'Signing in...' : ' Sign in with Apple'}
                 onPress={() => handleSocialSignIn('apple')}
                 disabled={isLoading || googleLoading || appleLoading}
-                style={({ pressed }) => [
-                  styles.socialButton,
-                  styles.appleButton,
-                  { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
-                ]}
-              >
-                <Text style={styles.appleLogo}></Text>
-                <Text style={styles.socialButtonText}>
-                  {appleLoading ? 'Signing in...' : 'Sign in with Apple'}
-                </Text>
-              </Pressable>
-            )}
-            {!showEmail && (
-            <Pressable
-              onPress={() => handleSocialSignIn('google')}
-              disabled={isLoading || googleLoading || appleLoading}
-              style={({ pressed }) => [
-                styles.socialButton,
-                styles.googleButton,
-                { opacity: pressed ? 0.85 : (isLoading || googleLoading || appleLoading) ? 0.5 : 1 },
-              ]}
-            >
-              <View style={styles.googleIconContainer}>
-                <Text style={styles.googleG}>G</Text>
-              </View>
-              <Text style={styles.socialButtonText}>
-                {googleLoading ? 'Signing in...' : 'Sign in with Google'}
-              </Text>
-            </Pressable>
+                style={styles.signInButton}
+              />
             )}
 
+            {!showEmail && (
+              <VibeButton
+                label={googleLoading ? 'Signing in...' : 'Sign in with Google'}
+                onPress={() => handleSocialSignIn('google')}
+                disabled={isLoading || googleLoading || appleLoading}
+                style={styles.signInButton}
+              />
+            )}
 
             {/* Email is the fallback, folded away. It is still one tap
                 to reach, but it no longer costs everyone else a
@@ -228,9 +221,7 @@ export default function LandingScreen({ navigation }) {
               <VibeButton
                 label="Sign in with email"
                 onPress={() => setShowEmail(true)}
-                variant="toggle"
-                color="purple"
-                style={styles.emailButton}
+                style={styles.signInButton}
               />
             )}
 
@@ -350,16 +341,22 @@ const makeStyles = (t) => ({
     textAlign: 'center',
     paddingVertical: 14,
   },
+  // Two halves. The mark sits centred in the top one and the buttons
+  // start at the midpoint and run down - so there is a line across the
+  // screen where branding stops and doing things starts, instead of one
+  // centred clump that drifted with however many buttons were showing.
+  //
+  // Only when the email form is closed: once it opens the form needs
+  // the room, so the halves collapse and the content flows normally.
   scrollContent: {
     flexGrow: 1,
     padding: theme.sizes.spacing?.lg || 24,
+  },
+  headerHalf: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  // One rhythm down the screen: the gap under the mark is the same 28
-  // as the gap between every button. It was 24 under the mark against a
-  // 20 between buttons - close enough to look like a mistake rather
-  // than a decision, and the mark ended up sitting slightly too close
-  // to the first button.
   header: {
     alignItems: 'center',
     marginBottom: 28,
@@ -371,6 +368,14 @@ const makeStyles = (t) => ({
   wordmark: {
     width: 300,
     height: 64,
+  },
+  buttonHalf: {
+    flex: 1,
+  },
+  // VibeButton carries its own marginVertical: 10, so the container
+  // does not add a gap on top of it.
+  signInButton: {
+    width: '100%',
   },
   formContainer: {
     // Was 40, which left a canyon between the password field and the
@@ -418,7 +423,6 @@ const makeStyles = (t) => ({
     opacity: 0.6,
   },
   buttonContainer: {
-    gap: 28,
     alignItems: 'center',
   },
   signupContainer: {

@@ -57,11 +57,7 @@ export const commentService = {
           updatedAt: serverTimestamp()
         });
 
-        // Create notification for parent comment author
-        await this.createCommentNotification(parentCommentId, commentRef.id, 'reply');
-      } else {
-        // Create notification for snapple creator
-        await this.createCommentNotification(snappleId, commentRef.id, 'comment');
+        // Notifications are the onCommentCreated trigger's job.
       }
 
       return {
@@ -152,9 +148,10 @@ export const commentService = {
           updatedAt: serverTimestamp()
         });
 
-        // Create notification for comment author
-        await this.createCommentNotification(commentId, null, 'like');
-        
+        // No notification for a like. It was writing to the same
+        // unread collection as the others, and a ping for every like
+        // is the kind of thing people turn the whole category off for -
+        // the comment and reply pings are the ones worth keeping.
         return { success: true, isLiked: true };
       }
     } catch (error) {
@@ -277,48 +274,57 @@ export const commentService = {
     }
   },
 
-  async createCommentNotification(targetId, commentId, type) {
+  // createCommentNotification lived here: it wrote a document into a
+  // top-level `notifications` collection that nothing has ever read.
+  // No trigger watched it, so no push was ever sent and nothing showed
+  // in-app - comments notified an empty room from the day they were
+  // written.
+  //
+  // functions/comments.js does it now, on a trigger, which is also the
+  // only place that CAN do it properly: it fans out to everyone in the
+  // thread rather than one person, and it goes through
+  // deliverNotification so blocks, mutes and the per-type toggle are
+  // checked the same way they are for follows and game invites.
+
+  /** Thread ids this user has muted, for seeding the bell states. */
+  async getMutedThreads() {
     try {
-      // Get target information (snapple creator or comment author)
-      let targetUserId;
-      
-      if (type === 'comment') {
-        // Notification for snapple creator
-        const snappleRef = doc(db, 'snapples', targetId);
-        const snappleDoc = await getDoc(snappleRef);
-        if (snappleDoc.exists()) {
-          targetUserId = snappleDoc.data().creatorId;
-        }
-      } else if (type === 'reply' || type === 'like') {
-        // Notification for comment author
-        const commentRef = doc(db, COMMENTS_COLLECTION, targetId);
-        const commentDoc = await getDoc(commentRef);
-        if (commentDoc.exists()) {
-          targetUserId = commentDoc.data().userId;
-        }
-      }
-
-      // Don't notify yourself
-      if (!targetUserId || targetUserId === auth.currentUser.uid) {
-        return;
-      }
-
-      const notificationDoc = {
-        userId: targetUserId,
-        fromUserId: auth.currentUser.uid,
-        fromUsername: auth.currentUser.displayName || 'Anonymous',
-        type, // 'comment', 'reply', 'like'
-        targetId,
-        commentId,
-        isRead: false,
-        createdAt: serverTimestamp()
+      if (!auth.currentUser) return { success: true, threadIds: [] };
+      const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      return {
+        success: true,
+        threadIds: (snap.exists() ? snap.data().mutedThreads : []) || [],
       };
-
-      const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
-      await setDoc(notificationRef, notificationDoc);
     } catch (error) {
-      console.error('Error creating notification:', error);
-      // Don't fail the main operation if notification fails
+      console.error('[CommentService] getMutedThreads error:', error);
+      return { success: false, threadIds: [] };
+    }
+  },
+
+  /**
+   * setThreadMuted — stop or resume notifications for ONE thread.
+   *
+   * Account-wide comment notifications are a settings toggle; this is
+   * the per-conversation one, for the thread that will not stop and
+   * that you cannot leave without also leaving every other thread.
+   *
+   * Stored as mutedThreads on the user document and read by the
+   * onCommentCreated trigger before it delivers. Top-level, not under
+   * resources/stats, so the client can write it - muting is a
+   * preference, not currency.
+   */
+  async setThreadMuted(threadId, muted) {
+    try {
+      if (!auth.currentUser || !threadId) {
+        return { success: false, error: 'Not signed in' };
+      }
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        mutedThreads: muted ? arrayUnion(threadId) : arrayRemove(threadId),
+      });
+      return { success: true, muted };
+    } catch (error) {
+      console.error('[CommentService] setThreadMuted error:', error);
+      return { success: false, error: error.message };
     }
   },
 

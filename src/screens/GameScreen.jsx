@@ -2591,15 +2591,17 @@ export default function GameScreen({ navigation, route }) {
           </ScrollView>
         </View>
 
-        {/* Host skip — end the current round early instead of
-            waiting out the scoring timer. Advances the game to the
-            SCORE (round-results) phase. Uses the ShimmerBar CTA
-            treatment (green → cyan, same palette as PLAY THIS SNAPPLE /
-            SUBMIT VOTE) so the "ready to advance" energy is
-            consistent across the game. */}
+        {/* Host skip — end the current round early instead of waiting
+            out the scoring timer.
+            
+            ctaCut, not ctaGo. It wore the same green-to-blue as PLAY
+            THIS SNAPPLE and NEXT ROUND, in the same place at the bottom
+            of the screen, which made "cut this short for everyone" look
+            identical to "carry on". Orange into red says it is the
+            other kind of action without moving it somewhere awkward. */}
         {isHost && (
           <ShimmerBar
-            colors={[theme.colors.vibeGreen, theme.colors.vibeBlue]}
+            colors={theme.colors.ctaCut}
             label="END ROUND"
             onPress={() => gameService.enterRoundResults(gameId)}
           />

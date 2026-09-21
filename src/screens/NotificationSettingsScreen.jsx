@@ -34,6 +34,7 @@ const TOGGLES = [
   { key: 'newFollower', label: 'New followers', desc: 'When someone new follows you.' },
   { key: 'followBack', label: 'Follow-backs', desc: 'When someone you follow follows you back.' },
   { key: 'followedUserSnapple', label: 'Snapples from friends', desc: "When people you follow make new snapples. Batched if they upload several at once." },
+  { key: 'comments', label: 'Comments and replies', desc: 'When someone comments on your snapple, or replies in a thread you are part of. Individual threads can be muted from the thread itself.' },
   { key: 'gameInvite', label: 'Game invites', desc: 'When someone invites you to a game.' },
   { key: 'newPrompts', label: 'New hot prompts', desc: 'Occasional pings when a proven high-engagement prompt goes live.' },
 ];

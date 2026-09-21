@@ -117,12 +117,36 @@ export default function StoreScreen({ navigation, route }) {
     // Cancelling is not a failure. They know they cancelled; telling
     // them so is just an extra tap.
     if (res.cancelled) return;
-    if (res.success) {
-      showAlert('Thank you!', 'Your purchase is on its way — your balance '
-        + 'will update in a moment.');
-    } else {
-      showAlert('Purchase Failed', res.error);
+
+    // A slow payment method - cash, bank transfer, a parent approving
+    // for a child. This is the ONE outcome that needs saying, because
+    // nothing visible happens: no charge yet, no coins, and Google's
+    // own sheet has already closed.
+    if (res.pending) {
+      showAlert(
+        'Waiting on Payment',
+        'Google is still processing this one. Your coins arrive '
+        + 'automatically once it clears — nothing else to do, and you '
+        + 'have not been charged yet.',
+      );
+      return;
     }
+
+    if (!res.success) {
+      showAlert('Purchase Failed', res.error);
+      return;
+    }
+
+    // Nothing on success. Google has already shown its own payment
+    // confirmation, and the resource bar ticks up about a second later
+    // when the webhook lands - so an alert here is a third telling of
+    // the same news, and it sits over the number it is talking about.
+    //
+    // It also used to say the balance "will update in a moment", which
+    // oversold a delay that is roughly one second in practice. The
+    // client cannot honestly claim the coins HAVE landed either - the
+    // webhook grants them, not us - so the truthful version is to say
+    // nothing and let the number speak.
   };
 
   const handleCoinPurchase = (item) => {

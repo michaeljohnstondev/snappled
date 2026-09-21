@@ -220,6 +220,7 @@ export async function ensureUserDocument(user, options = {}) {
           newFollower: true,
           followBack: true,
           followedUserSnapple: true,
+          comments: true,
           gameInvite: true,
           newPrompts: true,
         },

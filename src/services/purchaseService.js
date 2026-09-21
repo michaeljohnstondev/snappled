@@ -18,7 +18,7 @@
 // know one.
 
 import { Platform } from 'react-native';
-import Purchases, { LOG_LEVEL, PURCHASE_TYPE } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL, PURCHASE_TYPE, PURCHASES_ERROR_CODE } from 'react-native-purchases';
 
 // Everything Snappled sells is a one-time purchase. getProducts takes
 // an optional type and DEFAULTS TO SUBSCRIPTIONS on Android, so asking
@@ -207,6 +207,20 @@ const purchaseService = {
       return { success: true };
     } catch (error) {
       if (error?.userCancelled) return { success: false, cancelled: true };
+
+      // A pending payment arrives as an ERROR, not a result. Google
+      // uses it for slow payment methods - cash at a convenience store,
+      // a bank transfer, a parent approving a child's purchase - and
+      // the test card "slow approval" exercises it.
+      //
+      // Reporting it as "Purchase failed. You have not been charged."
+      // was wrong twice over: the payment has started, and it may well
+      // complete. Nothing is owed yet and nothing is lost; the webhook
+      // grants when Google confirms, which can be days later.
+      if (error?.code === PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR) {
+        return { success: false, pending: true };
+      }
+
       console.error('[PurchaseService] purchase failed:', error);
       return {
         success: false,

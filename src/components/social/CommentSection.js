@@ -30,6 +30,9 @@ export default function CommentSection({
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
+  // Threads this user has muted. Held locally so the bell flips the
+  // moment it is tapped; the write is what the trigger actually reads.
+  const [mutedThreads, setMutedThreads] = useState(new Set());
   const [expandedReplies, setExpandedReplies] = useState(new Set());
   const [commentLikes, setCommentLikes] = useState({});
   
@@ -40,6 +43,7 @@ export default function CommentSection({
     if (visible && snappleId) {
       loadComments();
       setupRealtimeSubscription();
+      loadMutedThreads();
     } else {
       cleanup();
     }
@@ -210,6 +214,33 @@ export default function CommentSection({
     return `${diffDays}d`;
   }
 
+  // Which threads this user has already muted, so the bells open in
+  // the right state rather than all reading "Mute" until tapped.
+  const loadMutedThreads = async () => {
+    const res = await commentService.getMutedThreads();
+    if (res.success) setMutedThreads(new Set(res.threadIds));
+  };
+
+  // Optimistic: the bell flips immediately and rolls back if the write
+  // fails. Muting is not currency - the worst case of getting it wrong
+  // for a second is a notification you did not want.
+  const toggleThreadMute = async (threadId) => {
+    const next = !mutedThreads.has(threadId);
+    setMutedThreads(prev => {
+      const s2 = new Set(prev);
+      if (next) s2.add(threadId); else s2.delete(threadId);
+      return s2;
+    });
+    const res = await commentService.setThreadMuted(threadId, next);
+    if (!res.success) {
+      setMutedThreads(prev => {
+        const s2 = new Set(prev);
+        if (next) s2.delete(threadId); else s2.add(threadId);
+        return s2;
+      });
+    }
+  };
+
   function renderComment({ item: comment, index }) {
     const isLiked = commentLikes[comment.id] || false;
     const canInteract = auth.currentUser && !comment.isDeleted;
@@ -247,6 +278,25 @@ export default function CommentSection({
             <Text style={styles.actionIcon}>💬</Text>
             <Text style={styles.actionText}>Reply</Text>
           </TouchableOpacity>
+
+          {/* Mute lives on top-level comments only: a thread IS its root
+              comment, so offering it on a reply would be asking which
+              thread you meant. Shown on every root rather than only the
+              ones you are in - the one you most want to mute is often
+              the one you are about to be dragged into. */}
+          {!comment.parentCommentId && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => toggleThreadMute(comment.id)}
+            >
+              <Text style={styles.actionIcon}>
+                {mutedThreads.has(comment.id) ? '🔕' : '🔔'}
+              </Text>
+              <Text style={styles.actionText}>
+                {mutedThreads.has(comment.id) ? 'Muted' : 'Mute'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {comment.replies > 0 && (
             <TouchableOpacity 

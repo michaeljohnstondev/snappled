@@ -10,6 +10,7 @@ import { userService } from '../../services/userService';
 import { snappleService } from '../../services/snappleService';
 import CurrencyIcon from '../ui/CurrencyIcon';
 import { shareService } from '../../services/shareService';
+import CommentSection from '../social/CommentSection';
 import { useModal } from '../../store/ModalContext';
 import theme from '../../theme/themes';
 import { useTheme, useThemedStyles } from '../../theme/ThemeContext';
@@ -49,6 +50,11 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   }, [currentUser?.uid, creatorId, isMine]);
 
   // Toggle follow on the snapple's creator. No-op if it's the current user.
+  // Comments live on the snapple, not on the person, so this shows on
+  // your own clips too - unlike follow, buy and report, which only make
+  // sense aimed at somebody else.
+  const [showComments, setShowComments] = useState(false);
+
   const handleFollow = async () => {
     if (busy || !creatorId || isMine) return;
     setBusy(true);
@@ -228,6 +234,25 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
           </View>
           <Text style={styles.railLabel}>Share</Text>
         </Pressable>
+      )}
+      {!!snappleId && (
+        <Pressable
+          style={styles.railBtn}
+          onPress={() => setShowComments(true)}
+        >
+          <View style={styles.railIcon}>
+            <Ionicons name="chatbubble-outline" size={22} color="white" />
+          </View>
+          <Text style={styles.railLabel}>Comments</Text>
+        </Pressable>
+      )}
+      {!!snappleId && (
+        <CommentSection
+          visible={showComments}
+          onClose={() => setShowComments(false)}
+          snappleId={snappleId}
+          snappleTitle={submission?.prompt || 'Snapple'}
+        />
       )}
       {hasActions && (
       <Pressable

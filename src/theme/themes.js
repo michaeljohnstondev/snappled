@@ -68,6 +68,15 @@ const darkTheme = {
     vibeTurquoise: '#40E0D0',
     vibeAqua: '#00FFF7',
     vibeTeal: '#00FFD4',
+    // CTA gradients, named so a screen does not carry a bare pair of
+    // hexes. ctaGo is the app's "advance" treatment - PLAY THIS
+    // SNAPPLE, SUBMIT VOTE, NEXT ROUND - and ctaCut is its opposite:
+    // the host cutting something short before it would have ended on
+    // its own. Orange into red because it is not the ordinary way
+    // forward, and the button sits where the ordinary one usually is.
+    ctaGo: ['#00FF41', '#00C6FF'],
+    ctaCut: ['#FF8C00', '#FF0800'],
+
     vibeElectricBlue: '#007FFF',
     vibeRoyalBlue: '#4169E1',
 
