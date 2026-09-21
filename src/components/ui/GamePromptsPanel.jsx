@@ -37,6 +37,9 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const { showConfirm, showError, showToast } = useModal();
+  // What is wrong with the draft, shown under the field when they try
+  // to submit. Empty string means nothing is wrong yet.
+  const [problem, setProblem] = useState('');
 
   const [season, setSeason] = useState(0);
   const [composing, setComposing] = useState(false);
@@ -59,7 +62,17 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
   // there is nothing to warn about there.
   const submit = () => {
     const text = draft.trim();
-    if (!text) return;
+    // A dimmed button tells you it will not work and nothing about
+    // why. This one always presses and says what is missing.
+    if (!text) {
+      setProblem('Write a prompt first.');
+      return;
+    }
+    if (text.length < 10) {
+      setProblem('A bit longer - give the room something to answer.');
+      return;
+    }
+    setProblem('');
     if (tickets < cost) {
       showError('Not Enough Tickets',
         `Creating a game prompt costs ${cost} tickets. You have ${tickets}.`);
@@ -74,10 +87,14 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
         const res = await gamePromptService.create(text);
         setSubmitting(false);
         if (!res.success) { showError('Could Not Submit', res.error); return; }
+        // Nothing after. The confirm you just accepted said what would
+        // happen, the composer closing says it happened, and the ticket
+        // count in the resource bar says what it cost - so a toast is
+        // the third telling of the same thing. It was also type
+        // 'reward', reading "REWARD!" over a gift icon, for an action
+        // that SPENDS a hundred tickets.
         setDraft('');
         setComposing(false);
-        showToast('reward', 'Prompt submitted',
-          cost > 0 ? `-${cost} tickets` : 'Up for the vote');
       },
     );
   };
@@ -138,7 +155,12 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
             <Text style={styles.sheetTitle}>NEW GAME PROMPT</Text>
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={(t) => {
+                setDraft(t);
+                // Clears the moment they start fixing it, rather than
+                // sitting there in red while they type the answer.
+                if (problem) setProblem('');
+              }}
               placeholder="Worst poker face"
               placeholderTextColor={t.colors.textSecondary}
               maxLength={GAME_PROMPT_MAX_LEN}
@@ -146,6 +168,7 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
               autoFocus
             />
             <Text style={styles.counter}>{draft.length}/{GAME_PROMPT_MAX_LEN}</Text>
+            {!!problem && <Text style={styles.problem}>{problem}</Text>}
             {cost > 0 && (
               <View style={styles.balanceRow}>
                 <CurrencyIcon name="tickets" size={18} />
@@ -153,9 +176,9 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
               </View>
             )}
             <Pressable
-              style={[styles.submit, (!draft.trim() || submitting) && styles.submitOff]}
+              style={[styles.submit, submitting && styles.submitOff]}
               onPress={submit}
-              disabled={!draft.trim() || submitting}
+              disabled={submitting}
             >
               {submitting
                 ? <ActivityIndicator color="#000" />
@@ -205,6 +228,12 @@ const makeStyles = (t) => ({
   submit: {
     marginTop: 16, paddingVertical: 13, borderRadius: 12,
     backgroundColor: theme.colors.vibeGreen, alignItems: 'center',
+  },
+  problem: {
+    color: theme.colors.vibeRed,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
   },
   submitOff: { opacity: 0.4 },
   submitText: { color: '#000', fontWeight: '900', letterSpacing: 1.5 },
