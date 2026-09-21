@@ -16,6 +16,7 @@ import { prefetchVideo } from '../../../services/videoCache';
 import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
 import { snappleService } from '../../../services/snappleService';
+import CommentSection from '../../social/CommentSection';
 import CurrencyIcon from '../CurrencyIcon';
 import theme from '../../../theme/themes';
 import { shareService } from '../../../services/shareService';
@@ -111,6 +112,12 @@ export default function SnappleOverlay({
     [snapples, currentIndex],
   );
   const [isPlaying, setIsPlaying] = useState(true);
+  // This state was already here with nothing reading it - the button
+  // and the section were never built. The overlay is the player
+  // everywhere OUTSIDE a game (profiles, the prompt grid, deck
+  // builder) and carries its own action column rather than
+  // CreatorActionRow, so anything added to that rail has to be added
+  // here too or it only exists mid-game.
   const [showComments, setShowComments] = useState(false);
   const [metrics, setMetrics] = useState({
     likes: snapple?.likes || 0,
@@ -490,6 +497,15 @@ export default function SnappleOverlay({
           </View>
 
           <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={() => setShowComments(true)}>
+              <View style={styles.buttonBg}>
+                <Ionicons name="chatbubble" size={19} style={{ marginTop: 2 }} color="white" />
+              </View>
+            </Pressable>
+            <Text style={styles.actionCount}>Comments</Text>
+          </View>
+
+          <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={handleShare}>
               <View style={[styles.buttonBg, sharing && { opacity: 0.6 }]}>
                 {sharing ? (
@@ -708,6 +724,16 @@ export default function SnappleOverlay({
         </View>
       </View>
       </GestureHandlerRootView>
+
+      {/* Inside the overlay's Modal, so it sits above the video rather
+          than behind it - a sibling Modal would render under this one
+          on Android. */}
+      <CommentSection
+        visible={showComments}
+        onClose={() => setShowComments(false)}
+        snappleId={snapple.id}
+        snappleTitle={snapple.prompt || 'Snapple'}
+      />
     </Modal>
   );
 }
