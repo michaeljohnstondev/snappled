@@ -53,7 +53,6 @@ export default function PromptSortDeck({
   // "you have ranked everything" and "the pool is empty" are different
   // facts, and only the caller knows which deck this is.
   emptyTitle = 'All caught up',
-  emptySub = 'You have ranked everything there is right now.',
 }) {
   const { theme: t } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -116,6 +115,13 @@ export default function PromptSortDeck({
   // from a screen that had failed to load. Both cases say something now.
   if (!current) {
     const swiped = sorted > 0;
+    // The heading carries it. An explanatory sentence under a heading
+    // that already said the thing is just more to read on a pane whose
+    // whole message is "there is nothing here" - so the only subtext
+    // left is the count, which is a fact rather than a restatement.
+    const title = exhausted
+      ? 'Nothing new yet'
+      : (swiped ? 'Nice work' : emptyTitle);
     return (
       <View style={styles.wrap}>
         <View style={styles.donePane}>
@@ -124,20 +130,16 @@ export default function PromptSortDeck({
             size={48}
             color={swiped ? theme.colors.vibeGreen : t.colors.textSecondary}
           />
-          <Text style={styles.doneTitle}>{swiped ? 'Nice work' : emptyTitle}</Text>
-          <Text style={styles.doneSub}>
-            {swiped
-              ? `You sorted ${sorted} ${sorted === 1 ? 'prompt' : 'prompts'}`
-              : emptySub}
-          </Text>
-          {/* Says so when there is nothing left, rather than offering a
-              button that looks broken. Tapping "Sort more" on an empty
-              well used to do exactly nothing on screen. */}
-          {exhausted ? (
+          <Text style={styles.doneTitle}>{title}</Text>
+          {swiped ? (
             <Text style={styles.doneSub}>
-              {"That's everything for now - check back when new ones arrive."}
+              {`You sorted ${sorted} ${sorted === 1 ? 'prompt' : 'prompts'}`}
             </Text>
-          ) : (
+          ) : null}
+          {/* No button once a refresh has come back empty. Re-offering
+              one that does nothing on screen is the bug this pane was
+              written for; the heading changing is the answer instead. */}
+          {exhausted ? null : (
             <Pressable style={styles.reload} onPress={() => load(true)}>
               <Text style={styles.reloadText}>
                 {swiped ? 'Sort more' : 'Check for new'}

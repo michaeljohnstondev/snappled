@@ -224,8 +224,6 @@ export default function GamePromptsPanel({ user, tickets = 0 }) {
           onReport={report}
           onAdmin={isAdminUid(user.uid) ? manage : undefined}
           emptyTitle="No new prompts to rank"
-          emptySub={'You have ranked every game prompt in the season. New '
-            + 'ones land here as players submit them.'}
         />
       ) : null}
 
