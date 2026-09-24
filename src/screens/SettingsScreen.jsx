@@ -23,6 +23,7 @@ import { usernameService } from '../services/usernameService';
 import AppLayout from '../components/ui/layout/AppLayout';
 import SettingsRow from '../components/ui/settings/SettingsRow';
 import UsernameEditor from '../components/ui/settings/UsernameEditor';
+import DeleteAccountModal from '../components/ui/modals/DeleteAccountModal';
 import theme from '../theme/themes';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -47,6 +48,11 @@ export default function SettingsScreen({ navigation }) {
   const [draft, setDraft] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState(null);
+
+  // Account deletion lives behind its own screen rather than a
+  // confirm dialog: it has numbers to show, a choice to make about
+  // other people's purchases, and a password to take.
+  const [deleting, setDeleting] = useState(false);
 
   const username = user?.username || user?.email?.split('@')[0] || 'player';
 
@@ -169,7 +175,28 @@ export default function SettingsScreen({ navigation }) {
             for things you CHANGE; a version string is a fact to read
             and signing out is a way to leave, and neither was a setting
             you could adjust. */}
+
+        {/* Last, alone, and after a gap. Both stores require this to
+            exist and be reachable without contacting anyone; nothing
+            requires it to sit next to the sound toggle. */}
+        <View style={styles.dangerZone}>
+          <Text style={styles.h2Danger}>Danger zone</Text>
+          <SettingsRow
+            icon="trash-outline"
+            iconColor={theme.colors.vibeRed}
+            destructive
+            label="Delete account"
+            desc="Erases your account, your snapples and your balance. Permanent."
+            onPress={() => setDeleting(true)}
+          />
+        </View>
       </ScrollView>
+
+      <DeleteAccountModal
+        visible={deleting}
+        onClose={() => setDeleting(false)}
+        username={username}
+      />
     </AppLayout>
   );
 }
@@ -192,5 +219,13 @@ const makeStyles = (t) => ({
     marginTop: 24,
     marginBottom: 6,
   },
-  dangerZone: { marginTop: 32 },
+  dangerZone: { marginTop: 40 },
+  h2Danger: {
+    color: theme.colors.vibeRed,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
 });

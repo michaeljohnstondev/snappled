@@ -1187,13 +1187,28 @@ exports.onSnappleDeleted = functions.firestore
     const data = snapshot.data() || {};
     const FV = admin.firestore.FieldValue;
 
-    const file = `shared/${snappleId}-poster.jpg`;
-    try {
-      await admin.storage().bucket().file(file).delete();
-    } catch (e) {
-      // 404 is the normal case for a snapple that never got a poster.
-      if (e.code !== 404) {
-        console.warn('[onSnappleDeleted] poster cleanup failed:', file, e.message);
+    // Poster AND video. The video used to be deleted by the client, in
+    // snappleService.deleteSnapple, which meant any other route to a
+    // delete - the admin screen, an account deletion, a moderation ban -
+    // left the mp4 sitting in the bucket. Paid storage for something
+    // nobody can play, and in the account-deletion case it is undeleted
+    // video of somebody who asked to be forgotten.
+    const files = [`shared/${snappleId}-poster.jpg`];
+    const video = data.filename
+      || (data.videoId && data.creatorId
+        ? `videos/${data.creatorId}/${data.videoId}.mp4`
+        : null);
+    if (video) files.push(video);
+
+    for (const file of files) {
+      try {
+        await admin.storage().bucket().file(file).delete();
+      } catch (e) {
+        // 404 is the normal case: a snapple that never got a poster, or
+        // a video already swept by a previous pass.
+        if (e.code !== 404) {
+          console.warn('[onSnappleDeleted] storage cleanup failed:', file, e.message);
+        }
       }
     }
 
@@ -1380,3 +1395,7 @@ exports.onSnappleLikesChanged = require('./snappleStats').onSnappleLikesChanged;
 exports.createGamePrompt = require('./gamePrompts').createGamePrompt;
 exports.rolloverSeason = require('./gamePrompts').rolloverSeason;
 exports.getShareCard = require('./shareRender').getShareCard;
+exports.previewAccountDeletion = require('./accountDeletion').previewAccountDeletion;
+exports.requestAccountDeletion = require('./accountDeletion').requestAccountDeletion;
+exports.onAccountDeletionRequested = require('./accountDeletion').onAccountDeletionRequested;
+exports.sweepStalledDeletions = require('./accountDeletion').sweepStalledDeletions;

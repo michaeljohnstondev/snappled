@@ -48,7 +48,13 @@ GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
 
 // Pop the native Google account picker → exchange ID token for a
 // Firebase credential → sign in. Returns { userCredential, isNewUser }.
-export async function signInWithGoogle() {
+// Pop the picker and build a Firebase credential, WITHOUT signing in.
+// Split out so account deletion can re-authenticate with the same
+// native flow: reauthenticateWithCredential refuses a credential
+// belonging to a different account, which signInWithCredential would
+// happily accept - and "picked the wrong Google account in the picker"
+// must not become "deleted the wrong account".
+export async function googleCredential() {
   await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   // Clear any cached session so the picker always shows (lets users
   // switch accounts without going through device settings).
@@ -58,7 +64,11 @@ export async function signInWithGoogle() {
   const idToken = signInResult.data?.idToken ?? signInResult.idToken;
   if (!idToken) throw new Error('No ID token returned from Google Sign-In');
 
-  const credential = GoogleAuthProvider.credential(idToken);
+  return GoogleAuthProvider.credential(idToken);
+}
+
+export async function signInWithGoogle() {
+  const credential = await googleCredential();
   const userCredential = await signInWithCredential(auth, credential);
   const isNewUser = userCredential._tokenResponse?.isNewUser ?? false;
   return { userCredential, isNewUser };
@@ -69,7 +79,10 @@ export async function signInWithGoogle() {
 // login (Google) is offered. Apple returns the user's full name only
 // on the FIRST authorization — we surface it so the caller can pre-fill
 // profile data.
-export async function signInWithApple() {
+// The Apple half of the same split. Returns the credential plus the
+// name Apple only ever hands over on a FIRST authorization, which the
+// sign-in path needs and the re-auth path ignores.
+export async function appleCredential() {
   if (Platform.OS !== 'ios') {
     throw new Error('Apple Sign-In is only available on iOS');
   }
@@ -101,14 +114,19 @@ export async function signInWithApple() {
   }
 
   const provider = new OAuthProvider('apple.com');
-  const firebaseCredential = provider.credential({
-    idToken: credential.identityToken,
-    rawNonce,
-  });
-  const userCredential = await signInWithCredential(auth, firebaseCredential);
+  return {
+    credential: provider.credential({
+      idToken: credential.identityToken,
+      rawNonce,
+    }),
+    firstName: credential.fullName?.givenName || null,
+    lastName: credential.fullName?.familyName || null,
+  };
+}
 
-  const firstName = credential.fullName?.givenName || null;
-  const lastName = credential.fullName?.familyName || null;
+export async function signInWithApple() {
+  const { credential, firstName, lastName } = await appleCredential();
+  const userCredential = await signInWithCredential(auth, credential);
   const isNewUser = userCredential._tokenResponse?.isNewUser ?? false;
   return { userCredential, isNewUser, firstName, lastName };
 }

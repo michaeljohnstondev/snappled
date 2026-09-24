@@ -766,22 +766,16 @@ export const snappleService = {
 
       const otherOwners = (data.owners || []).filter(id => id !== userId);
 
-      // Doc + Storage file, unconditionally. The file used to be kept
-      // whenever somebody else owned a copy, which left buyer-owned
-      // videos sitting in the bucket as paid-for storage nobody could
-      // ever play — the buyers get refunded, so there is nothing left
-      // to play them with.
+      // Just the document. onSnappleDeleted removes the video and the
+      // poster, refunds every buyer and sweeps the id out of everyone
+      // who owned or liked or wishlisted it.
+      //
+      // The video used to be deleted from here, which meant it only
+      // happened when a delete came through THIS function - an admin
+      // removal or an account deletion left the mp4 in the bucket. Two
+      // places doing the same cleanup is two places for it to drift,
+      // and the trigger is the one that catches every route.
       await deleteDoc(snappleRef);
-      try {
-        const { ref: storageRef, deleteObject } = await import('firebase/storage');
-        const { storage } = await import('./firebase');
-        const path = data.filename || (data.videoId ? `videos/${userId}/${data.videoId}.mp4` : null);
-        if (path) {
-          await deleteObject(storageRef(storage, path)).catch(() => {});
-        }
-      } catch (e) {
-        console.error('[SnappleService] Error deleting video file:', e);
-      }
 
       return otherOwners.length > 0
         ? { success: true, note: 'Snapple deleted, buyers refunded' }

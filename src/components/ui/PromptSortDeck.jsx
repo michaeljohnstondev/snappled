@@ -107,43 +107,30 @@ export default function PromptSortDeck({
 
   const current = deck[index];
 
-  // Two ways to land here, and they are not the same message. Either the
-  // stack ran out under you after some swipes, or there was nothing in
-  // it when the screen opened. The second case used to `return null`,
-  // which drew literally nothing - so somebody who had ranked every
-  // prompt got a blank gap where the deck should be, indistinguishable
-  // from a screen that had failed to load. Both cases say something now.
+  // An empty stack is an empty stack. It used to congratulate you for
+  // swiping - "Nice work, you sorted 4 prompts" - which is ceremony for
+  // having flicked four cards, and it made arriving here with nothing
+  // and arriving here having ranked everything look like two different
+  // events when they are the same one. The heading says what is true
+  // and the button says what you can do about it.
+  //
+  // The first case used to `return null` and draw literally nothing, so
+  // somebody caught up on every prompt got a blank gap indistinguishable
+  // from a screen that had failed to load.
   if (!current) {
-    const swiped = sorted > 0;
-    // The heading carries it. An explanatory sentence under a heading
-    // that already said the thing is just more to read on a pane whose
-    // whole message is "there is nothing here" - so the only subtext
-    // left is the count, which is a fact rather than a restatement.
-    const title = exhausted
-      ? 'Nothing new yet'
-      : (swiped ? 'Nice work' : emptyTitle);
     return (
       <View style={styles.wrap}>
         <View style={styles.donePane}>
-          <Ionicons
-            name={swiped ? 'checkmark-circle' : 'albums-outline'}
-            size={48}
-            color={swiped ? theme.colors.vibeGreen : t.colors.textSecondary}
-          />
-          <Text style={styles.doneTitle}>{title}</Text>
-          {swiped ? (
-            <Text style={styles.doneSub}>
-              {`You sorted ${sorted} ${sorted === 1 ? 'prompt' : 'prompts'}`}
-            </Text>
-          ) : null}
+          <Ionicons name="albums-outline" size={48} color={t.colors.textSecondary} />
+          <Text style={styles.doneTitle}>
+            {exhausted ? 'Nothing new yet' : emptyTitle}
+          </Text>
           {/* No button once a refresh has come back empty. Re-offering
               one that does nothing on screen is the bug this pane was
               written for; the heading changing is the answer instead. */}
           {exhausted ? null : (
             <Pressable style={styles.reload} onPress={() => load(true)}>
-              <Text style={styles.reloadText}>
-                {swiped ? 'Sort more' : 'Check for new'}
-              </Text>
+              <Text style={styles.reloadText}>Check for new</Text>
             </Pressable>
           )}
         </View>
@@ -278,8 +265,10 @@ const makeStyles = (t) => ({
   reportText: { color: t.colors.textSecondary, fontSize: 12, fontWeight: '600' },
 
   donePane: { alignItems: 'center', gap: 8, paddingVertical: 24 },
-  doneTitle: { color: t.colors.textPrimary, fontSize: 20, fontWeight: 'bold' },
-  doneSub: { color: t.colors.textSecondary, fontSize: 13, marginBottom: 8 },
+  doneTitle: {
+    color: t.colors.textPrimary, fontSize: 20, fontWeight: 'bold',
+    marginBottom: 6,
+  },
   reload: {
     paddingHorizontal: 18, paddingVertical: 9,
     borderRadius: 10,
