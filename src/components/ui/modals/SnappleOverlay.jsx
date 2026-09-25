@@ -16,6 +16,7 @@ import { prefetchVideo } from '../../../services/videoCache';
 import { useAuth } from '../../../store/AuthContext';
 import { useModal } from '../../../store/ModalContext';
 import { snappleService } from '../../../services/snappleService';
+import { saveSnappleToLibrary } from '../../../services/downloadService';
 import CommentSection from '../../social/CommentSection';
 import CurrencyIcon from '../CurrencyIcon';
 import theme from '../../../theme/themes';
@@ -149,6 +150,9 @@ export default function SnappleOverlay({
   // Admin-only mirror for the excludeFromPool flag. Snappy local
   // toggle; the underlying service write is admin-gated.
   const [excludeFromPool, setExcludeFromPool] = useState(!!snapple?.excludeFromPool);
+  // Saving to the camera roll. Can take a second on a clip that is
+  // not cached yet, and there is nothing on screen to show for it.
+  const [saving, setSaving] = useState(false);
 
   // Sync local privacy when a different snapple opens
   React.useEffect(() => {
@@ -610,6 +614,48 @@ export default function SnappleOverlay({
                 </View>
               </Pressable>
               <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
+            </View>
+          )}
+
+          {/* Creator-only: save to the camera roll. Your own video is
+              yours, and an app holding the only copy of something you
+              made is holding it hostage.
+
+              Only your own, deliberately. A save button on somebody
+              else's snapple is a one-tap way to take a copy of a
+              stranger's face out of the app permanently - and it would
+              make the account-deletion promise worthless, because
+              erasing the video means nothing once it is in fifty camera
+              rolls. downloadService refuses it too; a hidden button is
+              not a rule. */}
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                disabled={saving}
+                onPress={async () => {
+                  setSaving(true);
+                  const res = await saveSnappleToLibrary(snapple, user?.uid);
+                  setSaving(false);
+                  if (res.success) {
+                    // Worth a toast, unlike most things: it lands
+                    // somewhere else on the phone, so there is nothing
+                    // on this screen that could tell you it worked.
+                    showToast('info', 'Saved', 'It is in your photos');
+                  } else if (res.denied) {
+                    showError('Permission Needed', res.error);
+                  } else {
+                    showError('Could Not Save', res.error);
+                  }
+                }}
+              >
+                <View style={styles.buttonBg}>
+                  {saving
+                    ? <ActivityIndicator color="white" size="small" />
+                    : <Ionicons name="download-outline" size={20} color="white" />}
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{saving ? 'Saving' : 'Save'}</Text>
             </View>
           )}
 

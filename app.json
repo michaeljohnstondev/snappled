@@ -87,6 +87,14 @@
         }
       ],
       "expo-apple-authentication",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Snappled needs access to save your snapples to your photos.",
+          "savePhotosPermission": "Snappled saves your recorded snapples to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "react-native-compressor",
       [
         "expo-build-properties",
