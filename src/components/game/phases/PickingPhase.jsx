@@ -333,7 +333,7 @@ export default function PickingPhase({
           onPrev={previewAt > 0 ? () => stepPreview(-1) : undefined}
           primaryLabel={previewCard._isWaiting ? null : 'PLAY THIS SNAPPLE'}
           onPrimary={() => onPickCard(previewCard)}
-          topRightSlot={
+          adminSlot={
             isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) ? (
               <Pressable
                 style={pickingAdminStyles.poolNukeBtn}

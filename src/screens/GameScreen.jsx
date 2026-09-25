@@ -2383,7 +2383,7 @@ export default function GameScreen({ navigation, route }) {
               setFavoriteCard(previewCard);
               setPreviewCard(null);
             }}
-            topRightSlot={
+            adminSlot={
               isAdmin && previewCard.snappleId ? (
                 <Pressable
                   style={adminGameStyles.poolNukeBtn}
@@ -2668,7 +2668,7 @@ export default function GameScreen({ navigation, route }) {
             onNext={at >= 0 && at < list.length - 1 ? () => step(1) : undefined}
             onPrev={at > 0 ? () => step(-1) : undefined}
             primaryLabel={null}
-            topRightSlot={
+            adminSlot={
               isAdmin && previewCard.snappleId ? (
                 <Pressable
                   style={adminGameStyles.poolNukeBtn}

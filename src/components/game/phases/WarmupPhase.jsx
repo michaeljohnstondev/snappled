@@ -160,7 +160,7 @@ export default function WarmupPhase({
               // from warmup actually means.
             />
           }
-          topRightSlot={
+          adminSlot={
             isAdmin && onExcludeFromPool && (previewCard.id || previewCard.snappleId) ? (
               <Pressable
                 style={warmupAdminStyles.poolNukeBtn}

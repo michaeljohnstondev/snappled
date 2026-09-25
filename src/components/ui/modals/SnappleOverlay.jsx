@@ -429,6 +429,53 @@ export default function SnappleOverlay({
           </View>
         </Pressable>
 
+        {/* Admin controls live on the LEFT, on their own. Mixed into
+            the right rail they made it impossible to see the screen the
+            way a normal player does - every screenshot had a moderation
+            button in it, and "is this what everyone sees?" was a
+            question you could not answer by looking. The right rail is
+            now exactly what the person in front of you has.
+
+            Indented from the other side too, so nothing lines up with
+            it by accident. */}
+        {isAdmin ? (
+          <View style={styles.adminColumn}>
+            {/* Pool exclusion. When ON the snapple stops showing up in
+                bot picks and in the practice-mode hand padding pool.
+                Doesn't affect visibility / ownership / marketplace /
+                playability from any owner's own deck - purely a quality
+                lever on the auto-pool. Works on any snapple, including
+                ones you didn't create. */}
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={async () => {
+                  const next = !excludeFromPool;
+                  setExcludeFromPool(next);
+                  const result = await snappleService.setSnappleExcludeFromPool(
+                    snapple.id,
+                    user.uid,
+                    next,
+                  );
+                  if (!result.success) {
+                    setExcludeFromPool(!next);
+                    showError('Error', result.error || 'Could not update pool exclusion');
+                  }
+                }}
+              >
+                <View style={[styles.buttonBg, excludeFromPool && styles.activeBg]}>
+                  <Ionicons
+                    name={excludeFromPool ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={excludeFromPool ? theme.colors.vibeRed : 'white'}
+                  />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{excludeFromPool ? 'Pool: Off' : 'Pool: On'}</Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* Action Buttons - right side */}
         <View style={styles.actionsColumn}>
           <View style={styles.actionGroup}>
@@ -689,43 +736,6 @@ export default function SnappleOverlay({
             </View>
           )}
 
-          {/* Admin-only: pool exclusion. When ON the snapple stops
-              showing up in bot picks and in the practice-mode hand
-              padding pool. Doesn't affect visibility / ownership /
-              marketplace / playability from any owner's own deck —
-              purely a quality lever on the auto-pool. Visible to
-              admins on any snapple, including snapples they didn't
-              create. */}
-          {isAdmin && (
-            <View style={styles.actionGroup}>
-              <Pressable
-                style={styles.actionButton}
-                onPress={async () => {
-                  const next = !excludeFromPool;
-                  setExcludeFromPool(next);
-                  const result = await snappleService.setSnappleExcludeFromPool(
-                    snapple.id,
-                    user.uid,
-                    next,
-                  );
-                  if (!result.success) {
-                    setExcludeFromPool(!next);
-                    showError('Error', result.error || 'Could not update pool exclusion');
-                  }
-                }}
-              >
-                <View style={[styles.buttonBg, excludeFromPool && styles.activeBg]}>
-                  <Ionicons
-                    name={excludeFromPool ? 'eye-off' : 'eye'}
-                    size={20}
-                    color={excludeFromPool ? theme.colors.vibeRed : 'white'}
-                  />
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>{excludeFromPool ? 'Pool: Off' : 'Pool: On'}</Text>
-            </View>
-          )}
-
           {snapple.creatorId === user?.uid && (
             <View style={styles.actionGroup}>
               <Pressable style={styles.actionButton} onPress={() => {
@@ -829,6 +839,17 @@ const makeStyles = (t) => ({
   actionsColumn: {
     position: 'absolute',
     right: 12,
+    bottom: 60,
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 10,
+  },
+  // Mirrors actionsColumn on the other edge. Admin-only, so on a normal
+  // account this side of the video is empty and the right rail is the
+  // whole interface - which is the point.
+  adminColumn: {
+    position: 'absolute',
+    left: 12,
     bottom: 60,
     alignItems: 'center',
     gap: 12,

@@ -33,7 +33,10 @@ export default function PreviewModal({
   onClose,
   primaryLabel,
   onPrimary,
-  topRightSlot,
+  // Admin-only extras. Sits on the LEFT beside close, not opposite
+  // it, so the right-hand side of a preview is the same for a
+  // moderator as it is for everybody else.
+  adminSlot,
   overlaySlot,
   onNext,
   onPrev,
@@ -70,7 +73,7 @@ export default function PreviewModal({
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Ionicons name="close" size={22} color="white" />
           </Pressable>
-          {topRightSlot ? <View>{topRightSlot}</View> : <View />}
+          {adminSlot ? <View>{adminSlot}</View> : null}
         </View>
 
         {overlaySlot ? (
@@ -106,7 +109,11 @@ const makeStyles = (t) => ({
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    // Left-aligned rather than space-between: the admin pill used to be
+    // pushed to the far right, which put a moderation control in the
+    // corner of every preview and screenshot.
+    justifyContent: 'flex-start',
+    gap: 10,
     zIndex: 10,
   },
   closeBtn: {
