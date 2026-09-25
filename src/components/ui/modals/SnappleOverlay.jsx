@@ -266,7 +266,10 @@ export default function SnappleOverlay({
   };
 
   const handleLike = () => applyReaction(userInteraction.hasLiked ? null : 'like');
-  const handleDislike = () => applyReaction(userInteraction.hasDisliked ? null : 'dislike');
+  // No handleDislike: the button is gone. applyReaction keeps its
+  // 'dislike' branch and hasDisliked keeps being read, because a
+  // dislike cast before this still exists on the document and
+  // liking has to be able to clear it.
 
   const handleBuy = () => {
     // Skip the confirm flow entirely if the user already owns this snapple —
@@ -439,7 +442,10 @@ export default function SnappleOverlay({
             Indented from the other side too, so nothing lines up with
             it by accident. */}
         {isAdmin ? (
-          <View style={styles.adminColumn}>
+          /* box-none: the column runs the full height of the screen to
+             centre itself, and without this it would swallow every tap
+             along the left edge of the video. */
+          <View style={styles.adminColumn} pointerEvents="box-none">
             {/* Pool exclusion. When ON the snapple stops showing up in
                 bot picks and in the practice-mode hand padding pool.
                 Doesn't affect visibility / ownership / marketplace /
@@ -487,15 +493,6 @@ export default function SnappleOverlay({
             <Text style={styles.actionCount}>{formatCount(metrics.likes)}</Text>
           </View>
 
-          <View style={styles.actionGroup}>
-            <Pressable style={styles.actionButton} onPress={handleDislike}>
-              <View style={[styles.buttonBg, userInteraction.hasDisliked && styles.activeBg]}>
-                <Ionicons name="thumbs-down" size={19} style={{ marginTop: 3 }} color={userInteraction.hasDisliked ? theme.colors.vibeOrange : 'white'} />
-              </View>
-            </Pressable>
-            <Text style={styles.actionCount}>{formatCount(metrics.dislikes)}</Text>
-          </View>
-
           {/* Buy button — hidden entirely for private snapples since they
               can't be purchased. The creator viewing their own private
               snapple also doesn't see it. */}
@@ -528,24 +525,14 @@ export default function SnappleOverlay({
             </View>
           )}
 
-          <View style={styles.actionGroup}>
-            <Pressable style={styles.actionButton} onPress={async () => {
-              // Save button is a 2-way toggle. Batched service call
-              // updates BOTH user.wishlistedSnapples AND
-              // snapple.wishlistedBy atomically; the AuthContext
-              // snapshot listener picks up the user-side change and
-              // re-renders the button state.
-              const wishlisted = (userCurrency.wishlistedSnapples || []).includes(snapple.id);
-              await snappleService.setSnappleWishlist(
-                snapple.id, user.uid, !wishlisted, wishlisted,
-              );
-            }}>
-              <View style={[styles.buttonBg, (userCurrency.wishlistedSnapples || []).includes(snapple.id) && styles.activeBg]}>
-                <Ionicons name={(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? "bookmark" : "bookmark-outline"} size={20} color={(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? theme.colors.vibeYellow : 'white'} />
-              </View>
-            </Pressable>
-            <Text style={styles.actionCount}>{(userCurrency.wishlistedSnapples || []).includes(snapple.id) ? 'Saved' : 'Save'}</Text>
-          </View>
+          {/* No wishlist button. There were two things called Save on
+              one rail - this one bookmarked the card, the creator-only
+              one puts the video in your photos - and two buttons with
+              the same word on them is worse than not having one of
+              them. Wishlist data is untouched, so nothing anybody has
+              already saved is lost.
+
+              For a snapple you want, Buy is the button. */}
 
           <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={() => setShowComments(true)}>
@@ -844,13 +831,19 @@ const makeStyles = (t) => ({
     gap: 12,
     zIndex: 10,
   },
-  // Mirrors actionsColumn on the other edge. Admin-only, so on a normal
-  // account this side of the video is empty and the right rail is the
-  // whole interface - which is the point.
+  // Admin-only, so on a normal account this side of the video is empty
+  // and the right rail is the whole interface - which is the point.
+  //
+  // Centred rather than bottom-anchored like actionsColumn: down there
+  // it landed on top of the creator's name and price. Nothing else sits
+  // in the middle of the left edge, so it is the one place a column can
+  // grow without colliding with something.
   adminColumn: {
     position: 'absolute',
     left: 12,
-    bottom: 60,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
     zIndex: 10,
