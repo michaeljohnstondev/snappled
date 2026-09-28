@@ -89,6 +89,15 @@ export default function SnappleOverlay({
     ? snapples[Math.max(0, Math.min(currentIndex, snapples.length - 1))]
     : snappleProp;
 
+  // Is there anything here for this person to manage? The creator can do
+  // everything; a buyer can only discard their copy. Somebody who is
+  // neither gets no menu at all - which is why Report sits out on the
+  // rail rather than inside it.
+  const canManage = !!user?.uid && (
+    snapple?.creatorId === user.uid
+    || (userCurrency?.ownedSnapples || []).includes(snapple?.id)
+  );
+
   // Vertical swipe → advance / go back within the swipable list.
   // activeOffsetY([-15, 15]) means Pressables underneath still get
   // taps (Gesture.Pan only "wins" once the finger has moved past the
@@ -153,12 +162,17 @@ export default function SnappleOverlay({
   // Saving to the camera roll. Can take a second on a clip that is
   // not cached yet, and there is nothing on screen to show for it.
   const [saving, setSaving] = useState(false);
+  // Whether the owner menu behind the vertical ellipsis is open.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Sync local privacy when a different snapple opens
   React.useEffect(() => {
     setIsPrivate(!!snapple?.isPrivate);
     setMuted(!!snapple?.muted);
     setExcludeFromPool(!!snapple?.excludeFromPool);
+    // Close the menu too. Swiping to the next card with it left open
+    // would offer Delete for a snapple you are no longer looking at.
+    setMenuOpen(false);
   }, [snapple?.id, snapple?.isPrivate, snapple?.muted, snapple?.excludeFromPool]);
 
   // Refetch the snapple on every open so local state reflects the
@@ -482,6 +496,227 @@ export default function SnappleOverlay({
           </View>
         ) : null}
 
+        {/* Owner controls behind a menu, not on the rail.
+
+            The rail had grown to ten buttons on your own snapple, which
+            on most phones reached the top of the video - and a video app
+            covering the video with its own chrome has its priorities
+            backwards.
+
+            The split is by how often you reach for something, not by who
+            can see it. Like, buy, comment and share are every-viewing
+            actions. Setting privacy, saving to your photos, muting and
+            deleting are once in the whole life of a card: you do them
+            when you post it or when you change your mind, never while
+            watching. Once-ever actions are exactly the ones that should
+            cost a tap to reveal.
+
+            It also means the rail is the same for everybody, which is
+            what it looked like it was for and never actually was. */}
+        {canManage ? (
+          <>
+            <Pressable
+              style={styles.menuToggle}
+              onPress={() => setMenuOpen((o) => !o)}
+              hitSlop={8}
+            >
+              {/* Same icon either way, lit when open. An X up here
+                  would read as "close the snapple" - that is what the X
+                  in the other corner already does. */}
+              <View style={[styles.buttonBg, menuOpen && styles.activeBg]}>
+                <Ionicons
+                  name="ellipsis-vertical"
+                  size={20}
+                  color={menuOpen ? theme.colors.vibeYellow : 'white'}
+                />
+              </View>
+            </Pressable>
+
+            {/* Drops downward from the button, the way a menu opened
+                from a corner should. */}
+            {menuOpen ? (
+              <View style={styles.ownerMenu}>
+                <View style={styles.actionGroup}>
+                  <Pressable style={styles.actionButton} onPress={() => {
+                    showConfirm(
+                      'Discard Snapple',
+                      'Remove this snapple from your collection?',
+                      async () => {
+                        // Remove from user's owned lists
+                        const updated = (userCurrency.ownedSnapples || []).filter(id => id !== snapple.id);
+                        const updatedCards = (userCurrency.ownedCards || []).filter(id => id !== snapple.id);
+                        const discarded = [...(userCurrency.discardedSnapples || []), snapple.id];
+                        await updateUserCurrency({ ownedSnapples: updated, ownedCards: updatedCards, discardedSnapples: discarded });
+                        // Remove from snapple's owners array
+                        try {
+                          const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+                          const { db } = await import('../../../services/firebase');
+                          await updateDoc(doc(db, 'snapples', snapple.id), {
+                            owners: arrayRemove(user.uid),
+                          });
+                        } catch (e) {}
+                        onClose();
+                      }
+                    );
+                  }}>
+                    <View style={styles.buttonBg}>
+                      <Ionicons name="ban" size={20} color="white" />
+                    </View>
+                  </Pressable>
+                  <Text style={styles.actionCount}>Discard</Text>
+                </View>
+              {/* Creator-only: flip private ↔ public anytime. Private hides
+                  the snapple from public feeds and disables NEW buys; the
+                  UI confirms first if there are existing buyers (they keep
+                  their copy — see persistPrivacy / handlePrivacyToggle).
+                  Optimistic UI: flip the icon first, persist after. */}
+              {snapple.creatorId === user?.uid && (
+                <View style={styles.actionGroup}>
+                  <Pressable
+                    style={styles.actionButton}
+                    onPress={() => {
+                      const next = !isPrivate;
+                      // Owners always includes the creator; anyone else in
+                      // the array is a paying buyer who's grandfathered in.
+                      const buyerCount = (snapple.owners || [])
+                        .filter((id) => id !== snapple.creatorId).length;
+
+                      const persistPrivacy = async () => {
+                        setIsPrivate(next);
+                        const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
+                        if (!result.success) {
+                          setIsPrivate(!next);
+                          showError('Error', result.error || 'Could not update privacy');
+                        }
+                      };
+
+                      // Only warn when going PUBLIC → PRIVATE with buyers.
+                      // Public-bound flips never need a warning. Mentions
+                      // Delete as the alternative for creators whose real
+                      // intent is a full takedown, not just "no new buys".
+                      if (next && buyerCount > 0) {
+                        const noun = buyerCount === 1 ? 'player' : 'players';
+                        const verb = buyerCount === 1 ? 'owns' : 'own';
+                        showConfirm(
+                          'Make Private?',
+                          `${buyerCount} ${noun} already ${verb} this. They'll keep their copy — going private just stops new buys and hides it from public feeds.\n\nWant to take it down entirely? Use Delete instead.`,
+                          persistPrivacy
+                        );
+                      } else {
+                        persistPrivacy();
+                      }
+                    }}
+                  >
+                    <View style={[styles.buttonBg, isPrivate && styles.activeBg]}>
+                      <Ionicons
+                        name={isPrivate ? 'lock-closed' : 'lock-open'}
+                        size={20}
+                        color={isPrivate ? theme.colors.vibeYellow : 'white'}
+                      />
+                    </View>
+                  </Pressable>
+                  <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
+                </View>
+              )}
+
+              {/* Creator-only: save to the camera roll. Your own video is
+                  yours, and an app holding the only copy of something you
+                  made is holding it hostage.
+
+                  Only your own, deliberately. A save button on somebody
+                  else's snapple is a one-tap way to take a copy of a
+                  stranger's face out of the app permanently - and it would
+                  make the account-deletion promise worthless, because
+                  erasing the video means nothing once it is in fifty camera
+                  rolls. downloadService refuses it too; a hidden button is
+                  not a rule. */}
+              {snapple.creatorId === user?.uid && (
+                <View style={styles.actionGroup}>
+                  <Pressable
+                    style={styles.actionButton}
+                    disabled={saving}
+                    onPress={async () => {
+                      setSaving(true);
+                      const res = await saveSnappleToLibrary(snapple, user?.uid);
+                      setSaving(false);
+                      if (res.success) {
+                        // Worth a toast, unlike most things: it lands
+                        // somewhere else on the phone, so there is nothing
+                        // on this screen that could tell you it worked.
+                        showToast('info', 'Saved', 'It is in your photos');
+                      } else if (res.denied) {
+                        showError('Permission Needed', res.error);
+                      } else {
+                        showError('Could Not Save', res.error);
+                      }
+                    }}
+                  >
+                    <View style={styles.buttonBg}>
+                      {saving
+                        ? <ActivityIndicator color="white" size="small" />
+                        : <Ionicons name="download-outline" size={20} color="white" />}
+                    </View>
+                  </Pressable>
+                  <Text style={styles.actionCount}>{saving ? 'Saving' : 'Save'}</Text>
+                </View>
+              )}
+
+              {/* Creator-only: mute toggle. Applies to ALL playbacks across
+                  the app (home, game, voting, owners' decks). Useful for
+                  legacy uploads with background noise or for visual-only
+                  cards. Optimistic flip, rollback on failure. */}
+              {snapple.creatorId === user?.uid && (
+                <View style={styles.actionGroup}>
+                  <Pressable
+                    style={styles.actionButton}
+                    onPress={async () => {
+                      const next = !muted;
+                      setMuted(next);
+                      const result = await snappleService.setSnappleMuted(snapple.id, user.uid, next);
+                      if (!result.success) {
+                        setMuted(!next);
+                        showError('Error', result.error || 'Could not update mute');
+                      }
+                    }}
+                  >
+                    <View style={[styles.buttonBg, muted && styles.activeBg]}>
+                      <Ionicons
+                        name={muted ? 'volume-mute' : 'volume-high'}
+                        size={20}
+                        color={muted ? theme.colors.vibeYellow : 'white'}
+                      />
+                    </View>
+                  </Pressable>
+                  <Text style={styles.actionCount}>{muted ? 'Muted' : 'Sound'}</Text>
+                </View>
+              )}
+
+              {snapple.creatorId === user?.uid && (
+                <View style={styles.actionGroup}>
+                  <Pressable style={styles.actionButton} onPress={() => {
+                    showConfirm(
+                      'Delete Snapple',
+                      'This removes it for everyone. Are you sure?',
+                      async () => {
+                        const result = await snappleService.deleteSnapple(snapple.id, user.uid);
+                        if (result.success) {
+                          onClose();
+                        }
+                      }
+                    );
+                  }}>
+                    <View style={styles.buttonBg}>
+                      <Ionicons name="trash" size={20} color="white" />
+                    </View>
+                  </Pressable>
+                  <Text style={styles.actionCount}>Delete</Text>
+                </View>
+              )}
+              </View>
+            ) : null}
+          </>
+        ) : null}
+
         {/* Action Buttons - right side */}
         <View style={styles.actionsColumn}>
           <View style={styles.actionGroup}>
@@ -556,37 +791,10 @@ export default function SnappleOverlay({
             <Text style={styles.actionCount}>{sharing ? 'Preparing…' : 'Share'}</Text>
           </View>
 
-          {(snapple.creatorId === user?.uid || (userCurrency.ownedSnapples || []).includes(snapple.id)) ? (
-            <View style={styles.actionGroup}>
-              <Pressable style={styles.actionButton} onPress={() => {
-                showConfirm(
-                  'Discard Snapple',
-                  'Remove this snapple from your collection?',
-                  async () => {
-                    // Remove from user's owned lists
-                    const updated = (userCurrency.ownedSnapples || []).filter(id => id !== snapple.id);
-                    const updatedCards = (userCurrency.ownedCards || []).filter(id => id !== snapple.id);
-                    const discarded = [...(userCurrency.discardedSnapples || []), snapple.id];
-                    await updateUserCurrency({ ownedSnapples: updated, ownedCards: updatedCards, discardedSnapples: discarded });
-                    // Remove from snapple's owners array
-                    try {
-                      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
-                      const { db } = await import('../../../services/firebase');
-                      await updateDoc(doc(db, 'snapples', snapple.id), {
-                        owners: arrayRemove(user.uid),
-                      });
-                    } catch (e) {}
-                    onClose();
-                  }
-                );
-              }}>
-                <View style={styles.buttonBg}>
-                  <Ionicons name="ban" size={20} color="white" />
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>Discard</Text>
-            </View>
-          ) : (
+          {/* Report stays out here. Somebody looking at a stranger's
+              snapple has nothing to manage, so they get no menu - and
+              reporting is the one thing they might need in a hurry. */}
+          {!canManage && (
             <View style={styles.actionGroup}>
               <Pressable style={styles.actionButton} onPress={handleReport}>
                 <View style={styles.buttonBg}>
@@ -594,154 +802,6 @@ export default function SnappleOverlay({
                 </View>
               </Pressable>
               <Text style={styles.actionCount}>Report</Text>
-            </View>
-          )}
-
-          {/* Creator-only: flip private ↔ public anytime. Private hides
-              the snapple from public feeds and disables NEW buys; the
-              UI confirms first if there are existing buyers (they keep
-              their copy — see persistPrivacy / handlePrivacyToggle).
-              Optimistic UI: flip the icon first, persist after. */}
-          {snapple.creatorId === user?.uid && (
-            <View style={styles.actionGroup}>
-              <Pressable
-                style={styles.actionButton}
-                onPress={() => {
-                  const next = !isPrivate;
-                  // Owners always includes the creator; anyone else in
-                  // the array is a paying buyer who's grandfathered in.
-                  const buyerCount = (snapple.owners || [])
-                    .filter((id) => id !== snapple.creatorId).length;
-
-                  const persistPrivacy = async () => {
-                    setIsPrivate(next);
-                    const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
-                    if (!result.success) {
-                      setIsPrivate(!next);
-                      showError('Error', result.error || 'Could not update privacy');
-                    }
-                  };
-
-                  // Only warn when going PUBLIC → PRIVATE with buyers.
-                  // Public-bound flips never need a warning. Mentions
-                  // Delete as the alternative for creators whose real
-                  // intent is a full takedown, not just "no new buys".
-                  if (next && buyerCount > 0) {
-                    const noun = buyerCount === 1 ? 'player' : 'players';
-                    const verb = buyerCount === 1 ? 'owns' : 'own';
-                    showConfirm(
-                      'Make Private?',
-                      `${buyerCount} ${noun} already ${verb} this. They'll keep their copy — going private just stops new buys and hides it from public feeds.\n\nWant to take it down entirely? Use Delete instead.`,
-                      persistPrivacy
-                    );
-                  } else {
-                    persistPrivacy();
-                  }
-                }}
-              >
-                <View style={[styles.buttonBg, isPrivate && styles.activeBg]}>
-                  <Ionicons
-                    name={isPrivate ? 'lock-closed' : 'lock-open'}
-                    size={20}
-                    color={isPrivate ? theme.colors.vibeYellow : 'white'}
-                  />
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
-            </View>
-          )}
-
-          {/* Creator-only: save to the camera roll. Your own video is
-              yours, and an app holding the only copy of something you
-              made is holding it hostage.
-
-              Only your own, deliberately. A save button on somebody
-              else's snapple is a one-tap way to take a copy of a
-              stranger's face out of the app permanently - and it would
-              make the account-deletion promise worthless, because
-              erasing the video means nothing once it is in fifty camera
-              rolls. downloadService refuses it too; a hidden button is
-              not a rule. */}
-          {snapple.creatorId === user?.uid && (
-            <View style={styles.actionGroup}>
-              <Pressable
-                style={styles.actionButton}
-                disabled={saving}
-                onPress={async () => {
-                  setSaving(true);
-                  const res = await saveSnappleToLibrary(snapple, user?.uid);
-                  setSaving(false);
-                  if (res.success) {
-                    // Worth a toast, unlike most things: it lands
-                    // somewhere else on the phone, so there is nothing
-                    // on this screen that could tell you it worked.
-                    showToast('info', 'Saved', 'It is in your photos');
-                  } else if (res.denied) {
-                    showError('Permission Needed', res.error);
-                  } else {
-                    showError('Could Not Save', res.error);
-                  }
-                }}
-              >
-                <View style={styles.buttonBg}>
-                  {saving
-                    ? <ActivityIndicator color="white" size="small" />
-                    : <Ionicons name="download-outline" size={20} color="white" />}
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>{saving ? 'Saving' : 'Save'}</Text>
-            </View>
-          )}
-
-          {/* Creator-only: mute toggle. Applies to ALL playbacks across
-              the app (home, game, voting, owners' decks). Useful for
-              legacy uploads with background noise or for visual-only
-              cards. Optimistic flip, rollback on failure. */}
-          {snapple.creatorId === user?.uid && (
-            <View style={styles.actionGroup}>
-              <Pressable
-                style={styles.actionButton}
-                onPress={async () => {
-                  const next = !muted;
-                  setMuted(next);
-                  const result = await snappleService.setSnappleMuted(snapple.id, user.uid, next);
-                  if (!result.success) {
-                    setMuted(!next);
-                    showError('Error', result.error || 'Could not update mute');
-                  }
-                }}
-              >
-                <View style={[styles.buttonBg, muted && styles.activeBg]}>
-                  <Ionicons
-                    name={muted ? 'volume-mute' : 'volume-high'}
-                    size={20}
-                    color={muted ? theme.colors.vibeYellow : 'white'}
-                  />
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>{muted ? 'Muted' : 'Sound'}</Text>
-            </View>
-          )}
-
-          {snapple.creatorId === user?.uid && (
-            <View style={styles.actionGroup}>
-              <Pressable style={styles.actionButton} onPress={() => {
-                showConfirm(
-                  'Delete Snapple',
-                  'This removes it for everyone. Are you sure?',
-                  async () => {
-                    const result = await snappleService.deleteSnapple(snapple.id, user.uid);
-                    if (result.success) {
-                      onClose();
-                    }
-                  }
-                );
-              }}>
-                <View style={styles.buttonBg}>
-                  <Ionicons name="trash" size={20} color="white" />
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>Delete</Text>
             </View>
           )}
         </View>
@@ -830,6 +890,26 @@ const makeStyles = (t) => ({
     alignItems: 'center',
     gap: 12,
     zIndex: 10,
+  },
+  // The vertical ellipsis, top right. Opposite close, which is top
+  // left, and out of the way of both the rail below it and the creator
+  // strip along the bottom.
+  menuToggle: {
+    position: 'absolute',
+    right: 16,
+    top: 20,
+    zIndex: 11,
+  },
+  // Hangs off the toggle and grows downward, the way a menu opened from
+  // a corner should. Capped and scroll-free: five items is the most it
+  // can hold (discard, privacy, save, sound, delete) and that fits.
+  ownerMenu: {
+    position: 'absolute',
+    right: 16,
+    top: 66,
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 11,
   },
   // Admin-only, so on a normal account this side of the video is empty
   // and the right rail is the whole interface - which is the point.
