@@ -127,15 +127,12 @@ export default function CreatorActionRow({ submission, currentUser, ownedSnapple
   const doShare = async () => {
     setBusy(true);
     try {
-      // Flip the link open BEFORE the sheet appears. If the share sheet
-      // is where someone copies the link, the link has to already work -
-      // marking it afterwards would leave the first recipient looking at
-      // "this snapple is private".
-      if (isPrivate && isMine) {
-        await snappleService.markSharedPrivately(snappleId, currentUser?.uid);
-      }
+      // No markSharedPrivately here any more. shareService does it for
+      // every caller, because this rail doing it and the profile overlay
+      // not doing it is exactly how sharing a private snapple from a
+      // profile ended up producing a dead link.
       await shareService.shareSnapple(
-        { ...submission, id: snappleId }, prompt);
+        { ...submission, id: snappleId, isPrivate }, prompt);
     } finally { setBusy(false); }
   };
 

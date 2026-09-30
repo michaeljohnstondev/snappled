@@ -22,7 +22,8 @@
 
 import { Share } from 'react-native';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { auth, db } from './firebase';
+import { snappleService } from './snappleService';
 
 // Where a non-user lands. The per-snapple page plays the clip and hands
 // them a download link; the bare URL is the fallback when there's no id.
@@ -183,6 +184,21 @@ export const shareService = {
    */
   async shareSnapple(snapple, promptOverride) {
     if (!snapple) return { success: false, error: 'No snapple' };
+
+    // Open the link BEFORE the sheet appears. The share page refuses a
+    // private snapple that its creator never chose to send - an id is
+    // short enough to guess at - so sharing one has to flip that first
+    // or the very first recipient opens "this snapple is private".
+    //
+    // Here rather than in the callers, which is what was wrong: the
+    // game rail did this and the profile overlay did not, so sharing
+    // your own private snapple from your profile produced a dead link.
+    // markSharedPrivately refuses anyone who is not the creator, so
+    // calling it unconditionally is safe - a stranger sharing a private
+    // clip still produces a link that says private, which is correct.
+    if (snapple.isPrivate) {
+      await snappleService.markSharedPrivately(snapple.id, auth.currentUser?.uid);
+    }
 
     const code = await ensurePromptCode(promptOverride);
     return shareVideo({

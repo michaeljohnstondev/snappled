@@ -738,10 +738,13 @@ export default function SnappleOverlay({
           <Text style={styles.actionCount}>{formatCount(metrics.likes)}</Text>
         </View>
 
-        {/* Buy button — hidden entirely for private snapples since they
-            can't be purchased. The creator viewing their own private
-            snapple also doesn't see it. */}
-        {!isPrivate && (
+        {/* Buy button - hidden for private snapples, which can't be
+            purchased, and on your own, where it only ever rendered as a
+            green "Owned" tick. You know you made it; a slot confirming
+            it is noise. Every snapple lists its creator in `owners` from
+            the moment it is created, which is why it could never show a
+            price there. */}
+        {!isPrivate && snapple.creatorId !== user?.uid && (
           <View style={styles.actionGroup}>
             <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
               <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
@@ -788,6 +791,13 @@ export default function SnappleOverlay({
           <Text style={styles.actionCount}>Comments</Text>
         </View>
 
+        {/* Share, unless it is somebody else's private snapple. A buyer
+            grandfathered in on a clip that went private can still watch
+            it, but the share page refuses anyone the CREATOR did not
+            send it to - so the button would have handed them a link
+            reading "this snapple is private". Same rule the game rail
+            already used: !isPrivate || isMine. */}
+        {(!isPrivate || snapple.creatorId === user?.uid) && (
         <View style={styles.actionGroup}>
           <Pressable style={styles.actionButton} onPress={handleShare}>
             <View style={[styles.buttonBg, sharing && { opacity: 0.6 }]}>
@@ -800,6 +810,7 @@ export default function SnappleOverlay({
           </Pressable>
           <Text style={styles.actionCount}>{sharing ? 'Preparing…' : 'Share'}</Text>
         </View>
+        )}
 
         {/* Report stays out here. Somebody looking at a stranger's
             snapple has nothing to manage, so they get no menu - and
