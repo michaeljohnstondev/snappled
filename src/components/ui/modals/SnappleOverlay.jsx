@@ -513,314 +513,307 @@ export default function SnappleOverlay({
 
             It also means the rail is the same for everybody, which is
             what it looked like it was for and never actually was. */}
-        {/* One rail, two sets, one vertical line.
+        {/* Owner controls: the dots top right, the controls under them.
 
-            The owner controls used to be their own absolutely-positioned
-            column, and it could not be made to line up: actionsColumn
-            takes its WIDTH from its widest label ("Comments"), and its
-            buttons are centred inside that width - so a 36px button
-            pinned to right:16 sits a dozen pixels off the rail's centre
-            no matter what number you put there.
+            All in ONE container, which is the bit that was broken before.
+            Two separately-pinned columns each size themselves to their own
+            content - a bare 36px button in one, labelled buttons in the
+            other - so at the same right offset their centres still landed
+            a dozen pixels apart. Sharing a parent means they share its
+            centring.
 
-            So the ellipsis lives IN the rail and swaps what is above it.
-            Same container, same centring, aligned by construction rather
-            than by matching offsets that were never going to match.
-
-            It is the bottom item on purpose. The rail is bottom-anchored
-            and grows upward, so anything above it moves when the count
-            changes; down here the toggle stays put whichever set is
-            showing. */}
-        <View style={styles.actionsColumn}>
-          {menuOpen ? (
-            <>
-              <View style={styles.actionGroup}>
-                <Pressable style={styles.actionButton} onPress={() => {
-                  showConfirm(
-                    'Discard Snapple',
-                    'Remove this snapple from your collection?',
-                    async () => {
-                      // Remove from user's owned lists
-                      const updated = (userCurrency.ownedSnapples || []).filter(id => id !== snapple.id);
-                      const updatedCards = (userCurrency.ownedCards || []).filter(id => id !== snapple.id);
-                      const discarded = [...(userCurrency.discardedSnapples || []), snapple.id];
-                      await updateUserCurrency({ ownedSnapples: updated, ownedCards: updatedCards, discardedSnapples: discarded });
-                      // Remove from snapple's owners array
-                      try {
-                        const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
-                        const { db } = await import('../../../services/firebase');
-                        await updateDoc(doc(db, 'snapples', snapple.id), {
-                          owners: arrayRemove(user.uid),
-                        });
-                      } catch (e) {}
-                      onClose();
-                    }
-                  );
-                }}>
-                  <View style={styles.buttonBg}>
-                    <Ionicons name="ban" size={20} color="white" />
-                  </View>
-                </Pressable>
-                <Text style={styles.actionCount}>Discard</Text>
+            Both columns also carry a fixed width for the same reason: the
+            rail's width comes from "Comments" and this one's from
+            "Discard", so without it every button on this edge would sit on
+            a slightly different vertical line. */}
+        {canManage ? (
+          <View style={styles.ownerColumn}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => setMenuOpen((o) => !o)}
+              hitSlop={8}
+            >
+              {/* No label. The dots are the convention and a word under
+                  them only competes with the labels below. */}
+              <View style={[styles.buttonBg, menuOpen && styles.activeBg]}>
+                <Ionicons
+                  name="ellipsis-vertical"
+                  size={20}
+                  color={menuOpen ? theme.colors.vibeYellow : 'white'}
+                />
               </View>
-            {/* Creator-only: flip private ↔ public anytime. Private hides
-                the snapple from public feeds and disables NEW buys; the
-                UI confirms first if there are existing buyers (they keep
-                their copy — see persistPrivacy / handlePrivacyToggle).
-                Optimistic UI: flip the icon first, persist after. */}
-            {snapple.creatorId === user?.uid && (
-              <View style={styles.actionGroup}>
-                <Pressable
-                  style={styles.actionButton}
-                  onPress={() => {
-                    const next = !isPrivate;
-                    // Owners always includes the creator; anyone else in
-                    // the array is a paying buyer who's grandfathered in.
-                    const buyerCount = (snapple.owners || [])
-                      .filter((id) => id !== snapple.creatorId).length;
+            </Pressable>
 
-                    const persistPrivacy = async () => {
-                      setIsPrivate(next);
-                      const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
-                      if (!result.success) {
-                        setIsPrivate(!next);
-                        showError('Error', result.error || 'Could not update privacy');
-                      }
-                    };
-
-                    // Only warn when going PUBLIC → PRIVATE with buyers.
-                    // Public-bound flips never need a warning. Mentions
-                    // Delete as the alternative for creators whose real
-                    // intent is a full takedown, not just "no new buys".
-                    if (next && buyerCount > 0) {
-                      const noun = buyerCount === 1 ? 'player' : 'players';
-                      const verb = buyerCount === 1 ? 'owns' : 'own';
-                      showConfirm(
-                        'Make Private?',
-                        `${buyerCount} ${noun} already ${verb} this. They'll keep their copy — going private just stops new buys and hides it from public feeds.\n\nWant to take it down entirely? Use Delete instead.`,
-                        persistPrivacy
-                      );
-                    } else {
-                      persistPrivacy();
-                    }
-                  }}
-                >
-                  <View style={[styles.buttonBg, isPrivate && styles.activeBg]}>
-                    <Ionicons
-                      name={isPrivate ? 'lock-closed' : 'lock-open'}
-                      size={20}
-                      color={isPrivate ? theme.colors.vibeYellow : 'white'}
-                    />
-                  </View>
-                </Pressable>
-                <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
-              </View>
-            )}
-
-            {/* Creator-only: save to the camera roll. Your own video is
-                yours, and an app holding the only copy of something you
-                made is holding it hostage.
-
-                Only your own, deliberately. A save button on somebody
-                else's snapple is a one-tap way to take a copy of a
-                stranger's face out of the app permanently - and it would
-                make the account-deletion promise worthless, because
-                erasing the video means nothing once it is in fifty camera
-                rolls. downloadService refuses it too; a hidden button is
-                not a rule. */}
-            {snapple.creatorId === user?.uid && (
-              <View style={styles.actionGroup}>
-                <Pressable
-                  style={styles.actionButton}
-                  disabled={saving}
-                  onPress={async () => {
-                    setSaving(true);
-                    const res = await saveSnappleToLibrary(snapple, user?.uid);
-                    setSaving(false);
-                    if (res.success) {
-                      // Worth a toast, unlike most things: it lands
-                      // somewhere else on the phone, so there is nothing
-                      // on this screen that could tell you it worked.
-                      showToast('info', 'Saved', 'It is in your photos');
-                    } else if (res.denied) {
-                      showError('Permission Needed', res.error);
-                    } else {
-                      showError('Could Not Save', res.error);
-                    }
-                  }}
-                >
-                  <View style={styles.buttonBg}>
-                    {saving
-                      ? <ActivityIndicator color="white" size="small" />
-                      : <Ionicons name="download-outline" size={20} color="white" />}
-                  </View>
-                </Pressable>
-                <Text style={styles.actionCount}>{saving ? 'Saving' : 'Save'}</Text>
-              </View>
-            )}
-
-            {/* Creator-only: mute toggle. Applies to ALL playbacks across
-                the app (home, game, voting, owners' decks). Useful for
-                legacy uploads with background noise or for visual-only
-                cards. Optimistic flip, rollback on failure. */}
-            {snapple.creatorId === user?.uid && (
-              <View style={styles.actionGroup}>
-                <Pressable
-                  style={styles.actionButton}
-                  onPress={async () => {
-                    const next = !muted;
-                    setMuted(next);
-                    const result = await snappleService.setSnappleMuted(snapple.id, user.uid, next);
-                    if (!result.success) {
-                      setMuted(!next);
-                      showError('Error', result.error || 'Could not update mute');
-                    }
-                  }}
-                >
-                  <View style={[styles.buttonBg, muted && styles.activeBg]}>
-                    <Ionicons
-                      name={muted ? 'volume-mute' : 'volume-high'}
-                      size={20}
-                      color={muted ? theme.colors.vibeYellow : 'white'}
-                    />
-                  </View>
-                </Pressable>
-                <Text style={styles.actionCount}>{muted ? 'Muted' : 'Sound'}</Text>
-              </View>
-            )}
-
-            {snapple.creatorId === user?.uid && (
-              <View style={styles.actionGroup}>
-                <Pressable style={styles.actionButton} onPress={() => {
-                  showConfirm(
-                    'Delete Snapple',
-                    'This removes it for everyone. Are you sure?',
-                    async () => {
-                      const result = await snappleService.deleteSnapple(snapple.id, user.uid);
-                      if (result.success) {
-                        onClose();
-                      }
-                    }
-                  );
-                }}>
-                  <View style={styles.buttonBg}>
-                    <Ionicons name="trash" size={20} color="white" />
-                  </View>
-                </Pressable>
-                <Text style={styles.actionCount}>Delete</Text>
-              </View>
-            )}
-            </>
-          ) : (
-            <>
+            {menuOpen ? (
+              <>
             <View style={styles.actionGroup}>
-              <Pressable style={styles.actionButton} onPress={handleLike}>
-                <View style={[styles.buttonBg, userInteraction.hasLiked && styles.activeBg]}>
-                  <Ionicons name="heart" size={20} color={userInteraction.hasLiked ? theme.colors.vibeRed : 'white'} />
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>{formatCount(metrics.likes)}</Text>
-            </View>
-
-            {/* Buy button — hidden entirely for private snapples since they
-                can't be purchased. The creator viewing their own private
-                snapple also doesn't see it. */}
-            {!isPrivate && (
-              <View style={styles.actionGroup}>
-                <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
-                  <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
-                    {/* A coin, not a gem. This is the last call site
-                        still drawing the old blue diamond next to a
-                        COIN price - in games a gem is conventionally a
-                        separate premium currency, so it named something
-                        the player cannot spend. */}
-                    {userInteraction.hasPurchased ? (
-                      <Ionicons name="checkmark" size={20} style={{ marginTop: 2 }} color={theme.colors.vibeGreen} />
-                    ) : (
-                      <CurrencyIcon name="coins" size={22} />
-                    )}
-                  </View>
-                </Pressable>
-                {/* Just "Owned" once it is yours. The price used to stay
-                    underneath as a resale hint, but a price tag on a
-                    thing you already bought reads as a charge, not as
-                    value - and it is the one number that cannot do
-                    anything for you here. */}
-                {userInteraction.hasPurchased ? (
-                  <Text style={[styles.actionCount, styles.ownedLabel]}>Owned</Text>
-                ) : (
-                  <Text style={styles.actionCount}>{metrics.currentPrice}</Text>
-                )}
-              </View>
-            )}
-
-            {/* No wishlist button. There were two things called Save on
-                one rail - this one bookmarked the card, the creator-only
-                one puts the video in your photos - and two buttons with
-                the same word on them is worse than not having one of
-                them. Wishlist data is untouched, so nothing anybody has
-                already saved is lost.
-
-                For a snapple you want, Buy is the button. */}
-
-            <View style={styles.actionGroup}>
-              <Pressable style={styles.actionButton} onPress={() => setShowComments(true)}>
+              <Pressable style={styles.actionButton} onPress={() => {
+                showConfirm(
+                  'Discard Snapple',
+                  'Remove this snapple from your collection?',
+                  async () => {
+                    // Remove from user's owned lists
+                    const updated = (userCurrency.ownedSnapples || []).filter(id => id !== snapple.id);
+                    const updatedCards = (userCurrency.ownedCards || []).filter(id => id !== snapple.id);
+                    const discarded = [...(userCurrency.discardedSnapples || []), snapple.id];
+                    await updateUserCurrency({ ownedSnapples: updated, ownedCards: updatedCards, discardedSnapples: discarded });
+                    // Remove from snapple's owners array
+                    try {
+                      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+                      const { db } = await import('../../../services/firebase');
+                      await updateDoc(doc(db, 'snapples', snapple.id), {
+                        owners: arrayRemove(user.uid),
+                      });
+                    } catch (e) {}
+                    onClose();
+                  }
+                );
+              }}>
                 <View style={styles.buttonBg}>
-                  <Ionicons name="chatbubble" size={19} style={{ marginTop: 2 }} color="white" />
+                  <Ionicons name="ban" size={20} color="white" />
                 </View>
               </Pressable>
-              <Text style={styles.actionCount}>Comments</Text>
+              <Text style={styles.actionCount}>Discard</Text>
             </View>
-
-            <View style={styles.actionGroup}>
-              <Pressable style={styles.actionButton} onPress={handleShare}>
-                <View style={[styles.buttonBg, sharing && { opacity: 0.6 }]}>
-                  {sharing ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Ionicons name="share-social" size={20} style={{ marginTop: 2, marginLeft: -2 }} color="white" />
-                  )}
-                </View>
-              </Pressable>
-              <Text style={styles.actionCount}>{sharing ? 'Preparing…' : 'Share'}</Text>
-            </View>
-
-            {/* Report stays out here. Somebody looking at a stranger's
-                snapple has nothing to manage, so they get no menu - and
-                reporting is the one thing they might need in a hurry. */}
-            {!canManage && (
-              <View style={styles.actionGroup}>
-                <Pressable style={styles.actionButton} onPress={handleReport}>
-                  <View style={styles.buttonBg}>
-                    <Ionicons name="flag" size={20} color="white" />
-                  </View>
-                </Pressable>
-                <Text style={styles.actionCount}>Report</Text>
-              </View>
-            )}
-            </>
-          )}
-
-          {canManage ? (
+          {/* Creator-only: flip private ↔ public anytime. Private hides
+              the snapple from public feeds and disables NEW buys; the
+              UI confirms first if there are existing buyers (they keep
+              their copy — see persistPrivacy / handlePrivacyToggle).
+              Optimistic UI: flip the icon first, persist after. */}
+          {snapple.creatorId === user?.uid && (
             <View style={styles.actionGroup}>
               <Pressable
                 style={styles.actionButton}
-                onPress={() => setMenuOpen((o) => !o)}
-                hitSlop={8}
+                onPress={() => {
+                  const next = !isPrivate;
+                  // Owners always includes the creator; anyone else in
+                  // the array is a paying buyer who's grandfathered in.
+                  const buyerCount = (snapple.owners || [])
+                    .filter((id) => id !== snapple.creatorId).length;
+
+                  const persistPrivacy = async () => {
+                    setIsPrivate(next);
+                    const result = await snappleService.setSnapplePrivacy(snapple.id, user.uid, next);
+                    if (!result.success) {
+                      setIsPrivate(!next);
+                      showError('Error', result.error || 'Could not update privacy');
+                    }
+                  };
+
+                  // Only warn when going PUBLIC → PRIVATE with buyers.
+                  // Public-bound flips never need a warning. Mentions
+                  // Delete as the alternative for creators whose real
+                  // intent is a full takedown, not just "no new buys".
+                  if (next && buyerCount > 0) {
+                    const noun = buyerCount === 1 ? 'player' : 'players';
+                    const verb = buyerCount === 1 ? 'owns' : 'own';
+                    showConfirm(
+                      'Make Private?',
+                      `${buyerCount} ${noun} already ${verb} this. They'll keep their copy — going private just stops new buys and hides it from public feeds.\n\nWant to take it down entirely? Use Delete instead.`,
+                      persistPrivacy
+                    );
+                  } else {
+                    persistPrivacy();
+                  }
+                }}
               >
-                {/* Same icon either way, lit when open. An X here would
-                    read as "close the snapple", which is what the X in
-                    the top corner already does. */}
-                <View style={[styles.buttonBg, menuOpen && styles.activeBg]}>
+                <View style={[styles.buttonBg, isPrivate && styles.activeBg]}>
                   <Ionicons
-                    name="ellipsis-vertical"
+                    name={isPrivate ? 'lock-closed' : 'lock-open'}
                     size={20}
-                    color={menuOpen ? theme.colors.vibeYellow : 'white'}
+                    color={isPrivate ? theme.colors.vibeYellow : 'white'}
                   />
                 </View>
               </Pressable>
-              <Text style={styles.actionCount}>{menuOpen ? 'Back' : 'Manage'}</Text>
+              <Text style={styles.actionCount}>{isPrivate ? 'Private' : 'Public'}</Text>
             </View>
-          ) : null}
+          )}
+
+          {/* Creator-only: save to the camera roll. Your own video is
+              yours, and an app holding the only copy of something you
+              made is holding it hostage.
+
+              Only your own, deliberately. A save button on somebody
+              else's snapple is a one-tap way to take a copy of a
+              stranger's face out of the app permanently - and it would
+              make the account-deletion promise worthless, because
+              erasing the video means nothing once it is in fifty camera
+              rolls. downloadService refuses it too; a hidden button is
+              not a rule. */}
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                disabled={saving}
+                onPress={async () => {
+                  setSaving(true);
+                  const res = await saveSnappleToLibrary(snapple, user?.uid);
+                  setSaving(false);
+                  if (res.success) {
+                    // Worth a toast, unlike most things: it lands
+                    // somewhere else on the phone, so there is nothing
+                    // on this screen that could tell you it worked.
+                    showToast('info', 'Saved', 'It is in your photos');
+                  } else if (res.denied) {
+                    showError('Permission Needed', res.error);
+                  } else {
+                    showError('Could Not Save', res.error);
+                  }
+                }}
+              >
+                <View style={styles.buttonBg}>
+                  {saving
+                    ? <ActivityIndicator color="white" size="small" />
+                    : <Ionicons name="download-outline" size={20} color="white" />}
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{saving ? 'Saving' : 'Save'}</Text>
+            </View>
+          )}
+
+          {/* Creator-only: mute toggle. Applies to ALL playbacks across
+              the app (home, game, voting, owners' decks). Useful for
+              legacy uploads with background noise or for visual-only
+              cards. Optimistic flip, rollback on failure. */}
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={async () => {
+                  const next = !muted;
+                  setMuted(next);
+                  const result = await snappleService.setSnappleMuted(snapple.id, user.uid, next);
+                  if (!result.success) {
+                    setMuted(!next);
+                    showError('Error', result.error || 'Could not update mute');
+                  }
+                }}
+              >
+                <View style={[styles.buttonBg, muted && styles.activeBg]}>
+                  <Ionicons
+                    name={muted ? 'volume-mute' : 'volume-high'}
+                    size={20}
+                    color={muted ? theme.colors.vibeYellow : 'white'}
+                  />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>{muted ? 'Muted' : 'Sound'}</Text>
+            </View>
+          )}
+
+          {snapple.creatorId === user?.uid && (
+            <View style={styles.actionGroup}>
+              <Pressable style={styles.actionButton} onPress={() => {
+                showConfirm(
+                  'Delete Snapple',
+                  'This removes it for everyone. Are you sure?',
+                  async () => {
+                    const result = await snappleService.deleteSnapple(snapple.id, user.uid);
+                    if (result.success) {
+                      onClose();
+                    }
+                  }
+                );
+              }}>
+                <View style={styles.buttonBg}>
+                  <Ionicons name="trash" size={20} color="white" />
+                </View>
+              </Pressable>
+              <Text style={styles.actionCount}>Delete</Text>
+            </View>
+          )}
+              </>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Action Buttons - right side */}
+        <View style={styles.actionsColumn}>
+        <View style={styles.actionGroup}>
+          <Pressable style={styles.actionButton} onPress={handleLike}>
+            <View style={[styles.buttonBg, userInteraction.hasLiked && styles.activeBg]}>
+              <Ionicons name="heart" size={20} color={userInteraction.hasLiked ? theme.colors.vibeRed : 'white'} />
+            </View>
+          </Pressable>
+          <Text style={styles.actionCount}>{formatCount(metrics.likes)}</Text>
+        </View>
+
+        {/* Buy button — hidden entirely for private snapples since they
+            can't be purchased. The creator viewing their own private
+            snapple also doesn't see it. */}
+        {!isPrivate && (
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={handleBuy} disabled={userInteraction.hasPurchased}>
+              <View style={[styles.buttonBg, userInteraction.hasPurchased && styles.purchasedBg]}>
+                {/* A coin, not a gem. This is the last call site
+                    still drawing the old blue diamond next to a
+                    COIN price - in games a gem is conventionally a
+                    separate premium currency, so it named something
+                    the player cannot spend. */}
+                {userInteraction.hasPurchased ? (
+                  <Ionicons name="checkmark" size={20} style={{ marginTop: 2 }} color={theme.colors.vibeGreen} />
+                ) : (
+                  <CurrencyIcon name="coins" size={22} />
+                )}
+              </View>
+            </Pressable>
+            {/* Just "Owned" once it is yours. The price used to stay
+                underneath as a resale hint, but a price tag on a
+                thing you already bought reads as a charge, not as
+                value - and it is the one number that cannot do
+                anything for you here. */}
+            {userInteraction.hasPurchased ? (
+              <Text style={[styles.actionCount, styles.ownedLabel]}>Owned</Text>
+            ) : (
+              <Text style={styles.actionCount}>{metrics.currentPrice}</Text>
+            )}
+          </View>
+        )}
+
+        {/* No wishlist button. There were two things called Save on
+            one rail - this one bookmarked the card, the creator-only
+            one puts the video in your photos - and two buttons with
+            the same word on them is worse than not having one of
+            them. Wishlist data is untouched, so nothing anybody has
+            already saved is lost.
+
+            For a snapple you want, Buy is the button. */}
+
+        <View style={styles.actionGroup}>
+          <Pressable style={styles.actionButton} onPress={() => setShowComments(true)}>
+            <View style={styles.buttonBg}>
+              <Ionicons name="chatbubble" size={19} style={{ marginTop: 2 }} color="white" />
+            </View>
+          </Pressable>
+          <Text style={styles.actionCount}>Comments</Text>
+        </View>
+
+        <View style={styles.actionGroup}>
+          <Pressable style={styles.actionButton} onPress={handleShare}>
+            <View style={[styles.buttonBg, sharing && { opacity: 0.6 }]}>
+              {sharing ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Ionicons name="share-social" size={20} style={{ marginTop: 2, marginLeft: -2 }} color="white" />
+              )}
+            </View>
+          </Pressable>
+          <Text style={styles.actionCount}>{sharing ? 'Preparing…' : 'Share'}</Text>
+        </View>
+
+        {/* Report stays out here. Somebody looking at a stranger's
+            snapple has nothing to manage, so they get no menu - and
+            reporting is the one thing they might need in a hurry. */}
+        {!canManage && (
+          <View style={styles.actionGroup}>
+            <Pressable style={styles.actionButton} onPress={handleReport}>
+              <View style={styles.buttonBg}>
+                <Ionicons name="flag" size={20} color="white" />
+              </View>
+            </Pressable>
+            <Text style={styles.actionCount}>Report</Text>
+          </View>
+        )}
         </View>
 
         {/* Creator Info - bottom left */}
@@ -857,6 +850,13 @@ export default function SnappleOverlay({
     </Modal>
   );
 }
+
+// Both right-edge columns are pinned to this. Without it each one takes
+// its width from its own widest label - "Comments" on the rail, "Discard"
+// in the owner set - and their buttons end up centred on lines a dozen
+// pixels apart. Wide enough for the longest label ("Preparing…") to stay
+// on one line.
+const RAIL_WIDTH = 72;
 
 const makeStyles = (t) => ({
   overlay: {
@@ -904,9 +904,22 @@ const makeStyles = (t) => ({
     position: 'absolute',
     right: 12,
     bottom: 60,
+    width: RAIL_WIDTH,
     alignItems: 'center',
     gap: 12,
     zIndex: 10,
+  },
+  // The dots and whatever they open, top right. Same width and the same
+  // right offset as the rail below, so every button on this edge sits on
+  // one vertical line - which is the whole reason the width is fixed.
+  ownerColumn: {
+    position: 'absolute',
+    right: 12,
+    top: 20,
+    width: RAIL_WIDTH,
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 11,
   },
   // Admin-only, so on a normal account this side of the video is empty
   // and the right rail is the whole interface - which is the point.
