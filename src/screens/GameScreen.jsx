@@ -46,6 +46,13 @@ import { soundService } from '../services/soundService';
 import { shareService } from '../services/shareService';
 import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 
+// How long a practice game runs. Five, on feedback from people who
+// played it: practice is for learning the shape of a round, and a race
+// to a score runs as long as it takes - which is the wrong length for
+// somebody's first game. Short and visibly finite beats open-ended here.
+// Points are what Ranked will be scored on.
+const PRACTICE_ROUNDS = 5;
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // ── Round results reveal — staged animation: grid → spotlight → shrink → scoreboard ──
@@ -570,7 +577,14 @@ export default function GameScreen({ navigation, route }) {
     // cycle it is not part of.
     [GAME_PHASES.REVIEW]: {
       title: 'Warmup',
-      sub: "These are your snapples. Tap them to see what you're working with.",
+      // The length goes here because this is the first thing anybody
+      // sees in a game, and "how long is this" is the question you want
+      // answered before you start rather than in round four. Inlined
+      // rather than calling gameEndsBullet, which is declared further
+      // down - this object is built on every render, so reaching forward
+      // to it would be a temporal dead zone error.
+      sub: "These are your snapples. Tap them to see what you're working with."
+        + (game?.roundLimit > 0 ? ` ${game.roundLimit} rounds and you're done.` : ''),
     },
     [GAME_PHASES.PICKING]: {
       title: 'Picking phase',
@@ -602,6 +616,24 @@ export default function GameScreen({ navigation, route }) {
   }, [game?.phase, game?.currentRound]);
 
   const hidePhaseHelp = () => setRoundAlert(null);
+
+  /**
+   * One line on how THIS game ends, appended to every phase's help.
+   *
+   * Read off the game doc rather than written out, because the ending is
+   * set per game - a round cap or a points target - and help text that
+   * states the wrong one is worse than help text that says nothing.
+   * "How long does this last" is also the single question somebody is
+   * most likely to be pressing "?" to answer.
+   */
+  const gameEndsBullet = () => {
+    const cap = game?.roundLimit || 0;
+    const target = game?.totalRounds || 0;
+    if (cap > 0) return `${cap} rounds, then the game is over`;
+    if (target > 0) return `First to ${target} points wins`;
+    return 'Runs until the host ends it';
+  };
+
   const showPhaseHelp = () => {
     const phase = game?.phase;
     if (phase === GAME_PHASES.PICKING) {
@@ -611,6 +643,7 @@ export default function GameScreen({ navigation, route }) {
           'Pick the snapple that best suits the prompt',
           'Tap a card to preview it fullscreen',
           'Hit PLAY THIS SNAPPLE when you\'re locked in',
+          gameEndsBullet(),
         ],
       });
     } else if (phase === GAME_PHASES.VOTING) {
@@ -620,6 +653,7 @@ export default function GameScreen({ navigation, route }) {
           'Pick your favorite snapple for this prompt',
           'Tap a card to preview it fullscreen',
           'You can\'t vote for your own submission',
+          gameEndsBullet(),
         ],
       });
     } else if (phase === GAME_PHASES.SCORING) {
@@ -628,6 +662,7 @@ export default function GameScreen({ navigation, route }) {
         bullets: [
           'Each vote your card got is worth a point',
           'The round winner wears the crown',
+          gameEndsBullet(),
         ],
       });
     } else if (phase === GAME_PHASES.REVIEW) {
@@ -637,6 +672,7 @@ export default function GameScreen({ navigation, route }) {
           'Get comfy with your hand',
           'Tap READY UP when you\'re set',
           'Round starts when everyone\'s ready or the timer runs out',
+          gameEndsBullet(),
         ],
       });
     } else if (phase === GAME_PHASES.ROUND_RESULTS) {
@@ -645,6 +681,7 @@ export default function GameScreen({ navigation, route }) {
         bullets: [
           'Standings after the round',
           'Host advances to the next round when ready',
+          gameEndsBullet(),
         ],
       });
     }
@@ -1418,7 +1455,13 @@ export default function GameScreen({ navigation, route }) {
     // snapples show up in their hand alongside community cards.
     try {
       const username = user?.username || user?.email?.split('@')[0] || 'Player';
-      const createResult = await gameService.createGame(user.uid, username, selectedRounds);
+      // Five rounds, no points target. Practice is for learning the
+      // shape of a round, and a race to 25 points runs as long as it
+      // takes - which is the wrong length for the first game somebody
+      // ever plays. A fixed, short game you can see the end of beats an
+      // open one every time here. Points are what Ranked will be for.
+      const createResult = await gameService.createGame(
+        user.uid, username, 0, PRACTICE_ROUNDS);
       if (!createResult.success) {
         showError('Error', createResult.error);
         return;
@@ -1433,8 +1476,8 @@ export default function GameScreen({ navigation, route }) {
         await gameService.joinGame(createResult.gameId, `bot_${name}`, name);
       }
 
-      // Start immediately. Always seed a 25-prompt buffer regardless
-      // of target since game length is variable in vote-scoring mode.
+      // Start immediately. Seeds more prompts than the five rounds
+      // need, which costs nothing and covers a replaced or skipped one.
       const prompts = await gameService.getGamePrompts(25);
 
       await gameService.startGame(createResult.gameId, user.uid, prompts);

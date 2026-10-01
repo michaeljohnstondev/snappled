@@ -174,7 +174,7 @@ async function claimGameCode(gameId, hostId) {
 
 export const gameService = {
   // Create a new game lobby
-  async createGame(hostId, hostUsername, targetPoints = 25) {
+  async createGame(hostId, hostUsername, targetPoints = 25, roundCap = 0) {
     try {
       const gameRef = doc(collection(db, GAMES_COLLECTION));
       // Stored as totalRounds for backward compat — semantically it's now
@@ -182,13 +182,19 @@ export const gameService = {
       // 1-200 = fixed target.
       const raw = Number(targetPoints);
       const safeRounds = raw === 0 ? 0 : Math.max(1, Math.min(200, raw || 25));
+      // A cap at create time, for modes that are a fixed length rather
+      // than a race to a score. Practice is five rounds and says so;
+      // without this, createGame could only ever make a points game and
+      // practice ran until somebody hit 25.
+      const rawCap = Number(roundCap);
+      const safeCap = rawCap > 0 ? Math.max(1, Math.min(50, rawCap)) : 0;
       const gameDoc = {
         hostId,
         phase: GAME_PHASES.LOBBY,
         currentRound: 0,
         totalRounds: safeRounds,
         // 0 = no cap; the points target decides the ending.
-        roundLimit: 0,
+        roundLimit: safeCap,
         players: [{
           uid: hostId,
           username: hostUsername,
