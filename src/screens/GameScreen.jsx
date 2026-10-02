@@ -584,7 +584,9 @@ export default function GameScreen({ navigation, route }) {
       // down - this object is built on every render, so reaching forward
       // to it would be a temporal dead zone error.
       sub: "These are your snapples. Tap them to see what you're working with."
-        + (game?.roundLimit > 0 ? ` ${game.roundLimit} rounds and you're done.` : ''),
+        + (game?.roundLimit > 0
+          ? ` ${game.roundLimit} rounds, highest score wins.`
+          : ''),
     },
     [GAME_PHASES.PICKING]: {
       title: 'Picking phase',
@@ -629,9 +631,18 @@ export default function GameScreen({ navigation, route }) {
   const gameEndsBullet = () => {
     const cap = game?.roundLimit || 0;
     const target = game?.totalRounds || 0;
-    if (cap > 0) return `${cap} rounds, then the game is over`;
+    // Both can be set from the lobby, and isGameOver is `hitTarget ||
+    // hitLimit` - whichever lands first. So "both" is its own case, not a
+    // pick-one: naming only the cap would hide half the rule.
+    if (cap > 0 && target > 0) {
+      return `First to ${target} points, or top score after ${cap} rounds`;
+    }
+    // Says who WINS, not just when it stops. A fixed-length game is won
+    // on points like any other - there is simply no number to race to,
+    // so the highest score when the rounds run out takes it.
+    if (cap > 0) return `Highest score after ${cap} rounds wins`;
     if (target > 0) return `First to ${target} points wins`;
-    return 'Runs until the host ends it';
+    return 'Highest score when the host ends it wins';
   };
 
   const showPhaseHelp = () => {
