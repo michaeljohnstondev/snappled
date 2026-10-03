@@ -62,6 +62,9 @@ export default function LobbyPhase({
     }));
   };
   const styles = useThemedStyles(makeStyles);
+  // Whether the colour grid is expanded. Collapsed by default - picking
+  // a colour is a one-time thing and the roster is what you came to see.
+  const [colorsOpen, setColorsOpen] = useState(false);
   const totalRounds = game?.totalRounds ?? 5;
   const roundLimit = game?.roundLimit ?? 0;
   return (
@@ -110,25 +113,67 @@ export default function LobbyPhase({
             hidden: seeing that someone already has the pink is part of
             picking. */}
         {!!userId && (
-          <View style={styles.colorRow}>
-            {PLAYER_PALETTE.map((c, i) => {
-              const mine = me?.colorIndex === i;
-              const taken = takenColorSlots(game.players).has(i) && !mine;
-              return (
-                <Pressable
-                  key={c}
-                  disabled={taken}
-                  onPress={() => gameService.setPlayerColor(gameId, userId, i)}
-                  style={[
-                    styles.swatch,
-                    { backgroundColor: c },
-                    mine && styles.swatchMine,
-                    taken && styles.swatchTaken,
-                  ]}
-                  hitSlop={4}
-                />
-              );
-            })}
+          <View style={styles.colorBlock}>
+            {/* Collapsed to a single swatch until you want it. Sixteen
+                colours laid out flat pushed the player list and the
+                invite button off the first screen of a lobby, and the
+                one thing a lobby has to show you is who is in it. */}
+            <Pressable
+              style={styles.colorTrigger}
+              onPress={() => setColorsOpen((o) => !o)}
+              hitSlop={6}
+            >
+              <View
+                style={[
+                  styles.swatch,
+                  styles.triggerSwatch,
+                  { backgroundColor: PLAYER_PALETTE[
+                    (me?.colorIndex ?? 0) % PLAYER_PALETTE.length] },
+                ]}
+              />
+              <Text style={styles.colorTriggerText}>Your colour</Text>
+              <Ionicons
+                name={colorsOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={theme.colors.vibeBlue}
+              />
+            </Pressable>
+
+            {/* Four across, so sixteen reads as a block rather than a
+                ragged wrap. Taken swatches are shown rather than
+                hidden: seeing that somebody already has the pink is
+                part of picking. */}
+            {colorsOpen ? (
+              <View style={styles.colorGrid}>
+                {PLAYER_PALETTE.map((c, i) => {
+                  const mine = me?.colorIndex === i;
+                  const taken = takenColorSlots(game.players).has(i) && !mine;
+                  return (
+                    <Pressable
+                      // The index IS the identity here - colorIndex is
+                      // what gets stored - and two palette entries
+                      // resolving to the same hex would collide on key.
+                      key={i}
+                      disabled={taken}
+                      onPress={() => {
+                        gameService.setPlayerColor(gameId, userId, i);
+                        // Closes on pick. The grid is tall and you only
+                        // choose once, so leaving it open just hides the
+                        // room you are waiting in.
+                        setColorsOpen(false);
+                      }}
+                      style={[
+                        styles.swatch,
+                        { backgroundColor: c },
+                        mine && styles.swatchMine,
+                        taken && styles.swatchTaken,
+                      ]}
+                      hitSlop={2}
+                    />
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -347,12 +392,33 @@ const makeStyles = (t) => ({
     textAlign: 'center',
     paddingVertical: 10,
   },
-  colorRow: {
+  colorBlock: { marginTop: 18, alignItems: 'center' },
+  colorTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(0,198,255,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  triggerSwatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 0 },
+  colorTriggerText: {
+    color: theme.colors.vibeBlue,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  // 4 x 34 swatches + 3 x 10 gaps = 166. Fixed so the last row of four
+  // sits under the first rather than centring on its own.
+  colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
+    width: 166,
     gap: 10,
-    marginTop: 18,
+    marginTop: 12,
   },
   swatch: {
     width: 34,

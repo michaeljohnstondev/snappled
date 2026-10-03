@@ -14,15 +14,39 @@ import theme from '../theme/themes';
 // Distinct hues only. vibeCyan/Aqua/Teal used to be in here and were
 // near-duplicates of vibeBlue, which made adjacent players hard to tell
 // apart at a glance - the entire job of this list.
+//
+// APPEND ONLY. colorIndex is stored on every player document, so this is
+// not a list you can reorder or insert into: moving an entry repaints
+// everyone who had picked that slot, including in games already running.
+// New colours go on the end.
+//
+// Sixteen, so the picker reads as a 4x4 block rather than a ragged row.
+// Sixteen is also about where genuinely separable hues run out - the
+// second eight lean on lightness as much as hue (pale violet against
+// deep purple, pale pink against magenta), because "tell two players
+// apart at a glance" is the only thing this list has to do and twenty-
+// five near-identical neons would do it worse than sixteen honest ones.
 export const PLAYER_PALETTE = [
-  theme.colors.vibeBlue,
-  theme.colors.vibePurple,
-  theme.colors.vibePink,
-  theme.colors.vibeYellow,
-  theme.colors.vibeElectricBlue,
-  theme.colors.vibeRed,
-  theme.colors.vibeTurquoise,
-  theme.colors.vibeRoyalBlue,
+  // The original eight. Their positions are load-bearing.
+  theme.colors.vibeBlue,          //  0  sky blue
+  theme.colors.vibePurple,        //  1  deep purple
+  theme.colors.vibePink,          //  2  magenta
+  theme.colors.vibeYellow,        //  3  gold
+  theme.colors.vibeElectricBlue,  //  4  electric blue
+  theme.colors.vibeRed,           //  5  red
+  theme.colors.vibeTurquoise,     //  6  turquoise
+  theme.colors.vibeRoyalBlue,     //  7  royal blue
+  // Added for the 4x4 picker. Literals rather than theme references
+  // where the theme has no matching accent - a player colour is its own
+  // concern and does not need a token the rest of the app never reads.
+  theme.colors.vibeGreen,         //  8  neon green
+  '#FF7A00',                      //  9  orange
+  '#C2FF00',                      // 10  lime
+  '#FF0080',                      // 11  rose
+  '#B388FF',                      // 12  pale violet
+  '#FF9EB5',                      // 13  pale pink
+  '#8D99AE',                      // 14  slate
+  '#FFFFFF',                      // 15  white
 ];
 
 /**

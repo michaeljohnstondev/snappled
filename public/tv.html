@@ -194,9 +194,15 @@ function renderQr() {
  * Kept as literals rather than imported: this page loads no bundle.
  * If the palette changes in themes.js, change it here too.
  */
+// Mirrors PLAYER_PALETTE in src/lib/playerColors.js, written out as
+// literals because this page loads no bundle. Append only - colorIndex
+// is stored per player, so the order is load-bearing. Change one list,
+// change the other.
 const PLAYER_COLORS = [
   '#00C6FF', '#6B00CC', '#FF10F0', '#FFD700',
   '#007FFF', '#FF4444', '#40E0D0', '#4169E1',
+  '#00FF41', '#FF7A00', '#C2FF00', '#FF0080',
+  '#B388FF', '#FF9EB5', '#8D99AE', '#FFFFFF',
 ];
 
 const PHASE_LABEL = {
